@@ -1,0 +1,21 @@
+{
+  "general": {
+    "taxIntervalHours": 24,
+    "maxPlayerRoles": 3,
+    "enableDebugLogging": false
+  },
+  "defense": {
+    "patrolCooldownMinutes": 30,
+    "maxActiveThreats": 5,
+    "autoTurretEnabled": true
+  },
+  "quests": {
+    "dailyQuestLimit": 3,
+    "difficultyScaling": 1.25,
+    "expireAfterDays": 7
+  },
+  "logging": {
+    "aiDebugLevel": "WARN",
+    "systemEventsLevel": "INFO"
+  }
+}

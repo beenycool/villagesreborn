@@ -1,0 +1,6 @@
+Texture Instructions:
+1. Create a 16x16 PNG texture for the Return to Bed Potion
+2. Save it as 'return_to_bed_potion.png' in this directory
+3. Suggested design: A potion bottle with a bed icon
+4. Use the Minecraft texture style (16x16 pixels, 32-bit color with transparency)
+5. Recommended tools: Aseprite, Photoshop, or any image editor

@@ -1,0 +1,7 @@
+{
+  "item.villagesreborn.return_to_bed_potion": "Return to Bed Potion",
+  "tooltip.villagesreborn.return_to_bed_potion": "Right-click to teleport to bed. Works during night or thunderstorms.",
+  "quest.button.accept": "Accept Quest (X to view details)",
+  "quest.button.complete": "Complete Quest (Hold Shift for rewards)",
+  "config.villagesreborn.title": "Villages Reborn Settings"
+}

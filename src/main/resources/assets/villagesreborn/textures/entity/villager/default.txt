@@ -1,0 +1,2 @@
+This is a placeholder text file for the default villager skin. 
+Replace this with the actual default.png texture file.

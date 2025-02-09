@@ -1,0 +1,2 @@
+This is a placeholder text file for the trader villager skin. 
+Replace this with the actual trader.png texture file.

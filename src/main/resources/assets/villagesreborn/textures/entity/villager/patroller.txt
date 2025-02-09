@@ -1,0 +1,2 @@
+This is a placeholder text file for the patroller villager skin. 
+Replace this with the actual patroller.png texture file.
