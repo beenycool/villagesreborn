@@ -7,6 +7,8 @@ import org.lwjgl.opencl.CLPlatform;
 import org.lwjgl.cuda.CUDA;
 
 public class HardwareChecker {
+    public static PerformanceRating currentRating;
+    
     private static final Logger LOGGER = LogManager.getLogger();
     private static final long RAM_THRESHOLD_LOW = 4096; // 4GB
     private static final long RAM_THRESHOLD_HIGH = 16384; // 16GB
@@ -16,9 +18,9 @@ public class HardwareChecker {
     private static final long GPU_THRESHOLD_HIGH = 8192; // 8GB
 
     public enum PerformanceRating {
-        LOW("Low", "May experience performance issues - consider upgrading hardware", 0.5f),
-        MEDIUM("Medium", "Adequate for basic village operations", 0.75f),
-        HIGH("High", "Optimal for advanced village features", 1.0f);
+        LOW("Low", "May experience performance issues - Consider reducing render distance\nLower entity processing limits applied", 0.5f),
+        MEDIUM("Medium", "Adequate for basic operations\nModerate caching strategy enabled", 0.75f),
+        HIGH("High", "Optimal for advanced features\nAggressive caching enabled", 1.0f);
 
         public final String displayName;
         public final String advisory;
@@ -32,12 +34,41 @@ public class HardwareChecker {
     }
 
     public static PerformanceRating getPerformanceRating() {
-        LOGGER.debug("Performing hardware check...");
-        boolean result = getAvailableRAM() < MIN_RAM ||
-                        getAvailableCPUCores() < MIN_CORES ||
-                        getGPUMemory() < MIN_GPU_MEM;
-        LOGGER.info("Low-end system detected: {}", result);
-        return result;
+        LOGGER.debug("Calculating system performance rating...");
+        
+        // Get raw metrics
+        long ramMB = getAvailableRAM();
+        int cpuCores = getAvailableCPUCores();
+        long gpuMB = getGPUMemory();
+
+        // Calculate component scores (0-1 range)
+        float ramScore = Math.min((ramMB - RAM_THRESHOLD_LOW) / (float)(RAM_THRESHOLD_HIGH - RAM_THRESHOLD_LOW), 1.0f);
+        float cpuScore = Math.min((cpuCores - CPU_THRESHOLD_LOW) / (float)(CPU_THRESHOLD_HIGH - CPU_THRESHOLD_LOW), 1.0f);
+        float gpuScore = Math.min((gpuMB - GPU_THRESHOLD_LOW) / (float)(GPU_THRESHOLD_HIGH - GPU_THRESHOLD_LOW), 1.0f);
+
+        // Weighted overall score
+        float overallScore = (ramScore * 0.4f) + (cpuScore * 0.3f) + (gpuScore * 0.3f);
+
+        PerformanceRating rating;
+        if (overallScore < 0.5f) {
+            rating = PerformanceRating.LOW;
+        } else if (overallScore < 0.8f) {
+            rating = PerformanceRating.MEDIUM;
+        } else {
+            rating = PerformanceRating.HIGH;
+        }
+
+        LOGGER.info("System performance rating: {} (RAM: {}MB, CPU: {} cores, GPU: {}MB)",
+            rating.displayName, ramMB, cpuCores, gpuMB);
+        
+        // Dispatch system performance notification
+        com.villagesreborn.beeny.systems.events.EventDispatcher.dispatchPerformanceEvent(
+            rating.displayName,
+            rating.advisory,
+            rating.performanceFactor
+        );
+        
+        return rating;
     }
 
     public static String getAccelerationMode() {
@@ -105,5 +136,5 @@ public class HardwareChecker {
         }
 
         LOGGER.warn("Failed to detect GPU memory, using default");
-        return 2048; // Fallback value
+        return 512; // Conservative fallback value
     }

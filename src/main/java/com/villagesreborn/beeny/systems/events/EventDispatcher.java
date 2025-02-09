@@ -7,6 +7,19 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class EventDispatcher {
+    public static void dispatchPerformanceEvent(String ratingName, String advisory, float performanceFactor) {
+        // Implementation would use Minecraft's notification system
+        MinecraftClient.getInstance().inGameHud.setOverlayMessage(
+            Component.literal("System Rating: " + ratingName + " - " + advisory),
+            false
+        );
+        
+        // Send network packet to sync with server-side systems
+        ClientPlayNetworking.send(
+            new Identifier("villagesreborn", "performance_rating"),
+            new PerformanceRatingPayload(performanceFactor).toPacketByteBuf()
+        );
+    }
     private static final Map<Class<?>, List<Consumer<?>>> handlers = new HashMap<>();
 
     public static <T> void registerHandler(Class<T> eventType, Consumer<T> handler) {

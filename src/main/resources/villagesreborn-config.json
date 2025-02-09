@@ -1,4 +1,4 @@
-{
+- {
   "roleWeights": {
     "trader": 0.4,
     "builder": 0.3,
@@ -26,5 +26,28 @@
   "logging": {
     "aiDebugLevel": "WARN",
     "systemEventsLevel": "INFO"
+  },
+  "performance": {
+    "enableHardwareDetection": true,
+    "maxCachedEntities": {
+      "base": 50,
+      "multipliers": {
+        "LOW": 0.5,
+        "MEDIUM": 0.75,
+        "HIGH": 1.0
+      }
+    },
+    "autoAdjustSettings": true
+  },
+  "communication": {
+    "villagerChatRadius": 32.0,
+    "enableProximityFiltering": true
+  },
+  "world": {
+    "dimensionSpawning": {
+      "overworld": true,
+      "nether": false,
+      "end": false
+    }
   }
 }
