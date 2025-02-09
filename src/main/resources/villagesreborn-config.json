@@ -1,4 +1,13 @@
 {
+  "roleWeights": {
+    "trader": 0.4,
+    "builder": 0.3,
+    "defender": 0.2,
+    "patroller": 0.1
+  },
+  "debugMode": false,
+  "maxVillagersPerPlayer": 10,
+  "defaultSkin": "default",
   "general": {
     "taxIntervalHours": 24,
     "maxPlayerRoles": 3,
