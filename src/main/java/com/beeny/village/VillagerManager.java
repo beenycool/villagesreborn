@@ -1,6 +1,7 @@
 package com.beeny.village;
 
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -8,6 +9,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.minecraft.server.MinecraftServer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +25,7 @@ public class VillagerManager {
     private final Map<BlockPos, SpawnRegion> spawnRegions;
     private final NameGenerator nameGenerator;
     private final Random random;
+    private final Map<UUID, Relationship> relationships = new ConcurrentHashMap<>();
     private World world;
     private String culture;
 
@@ -33,12 +37,45 @@ public class VillagerManager {
         this.world = null; // Initialize world to null
     }
 
+    public void addRelationship(UUID villager1, UUID villager2, String type) {
+        Relationship relationship = new Relationship(villager1, villager2, type);
+        relationships.put(villager1, relationship);
+        relationships.put(villager2, relationship);
+    }
+
+    public Relationship getRelationship(UUID villager1, UUID villager2) {
+        return relationships.get(villager1);
+    }
+
+    public int getRelationshipCount(UUID villagerUUID) {
+        return (int) relationships.entrySet().stream()
+            .filter(entry -> entry.getValue().getVillager1().equals(villagerUUID) ||
+                           entry.getValue().getVillager2().equals(villagerUUID))
+            .count();
+    }
+
     public VillagerManager(World world) {
         this.world = world;
         this.villagerAIs = new ConcurrentHashMap<>();
         this.spawnRegions = new HashMap<>();
         this.nameGenerator = new NameGenerator();
         this.random = new Random();
+    }
+
+    public void updateVillagerActivities(ServerWorld world) {
+        MoodManager moodManager = MoodManager.getInstance();
+        for (VillagerAI ai : villagerAIs.values()) {
+            ai.updateActivityBasedOnTime(world);
+            moodManager.updateVillagerMood(ai, world);
+        }
+    }
+
+    public void registerTickEvent(MinecraftServer server) {
+        ServerTickEvents.END_SERVER_TICK.register(server1 -> {
+            for (ServerWorld world : server.getWorlds()) {
+                updateVillagerActivities(world);
+            }
+        });
     }
 
     public static VillagerManager getInstance() {
