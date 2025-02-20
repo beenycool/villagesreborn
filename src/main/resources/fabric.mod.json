@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "villagesreborn",
-  "version": "1.0.0",
+  "version": "0.1.0-alpha",
   "name": "Villages Reborn",
   "description": "A comprehensive village overhaul mod with enhanced villager AI and cultural variations.",
   "authors": [
     "Beeny"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "homepage": "https://modrinth.com/mod/villages-reborn",
+    "sources": "https://github.com/beeny/villages-reborn"
   },
   "license": "MIT",
   "icon": "assets/villagesreborn/icon.png",

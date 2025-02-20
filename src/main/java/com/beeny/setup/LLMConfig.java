@@ -25,7 +25,7 @@ public class LLMConfig {
     @Expose private int contextLength = 2048;
     @Expose private double temperature = 0.7;
     @Expose private boolean useGPU = false;
-    private boolean setupComplete;
+    @Expose private boolean setupComplete = false;
 
     public LLMConfig() {
         this.configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE);
@@ -33,11 +33,10 @@ public class LLMConfig {
             .excludeFieldsWithoutExposeAnnotation()
             .setPrettyPrinting()
             .create();
-        this.setupComplete = false;
     }
 
     public void initialize(SystemSpecs specs) {
-        // Configure based on system specs
+        LOGGER.info("Initializing LLM configuration with system specs");
         useGPU = specs.hasGpuSupport();
         
         // Adjust context length based on available RAM
@@ -49,6 +48,7 @@ public class LLMConfig {
             contextLength = 1024;
         }
 
+        LOGGER.info("Initialized with: contextLength={}, useGPU={}", contextLength, useGPU);
         saveConfig();
     }
 
@@ -72,7 +72,7 @@ public class LLMConfig {
         }
     }
 
-    private void saveConfig() {
+    public void saveConfig() {
         try {
             String json = gson.toJson(this);
             Files.writeString(configPath, json);
@@ -146,6 +146,11 @@ public class LLMConfig {
 
     public void setSetupComplete(boolean setupComplete) {
         this.setupComplete = setupComplete;
+        saveConfig();
+    }
+
+    public void setUseGPU(boolean useGPU) {
+        this.useGPU = useGPU;
         saveConfig();
     }
 }

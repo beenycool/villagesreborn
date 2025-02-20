@@ -27,9 +27,10 @@ public class SpawnRegion {
     public SpawnRegion(BlockPos center, int radius, String culture) {
         this.center = center;
         this.radius = radius;
-        this.culture = culture;
+        this.culture = culture.toLowerCase();
         this.pointsOfInterest = new HashSet<>();
         this.random = new Random();
+        LOGGER.info("Creating new {} village region at {} with radius {}", culture, center, radius);
     }
 
     public void addPointOfInterest(BlockPos pos) {
@@ -108,10 +109,18 @@ public class SpawnRegion {
     }
 
     public void generateVillage(World world) {
-        LOGGER.info("Generating village at {}", center);
+        LOGGER.info("Generating {} village at {}", culture, center);
         
-        // Default village generation
-        generateRomanVillage(world);
+        switch (culture) {
+            case "roman" -> generateRomanVillage(world);
+            case "egyptian" -> generateEgyptianVillage(world);
+            case "victorian" -> generateVictorianVillage(world);
+            case "nyc" -> generateNYCVillage(world);
+            default -> {
+                LOGGER.warn("Unknown culture type: '{}', defaulting to Roman village", culture);
+                generateRomanVillage(world);
+            }
+        }
     }
 
     private void generateRomanVillage(World world) {

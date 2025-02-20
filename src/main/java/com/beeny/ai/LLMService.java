@@ -12,25 +12,37 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-    private static final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .build();
-    private static final Gson gson = new Gson();
+    private static final int MAX_RETRIES = 3;
+    private static final int THREAD_POOL_SIZE = 4;
     
     private static LLMService instance;
     private final LLMConfig config;
+    private final OkHttpClient client;
+    private final Gson gson;
+    private final ExecutorService executor;
+    private final Map<String, String> responseCache;
 
     private LLMService(LLMConfig config) {
         this.config = config;
+        this.gson = new Gson();
+        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
+            Thread t = new Thread(r, "LLM-Worker");
+            t.setDaemon(true);
+            return t;
+        });
+        this.responseCache = new ConcurrentHashMap<>();
+        
+        this.client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build();
     }
 
     public static LLMService getInstance() {
@@ -41,32 +53,71 @@ public class LLMService {
     }
 
     public static void initialize(LLMConfig config) {
-        instance = new LLMService(config);
+        synchronized (LLMService.class) {
+            if (instance != null) {
+                instance.shutdown();
+            }
+            instance = new LLMService(config);
+        }
+    }
+
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     public CompletableFuture<String> generateResponse(String prompt) {
+        String cachedResponse = responseCache.get(prompt);
+        if (cachedResponse != null) {
+            return CompletableFuture.completedFuture(cachedResponse);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
-                switch (config.getProvider().toLowerCase()) {
-                    case "openai" -> {
-                        String response = callOpenAI(prompt);
-                        return extractResponseFromOpenAI(response);
-                    }
-                    case "anthropic" -> {
-                        String response = callAnthropic(prompt);
-                        return extractResponseFromAnthropic(response);
-                    }
-                    case "local" -> {
-                        String response = callLocalModel(prompt);
-                        return extractResponseFromLocal(response);
-                    }
+                String response = switch (config.getProvider().toLowerCase()) {
+                    case "openai" -> retryWithBackoff(() -> callOpenAI(prompt));
+                    case "anthropic" -> retryWithBackoff(() -> callAnthropic(prompt));
+                    case "local" -> retryWithBackoff(() -> callLocalModel(prompt));
                     default -> throw new IllegalStateException("Unsupported LLM provider: " + config.getProvider());
+                };
+
+                if (response != null) {
+                    responseCache.put(prompt, response);
                 }
+                return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response", e);
                 return "I apologize, but I'm having trouble processing your request at the moment.";
             }
-        });
+        }, executor);
+    }
+
+    private String retryWithBackoff(Callable<String> operation) throws Exception {
+        int retryCount = 0;
+        Exception lastException = null;
+
+        while (retryCount < MAX_RETRIES) {
+            try {
+                return operation.call();
+            } catch (IOException e) {
+                lastException = e;
+                retryCount++;
+                if (retryCount < MAX_RETRIES) {
+                    long backoffMs = (long) (Math.pow(2, retryCount) * 1000 + Math.random() * 1000);
+                    LOGGER.warn("Request failed, retrying in {} ms (attempt {}/{}): {}", 
+                        backoffMs, retryCount, MAX_RETRIES, e.getMessage());
+                    Thread.sleep(backoffMs);
+                }
+            }
+        }
+        throw new IOException("Failed after " + MAX_RETRIES + " attempts", lastException);
     }
 
     private String callOpenAI(String prompt) throws IOException {
@@ -80,7 +131,9 @@ public class LLMService {
         requestBody.put("temperature", config.getTemperature());
         requestBody.put("max_tokens", config.getContextLength());
 
-        return makeHttpRequest(config.getEndpoint() + "/chat/completions", gson.toJson(requestBody), config.getApiKey());
+        String response = makeHttpRequest(config.getEndpoint() + "/chat/completions", 
+            gson.toJson(requestBody), config.getApiKey());
+        return extractResponseFromOpenAI(response);
     }
 
     private String callAnthropic(String prompt) throws IOException {
@@ -90,7 +143,9 @@ public class LLMService {
         requestBody.put("max_tokens_to_sample", config.getContextLength());
         requestBody.put("temperature", config.getTemperature());
 
-        return makeHttpRequest(config.getEndpoint() + "/messages", gson.toJson(requestBody), config.getApiKey());
+        String response = makeHttpRequest(config.getEndpoint() + "/messages", 
+            gson.toJson(requestBody), config.getApiKey());
+        return extractResponseFromAnthropic(response);
     }
 
     private String callLocalModel(String prompt) throws IOException {
@@ -99,7 +154,9 @@ public class LLMService {
         requestBody.put("prompt", prompt);
         requestBody.put("stream", false);
 
-        return makeHttpRequest(config.getEndpoint() + "/api/generate", gson.toJson(requestBody), null);
+        String response = makeHttpRequest(config.getEndpoint() + "/api/generate", 
+            gson.toJson(requestBody), null);
+        return extractResponseFromLocal(response);
     }
 
     private String makeHttpRequest(String url, String jsonInput, String apiKey) throws IOException {
@@ -113,11 +170,13 @@ public class LLMService {
         }
 
         try (Response response = client.newCall(requestBuilder.build()).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("Unexpected response code: " + response.code());
-            }
             ResponseBody responseBody = response.body();
-            return responseBody != null ? responseBody.string() : "";
+            if (!response.isSuccessful() || responseBody == null) {
+                String errorBody = responseBody != null ? responseBody.string() : "No response body";
+                throw new IOException(String.format("Request failed with code %d: %s", 
+                    response.code(), errorBody));
+            }
+            return responseBody.string();
         }
     }
 
@@ -129,8 +188,8 @@ public class LLMService {
             JsonObject message = firstChoice.getAsJsonObject("message");
             return message.get("content").getAsString();
         } catch (Exception e) {
-            LOGGER.error("Error extracting OpenAI response", e);
-            return "Error processing response";
+            LOGGER.error("Error extracting OpenAI response: {}", response, e);
+            throw new RuntimeException("Failed to parse OpenAI response", e);
         }
     }
 
@@ -141,8 +200,8 @@ public class LLMService {
             JsonObject firstContent = content.get(0).getAsJsonObject();
             return firstContent.get("text").getAsString();
         } catch (Exception e) {
-            LOGGER.error("Error extracting Anthropic response", e);
-            return "Error processing response";
+            LOGGER.error("Error extracting Anthropic response: {}", response, e);
+            throw new RuntimeException("Failed to parse Anthropic response", e);
         }
     }
 
@@ -151,8 +210,8 @@ public class LLMService {
             JsonObject jsonResponse = gson.fromJson(response, JsonObject.class);
             return jsonResponse.get("response").getAsString();
         } catch (Exception e) {
-            LOGGER.error("Error extracting local model response", e);
-            return "Error processing response";
+            LOGGER.error("Error extracting local model response: {}", response, e);
+            throw new RuntimeException("Failed to parse local model response", e);
         }
     }
 }
