@@ -180,9 +180,8 @@ public class VillageEventManager {
             .average()
             .orElse(0);
             
-        return new BlockPos(avgX, 
-            world.getTopY(world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, (int)avgX, (int)avgZ)), 
-            avgZ);
+        int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, (int)avgX, (int)avgZ);
+        return new BlockPos((int)avgX, y, (int)avgZ);
     }
 
     private List<VillagerAI> getVillagersInRegion(SpawnRegion region) {

@@ -358,7 +358,7 @@ public class VillagerAI {
         StringBuilder context = new StringBuilder(region.getCulture());
         
         // Add active cultural events
-        List<VillagerManager.CulturalEvent> events = vm.getCurrentEvents(villager.getBlockPos());
+        List<VillagerManager.CulturalEvent> events = vm.getCurrentEvents(villager.getBlockPos(), (ServerWorld)villager.getWorld());
         if (!events.isEmpty()) {
             context.append(" (").append(events.get(0).name).append(" ongoing)");
         }
