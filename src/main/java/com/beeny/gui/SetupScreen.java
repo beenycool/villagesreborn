@@ -1,17 +1,37 @@
 package com.beeny.gui;
 
+import com.beeny.setup.ModelDownloader;
+import com.beeny.setup.SystemSpecs;
+import com.beeny.setup.SystemSpecs.SystemTier;
 import com.beeny.setup.LLMConfig;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.text.Text;
+import net.fabricmc.loader.api.FabricLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.text.Text;
 import java.util.List;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+
 public class SetupScreen extends Screen {
+    private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final LLMConfig llmConfig;
+    private final AnimationRenderer animationRenderer = new AnimationRenderer();
+    private boolean uiInitialized = false;
+
+    // UI positioning
+    private int leftX, fieldWidth, fieldHeight, padding, currentY;
+
     private TextFieldWidget apiKeyField;
     private TextFieldWidget endpointField;
     private CyclingButtonWidget<String> modelTypeButton;
@@ -28,13 +48,98 @@ public class SetupScreen extends Screen {
     }
 
     @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        renderBackground(context, mouseX, mouseY, delta);
+        if (!animationRenderer.isComplete()) {
+            animationRenderer.render(context, width, height);
+            animationRenderer.tick();
+        } else {
+            // Draw title
+            context.drawCenteredTextWithShadow(textRenderer, this.title, width / 2, 20, 0xFFFFFF);
+            super.render(context, mouseX, mouseY, delta);
+        }
+    }
+
+    @Override
     protected void init() {
-        super.init();
-        int leftX = width / 2 - 100;
-        int fieldWidth = 200;
-        int fieldHeight = 20;
-        int padding = 24;
-        int currentY = 50;
+        if (!animationRenderer.isComplete()) {
+            // Wait for animation to complete
+            return;
+        }
+        if (uiInitialized) return;
+        uiInitialized = true;
+
+        leftX = width / 2 - 100;
+        fieldWidth = 200;
+        fieldHeight = 20;
+        padding = 24;
+        currentY = 50;
+
+        // Display hardware info
+        SystemSpecs specs = com.beeny.Villagesreborn.getSystemSpecs();
+        Map<String, String> gpu = specs.getGpuInfo();
+        String hardwareText = String.format("CPU: %d cores, RAM: %d MB, GPU: %s",
+                specs.getCpuThreads(), specs.getAvailableRam(), gpu.getOrDefault("renderer", "Unknown"));
+
+        // Display hardware info as plain text; here we assume a simple method addRenderableText exists
+        addDrawableChild(ButtonWidget.builder(Text.literal("Hardware: " + hardwareText), (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        currentY += padding;
+
+        // Determine recommended model based on system tier
+        String recommendedModel;
+        int modelSize;
+        SystemTier tier = specs.getSystemTier();
+        switch (tier) {
+            case HIGH:
+                recommendedModel = "advanced_model.bin";
+                modelSize = 500;
+                break;
+            case MEDIUM:
+                recommendedModel = "standard_model.bin";
+                modelSize = 200;
+                break;
+            default:
+                recommendedModel = "basic_model.bin";
+                modelSize = 50;
+                break;
+        }
+        
+        // Display recommended model info
+        Text recommendationText = Text.literal("Recommended AI Model: " + recommendedModel + " (" + modelSize + " MB)");
+        addDrawableChild(ButtonWidget.builder(recommendationText, (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        currentY += padding;
+
+        // Download prompt
+        addDrawableChild(ButtonWidget.builder(Text.literal("Download this model to enhance villager AI?"), (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        currentY += padding;
+
+        // Yes, Download button
+        ButtonWidget downloadButton = ButtonWidget.builder(Text.literal("Yes, Download"), (button) -> {
+            // For demo purposes, use a dummy expected hash; in production, use real hash
+            String expectedHash = "dummyhash";
+            ModelDownloader.downloadModel(recommendedModel, expectedHash, progress -> {
+                LOGGER.info("Download progress: {}%", progress * 100);
+            }).thenAccept(modelPath -> {
+                llmConfig.setModelType(recommendedModel);
+                llmConfig.setSetupComplete(true);
+                llmConfig.saveConfig();
+                close();
+            }).exceptionally(e -> {
+                LOGGER.error("Download failed", e);
+                useDefaultModel();
+                return null;
+            });
+        }).dimensions(leftX, currentY, fieldWidth / 2 - 2, fieldHeight).build();
+        addDrawableChild(downloadButton);
+
+        // No, Use Default button
+        ButtonWidget declineButton = ButtonWidget.builder(Text.literal("No, Use Default"), (button) -> {
+            useDefaultModel();
+            close();
+        }).dimensions(leftX + fieldWidth / 2 + 2, currentY, fieldWidth / 2 - 2, fieldHeight).build();
+        addDrawableChild(declineButton);
+
+        currentY += padding;
 
         // API Key
         apiKeyField = new TextFieldWidget(textRenderer, leftX, currentY, fieldWidth, fieldHeight, Text.empty());
@@ -121,21 +226,29 @@ public class SetupScreen extends Screen {
         llmConfig.setSetupComplete(true);
     }
 
-    @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
-        
-        // Draw labels
-        int labelX = width / 2 - 100;
-        context.drawTextWithShadow(textRenderer, Text.literal("API Key:"), labelX, 40, 0xFFFFFF);
-        context.drawTextWithShadow(textRenderer, Text.literal("Endpoint:"), labelX, 84, 0xFFFFFF);
-        
-        super.render(context, mouseX, mouseY, delta);
+    private void useDefaultModel() {
+        Path defaultPath = FabricLoader.getInstance().getConfigDir()
+                .resolve("villagesreborn/models/basic_model.bin");
+        try {
+            Files.createDirectories(defaultPath.getParent());
+            try (InputStream is = getClass().getResourceAsStream("/models/basic_model.bin");
+                 OutputStream os = Files.newOutputStream(defaultPath)) {
+                if (is != null) {
+                    is.transferTo(os);
+                } else {
+                    LOGGER.error("Default model resource not found");
+                }
+            }
+            llmConfig.setModelType("basic_model.bin");
+            llmConfig.setSetupComplete(true);
+            llmConfig.saveConfig();
+        } catch (IOException e) {
+            LOGGER.error("Failed to copy default model", e);
+        }
     }
 
     @Override
     public boolean shouldPause() {
-        return true;
+        return false;
     }
 }

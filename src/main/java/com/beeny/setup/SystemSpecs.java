@@ -1,13 +1,12 @@
 package com.beeny.setup;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.sun.management.OperatingSystemMXBean;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.opengl.GL11;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.management.ManagementFactory;
+import com.sun.management.OperatingSystemMXBean;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,6 +20,11 @@ public class SystemSpecs {
     private int cpuThreads;
     private boolean gpuSupport;
     private Map<String, String> gpuInfo;
+    private SystemTier systemTier;
+
+    public enum SystemTier {
+        HIGH, MEDIUM, LOW
+    }
 
     public void analyzeSystem() {
         LOGGER.info("Analyzing system specifications...");
@@ -46,6 +50,7 @@ public class SystemSpecs {
 
         // Check GPU capabilities
         analyzeGPUCapabilities();
+        determineSystemTier();
     }
 
     private void analyzeGPUCapabilities() {
@@ -104,6 +109,39 @@ public class SystemSpecs {
         } else {
             LOGGER.warn("No dedicated GPU detected or using basic graphics");
         }
+    }
+
+    private void determineSystemTier() {
+        if (cpuThreads >= 8 && availableRam >= 16384 && isHighEndGpu()) {
+            systemTier = SystemTier.HIGH;
+        } else if (cpuThreads >= 4 && availableRam >= 8192 && isMidRangeGpu()) {
+            systemTier = SystemTier.MEDIUM;
+        } else {
+            systemTier = SystemTier.LOW;
+        }
+        LOGGER.info("System determined to be {} tier", systemTier);
+    }
+
+    private boolean isHighEndGpu() {
+        String renderer = gpuInfo.get("renderer");
+        if (renderer == null) return false;
+        return renderer.contains("RTX") || 
+               renderer.contains("RX 6") || 
+               renderer.contains("RX 7") ||
+               renderer.contains("Arc");
+    }
+
+    private boolean isMidRangeGpu() {
+        String renderer = gpuInfo.get("renderer");
+        if (renderer == null) return false;
+        return renderer.contains("GTX") || 
+               renderer.contains("RX 5") ||
+               renderer.contains("Iris") ||
+               renderer.contains("Vega");
+    }
+
+    public SystemTier getSystemTier() {
+        return systemTier;
     }
 
     public long getTotalRam() {

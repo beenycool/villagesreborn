@@ -1,28 +1,38 @@
 package com.beeny.ai;
 
+import com.beeny.setup.LLMConfig;
+import net.fabricmc.loader.api.FabricLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.Map;
 import java.util.HashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.beeny.setup.LLMConfig;
 
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
-    private static final LLMService INSTANCE = new LLMService();
+    private static LLMService instance;
     private static final int MAX_RETRIES = 3;
     private final Map<String, String> contextCache = new HashMap<>();
-    private LLMConfig config; // Add field to store configuration
+    private LLMConfig config;
 
     private LLMService() {}
 
     public static LLMService getInstance() {
-        return INSTANCE;
+        if (instance == null) {
+            instance = new LLMService();
+        }
+        return instance;
     }
 
-    // Add initialize method
     public void initialize(LLMConfig config) {
         this.config = config;
+        Path modelPath = FabricLoader.getInstance().getConfigDir()
+                .resolve("villagesreborn/models/" + config.getModelType());
+        LOGGER.info("Loading AI model from: {}", modelPath.toAbsolutePath());
+        // Add logic to load the model file based on the model path
+        // e.g., initialize model parameters, allocate resources etc.
         LOGGER.info("LLMService initialized with config: modelType={}", config.getModelType());
     }
 
@@ -57,10 +67,8 @@ public class LLMService {
     private CompletableFuture<String> callLLMWithRetry(String prompt, int retryCount) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Use config settings if available
                 if (config != null) {
                     LOGGER.debug("Using model: {}", config.getModelType());
-                    // Placeholder: Implement actual LLM call using config
                 }
                 return "Generated response"; // Placeholder
             } catch (Exception e) {
@@ -80,7 +88,6 @@ public class LLMService {
         return key.toString();
     }
 
-    // Add shutdown method (for error #2)
     public void shutdown() {
         LOGGER.info("Shutting down LLMService");
         contextCache.clear();
