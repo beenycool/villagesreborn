@@ -14,6 +14,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+import java.util.Objects;
 
 public class SpawnRegion {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -21,16 +28,134 @@ public class SpawnRegion {
     private final BlockPos center;
     private final int radius;
     private final String culture;
-    private final Set<BlockPos> pointsOfInterest;
+    private final Set<BlockPos> pointsOfInterest = new HashSet<>();
+    private final Map<String, BlockPos> culturalStructures = new HashMap<>();
+    private final List<String> pendingConstructions = new ArrayList<>();
     private final Random random;
 
     public SpawnRegion(BlockPos center, int radius, String culture) {
         this.center = center;
         this.radius = radius;
         this.culture = culture.toLowerCase();
-        this.pointsOfInterest = new HashSet<>();
         this.random = new Random();
+        initializeCulturalStructures();
         LOGGER.info("Creating new {} village region at {} with radius {}", culture, center, radius);
+    }
+
+    private void initializeCulturalStructures() {
+        generateCulturalStructuresList().thenAccept(structures -> {
+            pendingConstructions.addAll(structures);
+            LOGGER.info("Generated {} cultural structures for {} village", structures.size(), culture);
+        });
+    }
+
+    private CompletableFuture<List<String>> generateCulturalStructuresList() {
+        String prompt = String.format(
+            "You are designing a Minecraft village based on %s culture.\n" +
+            "What are 4-6 key architectural structures that would define this village?\n" +
+            "Respond with building names only, one per line, no numbers or punctuation.",
+            culture
+        );
+
+        return LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenApply(response -> Arrays.asList(response.trim().split("\n")));
+    }
+
+    private CompletableFuture<BuildingTemplate> generateBuildingTemplate(String buildingName) {
+        String prompt = String.format(
+            "Design a %s building for a %s-style Minecraft village.\n" +
+            "Specify dimensions (width, length, height) and key architectural features.\n" +
+            "Respond in this format:\n" +
+            "WIDTH: (number)\n" +
+            "LENGTH: (number)\n" +
+            "HEIGHT: (number)\n" +
+            "MATERIALS: (list main Minecraft blocks to use)\n" +
+            "FEATURES: (list key architectural elements)",
+            buildingName, culture
+        );
+
+        return LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenApply(this::parseBuildingTemplate);
+    }
+
+    private static class BuildingTemplate {
+        final int width;
+        final int length;
+        final int height;
+        final List<Block> materials;
+        final List<String> features;
+
+        BuildingTemplate(int width, int length, int height, List<Block> materials, List<String> features) {
+            this.width = width;
+            this.length = length;
+            this.height = height;
+            this.materials = materials;
+            this.features = features;
+        }
+    }
+
+    private BuildingTemplate parseBuildingTemplate(String response) {
+        Map<String, String> params = Arrays.stream(response.split("\n"))
+            .map(line -> line.split(": "))
+            .filter(parts -> parts.length == 2)
+            .collect(Collectors.toMap(
+                parts -> parts[0],
+                parts -> parts[1]
+            ));
+
+        return new BuildingTemplate(
+            Integer.parseInt(params.getOrDefault("WIDTH", "5")),
+            Integer.parseInt(params.getOrDefault("LENGTH", "7")),
+            Integer.parseInt(params.getOrDefault("HEIGHT", "4")),
+            parseMaterials(params.getOrDefault("MATERIALS", "STONE")),
+            Arrays.asList(params.getOrDefault("FEATURES", "").split(", "))
+        );
+    }
+
+    private List<Block> parseMaterials(String materials) {
+        return Arrays.stream(materials.split(", "))
+            .map(this::getBlockFromName)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    }
+
+    private Block getBlockFromName(String name) {
+        // Convert common material names to Minecraft blocks
+        return switch(name.toLowerCase()) {
+            case "stone" -> Blocks.STONE;
+            case "wood" -> Blocks.OAK_PLANKS;
+            case "brick" -> Blocks.BRICKS;
+            case "sandstone" -> Blocks.SANDSTONE;
+            default -> Blocks.STONE;
+        };
+    }
+
+    public void tickConstruction(ServerWorld world) {
+        if (!pendingConstructions.isEmpty() && world.getRandom().nextFloat() < 0.05f) {
+            String structure = pendingConstructions.remove(0);
+            BlockPos pos = findBuildingLocation(world, structure);
+            if (pos != null) {
+                generateCulturalStructure(world, pos, structure);
+                culturalStructures.put(structure, pos);
+            }
+        }
+    }
+
+    private BlockPos findBuildingLocation(ServerWorld world, String structure) {
+        // Find suitable flat area within radius
+        // For now returns center + random offset
+        int offset = world.getRandom().nextInt(radius);
+        return center.add(offset, 0, offset);
+    }
+
+    private void generateCulturalStructure(ServerWorld world, BlockPos pos, String structure) {
+        String structurePath = String.format("villagesreborn:structures/%s/%s", 
+            culture.toLowerCase(), structure);
+            
+        // Structure generation placeholder - would use Structure system
+        LOGGER.info("Generating {} at {}", structurePath, pos);
     }
 
     public void addPointOfInterest(BlockPos pos) {
@@ -82,7 +207,11 @@ public class SpawnRegion {
     }
 
     public Set<BlockPos> getPointsOfInterest() {
-        return pointsOfInterest;
+        return Collections.unmodifiableSet(pointsOfInterest);
+    }
+
+    public Map<String, BlockPos> getCulturalStructures() {
+        return Collections.unmodifiableMap(culturalStructures);
     }
 
     public BlockPos getNearestPointOfInterest(BlockPos pos) {
@@ -109,18 +238,229 @@ public class SpawnRegion {
     }
 
     public void generateVillage(World world) {
-        LOGGER.info("Generating {} village at {}", culture, center);
-        
-        switch (culture) {
-            case "roman" -> generateRomanVillage(world);
-            case "egyptian" -> generateEgyptianVillage(world);
-            case "victorian" -> generateVictorianVillage(world);
-            case "nyc" -> generateNYCVillage(world);
-            default -> {
-                LOGGER.warn("Unknown culture type: '{}', defaulting to Roman village", culture);
-                generateRomanVillage(world);
+        LOGGER.info("Starting generation of {} village at {}", culture, center);
+
+        // First get the cultural layout plan
+        generateLayoutPlan()
+            .thenCompose(layout -> {
+                // Generate the village center first
+                String centerBuilding = (String) layout.get("CENTER");
+                return generateCulturalBuildingDescription(centerBuilding)
+                    .thenCompose(centerDesc -> {
+                        BlockPos centerPos = findBuildingLocation(world, centerBuilding);
+                        generateBuildingFromDescription(world, centerPos, centerDesc);
+
+                        // Then generate districts
+                        @SuppressWarnings("unchecked")
+                        List<String> districts = (List<String>) layout.get("DISTRICTS");
+                        List<CompletableFuture<Void>> districtFutures = new ArrayList<>();
+
+                        for (String district : districts) {
+                            districtFutures.add(generateDistrict(world, district, layout));
+                        }
+
+                        return CompletableFuture.allOf(districtFutures.toArray(new CompletableFuture[0]));
+                    });
+            })
+            .thenRun(() -> {
+                // Finally generate paths and decorations
+                generateCulturalPathways(world);
+                addCulturalDecorations(world);
+                LOGGER.info("Completed generation of {} village at {}", culture, center);
+            })
+            .exceptionally(e -> {
+                LOGGER.error("Error generating village: {}", e.getMessage());
+                return null;
+            });
+    }
+
+    private CompletableFuture<Void> generateDistrict(World world, String district, Map<String, Object> layout) {
+        String prompt = String.format(
+            "Design a %s district for a %s village in Minecraft.\n" +
+            "The village has a %s layout style.\n" +
+            "Describe:\n" +
+            "1. What buildings should be in this district\n" +
+            "2. How they should be arranged\n" +
+            "3. Special features or decorations\n" +
+            "Keep descriptions Minecraft-appropriate and buildable.",
+            district, culture, layout.get("LAYOUT")
+        );
+
+        return LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenAccept(description -> {
+                BlockPos districtPos = findDistrictLocation(world, district);
+                generateDistrictFromDescription(world, districtPos, description);
+            });
+    }
+
+    private void generateCulturalPathways(World world) {
+        String prompt = String.format(
+            "Design pathways for a %s village in Minecraft.\n" +
+            "What blocks and patterns would best represent %s pathways?\n" +
+            "Format response as:\n" +
+            "BLOCKS: (comma-separated list)\n" +
+            "PATTERN: (linear/winding/grid)\n" +
+            "FEATURES: (special features along paths)",
+            culture, culture
+        );
+
+        LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenAccept(response -> {
+                Map<String, String> pathDetails = parseResponse(response);
+                generatePathsFromDescription(world, pathDetails);
+            });
+    }
+
+    private void generatePathsFromDescription(World world, Map<String, String> pathDetails) {
+        List<Block> pathBlocks = Arrays.stream(pathDetails.get("BLOCKS").split(","))
+            .map(String::trim)
+            .map(this::getBlockFromName)
+            .collect(Collectors.toList());
+
+        String pattern = pathDetails.get("PATTERN");
+        List<BlockPos> pathPoints = getPathPoints(pattern);
+
+        for (BlockPos pathPos : pathPoints) {
+            Block block = pathBlocks.get(world.getRandom().nextInt(pathBlocks.size()));
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pathPos.getX(), pathPos.getZ());
+            world.setBlockState(new BlockPos(pathPos.getX(), y - 1, pathPos.getZ()), block.getDefaultState());
+        }
+    }
+
+    private List<BlockPos> getPathPoints(String pattern) {
+        List<BlockPos> points = new ArrayList<>();
+        Random random = new Random();
+
+        switch (pattern.toLowerCase()) {
+            case "grid" -> generateGridPaths(points);
+            case "winding" -> generateWindingPaths(points, random);
+            default -> generateLinearPaths(points);
+        }
+
+        return points;
+    }
+
+    private void generateGridPaths(List<BlockPos> points) {
+        int spacing = 10;
+        for (int x = -radius; x <= radius; x += spacing) {
+            for (int z = -radius; z <= radius; z++) {
+                points.add(center.add(x, 0, z));
             }
         }
+        for (int z = -radius; z <= radius; z += spacing) {
+            for (int x = -radius; x <= radius; x++) {
+                points.add(center.add(x, 0, z));
+            }
+        }
+    }
+
+    private void generateWindingPaths(List<BlockPos> points, Random random) {
+        double angle = 0;
+        double x = center.getX();
+        double z = center.getZ();
+
+        for (int i = 0; i < radius * 4; i++) {
+            points.add(new BlockPos((int)x, 0, (int)z));
+            angle += (random.nextDouble() - 0.5) * 0.5;
+            x += Math.cos(angle) * 2;
+            z += Math.sin(angle) * 2;
+        }
+    }
+
+    private void generateLinearPaths(List<BlockPos> points) {
+        for (int x = -radius; x <= radius; x++) {
+            points.add(center.add(x, 0, 0));
+        }
+        for (int z = -radius; z <= radius; z++) {
+            points.add(center.add(0, 0, z));
+        }
+    }
+
+    private Map<String, String> parseResponse(String response) {
+        return Arrays.stream(response.split("\n"))
+            .map(line -> line.split(": "))
+            .filter(parts -> parts.length == 2)
+            .collect(Collectors.toMap(
+                parts -> parts[0],
+                parts -> parts[1]
+            ));
+    }
+
+    private BlockPos findDistrictLocation(World world, String district) {
+        // Placeholder for finding district location logic
+        return center.add(random.nextInt(radius), 0, random.nextInt(radius));
+    }
+
+    private void generateDistrictFromDescription(World world, BlockPos pos, String description) {
+        // Placeholder for generating district from description
+        LOGGER.info("Generating {} district at {}", description, pos);
+    }
+
+    private void generateBuildingFromDescription(World world, BlockPos pos, List<String> description) {
+        // Placeholder for generating building from description
+        LOGGER.info("Generating building at {} with description: {}", pos, description);
+    }
+
+    private CompletableFuture<List<String>> generateCulturalBuildingDescription(String buildingName) {
+        String prompt = String.format(
+            "You are designing a %s building in a %s village in Minecraft.\n" +
+            "Consider local cultural adaptations and unique features.\n" +
+            "Describe:\n" +
+            "1. How this building would be uniquely %s in style\n" +
+            "2. What blocks and decorations would best represent this culture\n" +
+            "3. Special architectural features unique to this culture\n" +
+            "Keep each point brief and minecraft-realistic.",
+            buildingName, culture, culture
+        );
+
+        return LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenApply(response -> Arrays.asList(response.split("\n")));
+    }
+
+    private CompletableFuture<Map<String, Object>> generateLayoutPlan() {
+        String prompt = String.format(
+            "Design a village layout for a %s culture in Minecraft.\n" +
+            "Consider:\n" +
+            "1. How buildings should be arranged (grid/organic/hierarchical)\n" +
+            "2. Important cultural spaces and their placement\n" +
+            "3. How villagers would naturally move through this space\n" +
+            "Format response as:\n" +
+            "LAYOUT: (grid/organic/radial)\n" +
+            "CENTER: (main cultural building)\n" +
+            "DISTRICTS: (comma-separated list)\n" +
+            "PATHWAYS: (road style description)",
+            culture
+        );
+
+        return LLMService.getInstance()
+            .generateResponse(prompt)
+            .thenApply(this::parseLayoutResponse);
+    }
+
+    private Map<String, Object> parseLayoutResponse(String response) {
+        Map<String, String> params = Arrays.stream(response.split("\n"))
+            .map(line -> line.split(": "))
+            .filter(parts -> parts.length == 2)
+            .collect(Collectors.toMap(
+                parts -> parts[0],
+                parts -> parts[1]
+            ));
+
+        Map<String, Object> layout = new HashMap<>();
+        layout.put("LAYOUT", params.get("LAYOUT"));
+        layout.put("CENTER", params.get("CENTER"));
+        layout.put("DISTRICTS", Arrays.asList(params.get("DISTRICTS").split(", ")));
+        layout.put("PATHWAYS", params.get("PATHWAYS"));
+
+        return layout;
+    }
+
+    private void addCulturalDecorations(World world) {
+        // Placeholder for adding cultural decorations
+        LOGGER.info("Adding cultural decorations for {} village", culture);
     }
 
     private void generateRomanVillage(World world) {
