@@ -1,31 +1,31 @@
 package com.beeny.village;
 
-import java.util.UUID;
+import com.beeny.village.VillagerAI.RelationshipType;
 
 public class Relationship {
-    private final UUID villager1;
-    private final UUID villager2;
-    private String type;
-
-    public Relationship(UUID villager1, UUID villager2, String type) {
-        this.villager1 = villager1;
-        this.villager2 = villager2;
+    private RelationshipType type;
+    private long establishedTime;
+    private int interactionCount;
+    
+    public Relationship(RelationshipType type) {
         this.type = type;
+        this.establishedTime = System.currentTimeMillis();
+        this.interactionCount = 0;
     }
-
-    public UUID getVillager1() {
-        return villager1;
-    }
-
-    public UUID getVillager2() {
-        return villager2;
-    }
-
-    public String getType() {
+    
+    public RelationshipType getType() {
         return type;
     }
-
-    public void setType(String type) {
-        this.type = type;
+    
+    public long getEstablishedTime() {
+        return establishedTime;
+    }
+    
+    public int getInteractionCount() {
+        return interactionCount;
+    }
+    
+    public void incrementInteractions() {
+        interactionCount++;
     }
 }

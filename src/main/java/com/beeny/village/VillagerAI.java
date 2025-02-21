@@ -3,7 +3,9 @@ package com.beeny.village;
 import com.beeny.ai.LLMService;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.server.world.ServerWorld;
@@ -84,22 +86,53 @@ public class VillagerAI {
     }
 
     private Map<Integer, ActivitySchedule> createSchedule(String profession) {
-        String prompt = String.format(
-            "Create a daily schedule for a %s villager with %s personality in a %s village.\n" +
-            "Their current happiness is %d/100.\n" +
-            "Format schedule entries as:\n" +
-            "TIME: (0-24000 minecraft ticks)\n" +
-            "ACTIVITY: (brief activity name)\n" +
-            "LOCATION: (work/home/social)\n" +
-            "DURATION: (ticks)\n" +
-            "Provide 4-6 schedule entries.",
-            profession, personality, getCurrentCulturalContext(), happiness
-        );
+        StringBuilder prompt = new StringBuilder()
+            .append(String.format(
+                "Create a realistic daily schedule for a %s villager with %s personality in a %s village.\n" +
+                "Their current happiness is %d/100.\n\n" +
+                "Consider profession-specific activities:\n",
+                profession, personality, getCurrentCulturalContext(), happiness
+            ));
+
+        // Add profession-specific activity suggestions
+        switch(profession.toLowerCase()) {
+            case "farmer":
+                prompt.append("- Tending crops (planting, harvesting)\n")
+                      .append("- Checking farmland and irrigation\n")
+                      .append("- Storing harvested goods\n");
+                break;
+            case "librarian":
+                prompt.append("- Reading and organizing books\n")
+                      .append("- Teaching villagers at lectern\n")
+                      .append("- Studying and research\n");
+                break;
+            case "blacksmith":
+                prompt.append("- Forging tools and weapons\n")
+                      .append("- Repairing equipment\n")
+                      .append("- Working at anvil\n");
+                break;
+            case "cleric":
+                prompt.append("- Brewing potions\n")
+                      .append("- Gathering brewing ingredients\n")
+                      .append("- Offering blessings\n");
+                break;
+            default:
+                prompt.append("- Work-related activities\n")
+                      .append("- Trading with customers\n")
+                      .append("- Organizing inventory\n");
+        }
+
+        prompt.append("\nFormat schedule entries as:\n")
+              .append("TIME: (0-24000 minecraft ticks)\n")
+              .append("ACTIVITY: (specific activity name)\n")
+              .append("LOCATION: (work/home/social)\n")
+              .append("DURATION: (ticks)\n")
+              .append("\nProvide 6-8 detailed schedule entries that show a full day's routine.");
 
         Map<Integer, ActivitySchedule> schedule = new ConcurrentHashMap<>();
 
         LLMService.getInstance()
-            .generateResponse(prompt)
+            .generateResponse(prompt.toString())
             .thenApply(response -> Arrays.stream(response.split("\n\n"))
                 .map(entry -> parseScheduleEntry(entry))
                 .filter(Objects::nonNull)
@@ -109,14 +142,25 @@ public class VillagerAI {
                         entry.activity,
                         getLocationForType(entry.locationType),
                         entry.duration
-                    )
+                    ),
+                    (a, b) -> b // In case of duplicate times, keep the later entry
                 )))
-            .thenAccept(newSchedule -> schedule.putAll(newSchedule))
+            .thenAccept(newSchedule -> {
+                schedule.putAll(newSchedule);
+                LOGGER.debug("Generated schedule for {} ({}): {} entries",
+                    villager.getName().getString(),
+                    profession,
+                    newSchedule.size());
+            })
             .exceptionally(e -> {
-                LOGGER.error("Error generating schedule, using fallback", e);
-                // Fallback schedule
-                schedule.put(0, new ActivitySchedule("work", findNearestWorkstation(profession), 12000));
-                schedule.put(12000, new ActivitySchedule("rest", homePos, 12000));
+                LOGGER.error("Error generating schedule for {}, using fallback", profession, e);
+                // Fallback schedule with more variety
+                int workStart = 1000; // Early morning
+                schedule.put(0, new ActivitySchedule("rest", homePos, workStart));
+                schedule.put(workStart, new ActivitySchedule("work", findNearestWorkstation(profession), 8000));
+                schedule.put(9000, new ActivitySchedule("socializing", findVillageCenter(), 2000));
+                schedule.put(11000, new ActivitySchedule("work", findNearestWorkstation(profession), 6000));
+                schedule.put(17000, new ActivitySchedule("rest", homePos, 7000));
                 return null;
             });
 
@@ -328,7 +372,7 @@ public class VillagerAI {
             .collect(Collectors.joining(", "));
     }
 
-    private String getSocialSummary() {
+    public String getSocialSummary() {
         long friends = relationships.values().stream().filter(r -> r == RelationshipType.FRIEND).count();
         long family = relationships.values().stream().filter(r -> r == RelationshipType.FAMILY).count();
         long rivals = relationships.values().stream().filter(r -> r == RelationshipType.RIVAL).count();
@@ -344,6 +388,10 @@ public class VillagerAI {
                 .thenAccept(thought -> {
                     LOGGER.debug("{} thinks: {}", villager.getName().getString(), thought);
                 });
+                
+            // Add visual effects for activity change
+            ServerWorld world = (ServerWorld) villager.getWorld();
+            addActivityEffects(world, newActivity);
         }
         
         this.currentActivity = newActivity;
@@ -360,6 +408,30 @@ public class VillagerAI {
 
         // Update profession skills
         updateProfessionSkill(newActivity);
+    }
+
+    private void addActivityEffects(ServerWorld world, String activity) {
+        double x = villager.getX();
+        double y = villager.getY();
+        double z = villager.getZ();
+
+        switch(activity.toLowerCase()) {
+            case "farming":
+                world.spawnParticles(ParticleTypes.COMPOSTER, x, y, z, 10, 0.5, 0.1, 0.5, 0.1);
+                break;
+            case "reading", "studying":
+                world.spawnParticles(ParticleTypes.ENCHANT, x, y + 0.5, z, 5, 0.2, 0.2, 0.2, 0.1);
+                break;
+            case "smithing", "crafting":
+                world.spawnParticles(ParticleTypes.CRIT, x, y, z, 8, 0.3, 0.3, 0.3, 0.1);
+                break;
+            case "trading":
+                world.spawnParticles(ParticleTypes.HAPPY_VILLAGER, x, y + 1, z, 5, 0.2, 0.2, 0.2, 0);
+                break;
+            case "socializing":
+                world.spawnParticles(ParticleTypes.HEART, x, y + 1, z, 1, 0, 0, 0, 0);
+                break;
+        }
     }
 
     public String getCurrentActivity() {
@@ -382,7 +454,7 @@ public class VillagerAI {
         return villager;
     }
 
-    private CompletableFuture<RelationshipType> determineRelationshipDynamically(VillagerEntity other) {
+    public CompletableFuture<RelationshipType> determineRelationshipDynamically(VillagerEntity other) {
         StringBuilder context = new StringBuilder()
             .append("You are a Minecraft villager with:\n")
             .append("- ").append(personality).append(" personality\n")
@@ -433,8 +505,8 @@ public class VillagerAI {
         adjustHappiness(type.moodModifier);
         
         // Generate and cache initial dialogue for this relationship
-        VillagerEntity other = ((ServerWorld)villager.getWorld()).getEntity(otherVillager);
-        if (other instanceof VillagerEntity) {
+        Entity entity = ((ServerWorld)villager.getWorld()).getEntity(otherVillager);
+        if (entity instanceof VillagerEntity other) {
             generateDialogue("Meeting new " + type.toString().toLowerCase(), other)
                 .thenAccept(dialogue -> {
                     String cacheKey = "meeting|" + otherVillager.toString();

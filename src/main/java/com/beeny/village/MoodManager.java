@@ -1,7 +1,10 @@
 package com.beeny.village;
 
+import com.beeny.ai.LLMService;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.server.world.ServerWorld;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,9 +14,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class MoodManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final MoodManager INSTANCE = new MoodManager();
     private final Map<UUID, Integer> moodModifiers = new ConcurrentHashMap<>();
-    private final Map<UUID, Long> lastDangerTime = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastDangerTick = new ConcurrentHashMap<>();
     private final Map<UUID, MoodStats> moodStats = new ConcurrentHashMap<>();
     private static final long DANGER_EFFECT_DURATION = 24000; // One Minecraft day
 
@@ -48,10 +52,10 @@ public class MoodManager {
             villagerAI.getPersonality(),
             villagerAI.getCurrentActivity(),
             villagerAI.getSocialSummary(),
-            getLastDangerTime(villagerUUID).map(time -> 
+            getLastDangerTick(villagerUUID, world.getTime()).map(time -> 
                 String.format("Danger experienced %d ticks ago", world.getTime() - time))
                 .orElse("No recent dangers"),
-            vm.getCurrentEvents(villagerAI.getVillager().getBlockPos()).stream()
+            vm.getCurrentEvents(villagerAI.getVillager().getBlockPos(), world).stream()
                 .map(e -> e.name)
                 .collect(Collectors.joining(", "))
         );
@@ -92,8 +96,9 @@ public class MoodManager {
             });
     }
 
-    private Optional<Long> getLastDangerTime(UUID villagerUUID) {
-        return Optional.ofNullable(lastDangerTime.get(villagerUUID));
+    private Optional<Long> getLastDangerTick(UUID villagerUUID, long currentTick) {
+        return Optional.ofNullable(lastDangerTick.get(villagerUUID))
+            .filter(tick -> currentTick - tick <= DANGER_EFFECT_DURATION);
     }
 
     private Map<String, Integer> parseMoodResponse(String response) {
@@ -128,8 +133,8 @@ public class MoodManager {
         }
     }
 
-    public void reportDanger(UUID villagerUUID) {
-        lastDangerTime.put(villagerUUID, System.currentTimeMillis());
+    public void reportDanger(UUID villagerUUID, ServerWorld world) {
+        lastDangerTick.put(villagerUUID, world.getTime());
         
         // Generate danger response behavior
         VillagerManager vm = VillagerManager.getInstance();
@@ -148,7 +153,7 @@ public class MoodManager {
             vm.getActiveVillagers().stream()
                 .filter(ai -> ai.getVillager().squaredDistanceTo(endangeredVillager.getVillager()) < 100)
                 .forEach(ai -> {
-                    lastDangerTime.put(ai.getVillager().getUuid(), System.currentTimeMillis());
+                    lastDangerTick.put(ai.getVillager().getUuid(), world.getTime());
                     
                     String nearbySituation = String.format("Reacting to danger near %s",
                         endangeredVillager.getVillager().getName().getString());
@@ -163,7 +168,7 @@ public class MoodManager {
 
     public void clearMoodModifiers() {
         moodModifiers.clear();
-        lastDangerTime.clear();
+        lastDangerTick.clear();
         moodStats.clear();
     }
 }

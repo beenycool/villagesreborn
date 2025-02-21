@@ -1,5 +1,10 @@
 package com.beeny.ai;
 
+import com.azure.core.credential.AzureKeyCredential;
+import com.azure.ai.openai.models.ChatRole;
+import com.azure.ai.openai.models.ChatMessage;
+import com.azure.ai.openai.models.ChatCompletions;
+import com.azure.ai.openai.models.ChatCompletionsOptions;
 import com.azure.ai.openai.OpenAIClient;
 import com.azure.ai.openai.OpenAIClientBuilder;
 import com.azure.ai.openai.models.*;

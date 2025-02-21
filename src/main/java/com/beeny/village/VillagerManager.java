@@ -1,12 +1,12 @@
 package com.beeny.village;
 
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -30,7 +30,7 @@ public class VillagerManager {
     private final Map<UUID, Map<UUID, Relationship>> relationships;
     private final NameGenerator nameGenerator;
     private final Random random;
-    private World world;
+    private ServerWorld world;
     private String currentCulture;
 
     private VillagerManager() {
@@ -95,12 +95,32 @@ public class VillagerManager {
 
     private void generateRandomSocialInteraction(VillagerAI villager1, ServerWorld world) {
         List<VillagerAI> nearbyVillagers = villagerAIs.values().stream()
-            .filter(v -> v != villager1 && 
+            .filter(v -> v != villager1 &&
                         v.getVillager().squaredDistanceTo(villager1.getVillager()) < 100)
             .collect(Collectors.toList());
             
         if (!nearbyVillagers.isEmpty()) {
             VillagerAI villager2 = nearbyVillagers.get(random.nextInt(nearbyVillagers.size()));
+            
+            // Make villagers face each other
+            VillagerEntity v1 = villager1.getVillager();
+            VillagerEntity v2 = villager2.getVillager();
+            
+            double dx = v2.getX() - v1.getX();
+            double dz = v2.getZ() - v1.getZ();
+            float yaw = (float)(Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
+            v1.setYaw(yaw);
+            v2.setYaw(yaw + 180.0F);
+            
+            // Move slightly closer if needed
+            if (v1.squaredDistanceTo(v2) > 4.0) {
+                v1.getNavigation().startMovingTo(
+                    v2.getX() + dx * 0.3,
+                    v2.getY(),
+                    v2.getZ() + dz * 0.3,
+                    0.5D
+                );
+            }
             
             // Let the LLM determine their relationship
             villager1.determineRelationshipDynamically(villager2.getVillager())
@@ -108,11 +128,45 @@ public class VillagerManager {
                     villager1.addRelationship(villager2.getVillager().getUuid(), type);
                     villager2.addRelationship(villager1.getVillager().getUuid(), type);
                     
+                    // Visual effects based on relationship type
+                    addInteractionEffects(world, v1, v2, type);
+                    
                     // Generate interaction dialogue
-                    String situation = String.format("Meeting %s for the first time", 
+                    String situation = String.format("Meeting %s for the first time",
                         villager2.getVillager().getName().getString());
-                    villager1.generateDialogue(situation, villager2.getVillager());
+                    villager1.generateDialogue(situation, villager2.getVillager())
+                        .thenAccept(dialogue -> {
+                            // Show dialogue as floating text
+                            world.getPlayers().forEach(player -> {
+                                if (player.squaredDistanceTo(v1) < 100) {
+                                    player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
+                                }
+                            });
+                        });
+                    
+                    // Update activities to reflect interaction
+                    villager1.updateActivity("socializing");
+                    villager2.updateActivity("socializing");
                 });
+        }
+    }
+    
+    private void addInteractionEffects(ServerWorld world, VillagerEntity v1, VillagerEntity v2, VillagerAI.RelationshipType type) {
+        double x = (v1.getX() + v2.getX()) / 2;
+        double y = (v1.getY() + v2.getY()) / 2 + 1;
+        double z = (v1.getZ() + v2.getZ()) / 2;
+        
+        switch(type) {
+            case FRIEND:
+                world.spawnParticles(ParticleTypes.HEART, x, y, z, 3, 0.2, 0.2, 0.2, 0.02);
+                break;
+            case FAMILY:
+                world.spawnParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 5, 0.2, 0.2, 0.2, 0.02);
+                world.spawnParticles(ParticleTypes.HEART, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
+                break;
+            case RIVAL:
+                world.spawnParticles(ParticleTypes.ANGRY_VILLAGER, x, y, z, 3, 0.2, 0.2, 0.2, 0.02);
+                break;
         }
     }
 
@@ -140,7 +194,7 @@ public class VillagerManager {
                     .append("- Culture: ").append(stats.culture).append("\n")
                     .append("- Building count: ").append(region.getCulturalStructures().size()).append("\n")
                     .append("- Population: ").append(getVillagerCount(region)).append("\n")
-                    .append("- Recent events: ").append(getRecentEvents(region)).append("\n")
+                    .append("- Recent events: ").append(getRecentEvents(region, world)).append("\n")
                     .append("\nProvide village stats in format:\n")
                     .append("PROSPERITY: (number 0-100)\n")
                     .append("SAFETY: (number 0-100)");
@@ -166,7 +220,7 @@ public class VillagerManager {
             .count();
     }
 
-    private String getRecentEvents(SpawnRegion region) {
+    private String getRecentEvents(SpawnRegion region, ServerWorld world) {
         return culturalEvents.values().stream()
             .filter(event -> event.startTime + event.duration > world.getTimeOfDay())
             .map(event -> event.name)
@@ -191,7 +245,7 @@ public class VillagerManager {
         LLMService.getInstance()
             .generateResponse(prompt)
             .thenAccept(response -> {
-                Map<String, String> eventDetails = parseEventResponse(response);
+                Map<String, String> eventDetails = parseResponse(response);
                 CulturalEvent event = new CulturalEvent(
                     eventDetails.get("NAME"),
                     eventDetails.get("DESCRIPTION"),
@@ -219,7 +273,7 @@ public class VillagerManager {
             });
     }
 
-    private Map<String, String> parseEventResponse(String response) {
+    private Map<String, String> parseResponse(String response) {
         return Arrays.stream(response.split("\n"))
             .map(line -> line.split(": ", 2))
             .filter(parts -> parts.length == 2)
@@ -245,8 +299,8 @@ public class VillagerManager {
         return currentCulture;
     }
 
-    public void onVillagerSpawn(VillagerEntity villager, World world) {
-        if (!(world instanceof ServerWorld)) return;
+    public void onVillagerSpawn(VillagerEntity villager, ServerWorld world) {
+        this.world = world;
 
         SpawnRegion region = getNearestSpawnRegion(villager.getBlockPos());
         if (region == null) {
@@ -371,7 +425,7 @@ public class VillagerManager {
         return center != null ? villageStats.get(center) : null;
     }
 
-    public List<CulturalEvent> getCurrentEvents(BlockPos pos) {
+    public List<CulturalEvent> getCurrentEvents(BlockPos pos, ServerWorld world) {
         SpawnRegion region = getNearestSpawnRegion(pos);
         if (region == null) return Collections.emptyList();
         
