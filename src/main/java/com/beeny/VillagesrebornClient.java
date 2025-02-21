@@ -20,9 +20,8 @@ public class VillagesrebornClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (!setupScreenShown && client.world != null) {
                 setupScreenShown = true;
-                client.setScreen(new SetupScreen(
-                    Villagesreborn.getSetupWizard().getLlmConfig()
-                ));
+                VillagesConfig.LLMSettings llmConfig = VillagesConfig.getInstance().getLLMSettings();
+                client.setScreen(new SetupScreen(llmConfig));
             }
         });
     }
