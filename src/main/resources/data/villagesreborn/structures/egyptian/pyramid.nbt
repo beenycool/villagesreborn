@@ -1,0 +1,22 @@
+{
+  "type": "structure",
+  "blocks": [
+    {
+      "pos": [0, 0, 0],
+      "state": "minecraft:sandstone"
+    },
+    {
+      "pos": [1, 0, 0],
+      "state": "minecraft:sandstone"
+    },
+    {
+      "pos": [0, 1, 0],
+      "state": "minecraft:sandstone_slab"
+    },
+    {
+      "pos": [1, 1, 0],
+      "state": "minecraft:sandstone_slab"
+    }
+  ],
+  "entities": []
+}
