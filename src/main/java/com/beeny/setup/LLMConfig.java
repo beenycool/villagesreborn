@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public class LLMConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -26,6 +29,7 @@ public class LLMConfig {
     @Expose private double temperature = 0.7;
     @Expose private boolean useGPU = false;
     @Expose private boolean setupComplete = false;
+    @Expose private Map<UUID, Boolean> welcomeSequenceShown = new HashMap<>();
 
     public LLMConfig() {
         this.configPath = FabricLoader.getInstance().getConfigDir().resolve(CONFIG_FILE);
@@ -65,6 +69,7 @@ public class LLMConfig {
                 this.temperature = loaded.temperature;
                 this.useGPU = loaded.useGPU;
                 this.setupComplete = loaded.setupComplete;
+                this.welcomeSequenceShown = loaded.welcomeSequenceShown;
                 LOGGER.info("Loaded LLM configuration from {}", configPath);
             }
         } catch (IOException e) {
@@ -112,6 +117,15 @@ public class LLMConfig {
 
     public boolean isSetupComplete() {
         return setupComplete;
+    }
+
+    public boolean hasSeenWelcomeSequence(UUID playerId) {
+        return welcomeSequenceShown.getOrDefault(playerId, false);
+    }
+
+    public void setWelcomeSequenceShown(UUID playerId) {
+        welcomeSequenceShown.put(playerId, true);
+        saveConfig();
     }
 
     public void setApiKey(String apiKey) {

@@ -5,16 +5,28 @@ import com.beeny.ai.LLMService;
 import com.beeny.commands.ModCommands;
 import com.beeny.setup.LLMConfig;
 import com.beeny.setup.SystemSpecs;
+import com.beeny.village.VillagerAI;
+import com.beeny.village.SpawnRegion;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.Heightmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.beeny.village.VillagerAI;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Villagesreborn implements ModInitializer {
     public static final String MOD_ID = "villagesreborn";
@@ -101,6 +113,142 @@ public class Villagesreborn implements ModInitializer {
                 villagerManager.removeVillager(villager.getUuid());
             }
         });
+
+        // Add player join event handler
+        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (entity instanceof ServerPlayerEntity player && !player.hasSpawnedBefore()) {
+                handleNewPlayerSpawn(player, (ServerWorld)world);
+            }
+        });
+    }
+
+    private void handleNewPlayerSpawn(ServerPlayerEntity player, ServerWorld world) {
+        BlockPos pos = player.getBlockPos();
+        VillagerManager vm = VillagerManager.getInstance();
+        VillagesConfig config = VillagesConfig.getInstance();
+        
+        // Check if welcome sequences are enabled
+        if (!config.getGeneralSettings().showWelcomeSequence) {
+            return;
+        }
+        
+        // Check if player has seen welcome sequence before
+        boolean hasSeenWelcome = llmConfig.hasSeenWelcomeSequence(player.getUuid());
+        
+        // Only proceed if player hasn't seen sequence or if returning player welcomes are enabled
+        if (!hasSeenWelcome || config.getGeneralSettings().showWelcomeForReturningPlayers) {
+            // Check if there's no nearby village
+            if (vm.getNearestSpawnRegion(pos) == null) {
+                String defaultCulture = llmConfig.getProvider().equals("local") ? "roman" : "victorian";
+                vm.registerSpawnRegion(pos, 64, defaultCulture);
+                triggerWelcomeSequence(player, world, defaultCulture);
+            } else {
+                // If there is a village nearby, still show welcome but don't create new one
+                SpawnRegion nearestRegion = vm.getNearestSpawnRegion(pos);
+                triggerWelcomeSequence(player, world, nearestRegion.getCulture());
+            }
+            llmConfig.setWelcomeSequenceShown(player.getUuid());
+        }
+    }
+
+    private void triggerWelcomeSequence(ServerPlayerEntity player, ServerWorld world, String culture) {
+        String prompt = String.format(
+            "Design a welcome ceremony for a %s village in Minecraft.\n" +
+            "Include:\n" +
+            "1. Villager actions (e.g., wave, offer items)\n" +
+            "2. Dialogue (short greeting)\n" +
+            "3. Visual effects (e.g., particles)\n" +
+            "Format:\n" +
+            "ACTIONS: (brief action description)\n" +
+            "DIALOGUE: (single line of welcome text)\n" +
+            "EFFECTS: (particle effect name)",
+            culture
+        );
+
+        LLMService.getInstance().generateResponse(prompt)
+            .thenAccept(response -> {
+                Map<String, String> ceremony = parseResponse(response);
+                player.sendMessage(Text.literal("§6" + ceremony.get("DIALOGUE")), false);
+                spawnWelcomingVillagers(world, player.getBlockPos(), ceremony.get("ACTIONS"), ceremony.get("EFFECTS"));
+            });
+    }
+
+    private void spawnWelcomingVillagers(ServerWorld world, BlockPos pos, String actions, String effects) {
+        VillagerManager vm = VillagerManager.getInstance();
+        
+        // Generate a culturally appropriate gift
+        String culture = vm.getNearestSpawnRegion(pos).getCulture();
+        String giftPrompt = String.format(
+            "What would be a simple welcome gift in a %s village? Choose from:\n" +
+            "1. bread (basic food)\n" +
+            "2. emerald (valuable)\n" +
+            "3. map (navigation)\n" +
+            "4. compass (direction)\n" +
+            "Respond with just the item name.",
+            culture
+        );
+
+        LLMService.getInstance().generateResponse(giftPrompt)
+            .thenAccept(giftResponse -> {
+                ItemStack gift = switch(giftResponse.trim().toLowerCase()) {
+                    case "bread" -> new ItemStack(Items.BREAD, 3);
+                    case "emerald" -> new ItemStack(Items.EMERALD, 1);
+                    case "map" -> new ItemStack(Items.MAP, 1);
+                    case "compass" -> new ItemStack(Items.COMPASS, 1);
+                    default -> new ItemStack(Items.BREAD, 1);
+                };
+
+                // Spawn villagers with gift
+                for (int i = 0; i < 3; i++) {
+                    double angle = Math.PI * (0.25 + 0.25 * i);
+                    double x = pos.getX() + Math.cos(angle) * 3;
+                    double z = pos.getZ() + Math.sin(angle) * 3;
+                    int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, (int)x, (int)z);
+                    
+                    VillagerEntity villager = new VillagerEntity(EntityType.VILLAGER, world);
+                    villager.setPosition(x, y, z);
+                    villager.setYaw((float)(angle * 180.0 / Math.PI) + 180.0F);
+                    
+                    // Give the middle villager the gift to offer
+                    if (i == 1) {
+                        villager.setStackInHand(Hand.MAIN_HAND, gift.copy());
+                    }
+                    
+                    world.spawnEntity(villager);
+                    
+                    // Initialize villager with welcoming behavior
+                    vm.onVillagerSpawn(villager, world);
+                    VillagerAI ai = vm.getVillagerAI(villager.getUuid());
+                    if (ai != null) {
+                        ai.updateActivity("welcoming");
+                    }
+
+                    // Add particle effects
+                    world.spawnParticles(
+                        ParticleTypes.valueOf(effects.toUpperCase()),
+                        x, y + 1, z,
+                        5, 0.2, 0.2, 0.2, 0.02
+                    );
+                }
+
+                // Drop the gift near the player after a short delay
+                world.getServer().execute(() -> {
+                    world.spawnEntity(new ItemEntity(world, 
+                        pos.getX(), pos.getY(), pos.getZ(),
+                        gift.copy()
+                    ));
+                });
+            });
+    }
+
+    private Map<String, String> parseResponse(String response) {
+        return Arrays.stream(response.split("\n"))
+            .map(line -> line.split(": ", 2))
+            .filter(parts -> parts.length == 2)
+            .collect(Collectors.toMap(
+                parts -> parts[0],
+                parts -> parts[1].trim()
+            ));
     }
 
     private void registerChatListener() {

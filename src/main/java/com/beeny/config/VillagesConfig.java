@@ -47,6 +47,8 @@ public class VillagesConfig {
         public float eventFrequency = 0.05f;
         public int maxVillageRadius = 64;
         public boolean debugLogging = false;
+        public boolean showWelcomeSequence = true;
+        public boolean showWelcomeForReturningPlayers = false;
         public Map<String, Boolean> features = new HashMap<>();
     }
 

@@ -2,6 +2,8 @@ package com.beeny.village;
 
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 import net.minecraft.server.world.ServerWorld;
 import org.slf4j.Logger;
@@ -10,6 +12,12 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.world.Heightmap;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.structure.StructurePlacementData;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.Identifier;
 import com.beeny.ai.LLMService;
 
 import java.util.*;
@@ -25,13 +33,10 @@ public class SpawnRegion {
     private final Set<BlockPos> pointsOfInterest = new HashSet<>();
     private final Map<String, BlockPos> culturalStructures = new HashMap<>();
     private final List<String> pendingConstructions = new ArrayList<>();
-    private final Random random;
-
     public SpawnRegion(BlockPos center, int radius, String culture) {
         this.center = center;
         this.radius = radius;
         this.culture = culture.toLowerCase();
-        this.random = new Random();
         initializeCulturalStructures();
         LOGGER.info("Creating new {} village region at {} with radius {}", culture, center, radius);
     }
@@ -138,18 +143,164 @@ public class SpawnRegion {
     }
 
     private BlockPos findBuildingLocation(World world, String structure) {
-        // Find suitable flat area within radius
-        // For now returns center + random offset
-        int offset = world.getRandom().nextInt(radius);
-        return center.add(offset, 0, offset);
+        int maxAttempts = 50;
+        int attempt = 0;
+        
+        while (attempt < maxAttempts) {
+            // Get random position within radius
+            double angle = world.getRandom().nextDouble() * Math.PI * 2;
+            double distance = world.getRandom().nextDouble() * radius;
+            int x = center.getX() + (int)(Math.cos(angle) * distance);
+            int z = center.getZ() + (int)(Math.sin(angle) * distance);
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos pos = new BlockPos(x, y, z);
+
+            // Skip if too close to existing structures
+            if (isTooCloseToOtherStructures(pos)) {
+                attempt++;
+                continue;
+            }
+
+            // Validate terrain
+            if (isTerrainSuitable(world, pos, structure)) {
+                return pos;
+            }
+            attempt++;
+        }
+        
+        LOGGER.warn("Failed to find suitable location for {}", structure);
+        return null;
     }
 
-    private void generateCulturalStructure(World world, BlockPos pos, String structure) {
-        String structurePath = String.format("villagesreborn:structures/%s/%s", 
-            culture.toLowerCase(), structure);
+    private boolean isTooCloseToOtherStructures(BlockPos pos) {
+        int minDistance = 10;
+        for (BlockPos structurePos : culturalStructures.values()) {
+            if (pos.getSquaredDistance(structurePos) < minDistance * minDistance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isTerrainSuitable(World world, BlockPos pos, String structure) {
+        // Use default dimensions for terrain check
+        final int width = 7;  // Default width for most structures
+        final int length = 9; // Default length for most structures
+        final int maxHeightDiff = 2;
+        final int baseY = pos.getY();
+
+        // Check area is relatively flat and has solid ground
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                BlockPos checkPos = pos.add(x, 0, z);
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, checkPos.getX(), checkPos.getZ());
+                
+                // Check height difference
+                if (Math.abs(y - baseY) > maxHeightDiff) {
+                    return false;
+                }
+                
+                // Check ground is solid
+                if (!world.getBlockState(checkPos.down()).isSideSolidFullSquare(world, checkPos.down(), Direction.UP)) {
+                    return false;
+                }
+                
+                // Check for water
+                if (world.getBlockState(checkPos).getBlock() == Blocks.WATER) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+
+    private void generateCulturalStructure(World world, BlockPos pos, String structureName) {
+        if (!(world instanceof ServerWorld)) {
+            LOGGER.error("Cannot generate structure in non-server world");
+            return;
+        }
+
+        ServerWorld serverWorld = (ServerWorld) world;
+        String namespace = "villagesreborn";
+        String path = String.format("structures/%s/%s",
+            culture.toLowerCase(), structureName.toLowerCase().replace(" ", "_"));
             
-        // Structure generation placeholder - would use Structure system
-        LOGGER.info("Generating {} at {}", structurePath, pos);
+        try {
+            // Get structure template from server
+            Identifier templateId = Identifier.of(namespace, path);
+            Optional<StructureTemplate> template = serverWorld.getStructureTemplateManager().getTemplate(templateId);
+            
+            if (template.isEmpty()) {
+                LOGGER.error("Structure template not found: {}", templateId);
+                return;
+            }
+
+            // Create placement data
+            StructurePlacementData placementData = new StructurePlacementData()
+                .setIgnoreEntities(false)
+                .setRotation(BlockRotation.random(serverWorld.getRandom()))
+                .setMirror(BlockMirror.NONE);
+
+            // Find suitable ground position
+            BlockPos placementPos = findGroundPosition(world, pos, template.get().getSize());
+            
+            // Place the structure
+            template.get().place(
+                serverWorld,
+                placementPos,
+                placementPos,
+                placementData,
+                serverWorld.getRandom(),
+                Block.NOTIFY_ALL | Block.FORCE_STATE);
+
+            LOGGER.info("Successfully generated {} at {}", templateId, placementPos);
+            Box boundingBox = new Box(
+                placementPos.getX(), placementPos.getY(), placementPos.getZ(),
+                placementPos.getX() + template.get().getSize().getX(),
+                placementPos.getY() + template.get().getSize().getY(),
+                placementPos.getZ() + template.get().getSize().getZ()
+            );
+            addStructurePointsOfInterest(world, placementPos, boundingBox);
+        } catch (Exception e) {
+            LOGGER.error("Error generating structure {}/{}: {}", namespace, path, e.getMessage());
+        }
+    }
+
+    private BlockPos findGroundPosition(World world, BlockPos pos, Vec3i size) {
+        int x = pos.getX();
+        int z = pos.getZ();
+        int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+        
+        // Check if area is flat enough
+        int maxHeightDiff = 3;
+        int baseHeight = y;
+        
+        for (int dx = 0; dx < size.getX(); dx++) {
+            for (int dz = 0; dz < size.getZ(); dz++) {
+                int height = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x + dx, z + dz);
+                if (Math.abs(height - baseHeight) > maxHeightDiff) {
+                    y = Math.max(y, height); // Use highest point to ensure structure isn't floating
+                }
+            }
+        }
+        
+        return new BlockPos(x, y, z);
+    }
+
+    private void addStructurePointsOfInterest(World world, BlockPos pos, Box boundingBox) {
+        Vec3d size = boundingBox.getCenter();
+        int sizeX = (int)(boundingBox.maxX - boundingBox.minX);
+        int sizeZ = (int)(boundingBox.maxZ - boundingBox.minZ);
+        
+        // Add POIs at structure corners
+        addPointOfInterest(pos);
+        addPointOfInterest(pos.add(sizeX, 0, 0));
+        addPointOfInterest(pos.add(0, 0, sizeZ));
+        addPointOfInterest(pos.add(sizeX, 0, sizeZ));
+        
+        // Add POI at the entrance (assuming front is -Z)
+        addPointOfInterest(pos.add(sizeX / 2, 0, -1));
     }
 
     public void addPointOfInterest(BlockPos pos) {
@@ -163,8 +314,9 @@ public class SpawnRegion {
 
         do {
             // Get random position within radius
-            double angle = random.nextDouble() * Math.PI * 2;
-            double distance = random.nextDouble() * radius;
+            net.minecraft.util.math.random.Random worldRandom = world.getRandom();
+            double angle = worldRandom.nextDouble() * Math.PI * 2;
+            double distance = worldRandom.nextDouble() * radius;
             int x = center.getX() + (int)(Math.cos(angle) * distance);
             int z = center.getZ() + (int)(Math.sin(angle) * distance);
             int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
@@ -313,8 +465,14 @@ public class SpawnRegion {
             .map(this::getBlockFromName)
             .collect(Collectors.toList());
 
-        String pattern = pathDetails.get("PATTERN");
-        List<BlockPos> pathPoints = getPathPoints(pattern);
+        String pattern = pathDetails.getOrDefault("PATTERN", "linear");
+        List<BlockPos> pathPoints = new ArrayList<>();
+
+        switch (pattern.toLowerCase()) {
+            case "grid" -> generateGridPaths(pathPoints);
+            case "winding" -> generateWindingPaths(pathPoints, world.getRandom());
+            default -> generateLinearPaths(pathPoints);
+        }
 
         for (BlockPos pathPos : pathPoints) {
             Block block = pathBlocks.get(world.getRandom().nextInt(pathBlocks.size()));
@@ -323,13 +481,12 @@ public class SpawnRegion {
         }
     }
 
-    private List<BlockPos> getPathPoints(String pattern) {
+    private List<BlockPos> generatePathsForPattern(String pattern, World world) {
         List<BlockPos> points = new ArrayList<>();
-        Random random = new Random();
-
+        
         switch (pattern.toLowerCase()) {
             case "grid" -> generateGridPaths(points);
-            case "winding" -> generateWindingPaths(points, random);
+            case "winding" -> generateWindingPaths(points, world.getRandom());
             default -> generateLinearPaths(points);
         }
 
@@ -350,7 +507,7 @@ public class SpawnRegion {
         }
     }
 
-    private void generateWindingPaths(List<BlockPos> points, Random random) {
+    private void generateWindingPaths(List<BlockPos> points, net.minecraft.util.math.random.Random random) {
         double angle = 0;
         double x = center.getX();
         double z = center.getZ();
@@ -384,7 +541,8 @@ public class SpawnRegion {
 
     private BlockPos findDistrictLocation(World world, String district) {
         // Placeholder for finding district location logic
-        return center.add(random.nextInt(radius), 0, random.nextInt(radius));
+        net.minecraft.util.math.random.Random worldRandom = world.getRandom();
+        return center.add(worldRandom.nextInt(radius), 0, worldRandom.nextInt(radius));
     }
 
     private void generateDistrictFromDescription(World world, BlockPos pos, String description) {
@@ -534,7 +692,7 @@ public class SpawnRegion {
 
     private void generateRomanBuildings(World world) {
         int buildingRadius = radius - 5;
-        Random random = new Random();
+        net.minecraft.util.math.random.Random random = world.getRandom();
 
         // Generate buildings in each quadrant
         for (int quadrant = 0; quadrant < 4; quadrant++) {
@@ -559,7 +717,7 @@ public class SpawnRegion {
     }
 
 
-    private void generateRomanHouse(World world, BlockPos pos, Random random) {
+    private void generateRomanHouse(World world, BlockPos pos, net.minecraft.util.math.random.Random random) {
         int houseWidth = random.nextInt(3) + 5;
         int houseLength = random.nextInt(3) + 6;
         int houseHeight = random.nextInt(2) + 3;
@@ -611,7 +769,7 @@ public class SpawnRegion {
     }
 
     private void addRomanDecorations(World world) {
-        Random random = new Random();
+        net.minecraft.util.math.random.Random random = world.getRandom();
 
         // Add decorative elements around the forum
         for (int i = 0; i < radius / 2; i++) {
@@ -702,7 +860,7 @@ public class SpawnRegion {
     }
 
     private void generateEgyptianResidential(World world) {
-        Random random = new Random();
+        net.minecraft.util.math.random.Random random = net.minecraft.util.math.random.Random.create();
         int houseCount = radius / 4;
 
         for (int i = 0; i < houseCount; i++) {
@@ -741,7 +899,7 @@ public class SpawnRegion {
     }
 
     private void generateOasis(World world) {
-        Random random = new Random();
+        net.minecraft.util.math.random.Random random = world.getRandom();
         BlockPos oasisPos = center.add(-radius / 3, 0, 0);
         int oasisSize = 8;
 
@@ -779,7 +937,7 @@ public class SpawnRegion {
         }
     }
 private void addEgyptianDecorations(World world) {
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = net.minecraft.util.math.random.Random.create();
     for (int i = 0; i < radius / 3; i++) {
         int x = center.getX() + random.nextInt(radius) - radius / 2;
         int z = center.getZ() + random.nextInt(radius) - radius / 2;
@@ -991,7 +1149,7 @@ private void generateVictorianPark(World world) {
     }
 
     // Add trees and decorations
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = world.getRandom();
     for (int i = 0; i < parkSize * 2; i++) {
         int x = parkPos.getX() + random.nextInt(parkSize * 2) - parkSize;
         int z = parkPos.getZ() + random.nextInt(parkSize * 2) - parkSize;
@@ -1026,7 +1184,7 @@ private void generateCobblestoneStreets(World world) {
 }
 
 private void addVictorianDecorations(World world) {
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = net.minecraft.util.math.random.Random.create();
     
     // Add gas lamps along streets
     for (int i = 0; i < radius; i++) {
@@ -1088,7 +1246,7 @@ private void generateNYCStreets(World world) {
 }
 
 private void generateSkyscrapers(World world) {
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = world.getRandom();
     int blockSize = 20;
 
     // Generate multiple skyscrapers
@@ -1133,7 +1291,7 @@ private void generateCentralPark(World world) {
     }
 
     // Add trees and paths
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = net.minecraft.util.math.random.Random.create();
     for (int i = 0; i < parkSize * 3; i++) {
         int x = parkPos.getX() + random.nextInt(parkSize * 2) - parkSize;
         int z = parkPos.getZ() + random.nextInt(parkSize * 2) - parkSize;
@@ -1143,7 +1301,7 @@ private void generateCentralPark(World world) {
 }
 
 private void generateSubwayEntrances(World world) {
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = world.getRandom();
     int entrances = 4;
 
     for (int i = 0; i < entrances; i++) {
@@ -1238,7 +1396,7 @@ private void generateCommercialBuilding(World world, BlockPos pos) {
 }
 
 private void addNYCDecorations(World world) {
-    Random random = new Random();
+    net.minecraft.util.math.random.Random random = world.getRandom();
     
     // Add modern urban decorations
     for (int i = 0; i < radius * 2; i++) {

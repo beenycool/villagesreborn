@@ -381,6 +381,23 @@ public class VillagerAI {
     }
 
     public void updateActivity(String newActivity) {
+        if (newActivity.equals("welcoming")) {
+            // Move towards player and wave
+            VillagerEntity villager = getVillager();
+            List<ServerPlayerEntity> nearbyPlayers = villager.getWorld().getPlayers()
+                .stream()
+                .filter(p -> p.squaredDistanceTo(villager) < 100)
+                .collect(Collectors.toList());
+
+            if (!nearbyPlayers.isEmpty()) {
+                ServerPlayerEntity player = nearbyPlayers.get(0);
+                villager.getLookControl().lookAt(player);
+                
+                // Wave animation (using villager's work animation)
+                villager.setHeadRollingTimeLeft(40);
+                villager.swingHand(Hand.MAIN_HAND);
+            }
+        }
         if (!newActivity.equals(currentActivity)) {
             // Generate contextual thoughts about activity change
             String situation = String.format("Switching from %s to %s", currentActivity, newActivity);

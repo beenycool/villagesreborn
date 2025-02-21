@@ -15,7 +15,6 @@ public class AnimationRenderer {
 
     public void render(DrawContext context, int width, int height) {
         int frameIndex = (animationTick / 20) % frames.length;
-        // Center the 128x128 animation
         context.drawTexture(RenderLayer::getEntitySolid, frames[frameIndex], width / 2 - 64, height / 2 - 64, 0, 0, 128, 128, 128, 128);
     }
 
