@@ -16,6 +16,11 @@ import com.azure.ai.openai.models.ChatRole;
 import com.azure.ai.openai.models.ChatCompletions;
 import com.azure.ai.openai.models.ChatCompletionsOptions;
 import com.azure.core.credential.AzureKeyCredential;
+import com.azure.ai.openai.models.ChatMessage;
+import com.azure.ai.openai.models.ChatRole;
+import com.azure.ai.openai.models.ChatCompletions;
+import com.azure.ai.openai.models.ChatCompletionsOptions;
+import com.azure.core.credential.AzureKeyCredential;
 
 import java.util.*;
 import java.util.concurrent.*;
