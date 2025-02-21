@@ -36,7 +36,30 @@ public class TutorialScreen extends Screen {
     @Override
     public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
         this.renderBackground(matrices);
-        this.drawCenteredText(matrices, this.textRenderer, Text.of(steps[currentStep]), this.width / 2, this.height / 2 - 20, 0xFFFFFF);
+        
+        // Draw title
+        drawCenteredText(matrices, this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        
+        // Draw current step
+        drawCenteredText(matrices, this.textRenderer, Text.literal(steps[currentStep]), 
+            this.width / 2, this.height / 2 - 20, 0xFFFFFF);
+        
+        // Draw progress dots
+        int dotSpacing = 20;
+        int totalWidth = (steps.length - 1) * dotSpacing;
+        int startX = this.width / 2 - totalWidth / 2;
+        
+        for (int i = 0; i < steps.length; i++) {
+            int color = i <= currentStep ? 0x00FF00 : 0x808080;
+            fill(matrices, startX + i * dotSpacing - 2, this.height / 2 + 20, 
+                startX + i * dotSpacing + 2, this.height / 2 + 24, color);
+        }
+        
         super.render(matrices, mouseX, mouseY, delta);
+    }
+
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return true;
     }
 }

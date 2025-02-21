@@ -4,54 +4,54 @@ import com.beeny.ai.LLMService;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.SpawnRegion;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
-public class VillageEventManager {
-    private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
-    private static final VillageEventManager INSTANCE = new VillageEventManager();
-    
-    private final Map<String, List<VillageEvent>> activeEvents = new HashMap<>();
-    private final Map<String, List<VillageEvent>> historicalEvents = new HashMap<>();
-    private final Random random = new Random();
-
-    private VillageEventManager() {}
-
-    public static VillageEventManager getInstance() {
-        return INSTANCE;
-    }
-
-    public CompletableFuture<VillageEvent> generateRandomEvent(String culture, ServerWorld world, List<VillagerAI> participants) {
-        Map<String, String> context = new HashMap<>();
-        context.put("culture", culture);
-        context.put("time_of_day", String.valueOf(world.getTimeOfDay()));
-        context.put("participant_count", String.valueOf(participants.size()));
-        context.put("recent_events", getRecentEvents(culture));
-        
-        String prompt = String.format(
-            "Generate a spontaneous cultural event for a %s village in Minecraft.\n" +
-            "Current context:\n" +
-            "- Time of day: %d\n" +
-            "- Participants: %d villagers\n" +
-            "- Recent events: %s\n\n" +
-            "Create an event that:\n" +
-            "1. Fits the culture and time of day\n" +
-            "2. Involves available villagers naturally\n" +
-            "3. Has meaningful impact on village life\n" +
-            "4. Creates memorable moments\n\n" +
-            "Format response as:\n" +
-            "TYPE: (celebration/gathering/ritual/market/etc)\n" +
-            "DESCRIPTION: (brief event description)\n" +
-            "DURATION: (time in ticks)\n" +
-            "OUTCOME: (effect on village)",
-            culture,
-            world.getTimeOfDay(),
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.s2c.play.ParticleS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.registry.Registry;
+import net.minecraft.util.registry.RegistryKey;
+import net.minecraft.world.World;
+import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.dimension.DimensionTypes;
+import net.minecraft.world.level.ServerWorldProperties;
+import net.minecraft.world.level.storage.LevelStorage;
+import net.minecraft.world.level.storage.LevelStorage.Session;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
+import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
             participants.size(),
             getRecentEvents(culture)
         );

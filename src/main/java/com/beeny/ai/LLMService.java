@@ -7,23 +7,25 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.Map;
 import java.util.HashMap;
 
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
-    private static LLMService instance;
+    private static final LLMService INSTANCE = new LLMService();
     private static final int MAX_RETRIES = 3;
+    private final Map<String, LLMImplementation.Cache> responseCache = new HashMap<>();
+    private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
 
     private LLMService() {}
 
     public static LLMService getInstance() {
-        if (instance == null) {
-            instance = new LLMService();
-        }
-        return instance;
+        return INSTANCE;
     }
 
     public void initialize(LLMConfig config) {
@@ -64,6 +66,34 @@ public class LLMService {
             });
     }
 
+    public CompletableFuture<String> generateBehavior(String profession, String situation, Map<String, Object> context) {
+        String cacheKey = String.format("%s_%s", profession, situation);
+        if (responseCache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(responseCache.get(cacheKey).response());
+        }
+
+        String prompt = String.format(
+            "You are a %s villager in Minecraft. Based on this situation:\n%s\n" +
+            "What would be your next action? Consider:\n" +
+            "1. Your profession's duties\n" +
+            "2. Time of day\n" +
+            "3. Current location\n" +
+            "4. Other villagers nearby\n\n" +
+            "Respond with a single action in the format:\n" +
+            "ACTION: (walk/work/trade/rest/socialize)\n" +
+            "TARGET: (specific location or villager)\n" +
+            "DURATION: (time in ticks)\n" +
+            "DETAIL: (specific activity description)",
+            profession, situation
+        );
+
+        return callLLMWithRetry(prompt, context)
+            .thenApply(response -> {
+                responseCache.put(cacheKey, new LLMImplementation.Cache(response, System.currentTimeMillis()));
+                return response;
+            });
+    }
+
     private CompletableFuture<String> callLLMWithRetry(String prompt, int retryCount) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -82,10 +112,46 @@ public class LLMService {
         });
     }
 
+    private CompletableFuture<String> callLLMWithRetry(String prompt, Map<String, Object> context) {
+        return CompletableFuture.supplyAsync(() -> {
+            for (int attempt = 0; attempt < 3; attempt++) {
+                try {
+                    return LLMImplementation.generateResponse(prompt, context);
+                } catch (Exception e) {
+                    if (attempt == 2) {
+                        LOGGER.error("Failed to generate LLM response after 3 attempts", e);
+                        return getDefaultResponse(prompt);
+                    }
+                    try {
+                        Thread.sleep(1000 * (attempt + 1));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return getDefaultResponse(prompt);
+                    }
+                }
+            }
+            return getDefaultResponse(prompt);
+        }, executor);
+    }
+
+    private String getDefaultResponse(String prompt) {
+        // Provide basic fallback behaviors
+        if (prompt.contains("farmer")) {
+            return "ACTION: work\nTARGET: nearest_farm\nDURATION: 6000\nDETAIL: tending crops";
+        }
+        return "ACTION: walk\nTARGET: village_center\nDURATION: 2400\nDETAIL: patrolling";
+    }
+
     private String generateCacheKey(String prompt, Map<String, String> context) {
         StringBuilder key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
+    }
+
+    public void pruneCache() {
+        long now = System.currentTimeMillis();
+        responseCache.entrySet().removeIf(entry -> 
+            now - entry.getValue().timestamp() > TimeUnit.HOURS.toMillis(1));
     }
 
     public void shutdown() {

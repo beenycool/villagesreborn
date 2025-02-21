@@ -14,6 +14,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
+import net.minecraft.util.Identifier;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.render.GameRenderer;
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.util.math.MathHelper;
 import java.util.List;
 
 import java.io.IOException;
@@ -42,9 +47,22 @@ public class SetupScreen extends Screen {
     private static final List<String> MODEL_TYPES = List.of("gpt-3.5-turbo", "gpt-4", "llama2", "claude-v2");
     private static final List<String> PROVIDERS = List.of("openai", "anthropic", "local");
 
+    private static final int ANIM_FRAME_TIME = 20;
+    private static final Identifier[] FRAMES = {
+        new Identifier("villagesreborn", "textures/gui/anim_frame1.png"),
+        new Identifier("villagesreborn", "textures/gui/anim_frame2.png"),
+        new Identifier("villagesreborn", "textures/gui/anim_frame3.png")
+    };
+    
+    private float progress = 0;
+    private int currentFrame = 0;
+    private int frameTimer = 0;
+    private final Text statusText;
+
     public SetupScreen(LLMConfig llmConfig) {
         super(Text.literal("Villages Reborn Setup"));
         this.llmConfig = llmConfig;
+        this.statusText = Text.literal("Setting up...");
     }
 
     @Override
@@ -119,6 +137,7 @@ public class SetupScreen extends Screen {
             String expectedHash = "dummyhash";
             ModelDownloader.downloadModel(recommendedModel, expectedHash, progress -> {
                 LOGGER.info("Download progress: {}%", progress * 100);
+                setProgress(progress);
             }).thenAccept(modelPath -> {
                 llmConfig.setModelType(recommendedModel);
                 llmConfig.setSetupComplete(true);
@@ -250,5 +269,67 @@ public class SetupScreen extends Screen {
     @Override
     public boolean shouldPause() {
         return false;
+    }
+
+    @Override
+    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+        this.renderBackground(matrices);
+        
+        // Update animation frame
+        frameTimer++;
+        if (frameTimer >= ANIM_FRAME_TIME) {
+            frameTimer = 0;
+            currentFrame = (currentFrame + 1) % FRAMES.length;
+        }
+        
+        // Draw current animation frame
+        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.setShaderTexture(0, FRAMES[currentFrame]);
+        
+        int frameSize = 128;
+        drawTexture(matrices, 
+            (this.width - frameSize) / 2, 
+            (this.height - frameSize) / 2 - 30, 
+            0, 0, frameSize, frameSize, 
+            frameSize, frameSize
+        );
+        
+        // Draw progress bar
+        int barWidth = 200;
+        int barHeight = 10;
+        int barX = (this.width - barWidth) / 2;
+        int barY = this.height / 2 + 50;
+        
+        // Background
+        fill(matrices, barX, barY, barX + barWidth, barY + barHeight, 0xFF333333);
+        // Progress
+        fill(matrices, 
+            barX, barY, 
+            barX + (int)(barWidth * progress), 
+            barY + barHeight, 
+            0xFF00FF00
+        );
+        
+        // Draw status text
+        drawCenteredText(
+            matrices, 
+            this.textRenderer, 
+            this.statusText, 
+            this.width / 2, 
+            barY + barHeight + 10, 
+            0xFFFFFF
+        );
+        
+        super.render(matrices, mouseX, mouseY, delta);
+    }
+
+    public void setProgress(float progress) {
+        this.progress = MathHelper.clamp(progress, 0.0f, 1.0f);
+    }
+
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return true;
     }
 }

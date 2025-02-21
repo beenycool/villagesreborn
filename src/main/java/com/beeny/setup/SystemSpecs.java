@@ -22,6 +22,19 @@ public class SystemSpecs {
     private Map<String, String> gpuInfo;
     private SystemTier systemTier;
 
+    private final int availableProcessors;
+    private final long maxMemory;
+    private final int performanceTier;
+    private final Map<String, Integer> aiCallQuotas = new HashMap<>();
+    private final Map<String, Long> lastAiCalls = new HashMap<>();
+
+    public SystemSpecs() {
+        this.availableProcessors = Runtime.getRuntime().availableProcessors();
+        this.maxMemory = Runtime.getRuntime().maxMemory();
+        this.performanceTier = calculatePerformanceTier();
+        initializeQuotas();
+    }
+
     public enum SystemTier {
         HIGH, MEDIUM, LOW
     }
@@ -138,6 +151,112 @@ public class SystemSpecs {
                renderer.contains("RX 5") ||
                renderer.contains("Iris") ||
                renderer.contains("Vega");
+    }
+
+    private int calculatePerformanceTier() {
+        // Tier 0: Low-end (2GB RAM, 2 cores)
+        // Tier 1: Mid-range (4GB RAM, 4 cores)
+        // Tier 2: High-end (8GB+ RAM, 6+ cores)
+        int memoryScore = (int)(maxMemory / (1024L * 1024L * 1024L)) / 2; // GB of RAM / 2
+        int cpuScore = availableProcessors / 2;
+        return Math.min(2, Math.min(memoryScore, cpuScore));
+    }
+
+    private void initializeQuotas() {
+        // Base quotas per minute, scaled by performance tier
+        int baseQuota = switch(performanceTier) {
+            case 0 -> 10;  // Low-end: 10 calls per minute
+            case 1 -> 30;  // Mid-range: 30 calls per minute
+            case 2 -> 60;  // High-end: 60 calls per minute
+            default -> 20; // Fallback: 20 calls per minute
+        };
+
+        aiCallQuotas.put("villager_behavior", baseQuota);
+        aiCallQuotas.put("cultural_event", baseQuota / 2);
+        aiCallQuotas.put("building_generation", baseQuota / 3);
+    }
+
+    public boolean canMakeAiCall(String type) {
+        long now = System.currentTimeMillis();
+        Long lastCall = lastAiCalls.get(type);
+        
+        if (lastCall == null) {
+            lastAiCalls.put(type, now);
+            return true;
+        }
+
+        int quota = aiCallQuotas.getOrDefault(type, 10);
+        long minimumInterval = 60000 / quota; // Convert quota per minute to interval in ms
+        
+        if (now - lastCall >= minimumInterval) {
+            lastAiCalls.put(type, now);
+            return true;
+        }
+        
+        return false;
+    }
+
+    public int getMaxConcurrentGeneration() {
+        return Math.max(1, availableProcessors / 2);
+    }
+
+    public int getVillagerUpdateInterval() {
+        return switch(performanceTier) {
+            case 0 -> 40;  // Update every 2 seconds
+            case 1 -> 20;  // Update every 1 second
+            case 2 -> 10;  // Update every 0.5 seconds
+            default -> 30; // Fallback: 1.5 seconds
+        };
+    }
+
+    public int getMaxActiveVillagers() {
+        return switch(performanceTier) {
+            case 0 -> 20;   // Low-end: 20 active villagers
+            case 1 -> 50;   // Mid-range: 50 active villagers
+            case 2 -> 100;  // High-end: 100 active villagers
+            default -> 30;  // Fallback: 30 active villagers
+        };
+    }
+
+    public boolean shouldUseComplexPathfinding() {
+        return performanceTier > 0;
+    }
+
+    public boolean shouldUseDetailedAnimations() {
+        return performanceTier > 1;
+    }
+
+    public int getStructureGenerationRadius() {
+        return switch(performanceTier) {
+            case 0 -> 32;   // Small villages
+            case 1 -> 64;   // Medium villages
+            case 2 -> 96;   // Large villages
+            default -> 48;  // Fallback size
+        };
+    }
+
+    public int getPerformanceTier() {
+        return performanceTier;
+    }
+
+    public String getPerformanceReport() {
+        return String.format(
+            "System Performance Report:\n" +
+            "CPU Cores: %d\n" +
+            "Max Memory: %d GB\n" +
+            "Performance Tier: %d\n" +
+            "Max Active Villagers: %d\n" +
+            "Village Size: %d blocks\n" +
+            "Using Complex Pathfinding: %b\n" +
+            "Using Detailed Animations: %b",
+            availableProcessors,
+            maxMemory / (1024 * 1024 * 1024),
+            performanceTier,
+            getMaxActiveVillagers(),
+            getStructureGenerationRadius(),
+            shouldUseComplexPathfinding(),
+            shouldUseDetailedAnimations()
+        );
     }
 
     public SystemTier getSystemTier() {

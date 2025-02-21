@@ -79,20 +79,8 @@ public class SpawnRegion {
             .thenApply(this::parseBuildingTemplate);
     }
 
-    private static class BuildingTemplate {
-        final int width;
-        final int length;
-        final int height;
-        final List<Block> materials;
-        final List<String> features;
-
-        BuildingTemplate(int width, int length, int height, List<Block> materials, List<String> features) {
-            this.width = width;
-            this.length = length;
-            this.height = height;
-            this.materials = materials;
-            this.features = features;
-        }
+    private static record BuildingTemplate(int width, int length, int height, List<Block> materials, List<String> features) {
+        // Records automatically provide getters and constructor
     }
 
     private BuildingTemplate parseBuildingTemplate(String response) {
@@ -138,6 +126,7 @@ public class SpawnRegion {
             if (pos != null) {
                 generateCulturalStructure(world, pos, structure);
                 culturalStructures.put(structure, pos);
+                LOGGER.info("Generated {} at {}", structure, pos);
             }
         }
     }
@@ -183,13 +172,16 @@ public class SpawnRegion {
     }
 
     private boolean isTerrainSuitable(World world, BlockPos pos, String structure) {
-        // Use default dimensions for terrain check
-        final int width = 7;  // Default width for most structures
-        final int length = 9; // Default length for most structures
-        final int maxHeightDiff = 2;
+        final int maxHeightDiff = 3;
         final int baseY = pos.getY();
+        Box bounds = getStructureBounds(structure);
+        int width = (int)bounds.maxX;
+        int length = (int)bounds.maxZ;
+        int height = (int)bounds.maxY;
 
-        // Check area is relatively flat and has solid ground
+        // Check area is relatively flat and has proper support
+        int validBlocks = 0;
+        int totalBlocks = 0;
         for (int x = -width/2; x <= width/2; x++) {
             for (int z = -length/2; z <= length/2; z++) {
                 BlockPos checkPos = pos.add(x, 0, z);
@@ -200,61 +192,126 @@ public class SpawnRegion {
                     return false;
                 }
                 
-                // Check ground is solid
-                if (!world.getBlockState(checkPos.down()).isSideSolidFullSquare(world, checkPos.down(), Direction.UP)) {
+                // Check for water or lava
+                if (world.getBlockState(checkPos).getBlock() == Blocks.WATER || 
+                    world.getBlockState(checkPos).getBlock() == Blocks.LAVA) {
                     return false;
                 }
                 
-                // Check for water
-                if (world.getBlockState(checkPos).getBlock() == Blocks.WATER) {
+                // Check ground stability
+                BlockPos groundPos = checkPos.down();
+                if (world.getBlockState(groundPos).isSideSolidFullSquare(world, groundPos, Direction.UP)) {
+                    validBlocks++;
+                }
+                totalBlocks++;
+            }
+        }
+
+        // Require at least 85% solid ground support
+        float solidGroundRatio = (float)validBlocks / totalBlocks;
+        if (solidGroundRatio < 0.85f) {
+            return false;
+        }
+
+        // Culture-specific checks
+        return switch(culture.toLowerCase()) {
+            case "egyptian" -> {
+                BlockPos sandCheck = pos.down();
+                yield world.getBlockState(sandCheck).getBlock() == Blocks.SAND;
+            }
+            case "roman" -> {
+                BlockPos stoneCheck = pos.down();
+                yield world.getBlockState(stoneCheck).getBlock().getBlastResistance() >= 6.0f;
+            }
+            case "victorian" -> pos.getY() > world.getSeaLevel() + 2;
+            case "nyc" -> isUrbanTerrain(world, pos) && hasAdequateSpace(world, pos, structure);
+            default -> true;
+        };
+    }
+
+    private boolean isUrbanTerrain(World world, BlockPos pos) {
+        // Check for artificial/urban type blocks in the area
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                BlockPos checkPos = pos.add(x, -1, z);
+                Block block = world.getBlockState(checkPos).getBlock();
+                if (block == Blocks.STONE_BRICKS || block == Blocks.SMOOTH_STONE || 
+                    block == Blocks.STONE) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAdequateSpace(World world, BlockPos pos, String structure) {
+        Box bounds = getStructureBounds(structure);
+        int width = (int)(bounds.maxX - bounds.minX);
+        int length = (int)(bounds.maxZ - bounds.minZ);
+        int height = (int)(bounds.maxY - bounds.minY);
+
+        // For skyscrapers, check vertical clearance
+        if (structure.toLowerCase().contains("skyscraper")) {
+            for (int y = 0; y < height; y++) {
+                BlockPos checkPos = pos.up(y);
+                if (!world.getBlockState(checkPos).isAir()) {
                     return false;
                 }
             }
         }
-        
+
+        // Check for adequate spacing between buildings
+        int spacing = structure.toLowerCase().contains("skyscraper") ? 10 : 5;
+        for (BlockPos existingPos : culturalStructures.values()) {
+            double distance = Math.sqrt(pos.getSquaredDistance(existingPos));
+            if (distance < width/2 + spacing) {
+                return false;
+            }
+        }
+
         return true;
     }
 
+    private Box getStructureBounds(String structure) {
+        // Default sizes for different structure types
+        Vec3d size = switch(structure.toLowerCase()) {
+            case "temple", "forum", "palace" -> new Vec3d(15, 12, 15);
+            case "house", "shop" -> new Vec3d(7, 5, 9);
+            case "monument", "statue" -> new Vec3d(5, 8, 5);
+            default -> new Vec3d(9, 6, 9);
+        };
+        return new Box(0, 0, 0, size.x, size.y, size.z);
+    }
+
     private void generateCulturalStructure(World world, BlockPos pos, String structureName) {
-        if (!(world instanceof ServerWorld)) {
+        if (!(world instanceof ServerWorld serverWorld)) {
             LOGGER.error("Cannot generate structure in non-server world");
             return;
         }
 
-        ServerWorld serverWorld = (ServerWorld) world;
-        String namespace = "villagesreborn";
-        String path = String.format("structures/%s/%s",
-            culture.toLowerCase(), structureName.toLowerCase().replace(" ", "_"));
-            
+        String path = String.format("structures/%s/%s", culture.toLowerCase(), 
+            structureName.toLowerCase().replace(" ", "_"));
+        Identifier templateId = Identifier.of("villagesreborn", path);
+        
         try {
-            // Get structure template from server
-            Identifier templateId = Identifier.of(namespace, path);
-            Optional<StructureTemplate> template = serverWorld.getStructureTemplateManager().getTemplate(templateId);
+            Optional<StructureTemplate> template = serverWorld.getStructureTemplateManager()
+                .getTemplate(templateId);
             
             if (template.isEmpty()) {
-                LOGGER.error("Structure template not found: {}", templateId);
+                LOGGER.warn("Template not found: {}, falling back to procedural generation", templateId);
+                generateProceduralStructure(world, pos, structureName);
                 return;
             }
 
-            // Create placement data
+            BlockPos placementPos = findGroundPosition(world, pos, template.get().getSize());
             StructurePlacementData placementData = new StructurePlacementData()
                 .setIgnoreEntities(false)
                 .setRotation(BlockRotation.random(serverWorld.getRandom()))
                 .setMirror(BlockMirror.NONE);
 
-            // Find suitable ground position
-            BlockPos placementPos = findGroundPosition(world, pos, template.get().getSize());
+            template.get().place(serverWorld, placementPos, placementPos, 
+                placementData, serverWorld.getRandom(), Block.NOTIFY_ALL);
             
-            // Place the structure
-            template.get().place(
-                serverWorld,
-                placementPos,
-                placementPos,
-                placementData,
-                serverWorld.getRandom(),
-                Block.NOTIFY_ALL | Block.FORCE_STATE);
-
-            LOGGER.info("Successfully generated {} at {}", templateId, placementPos);
             Box boundingBox = new Box(
                 placementPos.getX(), placementPos.getY(), placementPos.getZ(),
                 placementPos.getX() + template.get().getSize().getX(),
@@ -262,45 +319,79 @@ public class SpawnRegion {
                 placementPos.getZ() + template.get().getSize().getZ()
             );
             addStructurePointsOfInterest(world, placementPos, boundingBox);
+            culturalStructures.put(structureName, placementPos);
         } catch (Exception e) {
-            LOGGER.error("Error generating structure {}/{}: {}", namespace, path, e.getMessage());
+            LOGGER.error("Error generating structure {}: {}", templateId, e.getMessage());
+        }
+    }
+
+    private void generateProceduralStructure(World world, BlockPos pos, String structureName) {
+        switch(culture.toLowerCase()) {
+            case "roman" -> generateRomanStructure(world, pos, structureName);
+            case "egyptian" -> generateEgyptianStructure(world, pos, structureName);
+            case "victorian" -> generateVictorianStructure(world, pos, structureName);
+            case "nyc" -> generateNYCStructure(world, pos, structureName);
+            default -> LOGGER.error("Unknown culture for procedural generation: {}", culture);
         }
     }
 
     private BlockPos findGroundPosition(World world, BlockPos pos, Vec3i size) {
-        int x = pos.getX();
-        int z = pos.getZ();
-        int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+        int highestY = Integer.MIN_VALUE;
+        int lowestY = Integer.MAX_VALUE;
         
-        // Check if area is flat enough
-        int maxHeightDiff = 3;
-        int baseHeight = y;
-        
-        for (int dx = 0; dx < size.getX(); dx++) {
-            for (int dz = 0; dz < size.getZ(); dz++) {
-                int height = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x + dx, z + dz);
-                if (Math.abs(height - baseHeight) > maxHeightDiff) {
-                    y = Math.max(y, height); // Use highest point to ensure structure isn't floating
-                }
+        // Find the highest and lowest points in the building footprint
+        for (int x = 0; x < size.getX(); x++) {
+            for (int z = 0; z < size.getZ(); z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                    pos.getX() + x, pos.getZ() + z);
+                highestY = Math.max(highestY, y);
+                lowestY = Math.min(lowestY, y);
             }
         }
-        
-        return new BlockPos(x, y, z);
+
+        // If the terrain is too uneven, level it
+        if (highestY - lowestY > 3) {
+            int averageY = (highestY + lowestY) / 2;
+            levelTerrain(world, pos, size, averageY);
+            return new BlockPos(pos.getX(), averageY, pos.getZ());
+        }
+
+        return new BlockPos(pos.getX(), lowestY, pos.getZ());
+    }
+
+    private void levelTerrain(World world, BlockPos pos, Vec3i size, int targetY) {
+        for (int x = 0; x < size.getX(); x++) {
+            for (int z = 0; z < size.getZ(); z++) {
+                BlockPos levelPos = new BlockPos(pos.getX() + x, targetY, pos.getZ() + z);
+                
+                // Fill below target height
+                for (int y = targetY - 1; y >= targetY - 3; y--) {
+                    world.setBlockState(new BlockPos(levelPos.getX(), y, levelPos.getZ()),
+                        Blocks.DIRT.getDefaultState());
+                }
+                
+                // Clear above target height
+                for (int y = targetY + 1; y <= targetY + size.getY(); y++) {
+                    world.setBlockState(new BlockPos(levelPos.getX(), y, levelPos.getZ()),
+                        Blocks.AIR.getDefaultState());
+                }
+                
+                // Set surface block
+                world.setBlockState(levelPos, switch(culture.toLowerCase()) {
+                    case "egyptian" -> Blocks.SAND.getDefaultState();
+                    case "roman" -> Blocks.STONE.getDefaultState();
+                    default -> Blocks.GRASS_BLOCK.getDefaultState();
+                });
+            }
+        }
     }
 
     private void addStructurePointsOfInterest(World world, BlockPos pos, Box boundingBox) {
-        Vec3d size = boundingBox.getCenter();
-        int sizeX = (int)(boundingBox.maxX - boundingBox.minX);
-        int sizeZ = (int)(boundingBox.maxZ - boundingBox.minZ);
-        
-        // Add POIs at structure corners
         addPointOfInterest(pos);
-        addPointOfInterest(pos.add(sizeX, 0, 0));
-        addPointOfInterest(pos.add(0, 0, sizeZ));
-        addPointOfInterest(pos.add(sizeX, 0, sizeZ));
-        
-        // Add POI at the entrance (assuming front is -Z)
-        addPointOfInterest(pos.add(sizeX / 2, 0, -1));
+        addPointOfInterest(pos.add((int)boundingBox.maxX, 0, 0));
+        addPointOfInterest(pos.add(0, 0, (int)boundingBox.maxZ));
+        addPointOfInterest(pos.add((int)boundingBox.maxX, 0, (int)boundingBox.maxZ));
+        addPointOfInterest(pos.add((int)(boundingBox.maxX / 2), 0, -1)); // Entrance POI
     }
 
     public void addPointOfInterest(BlockPos pos) {
@@ -391,33 +482,114 @@ public class SpawnRegion {
             .thenCompose(layout -> {
                 // Generate the village center first
                 String centerBuilding = (String) layout.get("CENTER");
-                return generateCulturalBuildingDescription(centerBuilding)
-                    .thenCompose(centerDesc -> {
-                        BlockPos centerPos = findBuildingLocation(world, centerBuilding);
-                        generateBuildingFromDescription(world, centerPos, centerDesc);
+                BlockPos centerPos = findBuildingLocation(world, centerBuilding);
+                if (centerPos != null) {
+                    generateCulturalStructure(world, centerPos, centerBuilding);
+                    culturalStructures.put(centerBuilding, centerPos);
+                    addPointOfInterest(centerPos);
 
-                        // Then generate districts
-                        @SuppressWarnings("unchecked")
-                        List<String> districts = (List<String>) layout.get("DISTRICTS");
-                        List<CompletableFuture<Void>> districtFutures = new ArrayList<>();
+                    // Then generate districts in a spiral pattern around center
+                    @SuppressWarnings("unchecked")
+                    List<String> districts = (List<String>) layout.get("DISTRICTS");
+                    List<CompletableFuture<Void>> districtFutures = new ArrayList<>();
+                    
+                    int spiralRadius = Math.max(5, radius / districts.size());
+                    for (int i = 0; i < districts.size(); i++) {
+                        double angle = (2 * Math.PI * i) / districts.size();
+                        int x = center.getX() + (int)(Math.cos(angle) * spiralRadius);
+                        int z = center.getZ() + (int)(Math.sin(angle) * spiralRadius);
+                        int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+                        BlockPos districtPos = new BlockPos(x, y, z);
+                        
+                        String district = districts.get(i);
+                        districtFutures.add(generateDistrict(world, district, layout));
+                        
+                        // Connect district to center with paths
+                        generateCulturalPathways(world, centerPos, districtPos);
+                    }
 
-                        for (String district : districts) {
-                            districtFutures.add(generateDistrict(world, district, layout));
-                        }
-
-                        return CompletableFuture.allOf(districtFutures.toArray(new CompletableFuture[0]));
-                    });
+                    return CompletableFuture.allOf(districtFutures.toArray(new CompletableFuture[0]));
+                }
+                return CompletableFuture.completedFuture(null);
             })
             .thenRun(() -> {
-                // Finally generate paths and decorations
-                generateCulturalPathways(world);
+                // Add decorative elements and final touches
                 addCulturalDecorations(world);
+                validateVillageIntegrity(world);
                 LOGGER.info("Completed generation of {} village at {}", culture, center);
             })
             .exceptionally(e -> {
                 LOGGER.error("Error generating village: {}", e.getMessage());
                 return null;
             });
+    }
+
+    private void validateVillageIntegrity(World world) {
+        // Verify all structures are properly connected
+        Set<BlockPos> connected = new HashSet<>();
+        connected.add(center);
+        
+        // Use breadth-first search to check connectivity
+        Queue<BlockPos> toCheck = new LinkedList<>(connected);
+        while (!toCheck.isEmpty()) {
+            BlockPos current = toCheck.poll();
+            for (BlockPos target : culturalStructures.values()) {
+                if (!connected.contains(target) && isPathConnected(world, current, target)) {
+                    connected.add(target);
+                    toCheck.add(target);
+                }
+            }
+        }
+
+        // Fix any disconnected structures
+        for (Map.Entry<String, BlockPos> structure : culturalStructures.entrySet()) {
+            if (!connected.contains(structure.getValue())) {
+                BlockPos nearest = findNearestConnected(structure.getValue(), connected);
+                if (nearest != null) {
+                    generateCulturalPathways(world, nearest, structure.getValue());
+                    LOGGER.info("Fixed connectivity for {} at {}", structure.getKey(), structure.getValue());
+                }
+            }
+        }
+    }
+
+    private boolean isPathConnected(World world, BlockPos start, BlockPos end) {
+        PathStyle style = getCulturalPathStyle();
+        int minDistance = (int) Math.sqrt(start.getSquaredDistance(end));
+        
+        // Check if there's a continuous path of path blocks
+        Set<BlockPos> checked = new HashSet<>();
+        Queue<BlockPos> toCheck = new LinkedList<>();
+        toCheck.add(start);
+        
+        while (!toCheck.isEmpty() && checked.size() < minDistance * 3) {
+            BlockPos current = toCheck.poll();
+            if (current.isWithinDistance(end, 2)) {
+                return true;
+            }
+            
+            for (Direction dir : Direction.Type.HORIZONTAL) {
+                BlockPos next = current.offset(dir);
+                if (!checked.contains(next)) {
+                    int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, next.getX(), next.getZ());
+                    BlockPos pathPos = new BlockPos(next.getX(), y - 1, next.getZ());
+                    Block block = world.getBlockState(pathPos).getBlock();
+                    
+                    if (Arrays.asList(style.blocks).contains(block)) {
+                        checked.add(next);
+                        toCheck.add(next);
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    private BlockPos findNearestConnected(BlockPos pos, Set<BlockPos> connected) {
+        return connected.stream()
+            .min(Comparator.comparingDouble(p -> p.getSquaredDistance(pos)))
+            .orElse(null);
     }
 
     private CompletableFuture<Void> generateDistrict(World world, String district, Map<String, Object> layout) {
@@ -786,6 +958,175 @@ public class SpawnRegion {
         }
     }
 
+    private void generateRomanStructure(World world, BlockPos pos, String structureName) {
+        switch(structureName.toLowerCase()) {
+            case "temple" -> generateRomanTemple(world, pos);
+            case "villa" -> generateRomanVilla(world, pos);
+            case "bathhouse" -> generateRomanBathhouse(world, pos);
+            case "market" -> generateRomanMarket(world, pos);
+            default -> generateRomanHouse(world, pos, world.getRandom());
+        }
+    }
+
+    private void generateRomanTemple(World world, BlockPos pos) {
+        int width = 11;
+        int length = 15;
+        int height = 8;
+        
+        // Generate podium
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+                for (int dy = -1; dy < 1; dy++) {
+                    BlockPos podiumPos = new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z);
+                    world.setBlockState(podiumPos, Blocks.STONE_BRICKS.getDefaultState());
+                }
+            }
+        }
+
+        // Generate columns
+        for (int x = -width/2; x <= width/2; x += 2) {
+            for (int z : new int[]{-length/2, length/2}) {
+                generateRomanColumn(world, new BlockPos(pos.getX() + x, 
+                    world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z), 
+                    pos.getZ() + z));
+            }
+        }
+
+        // Generate roof
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+                BlockPos roofPos = new BlockPos(pos.getX() + x, y + height - 1, pos.getZ() + z);
+                world.setBlockState(roofPos, Blocks.STONE_BRICK_SLAB.getDefaultState());
+            }
+        }
+    }
+
+    private void generateRomanVilla(World world, BlockPos pos) {
+        int width = 13;
+        int length = 17;
+        int height = 6;
+
+        // Generate main structure
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+                
+                // Foundation
+                world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z), 
+                    Blocks.STONE_BRICKS.getDefaultState());
+
+                // Walls
+                if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                    for (int dy = 0; dy < height; dy++) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                            Blocks.STONE_BRICKS.getDefaultState());
+                    }
+                }
+            }
+        }
+
+        // Generate interior courtyard
+        int courtyardWidth = 5;
+        int courtyardLength = 7;
+        for (int x = -courtyardWidth/2; x <= courtyardWidth/2; x++) {
+            for (int z = -courtyardLength/2; z <= courtyardLength/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                    pos.getX() + x, pos.getZ() + z);
+                // Place water feature in center
+                if (x == 0 && z == 0) {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y, pos.getZ() + z),
+                        Blocks.WATER.getDefaultState());
+                } else {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                        Blocks.STONE_BRICKS.getDefaultState());
+                }
+            }
+        }
+    }
+
+    private void generateRomanBathhouse(World world, BlockPos pos) {
+        int width = 9;
+        int length = 13;
+        int height = 5;
+
+        // Generate main structure
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+                
+                // Foundation and floor
+                world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                    Blocks.STONE_BRICKS.getDefaultState());
+
+                // Walls
+                if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                    for (int dy = 0; dy < height; dy++) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                            dy == height - 1 ? Blocks.STONE_BRICK_STAIRS.getDefaultState() :
+                            Blocks.STONE_BRICKS.getDefaultState());
+                    }
+                }
+
+                // Water pools
+                if (Math.abs(x) < width/3 && Math.abs(z) < length/3) {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y, pos.getZ() + z),
+                        Blocks.WATER.getDefaultState());
+                }
+            }
+        }
+    }
+
+    private void generateRomanMarket(World world, BlockPos pos) {
+        int width = 15;
+        int length = 15;
+
+        // Generate market square
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -length/2; z <= length/2; z++) {
+                int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+                
+                // Market floor
+                world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                    (x + z) % 2 == 0 ? Blocks.STONE_BRICKS.getDefaultState() : 
+                    Blocks.SMOOTH_STONE.getDefaultState());
+
+                // Market stalls on the edges
+                if ((Math.abs(x) == width/2 || Math.abs(z) == length/2) && 
+                    (x + z) % 3 == 0) {
+                    generateMarketStall(world, new BlockPos(pos.getX() + x, y, pos.getZ() + z));
+                }
+            }
+        }
+    }
+
+    private void generateMarketStall(World world, BlockPos pos) {
+        // Generate small market stall structure
+        for (int y = 0; y < 3; y++) {
+            for (int x = -1; x <= 1; x++) {
+                for (int z = -1; z <= 1; z++) {
+                    if (y == 2) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, pos.getY() + y, pos.getZ() + z),
+                            Blocks.OAK_SLAB.getDefaultState());
+                    } else if (y == 1) {
+                        if (x == 0 && z == 0) continue; // Empty space
+                        world.setBlockState(new BlockPos(pos.getX() + x, pos.getY() + y, pos.getZ() + z),
+                            Blocks.OAK_FENCE.getDefaultState());
+                    } else {
+                        if (x == 0 && z == 0) {
+                            world.setBlockState(new BlockPos(pos.getX() + x, pos.getY() + y, pos.getZ() + z),
+                                Blocks.CRAFTING_TABLE.getDefaultState());
+                        } else {
+                            world.setBlockState(new BlockPos(pos.getX() + x, pos.getY() + y, pos.getZ() + z),
+                                Blocks.OAK_PLANKS.getDefaultState());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void generateEgyptianVillage(World world) {
         LOGGER.info("Generating Egyptian village at {}", center);
 
@@ -949,6 +1290,139 @@ private void addEgyptianDecorations(World world) {
     }
 }
 
+private void generateEgyptianStructure(World world, BlockPos pos, String structureName) {
+    switch(structureName.toLowerCase()) {
+        case "temple" -> generateEgyptianTemple(world, pos);
+        case "pyramid" -> generatePyramid(world, pos, 15);
+        case "obelisk" -> generateObelisk(world, pos);
+        case "palace" -> generateEgyptianPalace(world, pos);
+        default -> generateMudBrickHouse(world, pos);
+    }
+}
+
+private void generateEgyptianTemple(World world, BlockPos pos) {
+    int width = 13;
+    int length = 17;
+    int height = 10;
+
+    // Generate main temple structure
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+            
+            // Foundation
+            for (int dy = -1; dy < 1; dy++) {
+                world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                    Blocks.SANDSTONE.getDefaultState());
+            }
+
+            // Walls
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 1; dy < height; dy++) {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                        Blocks.SMOOTH_SANDSTONE.getDefaultState());
+                    
+                    // Add hieroglyph decorations
+                    if (dy > height/2 && (x + z) % 2 == 0) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                            Blocks.CHISELED_SANDSTONE.getDefaultState());
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate entrance pylons
+    generatePylon(world, new BlockPos(pos.getX() - width/2, pos.getY(), pos.getZ() - length/2));
+    generatePylon(world, new BlockPos(pos.getX() + width/2, pos.getY(), pos.getZ() - length/2));
+}
+
+private void generateObelisk(World world, BlockPos pos) {
+    int height = 12;
+    int baseWidth = 3;
+
+    // Generate base
+    for (int x = -baseWidth/2; x <= baseWidth/2; x++) {
+        for (int z = -baseWidth/2; z <= baseWidth/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+            world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                Blocks.SMOOTH_SANDSTONE.getDefaultState());
+        }
+    }
+
+    // Generate obelisk shaft
+    for (int y = 0; y < height; y++) {
+        int width = Math.max(1, baseWidth - (y / 4));
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -width/2; z <= width/2; z++) {
+                world.setBlockState(new BlockPos(pos.getX() + x, 
+                    world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z) + y,
+                    pos.getZ() + z),
+                    y == height - 1 ? Blocks.GOLD_BLOCK.getDefaultState() : 
+                    Blocks.SMOOTH_SANDSTONE.getDefaultState());
+            }
+        }
+    }
+}
+
+private void generateEgyptianPalace(World world, BlockPos pos) {
+    int width = 15;
+    int length = 19;
+    int height = 7;
+
+    // Generate main palace structure
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+            
+            // Foundation and floor
+            for (int dy = -1; dy < 1; dy++) {
+                world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                    Blocks.SMOOTH_SANDSTONE.getDefaultState());
+            }
+
+            // Walls
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 1; dy < height; dy++) {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                        Blocks.SANDSTONE.getDefaultState());
+                }
+            }
+        }
+    }
+
+    // Generate courtyards
+    generateEgyptianCourtyard(world, new BlockPos(pos.getX() - width/4, pos.getY(), pos.getZ()));
+    generateEgyptianCourtyard(world, new BlockPos(pos.getX() + width/4, pos.getY(), pos.getZ()));
+}
+
+private void generateEgyptianCourtyard(World world, BlockPos pos) {
+    int size = 5;
+    
+    for (int x = -size/2; x <= size/2; x++) {
+        for (int z = -size/2; z <= size/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+            
+            // Create water feature in center
+            if (x == 0 && z == 0) {
+                world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                    Blocks.WATER.getDefaultState());
+            } else {
+                world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                    Blocks.SMOOTH_SANDSTONE.getDefaultState());
+            }
+            
+            // Add pillars at corners
+            if ((Math.abs(x) == size/2 && Math.abs(z) == size/2)) {
+                for (int dy = 0; dy < 3; dy++) {
+                    world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                        Blocks.SANDSTONE_WALL.getDefaultState());
+                }
+            }
+        }
+    }
+}
+
 private void generateVictorianVillage(World world) {
     LOGGER.info("Generating Victorian village at {}", center);
 
@@ -962,7 +1436,8 @@ private void generateVictorianVillage(World world) {
     generateFactoryDistrict(world);
 
     // Generate Victorian church
-    generateVictorianChurch(world);
+    BlockPos churchPos = center.add(-radius/2, 0, -radius/3);
+    generateVictorianChurch(world, churchPos);
 
     // Generate traditional pub
     generateTraditionalPub(world);
@@ -1075,11 +1550,11 @@ private void generateFactoryChimney(World world, BlockPos base) {
     }
 }
 
-private void generateVictorianChurch(World world) {
-    BlockPos churchPos = center.add(-radius/2, 0, -radius/3);
+private void generateVictorianChurch(World world, BlockPos pos) {
     int width = 8;
     int length = 12;
     int height = 8;
+    BlockPos churchPos = pos;
 
     // Main building
     for (int x = -width/2; x <= width/2; x++) {
@@ -1421,5 +1896,464 @@ private boolean isNearNYCStreet(BlockPos pos) {
     int x = pos.getX() - center.getX();
     int z = pos.getZ() - center.getZ();
     return x % blockSize < 5 || z % blockSize < 5;
+}
+
+private void generateVictorianStructure(World world, BlockPos pos, String structureName) {
+    switch(structureName.toLowerCase()) {
+        case "mansion" -> generateVictorianMansion(world, pos);
+        case "factory" -> generateVictorianFactory(world, pos);
+        case "church" -> generateVictorianChurch(world, pos);
+        case "shop" -> generateVictorianShop(world, pos);
+        default -> generateTerracedHouse(world, pos, 5, 8);
+    }
+}
+
+private void generateVictorianMansion(World world, BlockPos pos) {
+    int width = 15;
+    int length = 15;
+    int height = 12;
+
+    // Generate main structure
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+
+            // Foundation
+            world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                Blocks.STONE_BRICKS.getDefaultState());
+
+            // Walls
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 0; dy < height; dy++) {
+                    Block block = switch(dy % 4) {
+                        case 0 -> Blocks.STONE_BRICKS;
+                        case 1 -> Blocks.BRICKS;
+                        case 2 -> Blocks.STONE_BRICKS;
+                        default -> Blocks.BRICKS;
+                    };
+                    world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                        block.getDefaultState());
+                }
+            }
+        }
+    }
+
+    // Generate tower
+    generateVictorianTower(world, new BlockPos(pos.getX() + width/2, pos.getY(), pos.getZ() + length/2));
+}
+
+private void generateVictorianTower(World world, BlockPos pos) {
+    int height = 16;
+    int width = 3;
+
+    for (int y = 0; y < height; y++) {
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -width/2; z <= width/2; z++) {
+                if (y == height - 1) {
+                    // Spire top
+                    if (x == 0 && z == 0) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, 
+                            pos.getY() + y, pos.getZ() + z),
+                            Blocks.IRON_BARS.getDefaultState());
+                    }
+                } else {
+                    world.setBlockState(new BlockPos(pos.getX() + x, 
+                        pos.getY() + y, pos.getZ() + z),
+                        Blocks.STONE_BRICKS.getDefaultState());
+                }
+            }
+        }
+    }
+}
+
+private void generateVictorianFactory(World world, BlockPos pos) {
+    int width = 13;
+    int length = 17;
+    int height = 10;
+
+    // Main building
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+
+            // Foundation
+            world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                Blocks.STONE_BRICKS.getDefaultState());
+
+            // Walls
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 0; dy < height; dy++) {
+                    Block block = (dy % 3 == 0) ? Blocks.STONE_BRICKS : Blocks.BRICKS;
+                    world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                        block.getDefaultState());
+
+                    // Windows
+                    if (dy > 1 && dy < height-1 && (x + z) % 3 == 0) {
+                        world.setBlockState(new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z),
+                            Blocks.GLASS_PANE.getDefaultState());
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate chimneys
+    generateFactoryChimney(world, new BlockPos(pos.getX() - width/4, pos.getY() + height, pos.getZ() - length/4));
+    generateFactoryChimney(world, new BlockPos(pos.getX() + width/4, pos.getY() + height, pos.getZ() + length/4));
+}
+
+private void generateVictorianShop(World world, BlockPos pos) {
+    int width = 7;
+    int length = 9;
+    int height = 6;
+
+    // Main building
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX() + x, pos.getZ() + z);
+
+            // Foundation
+            world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                Blocks.STONE_BRICKS.getDefaultState());
+
+            // Walls and shop front
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 0; dy < height; dy++) {
+                    BlockPos buildPos = new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z);
+                    
+                    // Shop front with large windows
+                    if (z == -length/2 && dy < 3 && x != -width/2 && x != width/2) {
+                        world.setBlockState(buildPos, Blocks.GLASS_PANE.getDefaultState());
+                    } else {
+                        world.setBlockState(buildPos, Blocks.BRICKS.getDefaultState());
+                    }
+                }
+            }
+        }
+    }
+
+    // Generate awning
+    for (int x = -width/2; x <= width/2; x++) {
+        world.setBlockState(new BlockPos(pos.getX() + x, 
+            pos.getY() + 3, pos.getZ() - length/2 - 1),
+            Blocks.OAK_STAIRS.getDefaultState());
+    }
+}
+
+private void generateNYCStructure(World world, BlockPos pos, String structureName) {
+    switch(structureName.toLowerCase()) {
+        case "skyscraper" -> generateModernSkyscraperBuilding(world, pos);
+        case "apartment" -> generateBrownstone(world, pos);
+        case "store" -> generateRetailStore(world, pos);
+        case "subway" -> generateSubwayStationBuilding(world, pos);
+        default -> generateCommercialBuilding(world, pos);
+    }
+}
+
+private void generateModernSkyscraperBuilding(World world, BlockPos pos) {
+    // Renamed to avoid conflict
+    int baseWidth = 11;
+    int height = 40 + world.getRandom().nextInt(20);
+
+    // Core structure
+    for (int y = 0; y < height; y++) {
+        int width = Math.max(7, baseWidth - (y / 10));
+        for (int x = -width/2; x <= width/2; x++) {
+            for (int z = -width/2; z <= width/2; z++) {
+                int baseY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                    pos.getX() + x, pos.getZ() + z);
+                    
+                BlockPos buildPos = new BlockPos(pos.getX() + x, baseY + y, pos.getZ() + z);
+                
+                if (x == -width/2 || x == width/2 || z == -width/2 || z == width/2) {
+                    world.setBlockState(buildPos, (y % 4 < 2) ? 
+                        Blocks.GLASS.getDefaultState() : 
+                        Blocks.SMOOTH_STONE.getDefaultState());
+                }
+                else if (y % 4 == 0) {
+                    world.setBlockState(buildPos, Blocks.SMOOTH_STONE.getDefaultState());
+                }
+            }
+        }
+    }
+
+    // Antenna/spire
+    for (int y = 0; y < 5; y++) {
+        world.setBlockState(new BlockPos(pos.getX(), pos.getY() + height + y, pos.getZ()),
+            Blocks.IRON_BARS.getDefaultState());
+    }
+}
+
+private void generateRetailStore(World world, BlockPos pos) {
+    int width = 9;
+    int length = 11;
+    int height = 4;
+
+    // Main structure
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                pos.getX() + x, pos.getZ() + z);
+
+            // Foundation
+            world.setBlockState(new BlockPos(pos.getX() + x, y - 1, pos.getZ() + z),
+                Blocks.SMOOTH_STONE.getDefaultState());
+
+            // Walls
+            if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                for (int dy = 0; dy < height; dy++) {
+                    BlockPos buildPos = new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z);
+                    
+                    // Storefront windows
+                    if (z == -length/2 && dy < 3 && x > -width/2 && x < width/2) {
+                        world.setBlockState(buildPos, Blocks.GLASS_PANE.getDefaultState());
+                    } else {
+                        world.setBlockState(buildPos, Blocks.SMOOTH_STONE.getDefaultState());
+                    }
+                }
+            }
+        }
+    }
+
+    // Modern signage
+    for (int x = -width/2 + 1; x <= width/2 - 1; x++) {
+        world.setBlockState(new BlockPos(pos.getX() + x, 
+            pos.getY() + height, pos.getZ() - length/2),
+            Blocks.GLOWSTONE.getDefaultState());
+    }
+}
+
+private void generateSubwayStationBuilding(World world, BlockPos pos) {
+    // Renamed to avoid conflict
+    int width = 7;
+    int length = 11;
+    int depth = 5;
+
+    // Underground platform
+    for (int x = -width/2; x <= width/2; x++) {
+        for (int z = -length/2; z <= length/2; z++) {
+            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                pos.getX() + x, pos.getZ() + z);
+                
+            for (int dy = -depth; dy < 0; dy++) {
+                BlockPos buildPos = new BlockPos(pos.getX() + x, y + dy, pos.getZ() + z);
+                
+                if (dy == -depth) {
+                    world.setBlockState(buildPos, Blocks.SMOOTH_STONE.getDefaultState());
+                }
+                else if (x == -width/2 || x == width/2 || z == -length/2 || z == length/2) {
+                    world.setBlockState(buildPos, Blocks.STONE_BRICKS.getDefaultState());
+                }
+                else {
+                    world.setBlockState(buildPos, Blocks.AIR.getDefaultState());
+                }
+            }
+        }
+    }
+
+    // Entrance structures at both ends
+    generateSubwayEntranceStructure(world, pos);
+    generateSubwayEntranceStructure(world, new BlockPos(pos.getX(), pos.getY(), pos.getZ() + length/2));
+}
+
+private void generateSubwayEntranceStructure(World world, BlockPos pos) {
+    // Renamed to avoid conflict
+    int entranceHeight = 4;
+    
+    for (int y = 0; y < entranceHeight; y++) {
+        for (int x = -1; x <= 1; x++) {
+            BlockPos stairPos = new BlockPos(pos.getX() + x, pos.getY() + y, pos.getZ());
+            
+            if (x == -1 || x == 1) {
+                world.setBlockState(stairPos, Blocks.SMOOTH_STONE.getDefaultState());
+            }
+            else {
+                world.setBlockState(stairPos, Blocks.STONE_STAIRS.getDefaultState());
+            }
+        }
+    }
+
+    // Entrance roof
+    for (int x = -1; x <= 1; x++) {
+        world.setBlockState(new BlockPos(pos.getX() + x, 
+            pos.getY() + entranceHeight, pos.getZ()),
+            Blocks.SMOOTH_STONE_SLAB.getDefaultState());
+    }
+}
+
+private void generateCulturalPathways(World world, BlockPos from, BlockPos to) {
+    // Get path style based on culture
+    PathStyle style = getCulturalPathStyle();
+    Queue<PathNode> pathQueue = new PriorityQueue<>(Comparator.comparingDouble(n -> n.cost));
+    Set<BlockPos> visited = new HashSet<>();
+    Map<BlockPos, BlockPos> cameFrom = new HashMap<>();
+    Map<BlockPos, Double> costSoFar = new HashMap<>();
+    
+    pathQueue.add(new PathNode(from, 0));
+    costSoFar.put(from, 0.0);
+    
+    while (!pathQueue.isEmpty()) {
+        PathNode current = pathQueue.poll();
+        if (current.pos.equals(to)) {
+            buildPath(world, reconstructPath(current.pos, cameFrom), style);
+            return;
+        }
+        
+        for (Direction dir : Direction.Type.HORIZONTAL) {
+            BlockPos next = current.pos.offset(dir);
+            double newCost = costSoFar.get(current.pos) + getPathCost(world, next, style);
+            
+            if (!visited.contains(next) && isValidPathLocation(world, next)) {
+                visited.add(next);
+                cameFrom.put(next, current.pos);
+                costSoFar.put(next, newCost);
+                pathQueue.add(new PathNode(next, newCost + estimateDistance(next, to)));
+            }
+        }
+    }
+}
+
+private record PathNode(BlockPos pos, double cost) implements Comparable<PathNode> {
+    @Override
+    public int compareTo(PathNode other) {
+        return Double.compare(this.cost, other.cost);
+    }
+}
+
+private static final class PathStyle {
+    final Block[] blocks;
+    final boolean elevated;
+    final boolean addLights;
+    final int lightSpacing;
+
+    PathStyle(Block[] blocks, boolean elevated, boolean addLights, int lightSpacing) {
+        this.blocks = blocks;
+        this.elevated = elevated;
+        this.addLights = addLights;
+        this.lightSpacing = lightSpacing;
+    }
+}
+
+private PathStyle getCulturalPathStyle() {
+    return switch(culture.toLowerCase()) {
+        case "roman" -> new PathStyle(
+            new Block[]{Blocks.STONE_BRICKS, Blocks.POLISHED_ANDESITE}, 
+            true, true, 6);
+        case "egyptian" -> new PathStyle(
+            new Block[]{Blocks.SANDSTONE, Blocks.SMOOTH_SANDSTONE},
+            false, true, 8);
+        case "victorian" -> new PathStyle(
+            new Block[]{Blocks.COBBLESTONE, Blocks.STONE_BRICKS},
+            true, true, 5);
+        case "nyc" -> new PathStyle(
+            new Block[]{Blocks.STONE_BRICKS, Blocks.SMOOTH_STONE},
+            true, true, 4);
+        default -> new PathStyle(
+
+private PathStyle getCulturalPathStyle() {
+    return switch(culture.toLowerCase()) {
+        case "roman" -> new PathStyle(
+            new Block[]{Blocks.STONE_BRICKS, Blocks.POLISHED_ANDESITE}, 
+            true, true, 6);
+        case "egyptian" -> new PathStyle(
+            new Block[]{Blocks.SANDSTONE, Blocks.SMOOTH_SANDSTONE},
+            false, true, 8);
+        case "victorian" -> new PathStyle(
+            new Block[]{Blocks.COBBLESTONE, Blocks.STONE_BRICKS},
+            true, true, 5);
+        case "nyc" -> new PathStyle(
+            new Block[]{Blocks.STONE_BRICKS, Blocks.SMOOTH_STONE},
+            true, true, 4);
+        default -> new PathStyle(
+            new Block[]{Blocks.DIRT_PATH},
+            false, false, 0);
+    };
+}
+
+private double getPathCost(World world, BlockPos pos, PathStyle style) {
+    int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
+    
+    // Higher cost for elevation changes
+    double heightCost = Math.abs(y - pos.getY()) * 2.0;
+    
+    // Higher cost for water crossing
+    if (world.getBlockState(pos).getBlock() == Blocks.WATER) {
+        return 10.0 + heightCost;
+    }
+    
+    // Lower cost for existing paths
+    Block block = world.getBlockState(pos.down()).getBlock();
+    if (Arrays.asList(style.blocks).contains(block)) {
+        return 0.5 + heightCost;
+    }
+    
+    return 1.0 + heightCost;
+}
+
+private boolean isValidPathLocation(World world, BlockPos pos) {
+    // Check if we can build a path here
+    int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
+    BlockPos checkPos = new BlockPos(pos.getX(), y - 1, pos.getZ());
+    
+    // Don't build through buildings
+    if (culturalStructures.values().stream()
+        .anyMatch(structurePos -> structurePos.isWithinDistance(checkPos, 3))) {
+        return false;
+    }
+    
+    return world.getBlockState(checkPos).isSolidBlock(world, checkPos);
+}
+
+private List<BlockPos> reconstructPath(BlockPos current, Map<BlockPos, BlockPos> cameFrom) {
+    List<BlockPos> path = new ArrayList<>();
+    BlockPos pos = current;
+    
+    while (cameFrom.containsKey(pos)) {
+        path.add(pos);
+        pos = cameFrom.get(pos);
+    }
+    path.add(pos);
+    Collections.reverse(path);
+    
+    return path;
+}
+
+private void buildPath(World world, List<BlockPos> path, PathStyle style) {
+    int lightCounter = 0;
+    
+    for (BlockPos pos : path) {
+        int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
+        BlockPos pathPos = new BlockPos(pos.getX(), y - 1, pos.getZ());
+        
+        // Place path block
+        Block pathBlock = style.blocks[world.getRandom().nextInt(style.blocks.length)];
+        world.setBlockState(pathPos, pathBlock.getDefaultState());
+        
+        // Add curbs for elevated paths
+        if (style.elevated) {
+            for (Direction dir : Direction.Type.HORIZONTAL) {
+                BlockPos edgePos = pathPos.offset(dir);
+                if (!path.contains(edgePos)) {
+                    world.setBlockState(edgePos, Blocks.STONE_BRICK_WALL.getDefaultState());
+                }
+            }
+        }
+        
+        // Add lights
+        if (style.addLights && ++lightCounter >= style.lightSpacing) {
+            lightCounter = 0;
+            BlockPos lightPos = pathPos.up();
+            switch(culture.toLowerCase()) {
+                case "roman" -> world.setBlockState(lightPos, Blocks.TORCH.getDefaultState());
+                case "egyptian" -> world.setBlockState(lightPos, Blocks.LANTERN.getDefaultState());
+                case "victorian" -> world.setBlockState(lightPos, Blocks.SOUL_LANTERN.getDefaultState());
+                case "nyc" -> world.setBlockState(lightPos, Blocks.SEA_LANTERN.getDefaultState());
+            }
+        }
+    }
+}
+
+private double estimateDistance(BlockPos start, BlockPos end) {
+    return Math.sqrt(start.getSquaredDistance(end));
 }
 }

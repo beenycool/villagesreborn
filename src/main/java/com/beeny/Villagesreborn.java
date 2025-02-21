@@ -30,64 +30,125 @@ import java.util.stream.Collectors;
 
 public class Villagesreborn implements ModInitializer {
     public static final String MOD_ID = "villagesreborn";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static final List<String> CONFLICTING_MODS = Arrays.asList(
+        "mca", "villagerfix", "bettervillagers", "villagelife"
+    );
     
+    private final VillagerManager villagerManager = VillagerManager.getInstance();
     private static LLMConfig llmConfig;
     private static SystemSpecs systemSpecs;
-    private final VillagerManager villagerManager = VillagerManager.getInstance();
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Initializing Villages Reborn...");
-        
-        // Initialize system specs and analyze hardware capabilities
+        checkModConflicts();
         initializeSystemSpecs();
-        
-        // Initialize and load LLM configuration
         initializeLLMConfig();
-        
-        // Initialize services
-        LLMService.getInstance().initialize(llmConfig);
-        ModCommands.register();
-        
-        // Register event handlers
         registerEvents();
-        registerChatListener();
-        
-        LOGGER.info("Villages Reborn initialization complete!");
+    }
+
+    private void checkModConflicts() {
+        ModList modList = ModList.get();
+        List<String> activeConflicts = CONFLICTING_MODS.stream()
+            .filter(modList::isLoaded)
+            .collect(Collectors.toList());
+
+        if (!activeConflicts.isEmpty()) {
+            LOGGER.warn("Detected potentially conflicting mods: {}", activeConflicts);
+            LOGGER.warn("Some features may not work as expected");
+            
+            // Configure compatibility mode based on conflicts
+            for (String conflictMod : activeConflicts) {
+                switch (conflictMod) {
+                    case "mca" -> disableVillagerAIOverrides();
+                    case "bettervillagers" -> disableBehaviorGeneration();
+                    case "villagelife" -> disableCustomEvents();
+                }
+            }
+        }
+    }
+
+    private void disableVillagerAIOverrides() {
+        VillagesConfig config = VillagesConfig.getInstance();
+        config.getGeneralSettings().features.put("custom_ai", false);
+        config.save();
+        LOGGER.info("Disabled villager AI overrides due to mod conflicts");
+    }
+
+    private void disableBehaviorGeneration() {
+        VillagesConfig config = VillagesConfig.getInstance();
+        config.getGeneralSettings().features.put("llm_behaviors", false);
+        config.save();
+        LOGGER.info("Disabled LLM behavior generation due to mod conflicts");
+    }
+
+    private void disableCustomEvents() {
+        VillagesConfig config = VillagesConfig.getInstance();
+        config.getGeneralSettings().features.put("cultural_events", false);
+        config.save();
+        LOGGER.info("Disabled custom cultural events due to mod conflicts");
     }
 
     private void initializeSystemSpecs() {
         systemSpecs = new SystemSpecs();
-        systemSpecs.analyzeSystem();
-
-        if (!systemSpecs.hasAdequateResources()) {
-            LOGGER.warn("System resources may be inadequate for optimal performance:");
-            LOGGER.warn("Available RAM: {} MB", systemSpecs.getAvailableRam());
-            LOGGER.warn("CPU Threads: {}", systemSpecs.getCpuThreads());
-            LOGGER.warn("GPU Support: {}", systemSpecs.hasGpuSupport());
-        }
+        LOGGER.info("System performance tier: {}", systemSpecs.getPerformanceTier());
+        LOGGER.info(systemSpecs.getPerformanceReport());
     }
 
     private void initializeLLMConfig() {
         llmConfig = new LLMConfig();
-        llmConfig.loadConfig();
-
-        if (!llmConfig.isSetupComplete()) {
-            LOGGER.info("First-time setup detected, initializing with system-specific settings");
-            llmConfig.initialize(systemSpecs);
-            llmConfig.setSetupComplete(true);
+        llmConfig.load();
+        
+        if (!llmConfig.isConfigured()) {
+            LOGGER.info("First-time setup required");
+            MinecraftClient.getInstance().execute(() -> {
+                MinecraftClient.getInstance().setScreen(new SetupScreen(
+                    Text.literal("Villages Reborn Setup"),
+                    Text.literal("Downloading required models...")
+                ));
+            });
         }
+    }
 
-        // Adjust settings based on current system state
-        if (systemSpecs.getAvailableRam() < 4096) { // Less than 4GB
-            LOGGER.warn("Low memory detected, reducing context length");
-            llmConfig.setContextLength(1024);
+    private void registerEvents() {
+        // Register server-side events
+        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (entity instanceof VillagerEntity villager) {
+                villagerManager.onVillagerSpawn(villager, (ServerWorld)world);
+            }
+        });
+
+        // Register client-side events if needed
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+            registerClientEvents();
         }
+    }
 
-        if (!systemSpecs.hasGpuSupport()) {
-            LOGGER.warn("No GPU support detected, disabling GPU acceleration");
-            llmConfig.setUseGPU(false);
+    private void registerClientEvents() {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.player != null && client.world != null) {
+                handleClientTick(client);
+            }
+        });
+    }
+
+    private void handleClientTick(MinecraftClient client) {
+        // Handle any client-side features
+        if (client.world.getTime() % 20 == 0) { // Once per second
+            checkPerformanceAndAdjust(client);
+        }
+    }
+
+    private void checkPerformanceAndAdjust(MinecraftClient client) {
+        if (client.getCurrentFps() < 30) {
+            LOGGER.warn("Low FPS detected, reducing feature complexity");
+            systemSpecs = new SystemSpecs(); // Recalculate performance tier
+            
+            if (systemSpecs.getPerformanceTier() > 0) {
+                VillagesConfig config = VillagesConfig.getInstance();
+                config.getGeneralSettings().features.put("detailed_animations", false);
+                config.save();
+            }
         }
     }
 
