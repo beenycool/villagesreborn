@@ -15,53 +15,26 @@ base {
 }
 
 dependencies {
-    include(implementation('com.azure:azure-ai-openai:1.0.0-beta.3'))
-    include(implementation('com.azure:azure-core:1.40.0'))
-    include(implementation('com.azure:azure-identity:1.9.0'))
-    include(implementation('com.azure:azure-core-http-netty:1.13.0'))
+    implementation 'com.azure:azure-ai-openai:1.0.0-beta.13'
+    implementation 'com.azure:azure-core:1.54.1'
+    implementation 'com.azure:azure-identity:1.11.0'
+    implementation 'com.azure:azure-core-http-netty:1.15.7'
     
     // Required dependencies for Azure SDK
-    include(implementation('com.fasterxml.jackson.core:jackson-databind:2.13.5'))
-    include(implementation('com.fasterxml.jackson.core:jackson-core:2.13.5'))
-    include(implementation('com.fasterxml.jackson.core:jackson-annotations:2.13.5'))
-    include(implementation('com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.5'))
-    include(implementation('org.slf4j:slf4j-api:1.7.36'))
-    include(implementation('org.slf4j:slf4j-simple:1.7.36'))
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.15.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
+    
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     
-    
     implementation 'com.squareup.okhttp3:okhttp:4.9.1'
     implementation 'com.google.code.gson:gson:2.8.9'
-}
-
-configurations.all {
-    resolutionStrategy {
-        eachDependency { details ->
-            if (details.requested.group == 'com.azure' && details.requested.name == 'azure-ai-openai') {
-                details.useVersion '1.0.0-beta.3'
-            }
-            if (details.requested.group == 'com.azure' && details.requested.name == 'azure-core') {
-                details.useVersion '1.40.0'
-            }
-            if (details.requested.group == 'com.azure' && details.requested.name == 'azure-identity') {
-                details.useVersion '1.9.0'
-            }
-            if (details.requested.group == 'com.azure' && details.requested.name == 'azure-core-http-netty') {
-                details.useVersion '1.13.0'
-            }
-        }
-    }
-}
-
-processResources {
-    inputs.property "version", project.version
-
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
-    }
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -71,6 +44,14 @@ tasks.withType(JavaCompile).configureEach {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
 }
 
 jar {
