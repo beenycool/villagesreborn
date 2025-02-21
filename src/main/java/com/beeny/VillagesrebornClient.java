@@ -16,11 +16,11 @@ public class VillagesrebornClient implements ClientModInitializer {
     public void onInitializeClient() {
         LOGGER.info("Villages Reborn Client initialized");
 
-        // Register tick event to show setup screen after game loads
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (!setupScreenShown && client.world != null) {
                 setupScreenShown = true;
-                VillagesConfig.LLMSettings llmConfig = VillagesConfig.getInstance().getLLMSettings();
+                // Use getLLMConfig() directly instead of getSetupWizard()
+                LLMConfig llmConfig = Villagesreborn.getLLMConfig();
                 client.setScreen(new SetupScreen(llmConfig));
             }
         });

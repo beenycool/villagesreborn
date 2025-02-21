@@ -5,17 +5,25 @@ import java.util.Map;
 import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.beeny.setup.LLMConfig;
 
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final LLMService INSTANCE = new LLMService();
     private static final int MAX_RETRIES = 3;
     private final Map<String, String> contextCache = new HashMap<>();
-    
+    private LLMConfig config; // Add field to store configuration
+
     private LLMService() {}
-    
+
     public static LLMService getInstance() {
         return INSTANCE;
+    }
+
+    // Add initialize method
+    public void initialize(LLMConfig config) {
+        this.config = config;
+        LOGGER.info("LLMService initialized with config: modelType={}", config.getModelType());
     }
 
     public CompletableFuture<String> generateResponse(String prompt) {
@@ -33,7 +41,6 @@ public class LLMService {
         enhancedPrompt.append("Provide specific, Minecraft-appropriate responses.\n");
         enhancedPrompt.append("Consider available blocks, game mechanics, and cultural authenticity.\n\n");
         
-        // Add any contextual information
         context.forEach((key, value) -> 
             enhancedPrompt.append(key).append(": ").append(value).append("\n")
         );
@@ -50,8 +57,11 @@ public class LLMService {
     private CompletableFuture<String> callLLMWithRetry(String prompt, int retryCount) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Actual LLM call implementation here
-                // This would integrate with your chosen LLM provider
+                // Use config settings if available
+                if (config != null) {
+                    LOGGER.debug("Using model: {}", config.getModelType());
+                    // Placeholder: Implement actual LLM call using config
+                }
                 return "Generated response"; // Placeholder
             } catch (Exception e) {
                 if (retryCount < MAX_RETRIES) {
@@ -68,6 +78,12 @@ public class LLMService {
         StringBuilder key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
+    }
+
+    // Add shutdown method (for error #2)
+    public void shutdown() {
+        LOGGER.info("Shutting down LLMService");
+        contextCache.clear();
     }
 
     public void clearCache() {

@@ -35,7 +35,7 @@ public class Villagesreborn implements ModInitializer {
         initializeLLMConfig();
         
         // Initialize services
-        LLMService.initialize(llmConfig);
+        LLMService.getInstance().initialize(llmConfig);
         ModCommands.register();
         
         // Register event handlers
