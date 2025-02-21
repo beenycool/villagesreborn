@@ -3,6 +3,7 @@ package com.beeny.village.event;
 import com.beeny.ai.LLMService;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
+import com.beeny.village.SpawnRegion;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;

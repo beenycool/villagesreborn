@@ -3,24 +3,18 @@ package com.beeny.village;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.server.world.ServerWorld;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.minecraft.util.math.Direction;
+import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.world.Heightmap;
+import com.beeny.ai.LLMService;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import java.util.Objects;
 
 public class SpawnRegion {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -132,7 +126,7 @@ public class SpawnRegion {
         };
     }
 
-    public void tickConstruction(ServerWorld world) {
+    public void tickConstruction(World world) {
         if (!pendingConstructions.isEmpty() && world.getRandom().nextFloat() < 0.05f) {
             String structure = pendingConstructions.remove(0);
             BlockPos pos = findBuildingLocation(world, structure);
@@ -143,14 +137,14 @@ public class SpawnRegion {
         }
     }
 
-    private BlockPos findBuildingLocation(ServerWorld world, String structure) {
+    private BlockPos findBuildingLocation(World world, String structure) {
         // Find suitable flat area within radius
         // For now returns center + random offset
         int offset = world.getRandom().nextInt(radius);
         return center.add(offset, 0, offset);
     }
 
-    private void generateCulturalStructure(ServerWorld world, BlockPos pos, String structure) {
+    private void generateCulturalStructure(World world, BlockPos pos, String structure) {
         String structurePath = String.format("villagesreborn:structures/%s/%s", 
             culture.toLowerCase(), structure);
             

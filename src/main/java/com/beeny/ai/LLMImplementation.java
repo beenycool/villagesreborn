@@ -74,7 +74,7 @@ public class LLMImplementation {
             ChatCompletions completions = client.getChatCompletions(
                 settings.model,
                 new ChatCompletionsOptions(messages)
-                    .setTemperature(settings.temperature)
+                    .setTemperature(Double.valueOf(settings.temperature))
                     .setMaxTokens(settings.maxTokens)
             );
 

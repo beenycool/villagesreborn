@@ -1,10 +1,6 @@
 package com.beeny.village;
 
-import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +9,19 @@ import com.beeny.ai.CulturalPromptTemplates;
 import net.minecraft.server.world.ServerWorld;
 
 public class CulturalEvolution {
+    public static class CulturalEvent {
+        public final String name;
+        public final String description;
+        public final long duration;
+        public final long timestamp;
+
+        public CulturalEvent(String name, String description, long duration, long timestamp) {
+            this.name = name;
+            this.description = description;
+            this.duration = duration;
+            this.timestamp = timestamp;
+        }
+    }
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final Map<String, CulturalState> culturalStates = new HashMap<>();
     private final List<CulturalEvent> historicalEvents = new ArrayList<>();
@@ -129,7 +138,7 @@ public class CulturalEvolution {
         LLMService.getInstance()
             .generateResponse(prompt)
             .thenAccept(response -> {
-                VillagerManager.CulturalEvent event = parseNewEvent(response);
+                CulturalEvent event = parseNewEvent(response);
                 if (event != null) {
                     historicalEvents.add(event);
                     notifyVillagersOfNewTradition(villagers, event);
@@ -148,7 +157,10 @@ public class CulturalEvolution {
                 .generateResponse(prompt)
                 .thenAccept(response -> {
                     Map<Integer, VillagerAI.ActivitySchedule> newSchedule = parseSchedule(response);
-                    villager.updateSchedule(newSchedule);
+                    // Update villager's current activity based on schedule
+                    newSchedule.forEach((time, schedule) -> {
+                        villager.updateActivity(schedule.activity);
+                    });
                 });
         });
     }
@@ -190,13 +202,16 @@ public class CulturalEvolution {
 
     private void applySocialBehaviorChanges(VillagerAI villager, Map<String, String> changes) {
         changes.forEach((behavior, description) -> {
-            villager.addBehaviorModifier(behavior, description);
+            // Generate behavior based on adaptation
+            villager.generateBehavior("Adapting to " + behavior + ": " + description)
+                .thenAccept(response -> 
+                    villager.updateActivity(behavior));
             LOGGER.info("Applied new behavior '{}' to villager {}", 
                 behavior, villager.getVillager().getName().getString());
         });
     }
 
-    private void notifyVillagersOfNewTradition(List<VillagerAI> villagers, VillagerManager.CulturalEvent event) {
+    private void notifyVillagersOfNewTradition(List<VillagerAI> villagers, CulturalEvent event) {
         villagers.forEach(villager -> {
             String situation = String.format("Learning about new tradition: %s", event.name);
             villager.generateBehavior(situation)
@@ -221,9 +236,9 @@ public class CulturalEvolution {
         return parseArchitecturalChanges(response); // Same parsing logic
     }
 
-    private VillagerManager.CulturalEvent parseNewEvent(String response) {
+    private CulturalEvent parseNewEvent(String response) {
         Map<String, String> eventDetails = parseArchitecturalChanges(response);
-        return new VillagerManager.CulturalEvent(
+        return new CulturalEvent(
             eventDetails.getOrDefault("NAME", "Unknown Event"),
             eventDetails.getOrDefault("DESCRIPTION", "A new tradition"),
             Integer.parseInt(eventDetails.getOrDefault("DURATION", "24000")),
