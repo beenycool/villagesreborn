@@ -56,7 +56,7 @@ public class LLMConfig {
         saveConfig();
     }
 
-    public void loadConfig() {
+    public void load() {
         try {
             if (Files.exists(configPath)) {
                 String json = Files.readString(configPath);
@@ -117,6 +117,10 @@ public class LLMConfig {
 
     public boolean isSetupComplete() {
         return setupComplete;
+    }
+
+    public boolean isConfigured() {
+        return !apiKey.isEmpty() && setupComplete;
     }
 
     public boolean hasSeenWelcomeSequence(UUID playerId) {

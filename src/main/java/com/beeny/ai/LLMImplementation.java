@@ -10,20 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.azure.ai.openai.OpenAIClient;
 import com.azure.ai.openai.OpenAIClientBuilder;
-import com.azure.ai.openai.models.ChatMessage;
-import com.azure.ai.openai.models.ChatRole;
-import com.azure.ai.openai.models.ChatCompletions;
-import com.azure.ai.openai.models.ChatCompletionsOptions;
-import com.azure.core.credential.AzureKeyCredential;
-import com.azure.ai.openai.models.ChatMessage;
-import com.azure.ai.openai.models.ChatRole;
-import com.azure.ai.openai.models.ChatCompletions;
-import com.azure.ai.openai.models.ChatCompletionsOptions;
-import com.azure.core.credential.AzureKeyCredential;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Function;
 
 public class LLMImplementation {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -37,8 +26,8 @@ public class LLMImplementation {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
         
         this.client = new OpenAIClientBuilder()
-            .credential(new AzureKeyCredential(System.getenv("AZURE_OPENAI_KEY")))
-            .endpoint(System.getenv("AZURE_OPENAI_ENDPOINT"))
+            .credential(new AzureKeyCredential(settings.apiKey))
+            .endpoint(settings.endpoint)
             .buildClient();
 
         this.responseCache = new Cache<>(settings.maxCacheSize);
@@ -48,7 +37,7 @@ public class LLMImplementation {
         String cacheKey = generateCacheKey(prompt, context);
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
 
-        if (settings.cacheResponses && responseCache.containsKey(cacheKey)) {
+        if (responseCache.containsKey(cacheKey)) {
             return CompletableFuture.completedFuture(responseCache.get(cacheKey));
         }
 
@@ -58,9 +47,7 @@ public class LLMImplementation {
         executor.submit(() -> {
             try {
                 String response = callLLMWithRetry(prompt, context, 0);
-                if (settings.cacheResponses) {
-                    responseCache.put(cacheKey, response);
-                }
+                responseCache.put(cacheKey, response);
                 future.complete(response);
             } catch (Exception e) {
                 future.completeExceptionally(e);
@@ -69,7 +56,7 @@ public class LLMImplementation {
             }
         });
 
-        return future.orTimeout(settings.timeout, TimeUnit.MILLISECONDS);
+        return future;
     }
 
     private String callLLMWithRetry(String prompt, Map<String, String> context, int retryCount) throws Exception {
@@ -81,10 +68,10 @@ public class LLMImplementation {
             messages.add(new ChatMessage(ChatRole.USER, prompt));
 
             ChatCompletions completions = client.getChatCompletions(
-                settings.model,
+                settings.modelType,
                 new ChatCompletionsOptions(messages)
-                    .setTemperature(Double.valueOf(settings.temperature))
-                    .setMaxTokens(settings.maxTokens)
+                    .setTemperature(settings.temperature)
+                    .setMaxTokens(settings.contextLength)
             );
 
             return completions.getChoices().get(0).getMessage().getContent();
@@ -122,18 +109,19 @@ public class LLMImplementation {
         return key.toString();
     }
 
-public static class Cache<K, V> extends LinkedHashMap<K, V> {
-    private final long timestamp;
+    public static class Cache<K, V> extends LinkedHashMap<K, V> {
+        private final int maxSize;
+        private final long timestamp;
 
-    public Cache(int maxSize, V value) {
-        super(16, 0.75f, true);
-        this.timestamp = System.currentTimeMillis();
-        this.put((K) "value", value);
-    }
+        public Cache(int maxSize) {
+            super(16, 0.75f, true);
+            this.maxSize = maxSize;
+            this.timestamp = System.currentTimeMillis();
+        }
 
-    public long getTimestamp() {
-        return timestamp;
-    }
+        public long getTimestamp() {
+            return timestamp;
+        }
 
         @Override
         protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {

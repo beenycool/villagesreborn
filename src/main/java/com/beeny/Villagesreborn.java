@@ -2,11 +2,19 @@ package com.beeny;
 
 import com.beeny.village.VillagerManager;
 import com.beeny.ai.LLMService;
+import com.beeny.config.VillagesConfig;
 import com.beeny.commands.ModCommands;
 import com.beeny.setup.LLMConfig;
 import com.beeny.setup.SystemSpecs;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.SpawnRegion;
+import com.beeny.gui.SetupScreen;
+import net.fabricmc.api.Environment;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.minecraft.client.MinecraftClient;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
@@ -48,9 +56,8 @@ public class Villagesreborn implements ModInitializer {
     }
 
     private void checkModConflicts() {
-        ModList modList = ModList.get();
         List<String> activeConflicts = CONFLICTING_MODS.stream()
-            .filter(modList::isLoaded)
+            .filter(mod -> FabricLoader.getInstance().isModLoaded(mod))
             .collect(Collectors.toList());
 
         if (!activeConflicts.isEmpty()) {
@@ -102,25 +109,8 @@ public class Villagesreborn implements ModInitializer {
         if (!llmConfig.isConfigured()) {
             LOGGER.info("First-time setup required");
             MinecraftClient.getInstance().execute(() -> {
-                MinecraftClient.getInstance().setScreen(new SetupScreen(
-                    Text.literal("Villages Reborn Setup"),
-                    Text.literal("Downloading required models...")
-                ));
+                MinecraftClient.getInstance().setScreen(new SetupScreen(llmConfig));
             });
-        }
-    }
-
-    private void registerEvents() {
-        // Register server-side events
-        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            if (entity instanceof VillagerEntity villager) {
-                villagerManager.onVillagerSpawn(villager, (ServerWorld)world);
-            }
-        });
-
-        // Register client-side events if needed
-        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
-            registerClientEvents();
         }
     }
 
@@ -286,7 +276,7 @@ public class Villagesreborn implements ModInitializer {
 
                     // Add particle effects
                     world.spawnParticles(
-                        ParticleTypes.valueOf(effects.toUpperCase()),
+                        getParticleType(effects),
                         x, y + 1, z,
                         5, 0.2, 0.2, 0.2, 0.02
                     );
@@ -339,6 +329,17 @@ public class Villagesreborn implements ModInitializer {
                 player.sendMessage(Text.literal("No villager named '" + villagerName + "' found nearby."), false);
             }
         }
+    }
+
+    private net.minecraft.particle.ParticleEffect getParticleType(String effect) {
+        return switch (effect.toLowerCase()) {
+            case "heart" -> ParticleTypes.HEART;
+            case "happy" -> ParticleTypes.HAPPY_VILLAGER;
+            case "angry" -> ParticleTypes.ANGRY_VILLAGER;
+            case "magic" -> ParticleTypes.ENCHANT;
+            case "sparkle" -> ParticleTypes.END_ROD;
+            default -> ParticleTypes.HAPPY_VILLAGER;
+        };
     }
 
     // Shutdown hook to clean up resources

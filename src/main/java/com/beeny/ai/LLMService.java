@@ -17,7 +17,8 @@ public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final LLMService INSTANCE = new LLMService();
     private static final int MAX_RETRIES = 3;
-private final Map<String, LLMImplementation.Cache<String, String>> responseCache = new HashMap<>();
+private final LLMImplementation llmImplementation;
+private final Map<String, String> behaviorCache = new HashMap<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
@@ -30,11 +31,7 @@ private final Map<String, LLMImplementation.Cache<String, String>> responseCache
 
     public void initialize(LLMConfig config) {
         this.config = config;
-        Path modelPath = FabricLoader.getInstance().getConfigDir()
-                .resolve("villagesreborn/models/" + config.getModelType());
-        LOGGER.info("Loading AI model from: {}", modelPath.toAbsolutePath());
-        // Add logic to load the model file based on the model path
-        // e.g., initialize model parameters, allocate resources etc.
+        this.llmImplementation = new LLMImplementation();
         LOGGER.info("LLMService initialized with config: modelType={}", config.getModelType());
     }
 
@@ -68,8 +65,8 @@ private final Map<String, LLMImplementation.Cache<String, String>> responseCache
 
     public CompletableFuture<String> generateBehavior(String profession, String situation, Map<String, Object> context) {
         String cacheKey = String.format("%s_%s", profession, situation);
-        if (responseCache.containsKey(cacheKey)) {
-return CompletableFuture.completedFuture(responseCache.get(cacheKey).get("value"));
+        if (behaviorCache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(behaviorCache.get(cacheKey));
         }
 
         String prompt = String.format(
@@ -89,7 +86,7 @@ return CompletableFuture.completedFuture(responseCache.get(cacheKey).get("value"
 
         return callLLMWithRetry(prompt, context)
             .thenApply(response -> {
-responseCache.put(cacheKey, new LLMImplementation.Cache<>(response, response));
+                behaviorCache.put(cacheKey, response);
                 return response;
             });
     }
@@ -116,7 +113,11 @@ responseCache.put(cacheKey, new LLMImplementation.Cache<>(response, response));
         return CompletableFuture.supplyAsync(() -> {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
-return LLMImplementation.generateResponse(prompt, (Map<String, String>) context);
+return llmImplementation.generateResponse(prompt, context.entrySet().stream()
+    .collect(java.util.stream.Collectors.toMap(
+        Map.Entry::getKey,
+        e -> String.valueOf(e.getValue())
+    ))).get();
                 } catch (Exception e) {
                     if (attempt == 2) {
                         LOGGER.error("Failed to generate LLM response after 3 attempts", e);
@@ -149,9 +150,7 @@ return (String) getDefaultResponse(prompt);
     }
 
     public void pruneCache() {
-        long now = System.currentTimeMillis();
-        responseCache.entrySet().removeIf(entry -> 
-now - entry.getValue().getTimestamp() > TimeUnit.HOURS.toMillis(1));
+        llmImplementation.clearCache();
     }
 
     public void shutdown() {
