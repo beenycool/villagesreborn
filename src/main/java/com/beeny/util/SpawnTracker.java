@@ -1,4 +1,4 @@
-package com.beeny.mixin;
+package com.beeny.util;
 
 public interface SpawnTracker {
     boolean hasSpawnedBefore();

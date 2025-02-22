@@ -1,6 +1,6 @@
 package com.beeny;
 
-import com.beeny.mixin.SpawnTracker;
+import com.beeny.util.SpawnTracker;
 import com.beeny.village.VillagerManager;
 import com.beeny.ai.LLMService;
 import com.beeny.config.VillagesConfig;
