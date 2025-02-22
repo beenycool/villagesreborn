@@ -25,6 +25,7 @@ public class VillagesConfig {
         public int contextLength = 2048;
         public double temperature = 0.7;
         public boolean useGPU = false;
+        public long cacheTTLSeconds = 3600;
     }
 
     public static class GeneralSettings {

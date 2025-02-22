@@ -7,7 +7,26 @@ public class CulturalPromptTemplates {
     private static final Map<String, String> TEMPLATES = new HashMap<>();
 
     static {
-        TEMPLATES.put("village_layout", 
+        TEMPLATES.put("roman_bathhouse_event",
+            """
+            Design a Roman bathhouse event in Minecraft.
+            Consider:
+            - Traditional Roman bathing customs
+            - Social networking and discussions
+            - Health and wellness activities
+            - Different bath chambers (caldarium, tepidarium, frigidarium)
+            - Cultural practices and etiquette
+
+            Format your response as:
+            TYPE: (type of bathing event)
+            DESCRIPTION: (cultural context)
+            DURATION: (in Minecraft ticks)
+            PARTICIPANTS: (recommended number)
+            ACTIVITIES: (sequence of bathing and social activities)
+            OUTCOME: (social/health benefits for participants)
+            """);
+
+        TEMPLATES.put("village_layout",
             """
             Design a culturally authentic %s village layout in Minecraft.
             Consider:

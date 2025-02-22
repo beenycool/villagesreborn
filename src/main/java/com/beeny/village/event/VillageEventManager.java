@@ -196,8 +196,20 @@ public class VillageEventManager {
         
         switch(region.getCulture().toLowerCase()) {
             case "roman" -> {
+                // For bathing or social events, prefer bathhouse
+                if (eventType.toLowerCase().contains("bath") ||
+                    eventType.toLowerCase().contains("social")) {
+                    if (structures.containsKey("bathhouse")) {
+                        return structures.get("bathhouse");
+                    }
+                }
+                // For official events, use forum
                 if (structures.containsKey("forum")) {
                     return structures.get("forum");
+                }
+                // Fallback to any Roman structure
+                if (structures.containsKey("bathhouse")) {
+                    return structures.get("bathhouse");
                 }
             }
             case "egyptian" -> {

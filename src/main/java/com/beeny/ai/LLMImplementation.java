@@ -20,7 +20,7 @@ public class LLMImplementation {
     private final OpenAIClient client;
     private final Map<String, CompletableFuture<String>> pendingRequests = new ConcurrentHashMap<>();
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
-    private final Cache<String, String> responseCache;
+    private final TTLCache responseCache;
 
     public LLMImplementation() {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
@@ -30,15 +30,16 @@ public class LLMImplementation {
             .endpoint(settings.endpoint)
             .buildClient();
 
-        this.responseCache = new Cache<>(settings.maxCacheSize);
+        this.responseCache = new TTLCache(settings.maxCacheSize);
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         String cacheKey = generateCacheKey(prompt, context);
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
 
-        if (responseCache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(responseCache.get(cacheKey));
+        String cachedResponse = responseCache.get(cacheKey);
+        if (cachedResponse != null) {
+            return CompletableFuture.completedFuture(cachedResponse);
         }
 
         CompletableFuture<String> future = new CompletableFuture<>();
@@ -79,7 +80,7 @@ public class LLMImplementation {
         } catch (Exception e) {
             if (retryCount < MAX_RETRIES) {
                 LOGGER.warn("LLM call failed, retrying ({}/{})", retryCount + 1, MAX_RETRIES);
-                Thread.sleep(1000 * (retryCount + 1)); // Exponential backoff
+                Thread.sleep(1000 * (retryCount + 1));
                 return callLLMWithRetry(prompt, context, retryCount + 1);
             }
             throw e;
@@ -109,23 +110,62 @@ public class LLMImplementation {
         return key.toString();
     }
 
-    public static class Cache<K, V> extends LinkedHashMap<K, V> {
-        private final int maxSize;
+    private static class CacheEntry {
+        private final String value;
         private final long timestamp;
 
-        public Cache(int maxSize) {
-            super(16, 0.75f, true);
-            this.maxSize = maxSize;
+        public CacheEntry(String value) {
+            this.value = value;
             this.timestamp = System.currentTimeMillis();
         }
 
-        public long getTimestamp() {
-            return timestamp;
+        public boolean isExpired(long ttlMillis) {
+            return System.currentTimeMillis() - timestamp > ttlMillis;
         }
 
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-            return size() > maxSize;
+        public String getValue() {
+            return value;
+        }
+    }
+
+    private class TTLCache {
+        private final Map<String, CacheEntry> cache = new LinkedHashMap<String, CacheEntry>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
+                VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
+                return size() > maxSize || eldest.getValue().isExpired(settings.cacheTTLSeconds * 1000);
+            }
+        };
+        
+        private final int maxSize;
+
+        public TTLCache(int maxSize) {
+            this.maxSize = maxSize;
+        }
+
+        public synchronized String get(String key) {
+            CacheEntry entry = cache.get(key);
+            if (entry != null) {
+                VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
+                if (!entry.isExpired(settings.cacheTTLSeconds * 1000)) {
+                    return entry.getValue();
+                } else {
+                    cache.remove(key);
+                }
+            }
+            return null;
+        }
+
+        public synchronized void put(String key, String value) {
+            cache.put(key, new CacheEntry(value));
+        }
+
+        public synchronized int size() {
+            return cache.size();
+        }
+
+        public synchronized void clear() {
+            cache.clear();
         }
     }
 
