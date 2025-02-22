@@ -4,7 +4,8 @@
   "package": "com.beeny.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "ServerPlayerEntityMixin"
+    "ServerPlayerEntityMixin",
+    "VillagerInteractionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

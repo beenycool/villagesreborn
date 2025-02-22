@@ -280,7 +280,7 @@ public class SystemSpecs {
     }
 
     public Map<String, String> getGpuInfo() {
-        return new HashMap<>(gpuInfo);
+        return gpuInfo != null ? new HashMap<>(gpuInfo) : new HashMap<>();
     }
 
     public boolean hasAdequateResources() {
