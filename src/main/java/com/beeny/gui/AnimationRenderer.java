@@ -8,34 +8,46 @@ import java.util.function.Function;
 public class AnimationRenderer {
     private int animationTick = 0;
     private static final int ANIMATION_DURATION = 100; // 5 seconds at 20 ticks/second
-    private static final Function<Identifier, RenderLayer> TEXTURE_RENDERER = identifier -> {
-        // Use the most basic texture render layer
-        return RenderLayer.getPositionTexture();
-    };
-    
+    private static final int TICKS_PER_FRAME = 20;     // Each frame lasts 1 second
+    private static final int TEXTURE_SIZE = 128;       // Assumes 128x128 texture dimensions
+
     private final Identifier[] frames = {
-        Identifier.of("villagesreborn", "textures/gui/anim_frame1.png"),
-        Identifier.of("villagesreborn", "textures/gui/anim_frame2.png"),
-        Identifier.of("villagesreborn", "textures/gui/anim_frame3.png")
+        Identifier.tryParse("villagesreborn:textures/gui/anim_frame1.png"),
+        Identifier.tryParse("villagesreborn:textures/gui/anim_frame2.png"),
+        Identifier.tryParse("villagesreborn:textures/gui/anim_frame3.png")
     };
+
+    // Defined but unused; kept for potential future use or compatibility
+    private static final Function<Identifier, RenderLayer> GUI_LAYER = 
+        id -> RenderLayer.getGui();
 
     public void render(DrawContext context, int width, int height) {
-        int frameIndex = (animationTick / 20) % frames.length;
-        int size = 128;
-        int x = width / 2 - size / 2;
-        int y = height / 2 - size / 2;
-        float u = 0;
-        float v = 0;
+        if (frames[0] == null) {
+            // Texture loading failed; skip rendering to avoid crashes
+            return;
+        }
 
-        // Draw texture with render layer
+        int frameIndex = (animationTick / TICKS_PER_FRAME) % frames.length;
+        int x = width / 2 - TEXTURE_SIZE / 2;
+        int y = height / 2 - TEXTURE_SIZE / 2;
+
         context.drawTexture(
-            TEXTURE_RENDERER,    // render layer provider
-            frames[frameIndex],  // texture
-            x, y,               // screen position
-            u, v,               // UV coordinates
-            size, size,         // width/height
-            size, size          // texture dimensions
+            GUI_LAYER,
+            frames[frameIndex],  // Current animation frame
+            x,                  // x position
+            y,                  // y position
+            0.0f,              // u (texture x offset)
+            0.0f,              // v (texture y offset)
+            TEXTURE_SIZE,       // width
+            TEXTURE_SIZE,       // height
+            TEXTURE_SIZE,       // texture width
+            TEXTURE_SIZE        // texture height
         );
+    }
+
+    public void render(DrawContext context, int width, int height, float delta) {
+        // Overloaded method for compatibility; delta unused as animation is tick-based
+        render(context, width, height);
     }
 
     public boolean isComplete() {

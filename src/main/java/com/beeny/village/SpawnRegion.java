@@ -474,6 +474,36 @@ public class SpawnRegion {
         return pos.getSquaredDistance(center) <= radius * radius;
     }
 
+    public String getDistrictAtPosition(BlockPos pos) {
+        if (!isWithinRegion(pos)) {
+            return null;
+        }
+
+        // Calculate relative position to center
+        double dx = pos.getX() - center.getX();
+        double dz = pos.getZ() - center.getZ();
+        double angle = Math.toDegrees(Math.atan2(dz, dx));
+        double distance = Math.sqrt(dx * dx + dz * dz);
+
+        // Determine district based on angle and distance
+        if (distance < radius / 3) {
+            return "central";
+        }
+
+        // Convert angle to positive degrees (0-360)
+        angle = (angle + 360) % 360;
+
+        if (angle < 90) {
+            return "residential";
+        } else if (angle < 180) {
+            return "commercial";
+        } else if (angle < 270) {
+            return "industrial";
+        } else {
+            return "cultural";
+        }
+    }
+
     public void generateVillage(World world) {
         LOGGER.info("Starting generation of {} village at {}", culture, center);
 
@@ -1508,11 +1538,11 @@ private void generateClockTower(World world, BlockPos base) {
     for (int y = 0; y < height; y++) {
         for (int x = -size/2; x <= size/2; x++) {
             for (int z = -size/2; z <= size/2; z++) {
-                BlockPos pos = base.add(x, y, z);
-                if (y < height - 1) {
-                    world.setBlockState(pos, Blocks.STONE_BRICKS.getDefaultState());
-                } else {
-                    world.setBlockState(pos, Blocks.GOLD_BLOCK.getDefaultState());
+                    BlockPos buildPos = base.add(x, y, z);
+                    if (y < height - 1) {
+                        world.setBlockState(buildPos, Blocks.STONE_BRICKS.getDefaultState());
+                    } else {
+                        world.setBlockState(buildPos, Blocks.GOLD_BLOCK.getDefaultState());
                 }
             }
         }
@@ -1594,8 +1624,8 @@ private void generateVictorianChurch(World world, BlockPos pos) {
         for (int z = -length/2; z <= length/2; z++) {
             for (int y = 0; y < height; y++) {
                 int baseY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, churchPos.getX() + x, churchPos.getZ() + z);
-                BlockPos pos = new BlockPos(churchPos.getX() + x, baseY + y - 1, churchPos.getZ() + z);
-                world.setBlockState(pos, Blocks.STONE_BRICKS.getDefaultState());
+                BlockPos buildPos = new BlockPos(churchPos.getX() + x, baseY + y - 1, churchPos.getZ() + z);
+                world.setBlockState(buildPos, Blocks.STONE_BRICKS.getDefaultState());
             }
         }
     }

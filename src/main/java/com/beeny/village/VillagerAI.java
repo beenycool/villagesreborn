@@ -5,6 +5,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
+import com.beeny.village.event.VillageEvent;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
@@ -595,6 +596,45 @@ public class VillagerAI {
             case FAMILY -> "family";
             case RIVAL -> "rival";
         };
+    }
+
+    public void learnFromEvent(VillageEvent event, String reflection) {
+        // Update behavior memory with event reflection
+        behaviorMemory.put("last_event_" + event.getType(), event);
+        behaviorMemory.put("last_event_reflection", reflection);
+
+        // Adjust happiness based on event outcome
+        if (event.getParticipants().contains(villager.getUuid())) {
+            String outcome = event.getOutcome();
+            if (outcome != null) {
+                if (outcome.toLowerCase().contains("success") || 
+                    outcome.toLowerCase().contains("happy") || 
+                    outcome.toLowerCase().contains("positive")) {
+                    adjustHappiness(5);
+                } else if (outcome.toLowerCase().contains("fail") || 
+                         outcome.toLowerCase().contains("sad") || 
+                         outcome.toLowerCase().contains("negative")) {
+                    adjustHappiness(-3);
+                }
+            }
+        }
+
+        // Update profession skills if event was work-related
+        if (event.getType().toLowerCase().contains("work") || 
+            event.getType().toLowerCase().contains("craft") || 
+            event.getType().toLowerCase().contains("trade")) {
+            updateProfessionSkill(event.getType());
+        }
+
+        // Update relationships based on event participants
+        event.getParticipants().forEach(participantId -> {
+            if (!participantId.equals(villager.getUuid()) && 
+                !relationships.containsKey(participantId)) {
+                determineRelationshipDynamically((VillagerEntity)
+                    ((ServerWorld)villager.getWorld()).getEntity(participantId))
+                    .thenAccept(type -> addRelationship(participantId, type));
+            }
+        });
     }
 
     public static void clearBehaviorCache() {

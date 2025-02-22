@@ -17,13 +17,15 @@ public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final LLMService INSTANCE = new LLMService();
     private static final int MAX_RETRIES = 3;
-private final LLMImplementation llmImplementation;
+private LLMImplementation llmImplementation;
 private final Map<String, String> behaviorCache = new HashMap<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
 
-    private LLMService() {}
+    private LLMService() {
+        this.llmImplementation = null;
+    }
 
     public static LLMService getInstance() {
         return INSTANCE;

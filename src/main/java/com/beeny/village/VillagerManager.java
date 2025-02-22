@@ -378,6 +378,10 @@ public class VillagerManager {
         return nearest;
     }
 
+    public SpawnRegion getSpawnRegionForVillager(VillagerEntity villager) {
+        return getNearestSpawnRegion(villager.getBlockPos());
+    }
+
     public void addPointOfInterest(BlockPos center, BlockPos poi) {
         SpawnRegion region = spawnRegions.get(center);
         if (region != null) {

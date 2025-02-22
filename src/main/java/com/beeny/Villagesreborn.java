@@ -1,5 +1,6 @@
 package com.beeny;
 
+import com.beeny.mixin.SpawnTracker;
 import com.beeny.village.VillagerManager;
 import com.beeny.ai.LLMService;
 import com.beeny.config.VillagesConfig;
@@ -167,8 +168,11 @@ public class Villagesreborn implements ModInitializer {
 
         // Add player join event handler
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            if (entity instanceof ServerPlayerEntity player && !player.hasSpawnedBefore()) {
-                handleNewPlayerSpawn(player, (ServerWorld)world);
+            if (entity instanceof ServerPlayerEntity player) {
+                SpawnTracker tracker = (SpawnTracker)player;
+                if (!tracker.hasSpawnedBefore()) {
+                    handleNewPlayerSpawn(player, (ServerWorld)world);
+                }
             }
         });
     }

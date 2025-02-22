@@ -15,6 +15,7 @@ public class VillageEvent {
     private final List<UUID> participants;
     private final String culture;
     private final String outcome;
+    private final String district;
 
     private VillageEvent(Builder builder) {
         this.type = builder.type;
@@ -25,6 +26,7 @@ public class VillageEvent {
         this.participants = builder.participants;
         this.culture = builder.culture;
         this.outcome = builder.outcome;
+        this.district = builder.district;
     }
 
     public static class Builder {
@@ -36,6 +38,7 @@ public class VillageEvent {
         private List<UUID> participants;
         private String culture;
         private String outcome;
+        private String district;
 
         public Builder type(String type) {
             this.type = type;
@@ -77,6 +80,11 @@ public class VillageEvent {
             return this;
         }
 
+        public Builder district(String district) {
+            this.district = district;
+            return this;
+        }
+
         public VillageEvent build() {
             return new VillageEvent(this);
         }
@@ -90,6 +98,7 @@ public class VillageEvent {
     public List<UUID> getParticipants() { return participants; }
     public String getCulture() { return culture; }
     public String getOutcome() { return outcome; }
+    public String getDistrict() { return district; }
 
     public boolean isActive(long currentTime) {
         return currentTime >= startTime && currentTime < startTime + duration;
