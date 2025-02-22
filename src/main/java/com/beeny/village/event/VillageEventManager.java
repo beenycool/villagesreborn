@@ -4,64 +4,74 @@ import com.beeny.ai.LLMService;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.SpawnRegion;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.s2c.play.ParticleS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.registry.Registry;
-import net.minecraft.util.registry.RegistryKey;
-import net.minecraft.world.World;
-import net.minecraft.world.dimension.DimensionType;
-import net.minecraft.world.dimension.DimensionTypes;
-import net.minecraft.world.level.ServerWorldProperties;
-import net.minecraft.world.level.storage.LevelStorage;
-import net.minecraft.world.level.storage.LevelStorage.Session;
-import net.minecraft.world.level.storage.LevelStorageSource;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.LevelStorageAccessException.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType.LevelStorageAccessExceptionType;
-            participants.size(),
-            getRecentEvents(culture)
-        );
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+public class VillageEventManager {
+    private static final Logger LOGGER = Logger.getLogger(VillageEventManager.class.getName());
+    private final Map<String, List<VillageEvent>> activeEvents = new HashMap<>();
+    private final Map<String, List<VillageEvent>> historicalEvents = new HashMap<>();
+    private final Map<String, Set<String>> successfulEventTypes = new HashMap<>();
+    private final Random random = new Random();
+
+    public CompletableFuture<VillageEvent> generateRandomEvent(String culture, ServerWorld world, List<VillagerAI> participants) {
+        String prompt;
+        Set<String> successful = successfulEventTypes.computeIfAbsent(culture, k -> new HashSet<>());
+        
+        // Get the current district if available
+        SpawnRegion region = VillagerManager.getInstance()
+            .getSpawnRegionForVillager(participants.get(0).getVillager());
+        String district = region != null ? 
+            region.getDistrictAtPosition(participants.get(0).getVillager().getBlockPos()) : null;
+
+        if (district != null) {
+            prompt = String.format(
+                "Generate a cultural event appropriate for the %s district in a %s village:\n" +
+                "Participants: %d\n" +
+                "Recent events: %s\n" +
+                "Consider the district's purpose and characteristics.",
+                district, culture, participants.size(), getRecentEvents(culture)
+            );
+        } else if (!successful.isEmpty() && random.nextFloat() < 0.3f) {
+            // Use previously successful event as inspiration if no specific district
+            String inspiredBy = successful.stream()
+                .skip(random.nextInt(successful.size()))
+                .findFirst()
+                .orElse("");
+                
+            prompt = String.format(
+                "Generate a cultural event similar to %s for the following village:\n" +
+                "Culture: %s\n" +
+                "Participants: %d\n" +
+                "Recent events: %s",
+                inspiredBy, culture, participants.size(), getRecentEvents(culture)
+            );
+        } else {
+            prompt = String.format(
+                "Generate a random cultural event for the following village:\n" +
+                "Culture: %s\n" +
+                "Participants: %d\n" +
+                "Recent events: %s",
+                culture, participants.size(), getRecentEvents(culture)
+            );
+        }
 
         return LLMService.getInstance()
-            .generateResponse(prompt, context)
+            .generateResponse(prompt)
             .thenApply(response -> {
                 Map<String, String> eventDetails = parseEventResponse(response);
+                String eventType = eventDetails.get("TYPE");
+                
+                if (eventType != null && !eventType.isEmpty()) {
+                    successful.add(eventType);
+                }
+                
                 return new VillageEvent.Builder()
-                    .type(eventDetails.get("TYPE"))
+                    .type(eventType)
                     .description(eventDetails.get("DESCRIPTION"))
                     .duration(Long.parseLong(eventDetails.getOrDefault("DURATION", "12000")))
                     .startTime(world.getTime())
@@ -69,6 +79,7 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
                         .map(ai -> ai.getVillager().getUuid())
                         .collect(Collectors.toList()))
                     .culture(culture)
+                    .district(district)
                     .outcome(eventDetails.get("OUTCOME"))
                     .location(findEventLocation(world, participants))
                     .build();
@@ -100,7 +111,7 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
         if (random.nextFloat() < 0.05f) { // 5% chance per tick
             VillagerManager.getInstance().getSpawnRegions().forEach(region -> {
                 List<VillagerAI> villagers = getVillagersInRegion(region);
-                if (!villagers.isEmpty()) {
+                if (!villagers.isEmpty() && getActiveEvents(region.getCulture()).size() < 3) {
                     generateRandomEvent(region.getCulture(), world, villagers)
                         .thenAccept(this::startEvent);
                 }
@@ -109,7 +120,7 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
     }
 
     private void completeEvent(VillageEvent event, ServerWorld world) {
-        LOGGER.info("Completing event: {} in {} culture", event.getType(), event.getCulture());
+        LOGGER.info(String.format("Completing event: %s in %s culture", event.getType(), event.getCulture()));
         
         // Generate completion effects
         String prompt = String.format(
@@ -143,8 +154,11 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
             if (ai != null) {
                 ai.generateBehavior("Reflecting on " + event.getType())
                     .thenAccept(reflection -> {
-                        LOGGER.debug("Villager {} reflects: {}", 
-                            ai.getVillager().getName().getString(), reflection);
+                        LOGGER.fine(String.format("Villager %s reflects: %s", 
+                            ai.getVillager().getName().getString(), reflection));
+                        
+                        // Update villager's cultural knowledge
+                        ai.learnFromEvent(event, reflection);
                     });
             }
         });
@@ -161,14 +175,53 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
                     
                 ai.generateBehavior(situation)
                     .thenAccept(behavior -> {
-                        LOGGER.debug("Villager {} behavior during event: {}", 
-                            ai.getVillager().getName().getString(), behavior);
+                        LOGGER.fine(String.format("Villager %s behavior during event: %s", 
+                            ai.getVillager().getName().getString(), behavior));
                     });
             }
         });
     }
 
     private BlockPos findEventLocation(ServerWorld world, List<VillagerAI> participants) {
+        SpawnRegion region = VillagerManager.getInstance()
+            .getSpawnRegionForVillager(participants.get(0).getVillager());
+            
+        if (region == null) {
+            return defaultEventLocation(world, participants);
+        }
+
+        // Try to find culturally appropriate location based on event type
+        Map<String, BlockPos> structures = region.getCulturalStructures();
+        String eventType = "gathering"; // Default type
+        
+        switch(region.getCulture().toLowerCase()) {
+            case "roman" -> {
+                if (structures.containsKey("forum")) {
+                    return structures.get("forum");
+                }
+            }
+            case "egyptian" -> {
+                if (structures.containsKey("temple")) {
+                    return structures.get("temple");
+                }
+            }
+            case "victorian" -> {
+                if (structures.containsKey("town_square")) {
+                    return structures.get("town_square");
+                }
+            }
+            case "nyc" -> {
+                if (structures.containsKey("plaza")) {
+                    return structures.get("plaza");
+                }
+            }
+        }
+
+        // Fallback to default location finding
+        return defaultEventLocation(world, participants);
+    }
+
+    private BlockPos defaultEventLocation(ServerWorld world, List<VillagerAI> participants) {
         // Find central location among participants
         double avgX = participants.stream()
             .mapToDouble(ai -> ai.getVillager().getX())
@@ -186,8 +239,29 @@ import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess.L
 
     private List<VillagerAI> getVillagersInRegion(SpawnRegion region) {
         return VillagerManager.getInstance().getActiveVillagers().stream()
-            .filter(ai -> region.isWithinRegion(ai.getVillager().getBlockPos()))
+            .filter(ai -> {
+                BlockPos pos = ai.getVillager().getBlockPos();
+                return region.isWithinRegion(pos) && 
+                       isAppropriateEventParticipant(ai, region.getCulture());
+            })
             .collect(Collectors.toList());
+    }
+
+    private boolean isAppropriateEventParticipant(VillagerAI ai, String culture) {
+        // Check if villager is already participating in an event
+        if (activeEvents.values().stream()
+            .flatMap(List::stream)
+            .anyMatch(event -> event.getParticipants().contains(ai.getVillager().getUuid()))) {
+            return false;
+        }
+
+        // Check if villager has participated in too many recent events
+        long recentEventCount = historicalEvents.getOrDefault(culture, Collections.emptyList())
+            .stream()
+            .filter(event -> event.getParticipants().contains(ai.getVillager().getUuid()))
+            .count();
+
+        return recentEventCount < 3; // Limit participation to prevent event fatigue
     }
 
     private String getRecentEvents(String culture) {

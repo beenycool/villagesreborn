@@ -15,11 +15,11 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.util.Identifier;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.render.GameRenderer;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.render.RenderLayer;
 import java.util.List;
+import java.util.function.Function;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,10 +48,11 @@ public class SetupScreen extends Screen {
     private static final List<String> PROVIDERS = List.of("openai", "anthropic", "local");
 
     private static final int ANIM_FRAME_TIME = 20;
-    private static final Identifier[] FRAMES = {
-        new Identifier("villagesreborn", "textures/gui/anim_frame1.png"),
-        new Identifier("villagesreborn", "textures/gui/anim_frame2.png"),
-        new Identifier("villagesreborn", "textures/gui/anim_frame3.png")
+    private static final Function<Identifier, RenderLayer> TEXTURE_LAYER = id -> RenderLayer.getGui();
+    private static final Identifier[] FRAMES = new Identifier[] {
+        Identifier.of("villagesreborn", "textures/gui/anim_frame1.png"),
+        Identifier.of("villagesreborn", "textures/gui/anim_frame2.png"),
+        Identifier.of("villagesreborn", "textures/gui/anim_frame3.png")
     };
     
     private float progress = 0;
@@ -67,14 +68,54 @@ public class SetupScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        super.render(context, mouseX, mouseY, delta);
+
         if (!animationRenderer.isComplete()) {
-            animationRenderer.render(context, width, height);
+            animationRenderer.render(context, width, height, delta);
             animationRenderer.tick();
         } else {
             // Draw title
-            context.drawCenteredTextWithShadow(textRenderer, this.title, width / 2, 20, 0xFFFFFF);
-            super.render(context, mouseX, mouseY, delta);
+            context.drawTextWithShadow(textRenderer, this.title,
+                (width - textRenderer.getWidth(this.title)) / 2, 20, 0xFFFFFF);
+            
+            // Draw current animation frame
+            int frameSize = 128;
+            int x = (this.width - frameSize) / 2;
+            int y = (this.height - frameSize) / 2 - 30;
+            
+            // Draw texture using the layer-based method with GUI layer
+            context.drawGuiTexture(TEXTURE_LAYER, FRAMES[currentFrame], x, y, frameSize, frameSize);
+            
+            // Draw progress bar
+            int barWidth = 200;
+            int barHeight = 10;
+            int barX = (this.width - barWidth) / 2;
+            int barY = this.height / 2 + 50;
+            
+            // Background
+            context.fill(barX, barY, barX + barWidth, barY + barHeight, 0xFF333333);
+            // Progress
+            context.fill(
+                barX, barY,
+                barX + (int)(barWidth * progress),
+                barY + barHeight,
+                0xFF00FF00
+            );
+            
+            // Draw status text
+            context.drawTextWithShadow(
+                this.textRenderer,
+                this.statusText,
+                (width - textRenderer.getWidth(this.statusText)) / 2,
+                barY + barHeight + 10,
+                0xFFFFFF
+            );
+            
+            frameTimer++;
+            if (frameTimer >= ANIM_FRAME_TIME) {
+                frameTimer = 0;
+                currentFrame = (currentFrame + 1) % FRAMES.length;
+            }
         }
     }
 
@@ -99,8 +140,10 @@ public class SetupScreen extends Screen {
         String hardwareText = String.format("CPU: %d cores, RAM: %d MB, GPU: %s",
                 specs.getCpuThreads(), specs.getAvailableRam(), gpu.getOrDefault("renderer", "Unknown"));
 
-        // Display hardware info as plain text; here we assume a simple method addRenderableText exists
-        addDrawableChild(ButtonWidget.builder(Text.literal("Hardware: " + hardwareText), (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        // Display hardware info as button
+        addDrawableChild(ButtonWidget.builder(Text.literal(hardwareText), button -> {})
+            .dimensions(leftX, currentY, fieldWidth, fieldHeight)
+            .build());
         currentY += padding;
 
         // Determine recommended model based on system tier
@@ -124,16 +167,19 @@ public class SetupScreen extends Screen {
         
         // Display recommended model info
         Text recommendationText = Text.literal("Recommended AI Model: " + recommendedModel + " (" + modelSize + " MB)");
-        addDrawableChild(ButtonWidget.builder(recommendationText, (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        addDrawableChild(ButtonWidget.builder(recommendationText, button -> {})
+            .dimensions(leftX, currentY, fieldWidth, fieldHeight)
+            .build());
         currentY += padding;
 
         // Download prompt
-        addDrawableChild(ButtonWidget.builder(Text.literal("Download this model to enhance villager AI?"), (button) -> {}).dimensions(leftX, currentY, fieldWidth, fieldHeight).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Download this model to enhance villager AI?"), button -> {})
+            .dimensions(leftX, currentY, fieldWidth, fieldHeight)
+            .build());
         currentY += padding;
 
         // Yes, Download button
-        ButtonWidget downloadButton = ButtonWidget.builder(Text.literal("Yes, Download"), (button) -> {
-            // For demo purposes, use a dummy expected hash; in production, use real hash
+        ButtonWidget downloadButton = ButtonWidget.builder(Text.literal("Yes, Download"), button -> {
             String expectedHash = "dummyhash";
             ModelDownloader.downloadModel(recommendedModel, expectedHash, progress -> {
                 LOGGER.info("Download progress: {}%", progress * 100);
@@ -148,14 +194,18 @@ public class SetupScreen extends Screen {
                 useDefaultModel();
                 return null;
             });
-        }).dimensions(leftX, currentY, fieldWidth / 2 - 2, fieldHeight).build();
+        })
+        .dimensions(leftX, currentY, fieldWidth / 2 - 2, fieldHeight)
+        .build();
         addDrawableChild(downloadButton);
 
         // No, Use Default button
-        ButtonWidget declineButton = ButtonWidget.builder(Text.literal("No, Use Default"), (button) -> {
+        ButtonWidget declineButton = ButtonWidget.builder(Text.literal("No, Use Default"), button -> {
             useDefaultModel();
             close();
-        }).dimensions(leftX + fieldWidth / 2 + 2, currentY, fieldWidth / 2 - 2, fieldHeight).build();
+        })
+        .dimensions(leftX + fieldWidth / 2 + 2, currentY, fieldWidth / 2 - 2, fieldHeight)
+        .build();
         addDrawableChild(declineButton);
 
         currentY += padding;
@@ -233,7 +283,9 @@ public class SetupScreen extends Screen {
         ButtonWidget doneButton = ButtonWidget.builder(Text.literal("Save & Close"), button -> {
             saveSettings();
             this.close();
-        }).dimensions(leftX, this.height - 28, fieldWidth, fieldHeight).build();
+        })
+        .dimensions(leftX, this.height - 28, fieldWidth, fieldHeight)
+        .build();
         addDrawableChild(doneButton);
     }
 
@@ -269,59 +321,6 @@ public class SetupScreen extends Screen {
     @Override
     public boolean shouldPause() {
         return false;
-    }
-
-    @Override
-    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
-        this.renderBackground(matrices);
-        
-        // Update animation frame
-        frameTimer++;
-        if (frameTimer >= ANIM_FRAME_TIME) {
-            frameTimer = 0;
-            currentFrame = (currentFrame + 1) % FRAMES.length;
-        }
-        
-        // Draw current animation frame
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.setShaderTexture(0, FRAMES[currentFrame]);
-        
-        int frameSize = 128;
-        drawTexture(matrices, 
-            (this.width - frameSize) / 2, 
-            (this.height - frameSize) / 2 - 30, 
-            0, 0, frameSize, frameSize, 
-            frameSize, frameSize
-        );
-        
-        // Draw progress bar
-        int barWidth = 200;
-        int barHeight = 10;
-        int barX = (this.width - barWidth) / 2;
-        int barY = this.height / 2 + 50;
-        
-        // Background
-        fill(matrices, barX, barY, barX + barWidth, barY + barHeight, 0xFF333333);
-        // Progress
-        fill(matrices, 
-            barX, barY, 
-            barX + (int)(barWidth * progress), 
-            barY + barHeight, 
-            0xFF00FF00
-        );
-        
-        // Draw status text
-        drawCenteredText(
-            matrices, 
-            this.textRenderer, 
-            this.statusText, 
-            this.width / 2, 
-            barY + barHeight + 10, 
-            0xFFFFFF
-        );
-        
-        super.render(matrices, mouseX, mouseY, delta);
     }
 
     public void setProgress(float progress) {

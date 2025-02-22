@@ -5,7 +5,6 @@ import com.azure.ai.openai.models.ChatRole;
 import com.azure.ai.openai.models.ChatMessage;
 import com.azure.ai.openai.models.ChatCompletions;
 import com.azure.ai.openai.models.ChatCompletionsOptions;
-import com.azure.ai.openai.models.*;
 import com.beeny.config.VillagesConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,13 +122,18 @@ public class LLMImplementation {
         return key.toString();
     }
 
-    private static class Cache<K, V> extends LinkedHashMap<K, V> {
-        private final int maxSize;
+public static class Cache<K, V> extends LinkedHashMap<K, V> {
+    private final long timestamp;
 
-        public Cache(int maxSize) {
-            super(16, 0.75f, true);
-            this.maxSize = maxSize;
-        }
+    public Cache(int maxSize, V value) {
+        super(16, 0.75f, true);
+        this.timestamp = System.currentTimeMillis();
+        this.put((K) "value", value);
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
 
         @Override
         protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {

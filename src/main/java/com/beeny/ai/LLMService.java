@@ -17,7 +17,7 @@ public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final LLMService INSTANCE = new LLMService();
     private static final int MAX_RETRIES = 3;
-    private final Map<String, LLMImplementation.Cache> responseCache = new HashMap<>();
+private final Map<String, LLMImplementation.Cache<String, String>> responseCache = new HashMap<>();
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
@@ -69,7 +69,7 @@ public class LLMService {
     public CompletableFuture<String> generateBehavior(String profession, String situation, Map<String, Object> context) {
         String cacheKey = String.format("%s_%s", profession, situation);
         if (responseCache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(responseCache.get(cacheKey).response());
+return CompletableFuture.completedFuture(responseCache.get(cacheKey).get("value"));
         }
 
         String prompt = String.format(
@@ -89,7 +89,7 @@ public class LLMService {
 
         return callLLMWithRetry(prompt, context)
             .thenApply(response -> {
-                responseCache.put(cacheKey, new LLMImplementation.Cache(response, System.currentTimeMillis()));
+responseCache.put(cacheKey, new LLMImplementation.Cache<>(response, response));
                 return response;
             });
     }
@@ -116,21 +116,21 @@ public class LLMService {
         return CompletableFuture.supplyAsync(() -> {
             for (int attempt = 0; attempt < 3; attempt++) {
                 try {
-                    return LLMImplementation.generateResponse(prompt, context);
+return LLMImplementation.generateResponse(prompt, (Map<String, String>) context);
                 } catch (Exception e) {
                     if (attempt == 2) {
                         LOGGER.error("Failed to generate LLM response after 3 attempts", e);
-                        return getDefaultResponse(prompt);
+return (String) getDefaultResponse(prompt);
                     }
                     try {
                         Thread.sleep(1000 * (attempt + 1));
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        return getDefaultResponse(prompt);
+return (String) getDefaultResponse(prompt);
                     }
                 }
             }
-            return getDefaultResponse(prompt);
+return (String) getDefaultResponse(prompt);
         }, executor);
     }
 
@@ -151,7 +151,7 @@ public class LLMService {
     public void pruneCache() {
         long now = System.currentTimeMillis();
         responseCache.entrySet().removeIf(entry -> 
-            now - entry.getValue().timestamp() > TimeUnit.HOURS.toMillis(1));
+now - entry.getValue().getTimestamp() > TimeUnit.HOURS.toMillis(1));
     }
 
     public void shutdown() {

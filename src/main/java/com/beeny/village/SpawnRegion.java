@@ -746,40 +746,78 @@ public class SpawnRegion {
 
     private CompletableFuture<Map<String, Object>> generateLayoutPlan() {
         String prompt = String.format(
-            "Design a village layout for a %s culture in Minecraft.\n" +
-            "Consider:\n" +
-            "1. How buildings should be arranged (grid/organic/hierarchical)\n" +
-            "2. Important cultural spaces and their placement\n" +
-            "3. How villagers would naturally move through this space\n" +
+            "Design a %s village layout in Minecraft considering:\n" +
+            "1. Historical accuracy and cultural authenticity\n" +
+            "2. Social hierarchy and community spaces\n" +
+            "3. Local architectural patterns\n" +
+            "4. Religious or ceremonial requirements\n" +
+            "5. Climate adaptations\n" +
             "Format response as:\n" +
-            "LAYOUT: (grid/organic/radial)\n" +
+            "LAYOUT: (grid/organic/radial/hierarchical)\n" +
             "CENTER: (main cultural building)\n" +
             "DISTRICTS: (comma-separated list)\n" +
-            "PATHWAYS: (road style description)",
+            "ZONING: (district arrangement rules)\n" +
+            "PATHWAYS: (road style and patterns)\n" +
+            "INFRASTRUCTURE: (water/drainage/defenses)",
             culture
         );
 
         return LLMService.getInstance()
             .generateResponse(prompt)
-            .thenApply(this::parseLayoutResponse);
+            .thenApply(response -> {
+                Map<String, String> params = Arrays.stream(response.split("\n"))
+                    .map(line -> line.split(": "))
+                    .filter(parts -> parts.length == 2)
+                    .collect(Collectors.toMap(
+                        parts -> parts[0],
+                        parts -> parts[1]
+                    ));
+
+                Map<String, Object> layout = new HashMap<>();
+                layout.put("LAYOUT", params.get("LAYOUT"));
+                layout.put("CENTER", params.get("CENTER"));
+                layout.put("DISTRICTS", Arrays.asList(params.get("DISTRICTS").split(", ")));
+                layout.put("ZONING", params.get("ZONING"));
+                layout.put("PATHWAYS", params.get("PATHWAYS"));
+                layout.put("INFRASTRUCTURE", params.get("INFRASTRUCTURE"));
+
+                // Apply cultural constraints to layout
+                applyCulturalLayoutRules(layout);
+                
+                return layout;
+            });
     }
 
-    private Map<String, Object> parseLayoutResponse(String response) {
-        Map<String, String> params = Arrays.stream(response.split("\n"))
-            .map(line -> line.split(": "))
-            .filter(parts -> parts.length == 2)
-            .collect(Collectors.toMap(
-                parts -> parts[0],
-                parts -> parts[1]
-            ));
-
-        Map<String, Object> layout = new HashMap<>();
-        layout.put("LAYOUT", params.get("LAYOUT"));
-        layout.put("CENTER", params.get("CENTER"));
-        layout.put("DISTRICTS", Arrays.asList(params.get("DISTRICTS").split(", ")));
-        layout.put("PATHWAYS", params.get("PATHWAYS"));
-
-        return layout;
+    private void applyCulturalLayoutRules(Map<String, Object> layout) {
+        switch(culture.toLowerCase()) {
+            case "roman" -> {
+                if (!layout.get("LAYOUT").equals("grid")) {
+                    layout.put("LAYOUT", "grid");  // Romans preferred grid layouts
+                }
+                if (!((List<String>)layout.get("DISTRICTS")).contains("forum")) {
+                    ((List<String>)layout.get("DISTRICTS")).add(0, "forum");
+                }
+            }
+            case "egyptian" -> {
+                if (!((String)layout.get("INFRASTRUCTURE")).contains("irrigation")) {
+                    layout.put("INFRASTRUCTURE", 
+                        ((String)layout.get("INFRASTRUCTURE")) + ", irrigation systems");
+                }
+            }
+            case "victorian" -> {
+                if (!((List<String>)layout.get("DISTRICTS")).contains("industrial")) {
+                    ((List<String>)layout.get("DISTRICTS")).add("industrial");
+                }
+                layout.put("ZONING", "residential separate from industrial");
+            }
+            case "nyc" -> {
+                layout.put("LAYOUT", "grid");  // NYC's iconic grid system
+                if (!((String)layout.get("INFRASTRUCTURE")).contains("subway")) {
+                    layout.put("INFRASTRUCTURE", 
+                        ((String)layout.get("INFRASTRUCTURE")) + ", subway system");
+                }
+            }
+        }
     }
 
     private void addCulturalDecorations(World world) {
@@ -911,17 +949,12 @@ public class SpawnRegion {
                     } else if (dy == houseHeight - 1) {
                         // Roof
                         world.setBlockState(buildPos, Blocks.STONE_BRICK_STAIRS.getDefaultState());
+                    } else {
+                        // Interior
+                        world.setBlockState(buildPos, Blocks.AIR.getDefaultState());
                     }
                 }
             }
-        }
-
-        // Add entrance
-        int doorZ = -houseLength;
-        for (int dy = 0; dy < 2; dy++) {
-            int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ() + doorZ);
-            BlockPos doorPos = new BlockPos(pos.getX(), y + dy, pos.getZ() + doorZ);
-            world.setBlockState(doorPos, Blocks.AIR.getDefaultState());
         }
     }
 
@@ -1740,12 +1773,16 @@ private void generateSkyscraper(World world, BlockPos base, int height) {
         for (int x = -size/2; x <= size/2; x++) {
             for (int z = -size/2; z <= size/2; z++) {
                 int baseY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, base.getX() + x, base.getZ() + z);
-                BlockPos pos = new BlockPos(base.getX() + x, baseY + y - 1, base.getZ() + z);
+                BlockPos pos = new BlockPos(base.getX() + x, baseY + y, base.getZ() + z);
                 
                 if (x == -size/2 || x == size/2 || z == -size/2 || z == size/2) {
-                    world.setBlockState(pos, Blocks.GLASS.getDefaultState());
-                } else {
+                    world.setBlockState(pos, y % 4 == 0 ? Blocks.SMOOTH_STONE.getDefaultState() : Blocks.GLASS.getDefaultState());
+                } else if (y % 4 == 0) {
+                    // Floor levels
                     world.setBlockState(pos, Blocks.SMOOTH_STONE.getDefaultState());
+                } else {
+                    // Interior space
+                    world.setBlockState(pos, Blocks.AIR.getDefaultState());
                 }
             }
         }
@@ -2176,7 +2213,7 @@ private void generateSubwayEntranceStructure(World world, BlockPos pos) {
     // Entrance roof
     for (int x = -1; x <= 1; x++) {
         world.setBlockState(new BlockPos(pos.getX() + x, 
-            pos.getY() + entranceHeight, pos.getZ()),
+            pos.getY() + entranceHeight, pos.getZ() ),
             Blocks.SMOOTH_STONE_SLAB.getDefaultState());
     }
 }
@@ -2249,22 +2286,6 @@ private PathStyle getCulturalPathStyle() {
             new Block[]{Blocks.STONE_BRICKS, Blocks.SMOOTH_STONE},
             true, true, 4);
         default -> new PathStyle(
-
-private PathStyle getCulturalPathStyle() {
-    return switch(culture.toLowerCase()) {
-        case "roman" -> new PathStyle(
-            new Block[]{Blocks.STONE_BRICKS, Blocks.POLISHED_ANDESITE}, 
-            true, true, 6);
-        case "egyptian" -> new PathStyle(
-            new Block[]{Blocks.SANDSTONE, Blocks.SMOOTH_SANDSTONE},
-            false, true, 8);
-        case "victorian" -> new PathStyle(
-            new Block[]{Blocks.COBBLESTONE, Blocks.STONE_BRICKS},
-            true, true, 5);
-        case "nyc" -> new PathStyle(
-            new Block[]{Blocks.STONE_BRICKS, Blocks.SMOOTH_STONE},
-            true, true, 4);
-        default -> new PathStyle(
             new Block[]{Blocks.DIRT_PATH},
             false, false, 0);
     };
@@ -2321,13 +2342,45 @@ private List<BlockPos> reconstructPath(BlockPos current, Map<BlockPos, BlockPos>
 private void buildPath(World world, List<BlockPos> path, PathStyle style) {
     int lightCounter = 0;
     
+    // Pre-calculate heights to ensure smooth transitions
+    Map<BlockPos, Integer> pathHeights = new HashMap<>();
+    for (int i = 0; i < path.size(); i++) {
+        BlockPos pos = path.get(i);
+        int baseY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
+        
+        // Smooth height transitions with neighboring blocks
+        if (i > 0 && i < path.size() - 1) {
+            int prevY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                path.get(i-1).getX(), path.get(i-1).getZ());
+            int nextY = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, 
+                path.get(i+1).getX(), path.get(i+1).getZ());
+            baseY = Math.round((prevY + baseY + nextY) / 3.0f);
+        }
+        pathHeights.put(pos, baseY);
+    }
+    
+    // Build the path with calculated heights
     for (BlockPos pos : path) {
-        int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ());
+        int y = pathHeights.get(pos);
         BlockPos pathPos = new BlockPos(pos.getX(), y - 1, pos.getZ());
         
         // Place path block
         Block pathBlock = style.blocks[world.getRandom().nextInt(style.blocks.length)];
         world.setBlockState(pathPos, pathBlock.getDefaultState());
+        
+        // Handle elevation changes with stairs or slabs
+        for (Direction dir : Direction.Type.HORIZONTAL) {
+            BlockPos neighbor = pos.offset(dir);
+            if (path.contains(neighbor)) {
+                int heightDiff = pathHeights.get(neighbor) - y;
+                if (Math.abs(heightDiff) == 1) {
+                    world.setBlockState(
+                        heightDiff > 0 ? pathPos.up() : pathPos,
+                        Blocks.STONE_BRICK_STAIRS.getDefaultState()
+                    );
+                }
+            }
+        }
         
         // Add curbs for elevated paths
         if (style.elevated) {
@@ -2335,6 +2388,14 @@ private void buildPath(World world, List<BlockPos> path, PathStyle style) {
                 BlockPos edgePos = pathPos.offset(dir);
                 if (!path.contains(edgePos)) {
                     world.setBlockState(edgePos, Blocks.STONE_BRICK_WALL.getDefaultState());
+                    
+                    // Fill underneath curbs for stability
+                    for (int dy = 1; dy < 3; dy++) {
+                        BlockPos support = edgePos.down(dy);
+                        if (world.getBlockState(support).isAir()) {
+                            world.setBlockState(support, pathBlock.getDefaultState());
+                        }
+                    }
                 }
             }
         }
@@ -2348,6 +2409,7 @@ private void buildPath(World world, List<BlockPos> path, PathStyle style) {
                 case "egyptian" -> world.setBlockState(lightPos, Blocks.LANTERN.getDefaultState());
                 case "victorian" -> world.setBlockState(lightPos, Blocks.SOUL_LANTERN.getDefaultState());
                 case "nyc" -> world.setBlockState(lightPos, Blocks.SEA_LANTERN.getDefaultState());
+                default -> world.setBlockState(lightPos, Blocks.TORCH.getDefaultState());
             }
         }
     }
