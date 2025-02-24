@@ -67,12 +67,24 @@ public class SetupScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        if (!animationRenderer.isComplete()) {
+            animationRenderer.tick();
+        } else {
+            frameTimer++;
+            if (frameTimer >= ANIM_FRAME_TIME) {
+                frameTimer = 0;
+                currentFrame = (currentFrame + 1) % FRAMES.length;
+            }
+        }
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
         if (!animationRenderer.isComplete()) {
             animationRenderer.render(context, width, height, delta);
-            animationRenderer.tick();
         } else {
             // Draw title
             context.drawTextWithShadow(textRenderer, this.title,
@@ -110,12 +122,6 @@ public class SetupScreen extends Screen {
                 barY + barHeight + 10,
                 0xFFFFFF
             );
-            
-            frameTimer++;
-            if (frameTimer >= ANIM_FRAME_TIME) {
-                frameTimer = 0;
-                currentFrame = (currentFrame + 1) % FRAMES.length;
-            }
         }
     }
 

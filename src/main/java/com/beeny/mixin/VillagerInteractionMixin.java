@@ -36,16 +36,20 @@ public class VillagerInteractionMixin {
             }
         } else {
             // Client-side handling
+            VillagerManager vm = VillagerManager.getInstance();
+            String culture = vm.getNearestSpawnRegion(villager.getBlockPos()).getCulture();
             if (isAtWorkstation(villager)) {
-                VillagerManager vm = VillagerManager.getInstance();
-                String culture = vm.getNearestSpawnRegion(villager.getBlockPos()).getCulture();
-                if (player.getWorld().isClient) {
-                    net.minecraft.client.MinecraftClient.getInstance().setScreen(
-                        new VillageCraftingScreen(villager, culture)
-                    );
-                }
-                cir.setReturnValue(ActionResult.SUCCESS);
+                // Open crafting screen when at workstation
+                net.minecraft.client.MinecraftClient.getInstance().setScreen(
+                    new VillageCraftingScreen(villager, culture)
+                );
+            } else {
+                // Open dialogue screen when not at workstation
+                net.minecraft.client.MinecraftClient.getInstance().setScreen(
+                    new com.beeny.gui.VillagerDialogueScreen(villager)
+                );
             }
+            cir.setReturnValue(ActionResult.SUCCESS);
         }
     }
 
