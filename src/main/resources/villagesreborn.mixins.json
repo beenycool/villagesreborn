@@ -5,7 +5,8 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "ServerPlayerEntityMixin",
-    "VillagerInteractionMixin"
+    "VillagerInteractionMixin",
+    "OptionsScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

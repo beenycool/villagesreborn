@@ -47,8 +47,23 @@ import net.minecraft.village.TradeOfferList;
 public class VillagerAI {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final int DEFAULT_TIMEOUT_SECONDS = 5;
-    private static final Map<String, String> behaviorCache = new ConcurrentHashMap<>();
+    private static final Map<String, CachedBehavior> behaviorCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHE_SIZE = 1000;
+    private static final long CACHE_EXPIRY_MS = 1800000; // 30 minutes
+
+    private static class CachedBehavior {
+        final String behavior;
+        final long timestamp;
+
+        CachedBehavior(String behavior) {
+            this.behavior = behavior;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() - timestamp > CACHE_EXPIRY_MS;
+        }
+    }
 
     private final VillagerEntity villager;
     private final String personality;
@@ -323,18 +338,27 @@ public class VillagerAI {
     }
 
     public CompletableFuture<String> generateBehavior(String situation, int timeoutSeconds) {
-        String cacheKey = String.format("%s|%s|%d|%s|%s", 
+        // Create a more generalized cache key focusing on essential context
+        String cacheKey = String.format("%s|%s|%s",
             personality,
-            situation,
-            happiness,
-            currentActivity,
-            getCurrentCulturalContext()
+            situation.replaceAll("\\s+", "_").toLowerCase(),
+            currentActivity
         );
         
-        String cachedBehavior = behaviorCache.get(cacheKey);
-        if (cachedBehavior != null) {
-            LOGGER.debug("Using cached behavior for {}: {}", villager.getName().getString(), cachedBehavior);
-            return CompletableFuture.completedFuture(cachedBehavior);
+        // Check cache and remove if expired
+        CachedBehavior cached = behaviorCache.get(cacheKey);
+        if (cached != null) {
+            if (!cached.isExpired()) {
+                LOGGER.debug("Using cached behavior for {}: {}", villager.getName().getString(), cached.behavior);
+                return CompletableFuture.completedFuture(cached.behavior);
+            } else {
+                behaviorCache.remove(cacheKey);
+            }
+        }
+
+        // Periodically prune expired cache entries
+        if (Math.random() < 0.1) { // 10% chance to trigger cleanup
+            pruneExpiredCache();
         }
 
         // Build rich context for the LLM
@@ -357,8 +381,8 @@ public class VillagerAI {
                 String behavior = response.trim();
                 LOGGER.debug("Generated behavior for {}: {}", villager.getName().getString(), behavior);
 
-                if (behaviorCache.size() < MAX_CACHE_SIZE) {
-                    behaviorCache.put(cacheKey, behavior);
+                if (behaviorCache.size() < MAX_CACHE_SIZE || removeOldestExpiredEntry()) {
+                    behaviorCache.put(cacheKey, new CachedBehavior(behavior));
                 }
                 return behavior;
             })
@@ -562,7 +586,7 @@ public class VillagerAI {
             generateDialogue("Meeting new " + type.toString().toLowerCase(), other)
                 .thenAccept(dialogue -> {
                     String cacheKey = "meeting|" + otherVillager.toString();
-                    behaviorCache.put(cacheKey, dialogue);
+                    behaviorCache.put(cacheKey, new CachedBehavior(dialogue));
                 });
         }
     }
@@ -636,6 +660,25 @@ public class VillagerAI {
             }
         });
     }
+
+    private static void pruneExpiredCache() {
+        behaviorCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+        LOGGER.debug("Pruned expired entries from behavior cache, new size: {}", behaviorCache.size());
+    }
+
+    private static boolean removeOldestExpiredEntry() {
+        Optional<Map.Entry<String, CachedBehavior>> oldestExpired = behaviorCache.entrySet().stream()
+            .filter(e -> e.getValue().isExpired())
+            .min((a, b) -> Long.compare(a.getValue().timestamp, b.getValue().timestamp));
+            
+        if (oldestExpired.isPresent()) {
+            behaviorCache.remove(oldestExpired.get().getKey());
+            LOGGER.debug("Removed oldest expired entry from behavior cache");
+            return true;
+        }
+        return false;
+    }
+
 
     public static void clearBehaviorCache() {
         behaviorCache.clear();
