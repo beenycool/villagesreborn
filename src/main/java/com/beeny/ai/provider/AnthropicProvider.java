@@ -2,12 +2,21 @@ package com.beeny.ai.provider;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class AnthropicProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -16,6 +25,19 @@ public class AnthropicProvider implements AIProvider {
     private String apiKey;
     private String model;
     private boolean initialized = false;
+    private final OkHttpClient client;
+    private final Gson gson = new Gson();
+    private static final String API_URL = "https://api.anthropic.com/v1/messages";
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final String ANTHROPIC_API_VERSION = "2023-06-01";
+
+    public AnthropicProvider() {
+        client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build();
+    }
 
     @Override
     public void initialize(Map<String, String> config) {
@@ -46,16 +68,71 @@ public class AnthropicProvider implements AIProvider {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // TODO: Implement actual Anthropic API call
-                // For now, return a mock response
-                String response = mockResponse(prompt);
+                String response = callAnthropicApi(prompt, context);
                 cache.put(cacheKey, response);
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Anthropic", e);
-                throw new RuntimeException("Failed to generate response", e);
+                // Fall back to mock response
+                String mockResp = mockResponse(prompt);
+                cache.put(cacheKey, mockResp);
+                return mockResp;
             }
         }, executor);
+    }
+
+    private String callAnthropicApi(String prompt, Map<String, String> context) throws IOException {
+        // Build system prompt from context
+        StringBuilder systemPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+        if (context != null && !context.isEmpty()) {
+            context.forEach((key, value) -> {
+                if (value != null && !value.isEmpty()) {
+                    systemPrompt.append(" ").append(key).append(": ").append(value).append(".");
+                }
+            });
+        }
+
+        // Create request body
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("max_tokens", 300);
+        requestBody.addProperty("system", systemPrompt.toString());
+        
+        // Add messages
+        JsonObject message = new JsonObject();
+        message.addProperty("role", "user");
+        message.addProperty("content", prompt);
+        requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+        
+        // Create request
+        Request request = new Request.Builder()
+            .url(API_URL)
+            .post(RequestBody.create(requestBody.toString(), JSON))
+            .header("X-API-Key", apiKey)
+            .header("anthropic-version", ANTHROPIC_API_VERSION)
+            .header("Content-Type", "application/json")
+            .build();
+        
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                LOGGER.error("Anthropic API error: {} - {}", response.code(), response.message());
+                throw new IOException("Anthropic API error: " + response.code() + " - " + response.message());
+            }
+            
+            String responseBody = response.body().string();
+            JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+            
+            if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) {
+                return jsonResponse.getAsJsonArray("content").get(0)
+                    .getAsJsonObject().get("text").getAsString().trim();
+            } else {
+                LOGGER.error("Unexpected Anthropic API response structure: {}", responseBody);
+                throw new IOException("Unexpected Anthropic API response structure");
+            }
+        } catch (IOException e) {
+            LOGGER.error("Anthropic API communication error", e);
+            throw e;
+        }
     }
 
     private String mockResponse(String prompt) {

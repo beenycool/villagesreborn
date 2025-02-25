@@ -2,7 +2,14 @@ package com.beeny.ai.provider;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.azure.ai.openai.OpenAIClient;
+import com.azure.ai.openai.OpenAIClientBuilder;
+import com.azure.ai.openai.models.*;
+import com.azure.core.credential.AzureKeyCredential;
+import com.azure.core.util.Context;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,6 +24,7 @@ public class AzureOpenAIProvider implements AIProvider {
     private String endpoint;
     private String modelName;
     private boolean initialized = false;
+    private OpenAIClient client;
 
     @Override
     public void initialize(Map<String, String> config) {
@@ -29,8 +37,17 @@ public class AzureOpenAIProvider implements AIProvider {
             return;
         }
         
-        initialized = true;
-        LOGGER.info("Azure OpenAI provider initialized with model: {}", modelName);
+        try {
+            this.client = new OpenAIClientBuilder()
+                .endpoint(endpoint)
+                .credential(new AzureKeyCredential(apiKey))
+                .buildClient();
+            
+            initialized = true;
+            LOGGER.info("Azure OpenAI provider initialized with model: {}", modelName);
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize Azure OpenAI client", e);
+        }
     }
 
     @Override
@@ -48,16 +65,60 @@ public class AzureOpenAIProvider implements AIProvider {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // TODO: Implement actual Azure OpenAI API call
-                // For now, return a mock response
-                String response = mockResponse(prompt);
+                String response = callAzureOpenAI(prompt, context);
                 cache.put(cacheKey, response);
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Azure OpenAI", e);
-                throw new RuntimeException("Failed to generate response", e);
+                
+                // Fall back to mock response if API call fails
+                String mockResp = mockResponse(prompt);
+                cache.put(cacheKey, mockResp);
+                return mockResp;
             }
         }, executor);
+    }
+
+    private String callAzureOpenAI(String prompt, Map<String, String> context) {
+        try {
+            // Create the messages for the chat completion
+            List<ChatMessage> chatMessages = new ArrayList<>();
+            
+            // Add system message with context if available
+            if (context != null && !context.isEmpty()) {
+                StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+                context.forEach((key, value) -> {
+                    if (value != null && !value.isEmpty()) {
+                        systemContent.append(" ").append(key).append(": ").append(value).append(".");
+                    }
+                });
+                
+                chatMessages.add(new ChatMessage(ChatRole.SYSTEM, systemContent.toString()));
+            }
+            
+            // Add user message with the prompt
+            chatMessages.add(new ChatMessage(ChatRole.USER, prompt));
+            
+            // Create chat completion options
+            ChatCompletionsOptions options = new ChatCompletionsOptions(chatMessages);
+            options.setMaxTokens(300);
+            options.setTemperature(0.7);
+            options.setModel(modelName);
+            
+            // Call the Azure OpenAI service
+            ChatCompletions completions = client.getChatCompletions(options);
+            
+            if (completions != null && !completions.getChoices().isEmpty()) {
+                ChatChoice choice = completions.getChoices().get(0);
+                return choice.getMessage().getContent();
+            } else {
+                LOGGER.warn("Empty response received from Azure OpenAI");
+                return mockResponse(prompt);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Exception during Azure OpenAI API call", e);
+            throw e;
+        }
     }
 
     private String mockResponse(String prompt) {

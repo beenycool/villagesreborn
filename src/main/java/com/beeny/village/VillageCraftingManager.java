@@ -2,10 +2,12 @@ package com.beeny.village;
 
 import com.beeny.ai.LLMService;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.util.Formatting;
 
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +19,8 @@ public class VillageCraftingManager {
     private static VillageCraftingManager instance;
     private final Map<String, List<CraftingRecipe>> culturalRecipes = new HashMap<>();
     private final VillagerManager villagerManager;
+    private final Map<UUID, Map<String, Long>> craftingCooldowns = new HashMap<>();
+    private static final long COOLDOWN_DURATION = 12000; // 10 minutes in game ticks
 
     private VillageCraftingManager() {
         this.villagerManager = VillagerManager.getInstance();
@@ -66,6 +70,33 @@ public class VillageCraftingManager {
         if (recipe == null) {
             return CompletableFuture.completedFuture("Unknown recipe");
         }
+        
+        // Check if villager is on cooldown for this recipe
+        if (isOnCooldown(villager.getUuid(), recipeId)) {
+            return CompletableFuture.completedFuture(villager.getName().getString() + " needs to rest before crafting this again.");
+        }
+
+        // Check if player has required materials
+        if (!hasRequiredMaterials(player, recipe)) {
+            StringBuilder missingItems = new StringBuilder();
+            for (Map.Entry<Item, Integer> entry : recipe.getInputs().entrySet()) {
+                int required = entry.getValue();
+                int playerHas = countPlayerItems(player, entry.getKey());
+                if (playerHas < required) {
+                    missingItems.append(required - playerHas).append("x ").append(entry.getKey().getName().getString()).append(", ");
+                }
+            }
+            
+            if (missingItems.length() > 0) {
+                missingItems.setLength(missingItems.length() - 2); // Remove trailing comma and space
+                return CompletableFuture.completedFuture("Missing materials: " + missingItems);
+            }
+        }
+        
+        // Consume materials
+        for (Map.Entry<Item, Integer> entry : recipe.getInputs().entrySet()) {
+            consumePlayerItems(player, entry.getKey(), entry.getValue());
+        }
 
         String prompt = String.format(
             "Villager %s (%s) is tasked with crafting %s in a %s village. Describe their reaction and work process in 15 words or less.",
@@ -77,11 +108,78 @@ public class VillageCraftingManager {
 
         return LLMService.getInstance().generateResponse(prompt)
             .thenApply(response -> {
+                // Apply skill gain
+                float skillGain = calculateSkillGain(recipe);
                 ai.updateActivity("crafting_" + recipeId);
                 ai.updateProfessionSkill("crafting");
+                
+                // Give the player the crafted item
+                ItemStack result = new ItemStack(recipe.getOutput());
+                player.getInventory().insertStack(result);
+                
+                // Set cooldown
+                setCooldown(villager.getUuid(), recipeId, player.getWorld().getTime());
+                
+                // Send messages
+                player.sendMessage(Text.literal("Received: " + result.getName().getString()).formatted(Formatting.GREEN), true);
                 player.sendMessage(Text.literal(response), false);
+                
                 return response;
             });
+    }
+    
+    private boolean isOnCooldown(UUID villagerUuid, String recipeId) {
+        Map<String, Long> villagerCooldowns = craftingCooldowns.get(villagerUuid);
+        if (villagerCooldowns == null) {
+            return false;
+        }
+        
+        Long cooldownUntil = villagerCooldowns.get(recipeId);
+        if (cooldownUntil == null) {
+            return false;
+        }
+        
+        // Check if current time is still within cooldown period
+        long currentTime = System.currentTimeMillis();
+        return currentTime < cooldownUntil;
+    }
+    
+    private void setCooldown(UUID villagerUuid, String recipeId, long currentGameTime) {
+        craftingCooldowns
+            .computeIfAbsent(villagerUuid, k -> new HashMap<>())
+            .put(recipeId, currentGameTime + COOLDOWN_DURATION);
+    }
+    
+    private boolean hasRequiredMaterials(ServerPlayerEntity player, CraftingRecipe recipe) {
+        for (Map.Entry<Item, Integer> entry : recipe.getInputs().entrySet()) {
+            if (countPlayerItems(player, entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    private int countPlayerItems(ServerPlayerEntity player, Item item) {
+        int count = 0;
+        for (ItemStack stack : player.getInventory().main) {
+            if (stack.getItem() == item) {
+                count += stack.getCount();
+            }
+        }
+        return count;
+    }
+    
+    private void consumePlayerItems(ServerPlayerEntity player, Item item, int amount) {
+        int remaining = amount;
+        
+        for (int i = 0; i < player.getInventory().size() && remaining > 0; i++) {
+            ItemStack stack = player.getInventory().getStack(i);
+            if (stack.getItem() == item) {
+                int toRemove = Math.min(stack.getCount(), remaining);
+                stack.decrement(toRemove);
+                remaining -= toRemove;
+            }
+        }
     }
 
     public static class CraftingRecipe {
@@ -110,6 +208,11 @@ public class VillageCraftingManager {
     }
 
     private float calculateSkillGain(CraftingRecipe recipe) {
-        return 0.1f * recipe.getInputs().size();
+        // More complex recipes provide more skill points
+        int ingredientCount = recipe.getInputs().size();
+        int totalItemCount = recipe.getInputs().values().stream().mapToInt(Integer::intValue).sum();
+        
+        // Base skill gain + bonuses for complexity
+        return 0.1f * ingredientCount + 0.05f * totalItemCount;
     }
 }
