@@ -4,6 +4,9 @@ import com.beeny.ai.provider.AIProvider;
 import com.beeny.ai.provider.AzureOpenAIProvider;
 import com.beeny.ai.provider.OpenAIProvider;
 import com.beeny.ai.provider.AnthropicProvider;
+import com.beeny.ai.provider.GeminiProvider;
+import com.beeny.ai.provider.CohereProvider;
+import com.beeny.ai.provider.MistralProvider;
 import com.beeny.setup.LLMConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +30,9 @@ public class LLMService {
         providers.put("azure", new AzureOpenAIProvider());
         providers.put("openai", new OpenAIProvider());
         providers.put("anthropic", new AnthropicProvider());
+        providers.put("gemini", new GeminiProvider());
+        providers.put("cohere", new CohereProvider());
+        providers.put("mistral", new MistralProvider());
     }
 
     public static LLMService getInstance() {

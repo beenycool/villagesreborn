@@ -44,8 +44,41 @@ public class SetupScreen extends Screen {
     private SliderWidget temperatureSlider;
     private SliderWidget contextLengthSlider;
 
-    private static final List<String> MODEL_TYPES = List.of("gpt-3.5-turbo", "gpt-4", "llama2", "claude-v2");
-    private static final List<String> PROVIDERS = List.of("openai", "anthropic", "local");
+    // Update model types to include models from the new providers
+    private static final List<String> MODEL_TYPES = List.of(
+        // OpenAI models
+        "gpt-3.5-turbo", 
+        "gpt-4", 
+        "gpt-4-turbo",
+        // Anthropic models
+        "claude-2.1",
+        "claude-3-opus",
+        "claude-3-sonnet", 
+        // Mistral models
+        "mistral-small",
+        "mistral-medium",
+        "mistral-large-latest",
+        // Gemini models
+        "gemini-1.0-pro",
+        "gemini-1.5-pro",
+        // Cohere models
+        "command",
+        "command-light",
+        "command-nightly",
+        // Local models
+        "llama2"
+    );
+    
+    // Update providers list to include the new options
+    private static final List<String> PROVIDERS = List.of(
+        "azure", 
+        "openai", 
+        "anthropic", 
+        "gemini", 
+        "cohere", 
+        "mistral", 
+        "local"
+    );
 
     private static final int ANIM_FRAME_TIME = 20;
     private static final Function<Identifier, RenderLayer> TEXTURE_LAYER = id -> RenderLayer.getGui();
@@ -230,20 +263,26 @@ public class SetupScreen extends Screen {
         addDrawableChild(endpointField);
         currentY += padding;
 
-        // Model Type
-        modelTypeButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Model: " + value))
-            .values(MODEL_TYPES)
-            .initially(MODEL_TYPES.contains(llmConfig.getModelType()) ? llmConfig.getModelType() : MODEL_TYPES.get(0))
-            .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Model Type"));
-        addDrawableChild(modelTypeButton);
-        currentY += padding;
-
-        // Provider
+        // Provider selection - updating the provider first, then model list based on provider
         providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Provider: " + value))
             .values(PROVIDERS)
             .initially(PROVIDERS.contains(llmConfig.getProvider()) ? llmConfig.getProvider() : PROVIDERS.get(0))
             .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Provider"));
+        
+        // Update the provider's models when provider changes
+        providerButton.setChangedListener(provider -> {
+            updateModelListForProvider(provider);
+        });
+        
         addDrawableChild(providerButton);
+        currentY += padding;
+        
+        // Model Type - default models are loaded, will be updated when provider changes
+        modelTypeButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Model: " + value))
+            .values(getModelsForProvider(providerButton.getValue()))
+            .initially(MODEL_TYPES.contains(llmConfig.getModelType()) ? llmConfig.getModelType() : getDefaultModelForProvider(providerButton.getValue()))
+            .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Model Type"));
+        addDrawableChild(modelTypeButton);
         currentY += padding;
 
         // Temperature Slider
@@ -293,6 +332,71 @@ public class SetupScreen extends Screen {
         .dimensions(leftX, this.height - 28, fieldWidth, fieldHeight)
         .build();
         addDrawableChild(doneButton);
+    }
+    
+    // Helper method to update model list when provider changes
+    private void updateModelListForProvider(String provider) {
+        // Re-create model button with filtered models
+        List<String> providerModels = getModelsForProvider(provider);
+        String defaultModel = getDefaultModelForProvider(provider);
+        
+        // Replace the existing model button with new filtered models
+        this.remove(modelTypeButton);
+        modelTypeButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Model: " + value))
+            .values(providerModels)
+            .initially(defaultModel)
+            .build(leftX, currentY - padding, fieldWidth, fieldHeight, Text.literal("Model Type"));
+        addDrawableChild(modelTypeButton);
+        
+        // Update endpoint for specific providers
+        updateEndpointForProvider(provider);
+    }
+    
+    // Helper method to get appropriate models for each provider
+    private List<String> getModelsForProvider(String provider) {
+        return switch(provider) {
+            case "openai" -> List.of("gpt-3.5-turbo", "gpt-4", "gpt-4-turbo");
+            case "anthropic" -> List.of("claude-2.1", "claude-3-opus", "claude-3-sonnet");
+            case "azure" -> List.of("gpt-3.5-turbo", "gpt-4");
+            case "gemini" -> List.of("gemini-1.0-pro", "gemini-1.5-pro");
+            case "cohere" -> List.of("command", "command-light", "command-nightly");
+            case "mistral" -> List.of("mistral-small", "mistral-medium", "mistral-large-latest");
+            case "local" -> List.of("llama2");
+            default -> List.of("gpt-3.5-turbo");
+        };
+    }
+    
+    // Helper method to set default model for each provider
+    private String getDefaultModelForProvider(String provider) {
+        return switch(provider) {
+            case "openai" -> "gpt-3.5-turbo";
+            case "anthropic" -> "claude-2.1";
+            case "azure" -> "gpt-3.5-turbo";
+            case "gemini" -> "gemini-1.5-pro";
+            case "cohere" -> "command";
+            case "mistral" -> "mistral-large-latest";
+            case "local" -> "llama2";
+            default -> "gpt-3.5-turbo";
+        };
+    }
+    
+    // Helper method to update endpoint based on provider
+    private void updateEndpointForProvider(String provider) {
+        String endpoint = switch(provider) {
+            case "openai" -> "https://api.openai.com/v1";
+            case "anthropic" -> "https://api.anthropic.com/v1";
+            case "azure" -> endpointField.getText(); // Keep existing Azure endpoint
+            case "gemini" -> "https://generativelanguage.googleapis.com/v1beta";
+            case "cohere" -> "https://api.cohere.ai/v1";
+            case "mistral" -> "https://api.mistral.ai/v1";
+            case "local" -> "http://localhost:8080";
+            default -> "https://api.openai.com/v1";
+        };
+        
+        // Only update if the endpoint is empty or if switching providers
+        if (endpointField.getText().isEmpty() || !provider.equals(llmConfig.getProvider())) {
+            endpointField.setText(endpoint);
+        }
     }
 
     private void saveSettings() {
