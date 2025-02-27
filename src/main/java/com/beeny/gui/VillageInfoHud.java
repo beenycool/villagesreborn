@@ -17,6 +17,7 @@ public class VillageInfoHud {
     private boolean showHud = false;
     private long displayEndTime = 0;
     private static final long DISPLAY_DURATION = 5000; // Show for 5 seconds after update
+    private boolean forcedDisplay = false;
     
     /**
      * Updates the village information to be displayed.
@@ -38,15 +39,29 @@ public class VillageInfoHud {
     }
     
     /**
+     * Force the HUD to display for a specific duration, regardless of auto-hide settings.
+     * 
+     * @param durationMillis Duration to show in milliseconds
+     */
+    public void forceDisplay(long durationMillis) {
+        this.showHud = true;
+        this.forcedDisplay = true;
+        this.displayEndTime = System.currentTimeMillis() + durationMillis;
+    }
+    
+    /**
      * Renders the village info HUD if it's currently visible.
      * 
      * @param matrices The matrix stack
      * @param client The Minecraft client instance
      */
     public void render(MatrixStack matrices, MinecraftClient client) {
+        long currentTime = System.currentTimeMillis();
+        
         // Auto-hide HUD after duration expires
-        if (System.currentTimeMillis() > displayEndTime) {
+        if (currentTime > displayEndTime) {
             showHud = false;
+            forcedDisplay = false;
         }
         
         // Only render if there's info to show
@@ -58,35 +73,72 @@ public class VillageInfoHud {
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
         
+        // Calculate animation factor for smooth transitions
+        float animationFactor = calculateAnimationFactor(currentTime);
+        
         // Position in the top-right corner with some padding
         int xPos = screenWidth - 150;
-        int yPos = 10;
+        int baseYPos = 10;
+        int yPos = baseYPos - (int)((1.0f - animationFactor) * 50); // Slide down animation
         int lineHeight = textRenderer.fontHeight + 2;
         
-        // Semi-transparent background
-        fill(matrices, xPos - 5, yPos - 5, xPos + 145, yPos + (lineHeight * 4) + 5, 0x80000000);
+        // Background opacity based on animation
+        int bgAlpha = (int)(128 * animationFactor);
+        int backgroundColor = (bgAlpha << 24) | 0x000000;
+        int borderColor = (int)(animationFactor * 255) << 24 | 0x444444;
+        
+        // Semi-transparent background with border
+        fill(matrices, xPos - 6, yPos - 6, xPos + 146, yPos + (lineHeight * 4) + 6, borderColor);
+        fill(matrices, xPos - 5, yPos - 5, xPos + 145, yPos + (lineHeight * 4) + 5, backgroundColor);
         
         // Village name/culture with color based on prosperity
         Formatting prosperityColor = getColorForValue(prosperity);
         textRenderer.drawWithShadow(matrices, 
             Text.literal("Village: ").append(Text.literal(cultureName).formatted(prosperityColor)),
-            xPos, yPos, 0xFFFFFF);
+            xPos, yPos, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
         
         // Prosperity indicator
         textRenderer.drawWithShadow(matrices, 
             Text.literal("Prosperity: ").append(Text.literal(getBarString(prosperity)).formatted(prosperityColor)),
-            xPos, yPos + lineHeight, 0xFFFFFF);
+            xPos, yPos + lineHeight, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
         
         // Safety indicator with color
         Formatting safetyColor = getColorForValue(safety);
         textRenderer.drawWithShadow(matrices, 
             Text.literal("Safety: ").append(Text.literal(getBarString(safety)).formatted(safetyColor)),
-            xPos, yPos + lineHeight * 2, 0xFFFFFF);
+            xPos, yPos + lineHeight * 2, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
         
         // Population count
         textRenderer.drawWithShadow(matrices, 
             Text.literal("Population: ").append(Text.literal(String.valueOf(population))),
-            xPos, yPos + lineHeight * 3, 0xFFFFFF);
+            xPos, yPos + lineHeight * 3, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
+    }
+    
+    /**
+     * Calculate animation factor (0.0 to 1.0) for smooth fade in/out
+     */
+    private float calculateAnimationFactor(long currentTime) {
+        // Time remaining until hide
+        long timeRemaining = displayEndTime - currentTime;
+        
+        // If forced display, maintain full visibility until near the end
+        if (forcedDisplay && timeRemaining > 500) {
+            return 1.0f;
+        }
+        
+        // During the first 500ms, fade in
+        if (displayEndTime - DISPLAY_DURATION + 500 > currentTime) {
+            long elapsed = currentTime - (displayEndTime - DISPLAY_DURATION);
+            return Math.min(1.0f, elapsed / 500.0f);
+        }
+        
+        // During the last 500ms, fade out
+        if (timeRemaining < 500) {
+            return Math.max(0.0f, timeRemaining / 500.0f);
+        }
+        
+        // Otherwise fully visible
+        return 1.0f;
     }
     
     /**

@@ -3,6 +3,8 @@ package com.beeny.gui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -16,6 +18,8 @@ import java.util.List;
 public class EventNotificationManager {
     private final List<EventNotification> activeNotifications = new ArrayList<>();
     private static final int MAX_NOTIFICATIONS = 3; // Maximum number of notifications visible at once
+    private static final int NOTIFICATION_WIDTH = 220; // Wider notifications for better readability
+    private static final int NOTIFICATION_HEIGHT = 60; // Taller notifications for more content
     
     /**
      * Adds a new notification to be displayed.
@@ -25,6 +29,17 @@ public class EventNotificationManager {
      * @param durationTicks How long to display the notification (in ticks)
      */
     public void addNotification(String title, String description, int durationTicks) {
+        // Play notification sound
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            client.player.playSound(
+                SoundEvents.BLOCK_NOTE_BLOCK_CHIME, 
+                SoundCategory.MASTER, 
+                0.5f, // Volume
+                1.0f  // Pitch
+            );
+        }
+        
         // Limit number of concurrent notifications
         if (activeNotifications.size() >= MAX_NOTIFICATIONS) {
             // Remove the oldest notification
@@ -49,7 +64,6 @@ public class EventNotificationManager {
         
         TextRenderer textRenderer = client.textRenderer;
         int screenWidth = client.getWindow().getScaledWidth();
-        int notificationHeight = 50; // Height of each notification
         int padding = 10; // Padding between notifications
         
         // Remove expired notifications
@@ -63,11 +77,24 @@ public class EventNotificationManager {
         }
         
         // Render active notifications from bottom to top
-        int yPosition = client.getWindow().getScaledHeight() - padding - notificationHeight;
+        int yPosition = client.getWindow().getScaledHeight() - padding - NOTIFICATION_HEIGHT;
         for (int i = activeNotifications.size() - 1; i >= 0; i--) {
             EventNotification notification = activeNotifications.get(i);
-            renderNotification(matrices, textRenderer, notification, screenWidth, yPosition);
-            yPosition -= (notificationHeight + padding);
+            
+            // Calculate animation offset (slide in from right)
+            float slideOffset = notification.getSlideOffset();
+            int xOffset = (int)(slideOffset * NOTIFICATION_WIDTH);
+            
+            // Render with animation
+            renderNotification(
+                matrices, 
+                textRenderer, 
+                notification, 
+                screenWidth + xOffset, 
+                yPosition
+            );
+            
+            yPosition -= (NOTIFICATION_HEIGHT + padding);
         }
     }
     
@@ -77,22 +104,27 @@ public class EventNotificationManager {
      * @param matrices The matrix stack
      * @param textRenderer The text renderer
      * @param notification The notification to render
-     * @param screenWidth The screen width
+     * @param xPosition The x position to render at
      * @param yPosition The y position to render at
      */
     private void renderNotification(MatrixStack matrices, TextRenderer textRenderer, 
-                                   EventNotification notification, int screenWidth, int yPosition) {
+                                   EventNotification notification, int xPosition, int yPosition) {
         // Calculate fade factor
         float alpha = notification.getFadeLevel();
         if (alpha <= 0.05f) return; // Don't render nearly invisible notifications
         
-        int width = 200;
-        int height = 50;
-        int xPosition = (screenWidth - width) / 2;
+        int width = NOTIFICATION_WIDTH;
+        int height = NOTIFICATION_HEIGHT;
+        xPosition -= width; // Position from right edge
         
         // Background with alpha based on fade level
         int backgroundColor = ((int)(alpha * 192) << 24) | 0x000000;
         int borderColor = ((int)(alpha * 255) << 24) | 0xFFD700; // Gold border
+        
+        // Draw a glowing background effect
+        float glowPulse = (float)(0.3 * Math.sin(notification.getLifeTimeProgress() * Math.PI * 6) + 0.7);
+        int glowColor = ((int)(alpha * 64 * glowPulse) << 24) | 0xFFD700;
+        fill(matrices, xPosition - 3, yPosition - 3, xPosition + width + 3, yPosition + height + 3, glowColor);
         
         // Draw background and border
         fill(matrices, xPosition - 1, yPosition - 1, xPosition + width + 1, yPosition + height + 1, borderColor);
@@ -102,17 +134,27 @@ public class EventNotificationManager {
         int titleColor = ((int)(alpha * 255) << 24) | 0xFFD700; // Gold text for title
         textRenderer.drawWithShadow(
             matrices, 
-            Text.literal(notification.title),
-            xPosition + 10, 
+            Text.literal("◆ " + notification.title + " ◆"),
+            xPosition + width/2 - textRenderer.getWidth("◆ " + notification.title + " ◆")/2, // Center text
             yPosition + 10, 
             titleColor
+        );
+        
+        // Divider line
+        fill(
+            matrices, 
+            xPosition + 10, 
+            yPosition + 22, 
+            xPosition + width - 10, 
+            yPosition + 23, 
+            ((int)(alpha * 128) << 24) | 0xFFD700
         );
         
         // Description (with possible word wrap)
         int descriptionColor = ((int)(alpha * 255) << 24) | 0xFFFFFF; // White text for description
         String[] words = notification.description.split(" ");
         StringBuilder currentLine = new StringBuilder();
-        int lineY = yPosition + 25;
+        int lineY = yPosition + 28;
         
         for (String word : words) {
             if (textRenderer.getWidth(currentLine + " " + word) > width - 20 && !currentLine.isEmpty()) {
@@ -195,6 +237,7 @@ public class EventNotificationManager {
         private int remainingTicks;
         private final int totalDuration;
         private static final int FADE_DURATION = 20; // Ticks to fade in/out
+        private static final int SLIDE_DURATION = 15; // Ticks for slide animation
         
         public EventNotification(String title, String description, int durationTicks) {
             this.title = title;
@@ -235,6 +278,34 @@ public class EventNotificationManager {
             
             // Fully visible between fade in/out
             return 1.0f;
+        }
+        
+        /**
+         * Gets the slide offset factor (-1.0 to 0.0) for horizontal animation.
+         * -1.0 means fully off-screen, 0.0 means in final position.
+         */
+        public float getSlideOffset() {
+            // Slide in during first SLIDE_DURATION ticks
+            if (totalDuration - remainingTicks < SLIDE_DURATION) {
+                float progress = (float)(totalDuration - remainingTicks) / SLIDE_DURATION;
+                return progress - 1.0f; // -1.0 to 0.0 range
+            }
+            
+            // Slide out during last SLIDE_DURATION ticks
+            if (remainingTicks < SLIDE_DURATION) {
+                float progress = (float)remainingTicks / SLIDE_DURATION;
+                return -1.0f + progress; // -1.0 to 0.0 range
+            }
+            
+            // Stable position in between
+            return 0.0f;
+        }
+        
+        /**
+         * Gets the progress through the notification's lifetime (0.0 to 1.0)
+         */
+        public float getLifeTimeProgress() {
+            return (float)(totalDuration - remainingTicks) / totalDuration;
         }
     }
 }

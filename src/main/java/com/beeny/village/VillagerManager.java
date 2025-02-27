@@ -12,11 +12,15 @@ import org.slf4j.LoggerFactory;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import com.beeny.ai.LLMService;
 import com.beeny.util.NameGenerator;
+import com.beeny.VillagesrebornClient;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 public class VillagerManager {
@@ -30,11 +34,15 @@ public class VillagerManager {
     private final Map<UUID, Map<UUID, Relationship>> relationships;
     private final NameGenerator nameGenerator;
     private final Random random;
-    // Cache for nearby villagers to reduce computational overhead
-    private final Map<UUID, List<UUID>> nearbyVillagersCache;
+    // Cache for nearby villagers with automatic expiration
+    private final Cache<UUID, List<UUID>> nearbyVillagersCache;
     private long lastCacheUpdateTime = 0;
     private static final long CACHE_UPDATE_INTERVAL = 100; // Update cache every 100 ticks (5 seconds)
     private static final double NEARBY_DISTANCE_SQUARED = 100.0;
+    
+    // Locks for thread safety
+    private final ReentrantReadWriteLock villageLock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock culturalEventLock = new ReentrantReadWriteLock();
     
     private ServerWorld world;
     private String currentCulture;
@@ -47,7 +55,11 @@ public class VillagerManager {
         this.relationships = new ConcurrentHashMap<>();
         this.nameGenerator = new NameGenerator();
         this.random = new Random();
-        this.nearbyVillagersCache = new ConcurrentHashMap<>();
+        // Build cache with expiration to prevent memory leaks
+        this.nearbyVillagersCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(30, TimeUnit.SECONDS)
+            .maximumSize(1000)
+            .build();
     }
 
     public static VillagerManager getInstance() {
@@ -55,10 +67,15 @@ public class VillagerManager {
     }
 
     public void registerSpawnRegion(BlockPos center, int radius, String culture) {
-        SpawnRegion region = new SpawnRegion(center, radius, culture);
-        spawnRegions.put(center, region);
-        addVillageStats(center, culture);
-        LOGGER.info("Registered new {} village at {}", culture, center);
+        villageLock.writeLock().lock();
+        try {
+            SpawnRegion region = new SpawnRegion(center, radius, culture);
+            spawnRegions.put(center, region);
+            addVillageStats(center, culture);
+            LOGGER.info("Registered new {} village at {}", culture, center);
+        } finally {
+            villageLock.writeLock().unlock();
+        }
     }
 
     public void addRelationship(UUID villager1, UUID villager2, VillagerAI.RelationshipType type) {
@@ -91,48 +108,92 @@ public class VillagerManager {
         // Update cultural events
         updateCulturalEvents(world);
         
-        // Update village stats
-        updateVillageStats(world);
+        // Update village stats - only do this occasionally to reduce LLM API calls
+        if (currentTime % 24000 == 0) { // Once per Minecraft day
+            updateVillageStats(world);
+        }
         
-        // Update individual villagers
-        for (VillagerAI ai : villagerAIs.values()) {
+        // Update individual villagers - use parallelism for better performance
+        villagerAIs.values().parallelStream().forEach(ai -> {
             ai.updateActivityBasedOnTime(world);
             moodManager.updateVillagerMood(ai, world);
-            
-            // Social interaction chance - reduced from 10% to 5% for better performance
-            if (random.nextFloat() < 0.05f) {
-                generateRandomSocialInteraction(ai, world);
+        });
+        
+        // Handle social interactions separately to control frequency
+        if (currentTime % 20 == 0) { // Check every second (20 ticks)
+            for (VillagerAI ai : villagerAIs.values()) {
+                // Social interaction chance - reduced to 2% for better performance
+                if (random.nextFloat() < 0.02f) {
+                    generateRandomSocialInteraction(ai, world);
+                }
             }
         }
     }
 
     private void updateNearbyVillagersCache() {
-        nearbyVillagersCache.clear();
+        // First clear expired entries
+        nearbyVillagersCache.cleanUp();
         
-        List<VillagerAI> villagerList = new ArrayList<>(villagerAIs.values());
-        for (int i = 0; i < villagerList.size(); i++) {
-            VillagerAI ai1 = villagerList.get(i);
-            UUID id1 = ai1.getVillager().getUuid();
+        // Batch villagers by chunks for more efficient spatial lookup
+        Map<Long, List<VillagerAI>> chunkMap = new HashMap<>();
+        for (VillagerAI ai : villagerAIs.values()) {
+            VillagerEntity villager = ai.getVillager();
+            if (villager == null || !villager.isAlive()) continue;
+            
+            int chunkX = villager.getBlockX() >> 4;
+            int chunkZ = villager.getBlockZ() >> 4;
+            long chunkPos = (((long)chunkX) << 32) | (chunkZ & 0xFFFFFFFFL);
+            
+            chunkMap.computeIfAbsent(chunkPos, k -> new ArrayList<>()).add(ai);
+        }
+        
+        // Analyze nearby villagers only in adjacent chunks
+        for (VillagerAI ai1 : villagerAIs.values()) {
+            VillagerEntity v1 = ai1.getVillager();
+            if (v1 == null || !v1.isAlive()) continue;
+            
+            int chunkX = v1.getBlockX() >> 4;
+            int chunkZ = v1.getBlockZ() >> 4;
             List<UUID> nearby = new ArrayList<>();
             
-            for (int j = 0; j < villagerList.size(); j++) {
-                if (i == j) continue;
-                
-                VillagerAI ai2 = villagerList.get(j);
-                if (ai1.getVillager().squaredDistanceTo(ai2.getVillager()) < NEARBY_DISTANCE_SQUARED) {
-                    nearby.add(ai2.getVillager().getUuid());
+            // Check this chunk and adjacent chunks
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    long adjacentChunk = (((long)(chunkX + dx)) << 32) | ((chunkZ + dz) & 0xFFFFFFFFL);
+                    List<VillagerAI> chunkVillagers = chunkMap.get(adjacentChunk);
+                    
+                    if (chunkVillagers != null) {
+                        for (VillagerAI ai2 : chunkVillagers) {
+                            if (ai1 == ai2) continue;
+                            
+                            VillagerEntity v2 = ai2.getVillager();
+                            if (v2 != null && v1.squaredDistanceTo(v2) < NEARBY_DISTANCE_SQUARED) {
+                                nearby.add(v2.getUuid());
+                            }
+                        }
+                    }
                 }
             }
             
             if (!nearby.isEmpty()) {
-                nearbyVillagersCache.put(id1, nearby);
+                nearbyVillagersCache.put(v1.getUuid(), nearby);
             }
         }
     }
 
     private void generateRandomSocialInteraction(VillagerAI villager1, ServerWorld world) {
-        UUID villager1UUID = villager1.getVillager().getUuid();
-        List<UUID> nearbyIds = nearbyVillagersCache.get(villager1UUID);
+        VillagerEntity v1 = villager1.getVillager();
+        if (v1 == null || !v1.isAlive()) return;
+        
+        UUID villager1UUID = v1.getUuid();
+        List<UUID> nearbyIds = null;
+        
+        try {
+            nearbyIds = nearbyVillagersCache.getIfPresent(villager1UUID);
+        } catch (Exception e) {
+            // Handle potential cache errors gracefully
+            LOGGER.debug("Cache error when retrieving nearby villagers", e);
+        }
         
         // If no nearby villagers in cache, exit early
         if (nearbyIds == null || nearbyIds.isEmpty()) {
@@ -144,60 +205,94 @@ public class VillagerManager {
         VillagerAI villager2 = villagerAIs.get(villager2UUID);
         
         if (villager2 == null) {
-            // Remove this entry from cache if the villager no longer exists
-            nearbyVillagersCache.remove(villager1UUID);
             return;
         }
         
-        // Make villagers face each other
-        VillagerEntity v1 = villager1.getVillager();
         VillagerEntity v2 = villager2.getVillager();
+        if (v2 == null || !v2.isAlive()) return;
         
-        double dx = v2.getX() - v1.getX();
-        double dz = v2.getZ() - v1.getZ();
-        float yaw = (float)(Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
-        v1.setYaw(yaw);
-        v2.setYaw(yaw + 180.0F);
-        
-        // Move slightly closer if needed
-        if (v1.squaredDistanceTo(v2) > 4.0) {
-            v1.getNavigation().startMovingTo(
-                v2.getX() + dx * 0.3,
-                v2.getY(),
-                v2.getZ() + dz * 0.3,
-                0.5D
-            );
+        // Only process interaction if villagers aren't busy
+        if (villager1.isBusy() || villager2.isBusy()) {
+            return;
         }
         
-        // Let the LLM determine their relationship
-        villager1.determineRelationshipDynamically(villager2.getVillager())
-            .thenAccept(type -> {
-                villager1.addRelationship(villager2.getVillager().getUuid(), type);
-                villager2.addRelationship(villager1.getVillager().getUuid(), type);
-                
-                // Only show particles if players are nearby to see them
-                boolean arePlayersNearby = arePlayersNearby(world, v1.getBlockPos(), 32);
-                if (arePlayersNearby) {
-                    addInteractionEffects(world, v1, v2, type);
-                }
-                
-                // Generate interaction dialogue
-                String situation = String.format("Meeting %s for the first time",
-                    villager2.getVillager().getName().getString());
-                villager1.generateDialogue(situation, villager2.getVillager())
-                    .thenAccept(dialogue -> {
-                        // Show dialogue as floating text only to nearby players
-                        for (ServerPlayerEntity player : world.getPlayers()) {
-                            if (player.squaredDistanceTo(v1) < 100) {
-                                player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
-                            }
-                        }
+        // Set both villagers as busy during interaction
+        villager1.setBusy(true);
+        villager2.setBusy(true);
+        
+        try {
+            // Make villagers face each other
+            double dx = v2.getX() - v1.getX();
+            double dz = v2.getZ() - v1.getZ();
+            float yaw = (float)(Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
+            v1.setYaw(yaw);
+            v2.setYaw(yaw + 180.0F);
+            
+            // Move slightly closer if needed
+            if (v1.squaredDistanceTo(v2) > 4.0) {
+                v1.getNavigation().startMovingTo(
+                    v2.getX() + dx * 0.3,
+                    v2.getY(),
+                    v2.getZ() + dz * 0.3,
+                    0.5D
+                );
+            }
+            
+            // Let the LLM determine their relationship with a timeout
+            CompletableFuture<VillagerAI.RelationshipType> relationshipFuture = 
+                villager1.determineRelationshipDynamically(v2)
+                    .orTimeout(5, TimeUnit.SECONDS)
+                    .exceptionally(e -> {
+                        LOGGER.warn("Relationship determination timed out or failed", e);
+                        return VillagerAI.RelationshipType.NEUTRAL;
                     });
-                
-                // Update activities to reflect interaction
-                villager1.updateActivity("socializing");
-                villager2.updateActivity("socializing");
+                    
+            relationshipFuture.thenAccept(type -> {
+                try {
+                    villager1.addRelationship(v2.getUuid(), type);
+                    villager2.addRelationship(v1.getUuid(), type);
+                    
+                    // Only show particles if players are nearby to see them
+                    boolean arePlayersNearby = arePlayersNearby(world, v1.getBlockPos(), 32);
+                    if (arePlayersNearby) {
+                        addInteractionEffects(world, v1, v2, type);
+                    }
+                    
+                    // Generate interaction dialogue with timeout
+                    String situation = String.format("Meeting %s for the first time",
+                        v2.getName().getString());
+                    villager1.generateDialogue(situation, v2)
+                        .orTimeout(3, TimeUnit.SECONDS)
+                        .exceptionally(e -> {
+                            LOGGER.debug("Dialogue generation timed out", e);
+                            return "...";
+                        })
+                        .thenAccept(dialogue -> {
+                            // Show dialogue as floating text only to nearby players
+                            for (ServerPlayerEntity player : world.getPlayers()) {
+                                if (player.squaredDistanceTo(v1) < 100) {
+                                    player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
+                                }
+                            }
+                        });
+                    
+                    // Update activities to reflect interaction
+                    villager1.updateActivity("socializing");
+                    villager2.updateActivity("socializing");
+                } finally {
+                    // Always release busy state when done
+                    CompletableFuture.delayedExecutor(60, TimeUnit.SECONDS).execute(() -> {
+                        villager1.setBusy(false);
+                        villager2.setBusy(false);
+                    });
+                }
             });
+        } catch (Exception e) {
+            // Make sure busy flag is cleared in case of any errors
+            villager1.setBusy(false);
+            villager2.setBusy(false);
+            LOGGER.error("Error in social interaction", e);
+        }
     }
     
     // Helper method to check if any players are nearby
@@ -234,45 +329,120 @@ public class VillagerManager {
     private void updateCulturalEvents(ServerWorld world) {
         long timeOfDay = world.getTimeOfDay();
         
-        // Clean up expired events
-        culturalEvents.entrySet().removeIf(entry -> 
-            timeOfDay > entry.getValue().startTime + entry.getValue().duration);
+        culturalEventLock.writeLock().lock();
+        try {
+            // Clean up expired events
+            List<String> expiredEvents = new ArrayList<>();
+            for (Map.Entry<String, CulturalEvent> entry : culturalEvents.entrySet()) {
+                if (timeOfDay > entry.getValue().startTime + entry.getValue().duration) {
+                    expiredEvents.add(entry.getKey());
+                }
+            }
             
-        // Generate new events based on culture
-        if (culturalEvents.isEmpty() && random.nextFloat() < 0.001f) { // 0.1% chance per tick
-            generateCulturalEvent(world);
+            // Remove expired events
+            for (String eventName : expiredEvents) {
+                culturalEvents.remove(eventName);
+            }
+            
+            // Generate new events based on culture - lower probability for better performance
+            if (culturalEvents.isEmpty() && random.nextFloat() < 0.0005f) { // 0.05% chance per tick
+                generateCulturalEvent(world);
+            }
+        } finally {
+            culturalEventLock.writeLock().unlock();
         }
     }
 
     private void updateVillageStats(ServerWorld world) {
-        for (Map.Entry<BlockPos, VillageStats> entry : villageStats.entrySet()) {
-            VillageStats stats = entry.getValue();
-            SpawnRegion region = spawnRegions.get(entry.getKey());
-            
-            if (region != null) {
-                StringBuilder prompt = new StringBuilder()
-                    .append("Analyze this village's current state:\n")
-                    .append("- Culture: ").append(stats.culture).append("\n")
-                    .append("- Building count: ").append(region.getCulturalStructures().size()).append("\n")
-                    .append("- Population: ").append(getVillagerCount(region)).append("\n")
-                    .append("- Recent events: ").append(getRecentEvents(region, world)).append("\n")
-                    .append("\nProvide village stats in format:\n")
-                    .append("PROSPERITY: (number 0-100)\n")
-                    .append("SAFETY: (number 0-100)");
-
-                LLMService.getInstance()
-                    .generateResponse(prompt.toString())
-                    .thenAccept(response -> {
-                        Map<String, String> values = parseResponse(response);
-                        stats.prosperity = Integer.parseInt(values.getOrDefault("PROSPERITY", "50"));
-                        stats.safety = Integer.parseInt(values.getOrDefault("SAFETY", "50"));
-                    })
-                    .exceptionally(e -> {
-                        LOGGER.error("Error updating village stats", e);
-                        return null;
-                    });
+        villageLock.readLock().lock();
+        try {
+            for (Map.Entry<BlockPos, VillageStats> entry : villageStats.entrySet()) {
+                VillageStats stats = entry.getValue();
+                SpawnRegion region = spawnRegions.get(entry.getKey());
+                
+                if (region != null) {
+                    // Get player in this village for HUD updates
+                    ServerPlayerEntity nearestPlayer = getNearestPlayer(world, entry.getKey());
+                    int villagerCount = getVillagerCount(region);
+                    
+                    // Only use LLM for stats if really necessary (less frequent updates)
+                    if (world.getTimeOfDay() % 72000 == 0) { // Every 3 minecraft days
+                        updateVillageStatsWithLLM(stats, region, villagerCount, world);
+                    } else {
+                        // Use simpler heuristics for regular updates
+                        updateVillageStatsHeuristically(stats, region, villagerCount);
+                    }
+                    
+                    // Update client HUD for nearby players
+                    if (nearestPlayer != null) {
+                        VillagesrebornClient.getInstance().updateVillageInfo(
+                            stats.culture, stats.prosperity, stats.safety, villagerCount);
+                    }
+                }
+            }
+        } finally {
+            villageLock.readLock().unlock();
+        }
+    }
+    
+    private ServerPlayerEntity getNearestPlayer(ServerWorld world, BlockPos center) {
+        double closestDistance = 100 * 100; // Within 100 blocks squared
+        ServerPlayerEntity closest = null;
+        
+        for (ServerPlayerEntity player : world.getPlayers()) {
+            double distance = player.getBlockPos().getSquaredDistance(center);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closest = player;
             }
         }
+        
+        return closest;
+    }
+    
+    private void updateVillageStatsHeuristically(VillageStats stats, SpawnRegion region, int villagerCount) {
+        // Simple algorithm for frequent updates
+        int structureCount = region.getCulturalStructures().size();
+        int poiCount = region.getPointsOfInterest().size();
+        
+        // Prosperity based on buildings and population
+        stats.prosperity = Math.min(100, Math.max(10, 
+            (structureCount * 5) + (villagerCount * 3) + (poiCount * 2)));
+            
+        // Safety based on population density and existing prosperity
+        double density = villagerCount / (Math.PI * region.getRadius() * region.getRadius());
+        stats.safety = Math.min(100, Math.max(0,
+            (int)(density * 50) + (stats.prosperity / 4) + 20));
+    }
+    
+    private void updateVillageStatsWithLLM(VillageStats stats, SpawnRegion region, 
+                                          int villagerCount, ServerWorld world) {
+        StringBuilder prompt = new StringBuilder()
+            .append("Analyze this village's current state:\n")
+            .append("- Culture: ").append(stats.culture).append("\n")
+            .append("- Building count: ").append(region.getCulturalStructures().size()).append("\n")
+            .append("- Population: ").append(villagerCount).append("\n")
+            .append("- Recent events: ").append(getRecentEvents(region, world)).append("\n")
+            .append("\nProvide village stats in format:\n")
+            .append("PROSPERITY: (number 0-100)\n")
+            .append("SAFETY: (number 0-100)");
+
+        LLMService.getInstance()
+            .generateResponse(prompt.toString())
+            .orTimeout(5, TimeUnit.SECONDS)
+            .exceptionally(e -> {
+                LOGGER.warn("LLM village stats generation failed, using heuristics instead", e);
+                return "PROSPERITY: " + stats.prosperity + "\nSAFETY: " + stats.safety;
+            })
+            .thenAccept(response -> {
+                Map<String, String> values = parseResponse(response);
+                try {
+                    stats.prosperity = Integer.parseInt(values.getOrDefault("PROSPERITY", String.valueOf(stats.prosperity)));
+                    stats.safety = Integer.parseInt(values.getOrDefault("SAFETY", String.valueOf(stats.safety)));
+                } catch (NumberFormatException e) {
+                    LOGGER.error("Failed to parse village stats numbers", e);
+                }
+            });
     }
 
     private int getVillagerCount(SpawnRegion region) {
@@ -292,56 +462,76 @@ public class VillagerManager {
         String culture = getCulture();
         if (culture == null) return;
         
-        String prompt = String.format(
-            "You are creating a cultural event for a %s-themed Minecraft village.\n" +
-            "Design a unique festival or celebration that reflects this culture.\n" +
-            "Format your response as:\n" +
-            "NAME: (event name)\n" +
-            "DURATION: (number of minecraft days)\n" +
-            "DESCRIPTION: (brief description)\n" +
-            "ACTIVITIES: (list of 2-3 villager activities during event)",
-            culture
-        );
-
-        LLMService.getInstance()
-            .generateResponse(prompt)
-            .thenAccept(response -> {
-                Map<String, String> eventDetails = parseResponse(response);
-                CulturalEvent event = new CulturalEvent(
-                    eventDetails.get("NAME"),
-                    eventDetails.get("DESCRIPTION"),
-                    Integer.parseInt(eventDetails.getOrDefault("DURATION", "1")) * 24000,
-                    world.getTimeOfDay()
-                );
-                
-                culturalEvents.put(event.name, event);
-                
-                // Generate event-specific behaviors for villagers
-                List<String> activities = Arrays.asList(
-                    eventDetails.getOrDefault("ACTIVITIES", "celebrate").split(", ")
-                );
-                
-                for (VillagerAI ai : villagerAIs.values()) {
-                    String activity = activities.get(world.getRandom().nextInt(activities.size()));
-                    ai.updateActivity("event_" + activity);
-                }
-                
-                LOGGER.info("Generated cultural event: {} for {} village", event.name, culture);
-            })
-            .exceptionally(e -> {
-                LOGGER.error("Error generating cultural event", e);
-                return null;
-            });
-    }
-
-    private Map<String, String> parseResponse(String response) {
-        return Arrays.stream(response.split("\n"))
-            .map(line -> line.split(": ", 2))
-            .filter(parts -> parts.length == 2)
-            .collect(Collectors.toMap(
-                parts -> parts[0],
-                parts -> parts[1].trim()
-            ));
+        culturalEventLock.writeLock().lock();
+        try {
+            String prompt = String.format(
+                "You are creating a cultural event for a %s-themed Minecraft village.\n" +
+                "Design a unique festival or celebration that reflects this culture.\n" +
+                "Format your response as:\n" +
+                "NAME: (event name)\n" +
+                "DURATION: (number of minecraft days)\n" +
+                "DESCRIPTION: (brief description)\n" +
+                "ACTIVITIES: (list of 2-3 villager activities during event)",
+                culture
+            );
+    
+            LLMService.getInstance()
+                .generateResponse(prompt)
+                .orTimeout(8, TimeUnit.SECONDS)
+                .exceptionally(e -> {
+                    LOGGER.error("Cultural event generation failed", e);
+                    return "NAME: Village Gathering\nDURATION: 1\nDESCRIPTION: A simple gathering.\nACTIVITIES: socialize, trade";
+                })
+                .thenAccept(response -> {
+                    Map<String, String> eventDetails = parseResponse(response);
+                    String eventName = eventDetails.getOrDefault("NAME", "Village Gathering");
+                    String description = eventDetails.getOrDefault("DESCRIPTION", "A cultural gathering");
+                    int duration = 0;
+                    
+                    try {
+                        duration = Integer.parseInt(eventDetails.getOrDefault("DURATION", "1")) * 24000;
+                    } catch (NumberFormatException e) {
+                        duration = 24000; // Default to 1 day
+                    }
+                    
+                    CulturalEvent event = new CulturalEvent(
+                        eventName,
+                        description,
+                        duration,
+                        world.getTimeOfDay()
+                    );
+                    
+                    culturalEventLock.writeLock().lock();
+                    try {
+                        culturalEvents.put(event.name, event);
+                    } finally {
+                        culturalEventLock.writeLock().unlock();
+                    }
+                    
+                    // Generate event-specific behaviors for villagers
+                    List<String> activities = Arrays.asList(
+                        eventDetails.getOrDefault("ACTIVITIES", "celebrate").split(", ")
+                    );
+                    
+                    for (VillagerAI ai : villagerAIs.values()) {
+                        String activity = activities.get(world.getRandom().nextInt(activities.size()));
+                        ai.updateActivity("event_" + activity);
+                    }
+                    
+                    // Send event notification to nearby players
+                    for (ServerPlayerEntity player : world.getPlayers()) {
+                        SpawnRegion region = getNearestSpawnRegion(player.getBlockPos());
+                        if (region != null && region.getCulture().equals(culture)) {
+                            VillagesrebornClient.getInstance().showEventNotification(
+                                eventName, description, 200);
+                        }
+                    }
+                    
+                    LOGGER.info("Generated cultural event: {} for {} village", event.name, culture);
+                });
+        } finally {
+            culturalEventLock.writeLock().unlock();
+        }
     }
 
     public void registerTickEvent(MinecraftServer server) {
@@ -539,5 +729,25 @@ public class VillagerManager {
             this.center = center;
             this.culture = culture;
         }
+    }
+
+    // More efficient parseResponse
+    private Map<String, String> parseResponse(String response) {
+        Map<String, String> result = new HashMap<>();
+        if (response == null) return result;
+        
+        try {
+            for (String line : response.split("\n")) {
+                int separatorIndex = line.indexOf(": ");
+                if (separatorIndex > 0) {
+                    String key = line.substring(0, separatorIndex).trim();
+                    String value = line.substring(separatorIndex + 2).trim();
+                    result.put(key, value);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("Error parsing response", e);
+        }
+        return result;
     }
 }
