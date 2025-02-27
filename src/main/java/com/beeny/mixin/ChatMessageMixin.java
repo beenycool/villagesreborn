@@ -1,6 +1,7 @@
 package com.beeny.mixin;
 
 import com.beeny.village.VillagerAI;
+import com.beeny.village.VillagerFeedbackHelper;
 import com.beeny.village.VillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket;
@@ -48,32 +49,54 @@ public class ChatMessageMixin {
                         if (!playerText.isEmpty()) {
                             player.sendMessage(Text.of("§7You: §f" + playerText + "§r"), false);
                             
+                            // Make the villager look at the player and animate
+                            villager.getLookControl().lookAt(player, 30F, 30F);
+                            VillagerFeedbackHelper.showTalkingAnimation(villager);
+                            
+                            // Show thinking particles while waiting for AI response
+                            VillagerFeedbackHelper.showThinkingEffect(villager);
+                            
                             // Generate AI response
                             villagerAI.generateDialogue(playerText, null)
                                 .thenAccept(response -> {
                                     // Only show the response if the player and villager are still valid
                                     if (player.isAlive() && villager.isAlive()) {
+                                        // Format response based on villager profession
+                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String formattedResponse = VillagerFeedbackHelper.formatSpeech(profession, response);
+                                        
+                                        // Send message to player
                                         player.sendMessage(
-                                            Text.of("§6" + villagerName + "§r: " + response),
+                                            Text.of("§6" + villagerName + "§r: " + formattedResponse),
                                             false
                                         );
+                                        
+                                        // Show speaking effect
+                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                                        VillagerFeedbackHelper.showTalkingAnimation(villager);
                                     }
                                 });
                         } else {
                             // Just the villager's name was mentioned, generate a greeting
+                            VillagerFeedbackHelper.showThinkingEffect(villager);
+                            
                             villagerAI.generateDialogue("Player mentioned my name", null)
                                 .thenAccept(greeting -> {
                                     if (player.isAlive() && villager.isAlive()) {
+                                        // Format greeting based on villager profession
+                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
+                                        
                                         player.sendMessage(
-                                            Text.of("§6" + villagerName + "§r: " + greeting),
+                                            Text.of("§6" + villagerName + "§r: " + formattedGreeting),
                                             false
                                         );
+                                        
+                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                                        VillagerFeedbackHelper.showTalkingAnimation(villager);
                                     }
                                 });
                         }
-                        
-                        // Make the villager look at the player
-                        villager.getLookControl().lookAt(player, 30F, 30F);
                         
                         // Cancel the normal chat message
                         ci.cancel();
