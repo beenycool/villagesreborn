@@ -24,94 +24,97 @@ public class ChatMessageMixin {
     private void onChatMessage(ChatMessageC2SPacket packet, CallbackInfo ci) {
         String message = packet.chatMessage();
         
-        // Check if this is talking to a villager (format: "VillagerName message")
         if (!message.startsWith("/")) {
             VillagerManager vm = VillagerManager.getInstance();
-            VillagerEntity targetVillager = null;
             
-            // Try to find the villager being addressed
             for (VillagerAI villagerAI : vm.getActiveVillagers()) {
                 VillagerEntity villager = villagerAI.getVillager();
                 if (villager == null || !villager.isAlive()) continue;
                 
                 String villagerName = villager.getName().getString();
-                if (message.startsWith(villagerName + " ") || message.equals(villagerName)) {
-                    // Found the villager being addressed
-                    targetVillager = villager;
-                    
-                    // Extract just the message part (everything after the name and space)
-                    String playerText = message.length() > villagerName.length() ? 
+                String messageLower = message.toLowerCase();
+                String villagerNameLower = villagerName.toLowerCase();
+                
+                boolean isAddressed = false;
+                String playerText = "";
+                
+                // Check for various formats: "Name message", "Hello Name!", etc.
+                if (messageLower.startsWith(villagerNameLower + " ") || messageLower.equals(villagerNameLower)) {
+                    isAddressed = true;
+                    playerText = message.length() > villagerName.length() ? 
                         message.substring(villagerName.length() + 1).trim() : "";
+                } else {
+                    // Match greeting patterns like "hello John!" or "hi John, how are you?"
+                    String greetingPattern = "^(hello|hi|hey|good morning|good afternoon|good evening)\\s+" + 
+                        villagerNameLower.replace(".", "\\.") + "[!.]*\\s*(.*)";
+                    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(greetingPattern);
+                    java.util.regex.Matcher matcher = pattern.matcher(messageLower);
                     
-                    // Only proceed if the villager is close enough (16 blocks)
+                    if (matcher.matches()) {
+                        isAddressed = true;
+                        String remainingText = matcher.group(2);
+                        playerText = remainingText.isEmpty() ? "hello" : remainingText;
+                    }
+                }
+                
+                if (isAddressed) {
                     if (villager.squaredDistanceTo(player) <= 256) {
-                        // Format the player's message
-                        if (!playerText.isEmpty()) {
-                            player.sendMessage(Text.of("§7You: §f" + playerText + "§r"), false);
-                            
-                            // Make the villager look at the player and animate
-                            villager.getLookControl().lookAt(player, 30F, 30F);
-                            VillagerFeedbackHelper.showTalkingAnimation(villager);
-                            
-                            // Show thinking particles while waiting for AI response
-                            VillagerFeedbackHelper.showThinkingEffect(villager);
-                            
-                            // Generate AI response
-                            villagerAI.generateDialogue(playerText, null)
-                                .thenAccept(response -> {
-                                    // Only show the response if the player and villager are still valid
-                                    if (player.isAlive() && villager.isAlive()) {
-                                        // Format response based on villager profession
-                                        String profession = villager.getVillagerData().getProfession().toString();
-                                        String formattedResponse = VillagerFeedbackHelper.formatSpeech(profession, response);
-                                        
-                                        // Send message to player
-                                        player.sendMessage(
-                                            Text.of("§6" + villagerName + "§r: " + formattedResponse),
-                                            false
-                                        );
-                                        
-                                        // Show speaking effect
-                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
-                                        VillagerFeedbackHelper.showTalkingAnimation(villager);
-                                    }
-                                });
-                        } else {
-                            // Just the villager's name was mentioned, generate a greeting
-                            VillagerFeedbackHelper.showThinkingEffect(villager);
-                            
-                            villagerAI.generateDialogue("Player mentioned my name", null)
-                                .thenAccept(greeting -> {
-                                    if (player.isAlive() && villager.isAlive()) {
-                                        // Format greeting based on villager profession
-                                        String profession = villager.getVillagerData().getProfession().toString();
-                                        String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
-                                        
-                                        player.sendMessage(
-                                            Text.of("§6" + villagerName + "§r: " + formattedGreeting),
-                                            false
-                                        );
-                                        
-                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
-                                        VillagerFeedbackHelper.showTalkingAnimation(villager);
-                                    }
-                                });
-                        }
-                        
-                        // Cancel the normal chat message
+                        handleVillagerInteraction(villager, villagerAI, villagerName, playerText);
                         ci.cancel();
-                        break;
                     } else {
-                        // Villager is too far away
                         player.sendMessage(
                             Text.of("§7" + villagerName + " is too far away to hear you.§r"),
                             false
                         );
                         ci.cancel();
-                        break;
                     }
+                    break;
                 }
             }
+        }
+    }
+
+    private void handleVillagerInteraction(VillagerEntity villager, VillagerAI villagerAI, String villagerName, String playerText) {
+        if (!playerText.isEmpty()) {
+            player.sendMessage(Text.of("§7You: §f" + playerText + "§r"), false);
+            
+            villager.getLookControl().lookAt(player, 30F, 30F);
+            VillagerFeedbackHelper.showTalkingAnimation(villager);
+            VillagerFeedbackHelper.showThinkingEffect(villager);
+            
+            villagerAI.generateDialogue(playerText, null)
+                .thenAccept(response -> {
+                    if (player.isAlive() && villager.isAlive()) {
+                        String profession = villager.getVillagerData().getProfession().toString();
+                        String formattedResponse = VillagerFeedbackHelper.formatSpeech(profession, response);
+                        
+                        player.sendMessage(
+                            Text.of("§6" + villagerName + "§r: " + formattedResponse),
+                            false
+                        );
+                        
+                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                        VillagerFeedbackHelper.showTalkingAnimation(villager);
+                    }
+                });
+        } else {
+            VillagerFeedbackHelper.showThinkingEffect(villager);
+            
+            villagerAI.generateDialogue("Player mentioned my name", null)
+                .thenAccept(greeting -> {
+                    if (player.isAlive() && villager.isAlive()) {
+                        String profession = villager.getVillagerData().getProfession().toString();
+                        String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
+                        
+                        player.sendMessage(
+                            Text.of("§6" + villagerName + "§r: " + formattedGreeting),
+                            false
+                        );
+                        
+                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                        VillagerFeedbackHelper.showTalkingAnimation(villager);
+                    }
+                });
         }
     }
 }

@@ -9,6 +9,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -31,8 +32,8 @@ public class VillagerInteractionMixin {
         VillagerManager vm = VillagerManager.getInstance();
         VillagerAI villagerAI = vm.getVillagerAI(villager.getUuid());
         if (villagerAI == null && !player.getWorld().isClient) {
-            // Register this villager with our system if not already tracked
-            vm.registerVillager(villager, (ServerPlayerEntity) player);
+            // Track this villager in our system
+            vm.onVillagerSpawn(villager, (ServerPlayerEntity) player);
             villagerAI = vm.getVillagerAI(villager.getUuid());
         }
         
@@ -65,8 +66,12 @@ public class VillagerInteractionMixin {
                             // Generate contextual greeting with thinking effect
                             VillagerFeedbackHelper.showThinkingEffect(villager);
                             
-                            if (!player.getScoreboardTags().contains("met_" + villager.getUuid())) {
-                                player.addScoreboardTag("met_" + villager.getUuid());
+                            // Check if player has met this villager before using NBT
+                            NbtCompound playerData = player.getDataTracker().get(PlayerEntity.PLAYER_DATA);
+                            String metTag = "met_" + villager.getUuid().toString();
+                            if (!playerData.contains(metTag)) {
+                                playerData.putBoolean(metTag, true);
+                                
                                 villagerAI.generateDialogue("First meeting", null)
                                     .thenAccept(greeting -> {
                                         // Format response based on profession
@@ -101,7 +106,7 @@ public class VillagerInteractionMixin {
                             
                             // Inform the player about chat interaction
                             serverPlayer.sendMessage(
-                                Text.of("§7Type §f" + villager.getName().getString() + " §7followed by your message to talk with this villager.§r"),
+                                Text.of("§7You can talk to this villager by typing messages in chat!§r"),
                                 false
                             );
                         }
