@@ -1,5 +1,7 @@
 package com.beeny;
 
+import com.beeny.ai.ModelChecker;
+import com.beeny.gui.ModelDownloadScreen;
 import com.beeny.gui.SetupScreen;
 import com.beeny.gui.VillageInfoHud;
 import com.beeny.gui.EventNotificationManager;
@@ -27,6 +29,7 @@ import org.slf4j.LoggerFactory;
 public class VillagesrebornClient implements ClientModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private boolean setupScreenShown = false;
+    private boolean modelCheckDone = false;
     private int tickCounter = 0;
     private static final int SETUP_DELAY_TICKS = 40; // Delay showing setup screen for about 2 seconds
     
@@ -69,7 +72,27 @@ public class VillagesrebornClient implements ClientModInitializer {
                 if (tickCounter >= SETUP_DELAY_TICKS) {
                     setupScreenShown = true;
                     LLMConfig llmConfig = Villagesreborn.getLLMConfig();
-                    client.setScreen(new SetupScreen(llmConfig));
+                    
+                    // Check if we need to show the model download screen
+                    if (!modelCheckDone) {
+                        modelCheckDone = true;
+                        // Only show model download screen if:
+                        // 1. We don't have a local model
+                        // 2. The provider is set to local or isn't configured yet
+                        String provider = llmConfig.getProvider();
+                        boolean needsLocalModel = !ModelChecker.hasLocalModel() && 
+                                                 (provider.equals("local") || !llmConfig.isConfigured());
+                        
+                        if (needsLocalModel) {
+                            client.setScreen(new ModelDownloadScreen(null, llmConfig));
+                            return;
+                        }
+                    }
+                    
+                    // If no model screen needed, show regular setup
+                    if (!llmConfig.isConfigured()) {
+                        client.setScreen(new SetupScreen(llmConfig));
+                    }
                 }
                 tickCounter++;
             }

@@ -6,7 +6,8 @@
   "mixins": [
     "ServerPlayerEntityMixin",
     "VillagerInteractionMixin",
-    "OptionsScreenMixin"
+    "OptionsScreenMixin",
+    "ChatMessageMixin"
   ],
   "injectors": {
     "defaultRequire": 1

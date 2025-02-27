@@ -1,9 +1,7 @@
 package com.beeny.mixin;
 
 import com.beeny.gui.VillageCraftingScreen;
-import com.beeny.gui.VillagerDialogueScreen;
 import com.beeny.village.SpawnRegion;
-import com.beeny.village.VillageCraftingManager;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
 import net.minecraft.block.Block;
@@ -65,33 +63,43 @@ public class VillagerInteractionMixin {
                                 villagerAI.generateDialogue("First meeting", null)
                                     .thenAccept(greeting -> {
                                         serverPlayer.sendMessage(
-                                            Text.of(villager.getName().getString() + ": " + greeting),
+                                            Text.of("§6" + villager.getName().getString() + "§r: " + greeting),
+                                            false
+                                        );
+                                    });
+                            } else {
+                                // Regular greeting
+                                villagerAI.generateDialogue("Greeting", null)
+                                    .thenAccept(greeting -> {
+                                        serverPlayer.sendMessage(
+                                            Text.of("§6" + villager.getName().getString() + "§r: " + greeting),
                                             false
                                         );
                                     });
                             }
+                            
+                            // Inform the player about chat interaction
+                            serverPlayer.sendMessage(
+                                Text.of("§7Type §f" + villager.getName().getString() + " §7followed by your message to talk with this villager.§r"),
+                                false
+                            );
                         }
                         
                         cir.setReturnValue(ActionResult.SUCCESS);
                     }
                 }
             } else {
-                // Client-side handling - open appropriate screen
-                SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-                String culture = region != null ? region.getCulture() : "default";
-                
+                // Client-side handling - only open crafting screen when at workstation
                 if (isAtWorkstation(villager)) {
+                    SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+                    String culture = region != null ? region.getCulture() : "default";
+                    
                     // Open crafting screen when at workstation
                     net.minecraft.client.MinecraftClient.getInstance().setScreen(
                         new VillageCraftingScreen(villager, culture)
                     );
-                } else {
-                    // Open dialogue screen when not at workstation
-                    net.minecraft.client.MinecraftClient.getInstance().setScreen(
-                        new VillagerDialogueScreen(villager)
-                    );
+                    cir.setReturnValue(ActionResult.SUCCESS);
                 }
-                cir.setReturnValue(ActionResult.SUCCESS);
             }
         }
     }
