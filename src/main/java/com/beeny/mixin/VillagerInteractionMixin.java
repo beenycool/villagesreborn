@@ -3,6 +3,7 @@ package com.beeny.mixin;
 import com.beeny.gui.VillageCraftingScreen;
 import com.beeny.village.SpawnRegion;
 import com.beeny.village.VillagerAI;
+import com.beeny.village.VillagerFeedbackHelper;
 import com.beeny.village.VillagerManager;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -57,24 +58,44 @@ public class VillagerInteractionMixin {
                         if (villagerAI != null) {
                             villagerAI.updateActivity("conversing");
                             
-                            // Generate contextual greeting if first time
+                            // Add animation - villager looks at player
+                            villager.getLookControl().lookAt(player, 30F, 30F);
+                            VillagerFeedbackHelper.showTalkingAnimation(villager);
+                            
+                            // Generate contextual greeting with thinking effect
+                            VillagerFeedbackHelper.showThinkingEffect(villager);
+                            
                             if (!player.getScoreboardTags().contains("met_" + villager.getUuid())) {
                                 player.addScoreboardTag("met_" + villager.getUuid());
                                 villagerAI.generateDialogue("First meeting", null)
                                     .thenAccept(greeting -> {
+                                        // Format response based on profession
+                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
+                                        
                                         serverPlayer.sendMessage(
-                                            Text.of("§6" + villager.getName().getString() + "§r: " + greeting),
+                                            Text.of("§6" + villager.getName().getString() + "§r: " + formattedGreeting),
                                             false
                                         );
+                                        
+                                        // Show speaking effect
+                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
                                     });
                             } else {
                                 // Regular greeting
                                 villagerAI.generateDialogue("Greeting", null)
                                     .thenAccept(greeting -> {
+                                        // Format response based on profession
+                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
+                                        
                                         serverPlayer.sendMessage(
-                                            Text.of("§6" + villager.getName().getString() + "§r: " + greeting),
+                                            Text.of("§6" + villager.getName().getString() + "§r: " + formattedGreeting),
                                             false
                                         );
+                                        
+                                        // Show speaking effect
+                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
                                     });
                             }
                             
