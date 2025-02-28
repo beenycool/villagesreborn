@@ -2,10 +2,11 @@ package com.beeny.gui;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.ColorHelper;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -32,6 +33,7 @@ public class EventNotificationManager {
         // Play notification sound
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
+            // Updated playSound call to use proper method signature
             client.player.playSound(
                 SoundEvents.BLOCK_NOTE_BLOCK_CHIME, 
                 SoundCategory.MASTER, 
@@ -53,11 +55,11 @@ public class EventNotificationManager {
     /**
      * Renders all active notifications and updates their state.
      *
-     * @param matrices The matrix stack
+     * @param context The draw context
      * @param client The Minecraft client
      * @param tickDelta The partial tick
      */
-    public void render(MatrixStack matrices, MinecraftClient client, float tickDelta) {
+    public void render(DrawContext context, MinecraftClient client, float tickDelta) {
         if (activeNotifications.isEmpty()) {
             return;
         }
@@ -87,7 +89,7 @@ public class EventNotificationManager {
             
             // Render with animation
             renderNotification(
-                matrices, 
+                context, 
                 textRenderer, 
                 notification, 
                 screenWidth + xOffset, 
@@ -101,14 +103,14 @@ public class EventNotificationManager {
     /**
      * Renders a single notification.
      *
-     * @param matrices The matrix stack
+     * @param context The draw context
      * @param textRenderer The text renderer
      * @param notification The notification to render
      * @param xPosition The x position to render at
      * @param yPosition The y position to render at
      */
-    private void renderNotification(MatrixStack matrices, TextRenderer textRenderer, 
-                                   EventNotification notification, int xPosition, int yPosition) {
+    private void renderNotification(DrawContext context, TextRenderer textRenderer, 
+                                  EventNotification notification, int xPosition, int yPosition) {
         // Calculate fade factor
         float alpha = notification.getFadeLevel();
         if (alpha <= 0.05f) return; // Don't render nearly invisible notifications
@@ -118,22 +120,22 @@ public class EventNotificationManager {
         xPosition -= width; // Position from right edge
         
         // Background with alpha based on fade level
-        int backgroundColor = ((int)(alpha * 192) << 24) | 0x000000;
-        int borderColor = ((int)(alpha * 255) << 24) | 0xFFD700; // Gold border
+        int backgroundColor = ColorHelper.Argb.getArgb((int)(alpha * 192), 0, 0, 0);
+        int borderColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 215, 0); // Gold border
         
         // Draw a glowing background effect
         float glowPulse = (float)(0.3 * Math.sin(notification.getLifeTimeProgress() * Math.PI * 6) + 0.7);
-        int glowColor = ((int)(alpha * 64 * glowPulse) << 24) | 0xFFD700;
-        fill(matrices, xPosition - 3, yPosition - 3, xPosition + width + 3, yPosition + height + 3, glowColor);
+        int glowColor = ColorHelper.Argb.getArgb((int)(alpha * 64 * glowPulse), 255, 215, 0);
+        context.fill(xPosition - 3, yPosition - 3, xPosition + width + 3, yPosition + height + 3, glowColor);
         
         // Draw background and border
-        fill(matrices, xPosition - 1, yPosition - 1, xPosition + width + 1, yPosition + height + 1, borderColor);
-        fill(matrices, xPosition, yPosition, xPosition + width, yPosition + height, backgroundColor);
+        context.fill(xPosition - 1, yPosition - 1, xPosition + width + 1, yPosition + height + 1, borderColor);
+        context.fill(xPosition, yPosition, xPosition + width, yPosition + height, backgroundColor);
         
         // Title
-        int titleColor = ((int)(alpha * 255) << 24) | 0xFFD700; // Gold text for title
-        textRenderer.drawWithShadow(
-            matrices, 
+        int titleColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 215, 0); // Gold text for title
+        context.drawTextWithShadow(
+            textRenderer, 
             Text.literal("◆ " + notification.title + " ◆"),
             xPosition + width/2 - textRenderer.getWidth("◆ " + notification.title + " ◆")/2, // Center text
             yPosition + 10, 
@@ -141,17 +143,16 @@ public class EventNotificationManager {
         );
         
         // Divider line
-        fill(
-            matrices, 
+        context.fill(
             xPosition + 10, 
             yPosition + 22, 
             xPosition + width - 10, 
             yPosition + 23, 
-            ((int)(alpha * 128) << 24) | 0xFFD700
+            ColorHelper.Argb.getArgb((int)(alpha * 128), 255, 215, 0)
         );
         
         // Description (with possible word wrap)
-        int descriptionColor = ((int)(alpha * 255) << 24) | 0xFFFFFF; // White text for description
+        int descriptionColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 255, 255); // White text for description
         String[] words = notification.description.split(" ");
         StringBuilder currentLine = new StringBuilder();
         int lineY = yPosition + 28;
@@ -159,12 +160,13 @@ public class EventNotificationManager {
         for (String word : words) {
             if (textRenderer.getWidth(currentLine + " " + word) > width - 20 && !currentLine.isEmpty()) {
                 // Line would be too long, render current line and start a new one
-                textRenderer.draw(
-                    matrices,
+                context.drawText(
+                    textRenderer,
                     currentLine.toString(),
                     xPosition + 10,
                     lineY,
-                    descriptionColor
+                    descriptionColor,
+                    false
                 );
                 currentLine = new StringBuilder(word);
                 lineY += textRenderer.fontHeight + 2;
@@ -182,50 +184,15 @@ public class EventNotificationManager {
         
         // Draw the last line
         if (currentLine.length() > 0 && lineY < yPosition + height - 5) {
-            textRenderer.draw(
-                matrices,
+            context.drawText(
+                textRenderer,
                 currentLine.toString(),
                 xPosition + 10,
                 lineY,
-                descriptionColor
+                descriptionColor,
+                false
             );
         }
-    }
-    
-    /**
-     * Fills a rectangular area with a solid color.
-     */
-    private void fill(MatrixStack matrices, int startX, int startY, int endX, int endY, int color) {
-        int minX = Math.min(startX, endX);
-        int minY = Math.min(startY, endY);
-        int maxX = Math.max(startX, endX);
-        int maxY = Math.max(startY, endY);
-        
-        matrices.push();
-        net.minecraft.client.render.Tessellator tessellator = net.minecraft.client.render.Tessellator.getInstance();
-        net.minecraft.client.render.BufferBuilder bufferBuilder = tessellator.getBuffer();
-        
-        net.minecraft.client.render.RenderSystem.enableBlend();
-        net.minecraft.client.render.RenderSystem.disableTexture();
-        net.minecraft.client.render.RenderSystem.defaultBlendFunc();
-        
-        bufferBuilder.begin(net.minecraft.client.render.VertexFormat.DrawMode.QUADS, net.minecraft.client.render.VertexFormats.POSITION_COLOR);
-        
-        float a = (color >> 24 & 255) / 255.0F;
-        float r = (color >> 16 & 255) / 255.0F;
-        float g = (color >> 8 & 255) / 255.0F;
-        float b = (color & 255) / 255.0F;
-        
-        bufferBuilder.vertex(minX, maxY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(maxX, maxY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(maxX, minY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(minX, minY, 0).color(r, g, b, a).next();
-        
-        tessellator.draw();
-        net.minecraft.client.render.RenderSystem.enableTexture();
-        net.minecraft.client.render.RenderSystem.disableBlend();
-        
-        matrices.pop();
     }
     
     /**

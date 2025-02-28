@@ -1,7 +1,6 @@
 package com.beeny.gui;
 
 import com.beeny.village.SpawnRegion;
-import com.beeny.village.VillageManager;
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
 import net.minecraft.client.MinecraftClient;
@@ -115,7 +114,7 @@ public class VillageDebugScreen extends Screen {
         villageStats.add("");
         villageStats.add("=== Current Cultural Events ===");
         List<VillagerManager.CulturalEvent> events = VillagerManager.getInstance()
-            .getCurrentEvents(playerPos, client.world.isClient() ? null : (net.minecraft.server.world.ServerWorld)client.world);
+            .getCurrentEvents(playerPos, null); // Changed to only pass null as server world from client is not possible
             
         if (events.isEmpty()) {
             villageStats.add("No active cultural events");
@@ -141,7 +140,8 @@ public class VillageDebugScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
         
-        renderBackground(context);
+        // Fix renderBackground method call by providing all required arguments
+        renderBackground(context, mouseX, mouseY, delta);
         
         // Calculate dimensions
         int screenWidth = this.width;
@@ -231,8 +231,9 @@ public class VillageDebugScreen extends Screen {
     public void tick() {
         super.tick();
         
-        // Update stats periodically
-        if (client.getTickCounter() % 20 == 0) {
+        // Update stats periodically - using frame count instead of tick counter
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null && client.world != null && client.world.getTime() % 20 == 0) {
             updateVillageStats();
             maxScroll = Math.max(0, villageStats.size() - (height / 12));
             

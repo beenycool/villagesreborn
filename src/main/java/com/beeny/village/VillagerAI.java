@@ -80,6 +80,8 @@ public class VillagerAI {
     private final Queue<Activity> plannedActivities = new ConcurrentLinkedQueue<>();
     private final Map<String, Integer> activityPriorities = new ConcurrentHashMap<>();
     private BehaviorState currentState = BehaviorState.IDLE;
+    // Add a busy flag for the villager
+    private boolean busy = false;
 
     public static class ActivitySchedule {
         public final String activity;
@@ -96,7 +98,8 @@ public class VillagerAI {
     public enum RelationshipType {
         FRIEND(10),
         FAMILY(20),
-        RIVAL(-10);
+        RIVAL(-10),
+        NEUTRAL(0); // Added NEUTRAL relationship type
 
         public final int moodModifier;
 
@@ -112,6 +115,22 @@ public class VillagerAI {
         this.currentActivity = "idle";
         this.schedule = createSchedule(villager.getVillagerData().getProfession().toString());
         this.happiness = 50; // Default happiness level
+    }
+
+    /**
+     * Check if the villager is currently busy with an activity that shouldn't be interrupted
+     * @return true if the villager is busy
+     */
+    public boolean isBusy() {
+        return busy;
+    }
+
+    /**
+     * Set the busy state of the villager
+     * @param busy true if the villager is busy with an important activity
+     */
+    public void setBusy(boolean busy) {
+        this.busy = busy;
     }
 
     public int getHappiness() {
