@@ -8,8 +8,6 @@ import com.beeny.ai.provider.GeminiProvider;
 import com.beeny.ai.provider.CohereProvider;
 import com.beeny.ai.provider.MistralProvider;
 import com.beeny.ai.provider.DeepSeekProvider;
-import com.beeny.ai.provider.AnotherProvider;
-import com.beeny.ai.provider.YetAnotherProvider;
 import com.beeny.setup.LLMConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +34,6 @@ public class LLMService {
         providers.put("cohere", new CohereProvider());
         providers.put("mistral", new MistralProvider());
         providers.put("deepseek", new DeepSeekProvider());
-        providers.put("anotherprovider", new AnotherProvider());
-        providers.put("yetanotherprovider", new YetAnotherProvider());
     }
 
     public static LLMService getInstance() {
