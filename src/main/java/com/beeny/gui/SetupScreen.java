@@ -270,9 +270,14 @@ public class SetupScreen extends Screen {
             .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Provider"));
         
         // Update the provider's models when provider changes
-        providerButton.setChangedListener(provider -> {
-            updateModelListForProvider(provider);
-        });
+        providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Provider: " + value))
+            .values(PROVIDERS)
+            .initially(PROVIDERS.contains(llmConfig.getProvider()) ? llmConfig.getProvider() : PROVIDERS.get(0))
+            .tooltip(tooltip -> updateModelListForProvider(providerButton.getValue()))
+            .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Provider"));
+
+        // Add a button press listener
+        providerButton.setMessage(Text.literal("Provider: " + providerButton.getValue()));
         
         addDrawableChild(providerButton);
         currentY += padding;

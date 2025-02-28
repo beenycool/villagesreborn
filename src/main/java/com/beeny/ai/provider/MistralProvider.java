@@ -104,6 +104,10 @@ public class MistralProvider implements AIProvider {
             }
         });
     }
+@Override
+public boolean isAvailable() {
+    return initialized && apiKey != null && !apiKey.isEmpty();
+}
 
     @Override
     public String getName() {

@@ -106,7 +106,7 @@ public class AzureOpenAIProvider implements AIProvider {
             options.setModel(modelName);
             
             // Call the Azure OpenAI service
-            ChatCompletions completions = client.getChatCompletions(options);
+            ChatCompletions completions = client.getChatCompletions(modelName, options);
             
             if (completions != null && !completions.getChoices().isEmpty()) {
                 ChatChoice choice = completions.getChoices().get(0);

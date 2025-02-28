@@ -35,8 +35,7 @@ public class EventNotificationManager {
         if (client.player != null) {
             // Updated playSound call to use proper method signature
             client.player.playSound(
-                SoundEvents.BLOCK_NOTE_BLOCK_CHIME, 
-                SoundCategory.MASTER, 
+                SoundEvents.BLOCK_NOTE_BLOCK_CHIME.value(),
                 0.5f, // Volume
                 1.0f  // Pitch
             );
@@ -120,12 +119,12 @@ public class EventNotificationManager {
         xPosition -= width; // Position from right edge
         
         // Background with alpha based on fade level
-        int backgroundColor = ColorHelper.Argb.getArgb((int)(alpha * 192), 0, 0, 0);
-        int borderColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 215, 0); // Gold border
+        int backgroundColor = ((int)(alpha * 192) << 24) | (0 << 16) | (0 << 8) | 0;
+        int borderColor = ((int)(alpha * 255) << 24) | (255 << 16) | (215 << 8) | 0; // Gold border
         
         // Draw a glowing background effect
         float glowPulse = (float)(0.3 * Math.sin(notification.getLifeTimeProgress() * Math.PI * 6) + 0.7);
-        int glowColor = ColorHelper.Argb.getArgb((int)(alpha * 64 * glowPulse), 255, 215, 0);
+        int glowColor = ((int)(alpha * 64 * glowPulse) << 24) | (255 << 16) | (215 << 8) | 0;
         context.fill(xPosition - 3, yPosition - 3, xPosition + width + 3, yPosition + height + 3, glowColor);
         
         // Draw background and border
@@ -133,7 +132,7 @@ public class EventNotificationManager {
         context.fill(xPosition, yPosition, xPosition + width, yPosition + height, backgroundColor);
         
         // Title
-        int titleColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 215, 0); // Gold text for title
+        int titleColor = ((int)(alpha * 255) << 24) | (255 << 16) | (215 << 8) | 0; // Gold text for title
         context.drawTextWithShadow(
             textRenderer, 
             Text.literal("◆ " + notification.title + " ◆"),
@@ -148,11 +147,11 @@ public class EventNotificationManager {
             yPosition + 22, 
             xPosition + width - 10, 
             yPosition + 23, 
-            ColorHelper.Argb.getArgb((int)(alpha * 128), 255, 215, 0)
+            ((int)(alpha * 128) << 24) | (255 << 16) | (215 << 8) | 0
         );
         
         // Description (with possible word wrap)
-        int descriptionColor = ColorHelper.Argb.getArgb((int)(alpha * 255), 255, 255, 255); // White text for description
+        int descriptionColor = ((int)(alpha * 255) << 24) | (255 << 16) | (255 << 8) | 255; // White text for description
         String[] words = notification.description.split(" ");
         StringBuilder currentLine = new StringBuilder();
         int lineY = yPosition + 28;

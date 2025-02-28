@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -81,7 +82,7 @@ public class ModelChecker {
                 
                 // Send request and handle response
                 HttpResponse<Path> response = client.send(request, 
-                    HttpResponse.BodyHandlers.ofFileDownload(tempFile, StandardCopyOption.REPLACE_EXISTING));
+                    HttpResponse.BodyHandlers.ofFileDownload(tempFile, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
                 
                 if (response.statusCode() == 200) {
                     // Move the temp file to the final destination
