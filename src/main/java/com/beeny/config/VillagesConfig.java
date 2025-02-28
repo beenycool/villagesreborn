@@ -14,6 +14,7 @@ public class VillagesConfig {
     private final Path configPath;
     private final GeneralSettings generalSettings;
     private final LLMSettings llmSettings;
+    private final UISettings uiSettings;
     private final Gson gson;
 
     public static class LLMSettings {
@@ -43,6 +44,21 @@ public class VillagesConfig {
             showWelcomeForReturningPlayers = false;
         }
     }
+    
+    public static class UISettings {
+        public String conversationHudPosition = "BOTTOM_RIGHT";
+        public String conversationLabelFormat = "Speaking to: {name}";
+        public boolean showCulture = true;
+        public boolean showProfession = true;
+        public int backgroundColor = 0x80000000; // Semi-transparent black
+        public int borderColor = 0xFFCCCCCC;     // Light gray
+        public int labelColor = 0xFFFFFFFF;      // White
+        public int nameColor = 0xFFFFAA00;       // Gold
+        
+        public UISettings() {
+            // Default constructor with values already set
+        }
+    }
 
     private VillagesConfig() {
         configPath = FabricLoader.getInstance().getConfigDir().resolve("villagesreborn.json");
@@ -51,6 +67,7 @@ public class VillagesConfig {
             .create();
         generalSettings = loadGeneralConfig();
         llmSettings = loadLLMConfig();
+        uiSettings = loadUIConfig();
     }
 
     public static VillagesConfig getInstance() {
@@ -66,6 +83,10 @@ public class VillagesConfig {
 
     public LLMSettings getLLMSettings() {
         return llmSettings;
+    }
+    
+    public UISettings getUISettings() {
+        return uiSettings;
     }
 
     private GeneralSettings loadGeneralConfig() {
@@ -93,17 +114,33 @@ public class VillagesConfig {
         }
         return new LLMSettings();
     }
+    
+    private UISettings loadUIConfig() {
+        Path uiPath = configPath.resolveSibling("villagesreborn_ui.json");
+        if (Files.exists(uiPath)) {
+            try {
+                String content = Files.readString(uiPath);
+                return gson.fromJson(content, UISettings.class);
+            } catch (IOException e) {
+                return new UISettings();
+            }
+        }
+        return new UISettings();
+    }
 
     public void save() {
         try {
             Path generalPath = configPath.resolveSibling("villagesreborn_general.json");
             Path llmPath = configPath.resolveSibling("villagesreborn_llm.json");
+            Path uiPath = configPath.resolveSibling("villagesreborn_ui.json");
             
             String generalJson = gson.toJson(generalSettings);
             String llmJson = gson.toJson(llmSettings);
+            String uiJson = gson.toJson(uiSettings);
             
             Files.writeString(generalPath, generalJson);
             Files.writeString(llmPath, llmJson);
+            Files.writeString(uiPath, uiJson);
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -4,6 +4,7 @@ import com.beeny.ai.ModelChecker;
 import com.beeny.gui.ModelDownloadScreen;
 import com.beeny.gui.SetupScreen;
 import com.beeny.gui.VillageInfoHud;
+import com.beeny.gui.ConversationHud;
 import com.beeny.gui.EventNotificationManager;
 import com.beeny.gui.VillageDebugScreen;
 import com.beeny.setup.LLMConfig;
@@ -14,6 +15,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -39,11 +41,13 @@ public class VillagesrebornClient implements ClientModInitializer {
     // HUD components
     private final VillageInfoHud villageInfoHud;
     private final EventNotificationManager eventManager;
+    private final ConversationHud conversationHud;
     
     // Keybindings
     private KeyBinding toggleHudKeyBinding;
     private KeyBinding villagePingKeyBinding;
     private KeyBinding villageDebugKeyBinding;
+    private KeyBinding cycleConversationPositionKeyBinding;
     
     // HUD state
     private boolean hudEnabled = true;
@@ -52,6 +56,7 @@ public class VillagesrebornClient implements ClientModInitializer {
         INSTANCE = this;
         villageInfoHud = new VillageInfoHud();
         eventManager = new EventNotificationManager();
+        conversationHud = new ConversationHud();
     }
     
     public static VillagesrebornClient getInstance() {
@@ -100,16 +105,19 @@ public class VillagesrebornClient implements ClientModInitializer {
             // Process keybindings
             handleKeybindings(client);
         });
-
+        
         // Register HUD rendering
-        HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> {
+        HudRenderCallback.EVENT.register((context, tickDelta) -> {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.player != null && client.world != null && !client.options.hudHidden && hudEnabled) {
                 // Render village info HUD
-                villageInfoHud.render(matrixStack, client);
+                villageInfoHud.render(context, client);
                 
                 // Render event notifications
-                eventManager.render(matrixStack, client, tickDelta);
+                eventManager.render(context, client, tickDelta);
+                
+                // Render conversation indicator
+                conversationHud.render(context, client);
             }
         });
 
@@ -146,6 +154,14 @@ public class VillagesrebornClient implements ClientModInitializer {
             GLFW.GLFW_KEY_V,
             "category.villagesreborn.debug"
         ));
+        
+        // Cycle conversation HUD position (C key)
+        cycleConversationPositionKeyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            "key.villagesreborn.cycleconversationposition",
+            InputUtil.Type.KEYSYM,
+            GLFW.GLFW_KEY_C,
+            "category.villagesreborn.general"
+        ));
     }
     
     /**
@@ -173,6 +189,46 @@ public class VillagesrebornClient implements ClientModInitializer {
                 InputUtil.isKeyPressed(MinecraftClient.getInstance().getWindow().getHandle(), 
                 GLFW.GLFW_KEY_LEFT_SHIFT)) {
             client.setScreen(new VillageDebugScreen());
+        }
+        
+        // Cycle conversation HUD position
+        if (cycleConversationPositionKeyBinding.wasPressed()) {
+            cycleConversationPosition();
+        }
+    }
+    
+    /**
+     * Cycle through the available positions for the conversation HUD
+     */
+    private void cycleConversationPosition() {
+        ConversationHud.HudPosition currentPosition = conversationHud.getPosition();
+        ConversationHud.HudPosition newPosition;
+        
+        switch (currentPosition) {
+            case TOP_LEFT:
+                newPosition = ConversationHud.HudPosition.TOP_RIGHT;
+                break;
+            case TOP_RIGHT:
+                newPosition = ConversationHud.HudPosition.BOTTOM_RIGHT;
+                break;
+            case BOTTOM_RIGHT:
+                newPosition = ConversationHud.HudPosition.BOTTOM_LEFT;
+                break;
+            case BOTTOM_LEFT:
+            default:
+                newPosition = ConversationHud.HudPosition.TOP_LEFT;
+                break;
+        }
+        
+        conversationHud.setPosition(newPosition);
+        
+        // Show feedback to the player
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            client.player.sendMessage(
+                Text.of("Conversation indicator position: " + newPosition.name()),
+                true
+            );
         }
     }
     
@@ -229,5 +285,42 @@ public class VillagesrebornClient implements ClientModInitializer {
      */
     public void setHudEnabled(boolean enabled) {
         this.hudEnabled = enabled;
+    }
+    
+    /**
+     * Start or update a conversation with a villager
+     * 
+     * @param villager The villager being spoken to
+     */
+    public void startConversation(VillagerEntity villager) {
+        conversationHud.startConversation(villager);
+    }
+    
+    /**
+     * End the current conversation
+     */
+    public void endConversation() {
+        conversationHud.endConversation();
+    }
+    
+    /**
+     * Update the timestamp of the current conversation to prevent timeout
+     */
+    public void updateConversation() {
+        conversationHud.updateInteraction();
+    }
+    
+    /**
+     * Check if a conversation is currently active
+     */
+    public boolean isInConversation() {
+        return conversationHud.isConversationActive();
+    }
+    
+    /**
+     * Get the villager currently being spoken to
+     */
+    public VillagerEntity getCurrentConversationVillager() {
+        return conversationHud.getCurrentVillager();
     }
 }

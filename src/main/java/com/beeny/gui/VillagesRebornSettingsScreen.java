@@ -51,6 +51,11 @@ public class VillagesRebornSettingsScreen extends Screen {
             .build());
 
         startY += 30;
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("UI Settings"), button -> openUISettings())
+            .dimensions(centerX, startY, buttonWidth, buttonHeight)
+            .build());
+
+        startY += 30;
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> saveSettings())
             .dimensions(centerX, startY, buttonWidth, buttonHeight)
             .build());
@@ -73,6 +78,10 @@ public class VillagesRebornSettingsScreen extends Screen {
         llmConfig.setEndpoint(endpointField.getText());
         llmConfig.saveConfig();
         LOGGER.info("Settings saved: API Key={}, Endpoint={}", apiKeyField.getText(), endpointField.getText());
+    }
+    
+    private void openUISettings() {
+        this.client.setScreen(new VillageUISettingsScreen(this));
     }
 
     private void downloadLocalAIModel() {
