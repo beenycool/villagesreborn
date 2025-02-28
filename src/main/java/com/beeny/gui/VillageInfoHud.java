@@ -2,9 +2,10 @@ package com.beeny.gui;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Formatting;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.ColorHelper;
 
 /**
  * Renders information about the current village on the player's HUD.
@@ -52,10 +53,10 @@ public class VillageInfoHud {
     /**
      * Renders the village info HUD if it's currently visible.
      * 
-     * @param matrices The matrix stack
+     * @param context The draw context
      * @param client The Minecraft client instance
      */
-    public void render(MatrixStack matrices, MinecraftClient client) {
+    public void render(DrawContext context, MinecraftClient client) {
         long currentTime = System.currentTimeMillis();
         
         // Auto-hide HUD after duration expires
@@ -84,34 +85,38 @@ public class VillageInfoHud {
         
         // Background opacity based on animation
         int bgAlpha = (int)(128 * animationFactor);
-        int backgroundColor = (bgAlpha << 24) | 0x000000;
-        int borderColor = (int)(animationFactor * 255) << 24 | 0x444444;
+        int backgroundColor = ColorHelper.Argb.getArgb(bgAlpha, 0, 0, 0);
+        int borderColor = ColorHelper.Argb.getArgb((int)(animationFactor * 255), 68, 68, 68);
         
         // Semi-transparent background with border
-        fill(matrices, xPos - 6, yPos - 6, xPos + 146, yPos + (lineHeight * 4) + 6, borderColor);
-        fill(matrices, xPos - 5, yPos - 5, xPos + 145, yPos + (lineHeight * 4) + 5, backgroundColor);
+        context.fill(xPos - 6, yPos - 6, xPos + 146, yPos + (lineHeight * 4) + 6, borderColor);
+        context.fill(xPos - 5, yPos - 5, xPos + 145, yPos + (lineHeight * 4) + 5, backgroundColor);
         
         // Village name/culture with color based on prosperity
         Formatting prosperityColor = getColorForValue(prosperity);
-        textRenderer.drawWithShadow(matrices, 
+        context.drawTextWithShadow(textRenderer, 
             Text.literal("Village: ").append(Text.literal(cultureName).formatted(prosperityColor)),
-            xPos, yPos, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
+            xPos, yPos, 
+            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
         
         // Prosperity indicator
-        textRenderer.drawWithShadow(matrices, 
+        context.drawTextWithShadow(textRenderer, 
             Text.literal("Prosperity: ").append(Text.literal(getBarString(prosperity)).formatted(prosperityColor)),
-            xPos, yPos + lineHeight, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
+            xPos, yPos + lineHeight, 
+            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
         
         // Safety indicator with color
         Formatting safetyColor = getColorForValue(safety);
-        textRenderer.drawWithShadow(matrices, 
+        context.drawTextWithShadow(textRenderer, 
             Text.literal("Safety: ").append(Text.literal(getBarString(safety)).formatted(safetyColor)),
-            xPos, yPos + lineHeight * 2, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
+            xPos, yPos + lineHeight * 2, 
+            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
         
         // Population count
-        textRenderer.drawWithShadow(matrices, 
+        context.drawTextWithShadow(textRenderer, 
             Text.literal("Population: ").append(Text.literal(String.valueOf(population))),
-            xPos, yPos + lineHeight * 3, (int)(animationFactor * 255) << 24 | 0xFFFFFF);
+            xPos, yPos + lineHeight * 3, 
+            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
     }
     
     /**
@@ -168,41 +173,5 @@ public class VillageInfoHud {
         if (value < 30) return Formatting.RED;
         if (value < 60) return Formatting.YELLOW;
         return Formatting.GREEN;
-    }
-    
-    /**
-     * Fill a rectangle with color (helper method).
-     */
-    private void fill(MatrixStack matrices, int startX, int startY, int endX, int endY, int color) {
-        int minX = Math.min(startX, endX);
-        int minY = Math.min(startY, endY);
-        int maxX = Math.max(startX, endX);
-        int maxY = Math.max(startY, endY);
-        
-        matrices.push();
-        net.minecraft.client.render.Tessellator tessellator = net.minecraft.client.render.Tessellator.getInstance();
-        net.minecraft.client.render.BufferBuilder bufferBuilder = tessellator.getBuffer();
-        
-        net.minecraft.client.render.RenderSystem.enableBlend();
-        net.minecraft.client.render.RenderSystem.disableTexture();
-        net.minecraft.client.render.RenderSystem.defaultBlendFunc();
-        
-        bufferBuilder.begin(net.minecraft.client.render.VertexFormat.DrawMode.QUADS, net.minecraft.client.render.VertexFormats.POSITION_COLOR);
-        
-        float a = (color >> 24 & 255) / 255.0F;
-        float r = (color >> 16 & 255) / 255.0F;
-        float g = (color >> 8 & 255) / 255.0F;
-        float b = (color & 255) / 255.0F;
-        
-        bufferBuilder.vertex(minX, maxY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(maxX, maxY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(maxX, minY, 0).color(r, g, b, a).next();
-        bufferBuilder.vertex(minX, minY, 0).color(r, g, b, a).next();
-        
-        tessellator.draw();
-        net.minecraft.client.render.RenderSystem.enableTexture();
-        net.minecraft.client.render.RenderSystem.disableBlend();
-        
-        matrices.pop();
     }
 }

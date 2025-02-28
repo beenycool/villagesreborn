@@ -117,6 +117,11 @@ public class GeminiProvider implements AIProvider {
     }
 
     @Override
+    public boolean isAvailable() {
+        return initialized && apiKey != null && !apiKey.isEmpty();
+    }
+
+    @Override
     public String getName() {
         return "gemini";
     }

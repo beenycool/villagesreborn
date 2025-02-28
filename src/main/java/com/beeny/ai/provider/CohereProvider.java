@@ -104,6 +104,11 @@ public class CohereProvider implements AIProvider {
     }
 
     @Override
+    public boolean isAvailable() {
+        return initialized && apiKey != null && !apiKey.isEmpty();
+    }
+
+    @Override
     public void shutdown() {
         // Nothing to do for OkHttp client
     }

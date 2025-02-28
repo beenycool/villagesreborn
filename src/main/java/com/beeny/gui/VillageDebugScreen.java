@@ -7,13 +7,8 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
-import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -138,10 +133,8 @@ public class VillageDebugScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        
-        // Fix renderBackground method call by providing all required arguments
-        renderBackground(context, mouseX, mouseY, delta);
+        // Draw the default dark background
+        this.renderBackgroundTexture(context);
         
         // Calculate dimensions
         int screenWidth = this.width;
@@ -157,12 +150,11 @@ public class VillageDebugScreen extends Screen {
         
         // Draw title
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-        context.drawText(textRenderer, 
+        context.drawTextWithShadow(textRenderer, 
             "Villages Reborn Debug", 
             panelX + (panelWidth - textRenderer.getWidth("Villages Reborn Debug")) / 2, 
             panelY + 10, 
-            TITLE_COLOR, 
-            true);
+            TITLE_COLOR);
         
         // Draw stats content with scrolling
         int lineY = panelY + 30;
@@ -172,7 +164,7 @@ public class VillageDebugScreen extends Screen {
         for (int i = scrollOffset; i < Math.min(scrollOffset + visibleLines, villageStats.size()); i++) {
             String line = villageStats.get(i);
             int color = line.startsWith("===") ? TITLE_COLOR : TEXT_COLOR;
-            context.drawText(textRenderer, line, panelX + 10, lineY, color, true);
+            context.drawTextWithShadow(textRenderer, line, panelX + 10, lineY, color);
             lineY += lineHeight;
         }
         
@@ -200,6 +192,8 @@ public class VillageDebugScreen extends Screen {
                 0xCCFFFFFF
             );
         }
+        
+        super.render(context, mouseX, mouseY, delta);
     }
     
     @Override

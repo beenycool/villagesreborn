@@ -8,6 +8,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.particle.ParticleEffect;
 import net.minecraft.server.world.ServerWorld;
 
 import java.util.*;
@@ -31,7 +32,8 @@ public class VillageEvent {
     private final Set<UUID> participants = new HashSet<>();
     private boolean completed = false;
     private final Map<String, Object> eventData = new HashMap<>();
-    
+    private String outcome; // Added outcome field
+
     /**
      * Create a new village event
      */
@@ -56,6 +58,22 @@ public class VillageEvent {
     public long getStartTime() { return startTime; }
     public long getDuration() { return duration; }
     public boolean isCompleted() { return completed; }
+    
+    /**
+     * Get the outcome of this event
+     * @return Event outcome description
+     */
+    public String getOutcome() {
+        return outcome;
+    }
+    
+    /**
+     * Set the outcome of this event
+     * @param outcome Event outcome description
+     */
+    public void setOutcome(String outcome) {
+        this.outcome = outcome;
+    }
     
     /**
      * Check if the event has expired based on its duration
@@ -165,7 +183,8 @@ public class VillageEvent {
                 continue;
             }
             
-            BlockPos particlePos = location.add(offsetX, 0, offsetZ);
+            // Fixed: Convert double to int before adding to BlockPos
+            BlockPos particlePos = location.add((int)offsetX, 0, (int)offsetZ);
             
             // Find the ground level
             BlockPos groundPos = world.getTopPosition(
@@ -189,9 +208,10 @@ public class VillageEvent {
     /**
      * Get appropriate particle type based on culture
      */
-    private net.minecraft.particle.ParticleEffect getCultureParticle() {
+    private ParticleEffect getCultureParticle() {
+        // Fixed: Return appropriate ParticleEffect types
         return switch(culture.toLowerCase()) {
-            case "roman" -> ParticleTypes.ENTITY_EFFECT;
+            case "roman" -> ParticleTypes.COMPOSTER; // Changed from ENTITY_EFFECT to COMPOSTER
             case "egyptian" -> ParticleTypes.ENCHANT;
             case "victorian" -> ParticleTypes.SMOKE;
             case "nyc" -> ParticleTypes.FIREWORK;
