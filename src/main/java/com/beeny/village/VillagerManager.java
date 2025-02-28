@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import com.beeny.ai.LLMService;
+import com.beeny.ai.CulturalPromptTemplates;
 import com.beeny.util.NameGenerator;
 import com.beeny.VillagesrebornClient;
 import com.google.common.cache.Cache;
@@ -191,102 +192,77 @@ public class VillagerManager {
         try {
             nearbyIds = nearbyVillagersCache.getIfPresent(villager1UUID);
         } catch (Exception e) {
-            // Handle potential cache errors gracefully
             LOGGER.debug("Cache error when retrieving nearby villagers", e);
-        }
-        
-        // If no nearby villagers in cache, exit early
-        if (nearbyIds == null || nearbyIds.isEmpty()) {
             return;
         }
         
-        // Select a random nearby villager
+        if (nearbyIds == null || nearbyIds.isEmpty()) return;
+        
         UUID villager2UUID = nearbyIds.get(random.nextInt(nearbyIds.size()));
         VillagerAI villager2 = villagerAIs.get(villager2UUID);
-        
-        if (villager2 == null) {
-            return;
-        }
+        if (villager2 == null) return;
         
         VillagerEntity v2 = villager2.getVillager();
         if (v2 == null || !v2.isAlive()) return;
         
-        // Only process interaction if villagers aren't busy
-        if (villager1.isBusy() || villager2.isBusy()) {
-            return;
-        }
+        if (villager1.isBusy() || villager2.isBusy()) return;
         
-        // Set both villagers as busy during interaction
         villager1.setBusy(true);
         villager2.setBusy(true);
         
         try {
-            // Make villagers face each other
-            double dx = v2.getX() - v1.getX();
-            double dz = v2.getZ() - v1.getZ();
-            float yaw = (float)(Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
-            v1.setYaw(yaw);
-            v2.setYaw(yaw + 180.0F);
+            // Position villagers for interaction
+            positionVillagersForInteraction(v1, v2);
             
-            // Move slightly closer if needed
-            if (v1.squaredDistanceTo(v2) > 4.0) {
-                v1.getNavigation().startMovingTo(
-                    v2.getX() + dx * 0.3,
-                    v2.getY(),
-                    v2.getZ() + dz * 0.3,
-                    0.5D
-                );
-            }
+            // Get rich context for interaction
+            String location = getLocationContext(v1.getBlockPos());
+            String timeContext = getTimeContext(world.getTimeOfDay());
+            String sharedHistory = getSharedHistory(villager1, villager2);
+            SpawnRegion region = getNearestSpawnRegion(v1.getBlockPos());
+            String culturalContext = region != null ? region.getCulture() : "unknown";
+            String weather = world.isRaining() ? "raining" : "clear";
+            String nearbyActivities = getNearbyActivities(world, v1.getBlockPos());
             
-            // Let the LLM determine their relationship with a timeout
-            CompletableFuture<VillagerAI.RelationshipType> relationshipFuture = 
-                villager1.determineRelationshipDynamically(v2)
-                    .orTimeout(5, TimeUnit.SECONDS)
-                    .exceptionally(e -> {
-                        LOGGER.warn("Relationship determination timed out or failed", e);
-                        return VillagerAI.RelationshipType.NEUTRAL;
-                    });
-                    
-            relationshipFuture.thenAccept(type -> {
-                try {
-                    villager1.addRelationship(v2.getUuid(), type);
-                    villager2.addRelationship(v1.getUuid(), type);
-                    
-                    // Only show particles if players are nearby to see them
-                    boolean arePlayersNearby = arePlayersNearby(world, v1.getBlockPos(), 32);
-                    if (arePlayersNearby) {
-                        addInteractionEffects(world, v1, v2, type);
-                    }
-                    
-                    // Generate interaction dialogue with timeout
-                    String situation = String.format("Meeting %s for the first time",
-                        v2.getName().getString());
-                    villager1.generateDialogue(situation, v2)
-                        .orTimeout(3, TimeUnit.SECONDS)
-                        .exceptionally(e -> {
-                            LOGGER.debug("Dialogue generation timed out", e);
-                            return "...";
-                        })
-                        .thenAccept(dialogue -> {
-                            // Show dialogue as floating text only to nearby players
-                            for (ServerPlayerEntity player : world.getPlayers()) {
-                                if (player.squaredDistanceTo(v1) < 100) {
-                                    player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
-                                }
-                            }
+            // Generate dynamic interaction using the new template
+            String interactionPrompt = CulturalPromptTemplates.getTemplate("villager_interaction",
+                v1.getName().getString(), villager1.getPersonality(), villager1.getHappiness(),
+                v2.getName().getString(), villager2.getPersonality(), villager2.getHappiness(),
+                location, timeContext, sharedHistory, culturalContext, weather, nearbyActivities);
+                
+            LLMService.getInstance()
+                .generateResponse(interactionPrompt)
+                .orTimeout(5, TimeUnit.SECONDS)
+                .thenAccept(response -> {
+                    try {
+                        Map<String, String> interaction = parseResponse(response);
+                        
+                        // Apply interaction effects
+                        applyInteractionEffects(world, v1, v2, interaction);
+                        
+                        // Update relationships based on outcome
+                        updateRelationships(villager1, villager2, interaction);
+                        
+                        // Display interaction to nearby players
+                        if (arePlayersNearby(world, v1.getBlockPos(), 32)) {
+                            displayInteraction(world, v1, v2, interaction);
+                        }
+                        
+                        // Update villager states
+                        updateVillagerStates(villager1, villager2, interaction);
+                    } finally {
+                        // Release busy state after delay
+                        CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> {
+                            villager1.setBusy(false);
+                            villager2.setBusy(false);
                         });
-                    
-                    // Update activities to reflect interaction
-                    villager1.updateActivity("socializing");
-                    villager2.updateActivity("socializing");
-                } finally {
-                    // Always release busy state when done
-                    CompletableFuture.delayedExecutor(60, TimeUnit.SECONDS).execute(() -> {
-                        villager1.setBusy(false);
-                        villager2.setBusy(false);
-                    });
-                }
-            });
+                    }
+                })
+                .exceptionally(e -> {
+                    LOGGER.error("Error in social interaction", e);
+                    villager1.setBusy(false);
+                    villager2.setBusy(false);
+                    return null;
+                });
         } catch (Exception e) {
             // Make sure busy flag is cleared in case of any errors
             villager1.setBusy(false);
@@ -728,6 +704,133 @@ public class VillagerManager {
         public VillageStats(BlockPos center, String culture) {
             this.center = center;
             this.culture = culture;
+        }
+    }
+
+    private void positionVillagersForInteraction(VillagerEntity v1, VillagerEntity v2) {
+        double dx = v2.getX() - v1.getX();
+        double dz = v2.getZ() - v1.getZ();
+        float yaw = (float)(Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
+        v1.setYaw(yaw);
+        v2.setYaw(yaw + 180.0F);
+        
+        // Move slightly closer if needed
+        if (v1.squaredDistanceTo(v2) > 4.0) {
+            v1.getNavigation().startMovingTo(
+                v2.getX() + dx * 0.3,
+                v2.getY(),
+                v2.getZ() + dz * 0.3,
+                0.5D
+            );
+        }
+    }
+
+    private String getLocationContext(BlockPos pos) {
+        SpawnRegion region = getNearestSpawnRegion(pos);
+        if (region == null) return "village outskirts";
+
+        int distanceToCenter = (int) Math.sqrt(pos.getSquaredDistance(region.getCenter()));
+        if (distanceToCenter < 5) return "village center";
+        if (distanceToCenter < 15) return "village interior";
+        return "village outskirts";
+    }
+
+    private String getTimeContext(long timeOfDay) {
+        long adjustedTime = timeOfDay % 24000;
+        if (adjustedTime < 6000) return "early morning";
+        if (adjustedTime < 12000) return "midday";
+        if (adjustedTime < 18000) return "evening";
+        return "night";
+    }
+
+    private String getSharedHistory(VillagerAI v1, VillagerAI v2) {
+        Relationship relationship = getRelationship(v1.getVillager().getUuid(), v2.getVillager().getUuid());
+        if (relationship == null) return "first meeting";
+        return relationship.toString();
+    }
+
+    private String getNearbyActivities(ServerWorld world, BlockPos pos) {
+        List<String> activities = new ArrayList<>();
+        int searchRadius = 10;
+        List<VillagerAI> nearbyVillagers = villagerAIs.values().stream()
+            .filter(ai -> ai.getVillager().getBlockPos().isWithinDistance(pos, searchRadius))
+            .collect(Collectors.toList());
+
+        for (VillagerAI ai : nearbyVillagers) {
+            activities.add(ai.getCurrentActivity());
+        }
+
+        return activities.stream()
+            .distinct()
+            .collect(Collectors.joining(", "));
+    }
+
+    private void applyInteractionEffects(ServerWorld world, VillagerEntity v1, VillagerEntity v2, Map<String, String> interaction) {
+        String outcome = interaction.getOrDefault("OUTCOME", "neutral");
+        double x = (v1.getX() + v2.getX()) / 2;
+        double y = (v1.getY() + v2.getY()) / 2 + 1;
+        double z = (v1.getZ() + v2.getZ()) / 2;
+
+        if (outcome.contains("positive") || outcome.contains("friend")) {
+            world.spawnParticles(ParticleTypes.HEART, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
+        } else if (outcome.contains("negative") || outcome.contains("rival")) {
+            world.spawnParticles(ParticleTypes.ANGRY_VILLAGER, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
+        }
+    }
+
+    private void updateRelationships(VillagerAI v1, VillagerAI v2, Map<String, String> interaction) {
+        String outcome = interaction.getOrDefault("OUTCOME", "neutral");
+        VillagerAI.RelationshipType type;
+
+        if (outcome.contains("positive") || outcome.contains("friend")) {
+            type = VillagerAI.RelationshipType.FRIEND;
+        } else if (outcome.contains("negative") || outcome.contains("rival")) {
+            type = VillagerAI.RelationshipType.RIVAL;
+        } else {
+            type = VillagerAI.RelationshipType.NEUTRAL;
+        }
+
+        v1.addRelationship(v2.getVillager().getUuid(), type);
+        v2.addRelationship(v1.getVillager().getUuid(), type);
+    }
+
+    private void displayInteraction(ServerWorld world, VillagerEntity v1, VillagerEntity v2, Map<String, String> interaction) {
+        String dialogue = interaction.getOrDefault("DIALOGUE", "...");
+        String actions = interaction.getOrDefault("ACTIONS", "");
+
+        for (ServerPlayerEntity player : world.getPlayers()) {
+            if (player.squaredDistanceTo(v1) < 100) {
+                player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
+                if (!actions.isEmpty()) {
+                    player.sendMessage(Text.of("§7* " + v1.getName().getString() + " " + actions), false);
+                }
+            }
+        }
+    }
+
+    private void updateVillagerStates(VillagerAI v1, VillagerAI v2, Map<String, String> interaction) {
+        String moodChange = interaction.getOrDefault("MOOD_CHANGE", "neutral");
+        int moodDelta = 0;
+
+        if (moodChange.contains("positive")) {
+            moodDelta = 5;
+        } else if (moodChange.contains("negative")) {
+            moodDelta = -3;
+        }
+
+        if (moodDelta != 0) {
+            v1.adjustHappiness(moodDelta);
+            v2.adjustHappiness(moodDelta);
+        }
+
+        // Update activity if specified
+        String topic = interaction.getOrDefault("TOPIC", "");
+        if (topic.contains("work")) {
+            v1.updateActivity("discussing_work");
+            v2.updateActivity("discussing_work");
+        } else {
+            v1.updateActivity("socializing");
+            v2.updateActivity("socializing");
         }
     }
 

@@ -270,10 +270,11 @@ public class SetupScreen extends Screen {
             .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Provider"));
 
         // After provider selection, update the model types accordingly
-        providerButton.setChangedListener(provider -> updateModelListForProvider(provider));
+        providerButton.onValueChange(provider -> updateModelListForProvider(provider));
         
         // Add a button press listener
         providerButton.setMessage(Text.literal("Provider: " + providerButton.getValue()));
+        providerButton.setValueChangeListener(provider -> updateModelListForProvider(provider));
         
         addDrawableChild(providerButton);
         currentY += padding;
@@ -377,6 +378,7 @@ public class SetupScreen extends Screen {
             case "cohere" -> "command";
             case "mistral" -> "mistral-large-latest";
             case "local" -> "llama2";
+            case "deepseek" -> "deepseek-1.0";
             default -> "gpt-3.5-turbo";
         };
     }

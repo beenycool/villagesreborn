@@ -133,8 +133,8 @@ public class VillageDebugScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Draw the default dark background
-        this.renderBackgroundTexture(context, 0, 0, this.width, this.height, 0, 0, this.width, this.height, 0.5f, 0.5f);
+        // Draw the default dark background with the standard method
+        this.renderBackgroundTexture(context);
         
         // Calculate dimensions
         int screenWidth = this.width;

@@ -7,25 +7,34 @@ public class CulturalPromptTemplates {
     private static final Map<String, String> TEMPLATES = new HashMap<>();
 
     static {
-        TEMPLATES.put("roman_bathhouse_event",
+        TEMPLATES.put("dynamic_event",
             """
-            Design a Roman bathhouse event in Minecraft.
+            Create a culturally authentic %s event in Minecraft.
+            Current village context:
+            - Time period: %s
+            - Recent events: %s
+            - Participating villagers: %s
+            - Weather conditions: %s
+            - Local resources: %s
+            
             Consider:
-            - Traditional Roman bathing customs
-            - Social networking and discussions
-            - Health and wellness activities
-            - Different bath chambers (caldarium, tepidarium, frigidarium)
-            - Cultural practices and etiquette
-
+            - Cultural authenticity and historical accuracy
+            - Environmental and seasonal influences
+            - Social dynamics and relationships
+            - Available resources and infrastructure
+            - Impact on village development
+            
             Format your response as:
-            TYPE: (type of bathing event)
-            DESCRIPTION: (cultural context)
+            TYPE: (specific type of event)
+            THEME: (cultural significance)
+            LOCATION: (specific area in village)
             DURATION: (in Minecraft ticks)
-            PARTICIPANTS: (recommended number)
-            ACTIVITIES: (sequence of bathing and social activities)
-            OUTCOME: (social/health benefits for participants)
+            PARTICIPANTS: (roles and numbers)
+            ACTIVITIES: (sequence of events)
+            REQUIREMENTS: (needed resources/preparations)
+            OUTCOMES: (social/cultural/economic impacts)
             """);
-
+        
         TEMPLATES.put("village_layout",
             """
             Design a culturally authentic %s village layout in Minecraft.
@@ -102,17 +111,84 @@ public class CulturalPromptTemplates {
 
         TEMPLATES.put("daily_schedule",
             """
-            Create a daily schedule for a %s %s in a %s village.
+            Create a dynamic daily schedule for a %s %s in a %s village.
+            Current context:
+            - Time of year: %s
+            - Weather: %s
+            - Active village events: %s
+            - Personal relationships: %s
+            - Recent activities: %s
+            - Mood: %s
+            
             Consider:
-            - Professional duties
-            - Cultural customs
-            - Social obligations
-            - Personal characteristics
-            - Village dynamics
+            - Professional duties and skill level
+            - Cultural customs and traditions
+            - Current village events and celebrations
+            - Personal relationships and social networks
+            - Environmental conditions and adaptations
+            - Individual preferences and characteristics
+            - Recent experiences and learned behaviors
             
             Format response as time blocks (0-24000 ticks):
-            TIME: activity, location, duration
-            Include 4-6 distinct activities
+            TIME: activity, location, duration, priority_level (1-5), social_context
+            Include 6-8 distinct activities that reflect current conditions
+            """);
+
+        TEMPLATES.put("villager_interaction",
+            """
+            Generate an organic interaction between villagers in current context:
+            - Villager 1: %s (%s, mood: %s)
+            - Villager 2: %s (%s, mood: %s)
+            - Location: %s
+            - Time: %s
+            - Recent shared experiences: %s
+            - Cultural background: %s
+            - Weather: %s
+            - Nearby activities: %s
+            
+            Consider:
+            - Individual personalities and current moods
+            - Existing relationship dynamics
+            - Cultural and social context
+            - Environmental influences
+            - Recent village events
+            - Personal histories and shared experiences
+            
+            Format response as:
+            GREETING: (culturally appropriate opening)
+            TOPIC: (main discussion point)
+            ACTIONS: (physical gestures/movements)
+            DIALOGUE: (natural conversation)
+            OUTCOME: (relationship impact)
+            MOOD_CHANGE: (emotional effects)
+            """);
+
+        TEMPLATES.put("cultural_adaptation",
+            """
+            Design a cultural adaptation for the village based on:
+            - Base culture: %s
+            - Environmental changes: %s
+            - Recent challenges: %s
+            - Available resources: %s
+            - Population needs: %s
+            - External influences: %s
+            
+            Consider:
+            - Practical necessity and survival needs
+            - Cultural preservation vs adaptation
+            - Social cohesion and community impact
+            - Resource sustainability
+            - Long-term implications
+            - Implementation feasibility
+            
+            Format response as:
+            TYPE: (type of adaptation)
+            MOTIVATION: (driving factors)
+            CHANGES: (specific modifications)
+            IMPLEMENTATION: (step-by-step process)
+            RESOURCES: (required materials)
+            TIMEFRAME: (adaptation period)
+            IMPACT: (expected effects)
             """);
     }
 

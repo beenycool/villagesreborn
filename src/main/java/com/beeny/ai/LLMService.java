@@ -7,6 +7,9 @@ import com.beeny.ai.provider.AnthropicProvider;
 import com.beeny.ai.provider.GeminiProvider;
 import com.beeny.ai.provider.CohereProvider;
 import com.beeny.ai.provider.MistralProvider;
+import com.beeny.ai.provider.DeepSeekProvider;
+import com.beeny.ai.provider.AnotherProvider;
+import com.beeny.ai.provider.YetAnotherProvider;
 import com.beeny.setup.LLMConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +21,6 @@ import java.util.concurrent.CompletableFuture;
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final LLMService INSTANCE = new LLMService();
-    private static final int MAX_RETRIES = 3;
 
     private final Map<String, AIProvider> providers = new HashMap<>();
     private AIProvider currentProvider;
@@ -33,6 +35,9 @@ public class LLMService {
         providers.put("gemini", new GeminiProvider());
         providers.put("cohere", new CohereProvider());
         providers.put("mistral", new MistralProvider());
+        providers.put("deepseek", new DeepSeekProvider());
+        providers.put("anotherprovider", new AnotherProvider());
+        providers.put("yetanotherprovider", new YetAnotherProvider());
     }
 
     public static LLMService getInstance() {
