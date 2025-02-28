@@ -1,11 +1,14 @@
 package com.beeny.village.crafting;
 
+import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,8 +36,10 @@ public class CulturalRecipeInitializer {
         // Roman Gladius - Enhanced sword with sharpness
         ItemStack romanGladius = new ItemStack(Items.IRON_SWORD);
         romanGladius.setCustomName(Text.of("Roman Gladius"));
-        romanGladius.addEnchantment(Enchantments.SHARPNESS, 3);
-        romanGladius.addEnchantment(Enchantments.UNBREAKING, 2);
+        
+        // Add enchantments using the new registry method
+        addEnchantment(romanGladius, Enchantments.SHARPNESS, 3);
+        addEnchantment(romanGladius, Enchantments.UNBREAKING, 2);
         
         List<ItemStack> gladiusIngredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 3),
@@ -56,7 +61,7 @@ public class CulturalRecipeInitializer {
         // Roman Lorica Segmentata - Enhanced chestplate
         ItemStack lorica = new ItemStack(Items.IRON_CHESTPLATE);
         lorica.setCustomName(Text.of("Roman Lorica Segmentata"));
-        lorica.addEnchantment(Enchantments.PROTECTION, 2);
+        addEnchantment(lorica, Enchantments.PROTECTION, 2);
         
         List<ItemStack> loricaIngredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 8),
@@ -76,8 +81,9 @@ public class CulturalRecipeInitializer {
         
         // Roman Bath Salts - Regeneration potion
         ItemStack bathSalts = new ItemStack(Items.POTION);
-        NbtCompound tag = bathSalts.getOrCreateNbt();
-        tag.putString("Potion", "minecraft:regeneration");
+        NbtCompound nbt = new NbtCompound();
+        nbt.putString("Potion", "minecraft:regeneration");
+        bathSalts.setNbt(nbt);
         bathSalts.setCustomName(Text.of("Roman Bath Salts"));
         
         List<ItemStack> bathSaltsIngredients = Arrays.asList(
@@ -107,7 +113,7 @@ public class CulturalRecipeInitializer {
         eyeOfHorus.setCustomName(Text.of("Eye of Horus"));
         
         // Use NBT to add custom effects
-        NbtCompound tag = eyeOfHorus.getOrCreateNbt();
+        NbtCompound nbt = new NbtCompound();
         NbtList effectsList = new NbtList();
         NbtCompound effect = new NbtCompound();
         effect.putByte("Id", (byte)16); // Night Vision ID
@@ -115,7 +121,8 @@ public class CulturalRecipeInitializer {
         effect.putByte("Amplifier", (byte)0);
         effect.putBoolean("ShowParticles", false);
         effectsList.add(effect);
-        tag.put("CustomPotionEffects", effectsList);
+        nbt.put("CustomPotionEffects", effectsList);
+        eyeOfHorus.setNbt(nbt);
         
         List<ItemStack> eyeIngredients = Arrays.asList(
             new ItemStack(Items.GOLDEN_CARROT, 1),
@@ -137,7 +144,7 @@ public class CulturalRecipeInitializer {
         // Scarab Charm - Luck enhancement
         ItemStack scarabCharm = new ItemStack(Items.GOLD_INGOT);
         scarabCharm.setCustomName(Text.of("Scarab Charm"));
-        scarabCharm.addEnchantment(Enchantments.LUCK_OF_THE_SEA, 3);
+        addEnchantment(scarabCharm, Enchantments.LUCK_OF_THE_SEA, 3);
         
         List<ItemStack> scarabIngredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 2),
@@ -159,8 +166,8 @@ public class CulturalRecipeInitializer {
         // Pharaoh's Crown - Enhanced helmet
         ItemStack pharaohCrown = new ItemStack(Items.GOLDEN_HELMET);
         pharaohCrown.setCustomName(Text.of("Pharaoh's Crown"));
-        pharaohCrown.addEnchantment(Enchantments.PROTECTION, 2);
-        pharaohCrown.addEnchantment(Enchantments.RESPIRATION, 1);
+        addEnchantment(pharaohCrown, Enchantments.PROTECTION, 2);
+        addEnchantment(pharaohCrown, Enchantments.RESPIRATION, 1);
         
         List<ItemStack> crownIngredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 5),
@@ -188,14 +195,15 @@ public class CulturalRecipeInitializer {
         ItemStack pocketWatch = new ItemStack(Items.CLOCK);
         pocketWatch.setCustomName(Text.of("Victorian Pocket Watch"));
         
-        NbtCompound watchTag = pocketWatch.getOrCreateNbt();
+        NbtCompound nbt = new NbtCompound();
         NbtList watchEffects = new NbtList();
         NbtCompound hasteEffect = new NbtCompound();
         hasteEffect.putByte("Id", (byte)3); // Haste ID
         hasteEffect.putInt("Duration", 4800); // 4 minutes
         hasteEffect.putByte("Amplifier", (byte)0);
         watchEffects.add(hasteEffect);
-        watchTag.put("CustomPotionEffects", watchEffects);
+        nbt.put("CustomPotionEffects", watchEffects);
+        pocketWatch.setNbt(nbt);
         
         List<ItemStack> watchIngredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 1),
@@ -217,8 +225,8 @@ public class CulturalRecipeInitializer {
         // Industrial Pickaxe - Enhanced mining tool
         ItemStack industrialPickaxe = new ItemStack(Items.IRON_PICKAXE);
         industrialPickaxe.setCustomName(Text.of("Industrial Pickaxe"));
-        industrialPickaxe.addEnchantment(Enchantments.EFFICIENCY, 3);
-        industrialPickaxe.addEnchantment(Enchantments.UNBREAKING, 2);
+        addEnchantment(industrialPickaxe, Enchantments.EFFICIENCY, 3);
+        addEnchantment(industrialPickaxe, Enchantments.UNBREAKING, 2);
         
         List<ItemStack> pickaxeIngredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 3),
@@ -240,8 +248,8 @@ public class CulturalRecipeInitializer {
         // Steam-Powered Boots - Speed enhancement
         ItemStack steamBoots = new ItemStack(Items.IRON_BOOTS);
         steamBoots.setCustomName(Text.of("Steam-Powered Boots"));
-        steamBoots.addEnchantment(Enchantments.DEPTH_STRIDER, 2);
-        steamBoots.addEnchantment(Enchantments.FEATHER_FALLING, 2);
+        addEnchantment(steamBoots, Enchantments.DEPTH_STRIDER, 2);
+        addEnchantment(steamBoots, Enchantments.FEATHER_FALLING, 2);
         
         List<ItemStack> bootsIngredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 4),
@@ -269,7 +277,7 @@ public class CulturalRecipeInitializer {
         ItemStack nycFireworks = new ItemStack(Items.FIREWORK_ROCKET, 3);
         nycFireworks.setCustomName(Text.of("NYC Celebration Fireworks"));
         
-        NbtCompound fireworkTag = nycFireworks.getOrCreateNbt();
+        NbtCompound nbt = new NbtCompound();
         NbtCompound fireworksItem = new NbtCompound();
         fireworksItem.putByte("Flight", (byte)3); // Maximum flight duration
         
@@ -280,7 +288,8 @@ public class CulturalRecipeInitializer {
         explosions.add(explosion1);
         
         fireworksItem.put("Explosions", explosions);
-        fireworkTag.put("Fireworks", fireworksItem);
+        nbt.put("Fireworks", fireworksItem);
+        nycFireworks.setNbt(nbt);
         
         List<ItemStack> fireworkIngredients = Arrays.asList(
             new ItemStack(Items.PAPER, 3),
@@ -304,8 +313,8 @@ public class CulturalRecipeInitializer {
         // Urban Crossbow - Enhanced ranged weapon
         ItemStack urbanCrossbow = new ItemStack(Items.CROSSBOW);
         urbanCrossbow.setCustomName(Text.of("Urban Crossbow"));
-        urbanCrossbow.addEnchantment(Enchantments.QUICK_CHARGE, 2);
-        urbanCrossbow.addEnchantment(Enchantments.PIERCING, 2);
+        addEnchantment(urbanCrossbow, Enchantments.QUICK_CHARGE, 2);
+        addEnchantment(urbanCrossbow, Enchantments.PIERCING, 2);
         
         List<ItemStack> crossbowIngredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 2),
@@ -345,5 +354,33 @@ public class CulturalRecipeInitializer {
                 180 // 9 seconds
             )
         );
+    }
+    
+    /**
+     * Helper method to add enchantments properly using the Registry system in 1.21.4
+     */
+    private static void addEnchantment(ItemStack stack, Enchantment enchantment, int level) {
+        // Get or create enchantments NBT
+        NbtCompound nbt = stack.getNbt() != null ? stack.getNbt() : new NbtCompound();
+        NbtList enchList;
+        
+        // Check if there are existing enchantments
+        if (nbt.contains("Enchantments", 9)) {
+            enchList = nbt.getList("Enchantments", 10);
+        } else {
+            enchList = new NbtList();
+        }
+        
+        // Create the enchantment entry
+        NbtCompound enchEntry = new NbtCompound();
+        enchEntry.putString("id", Registries.ENCHANTMENT.getId(enchantment).toString());
+        enchEntry.putInt("lvl", level);
+        
+        // Add to the list
+        enchList.add(enchEntry);
+        
+        // Put back in the NBT
+        nbt.put("Enchantments", enchList);
+        stack.setNbt(nbt);
     }
 }

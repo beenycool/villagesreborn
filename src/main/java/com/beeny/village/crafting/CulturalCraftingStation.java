@@ -164,13 +164,15 @@ public class CulturalCraftingStation {
         }
         
         @Override
-        protected void writeNbt(NbtCompound nbt) {
-            super.writeNbt(nbt);
+        public NbtCompound writeNbt(NbtCompound nbt, WrapperLookup lookup) {
+            super.writeNbt(nbt, lookup);
             nbt.putString("StationType", stationType.name());
+            return nbt;
         }
         
-        public void readNbt(NbtCompound nbt) {
-            super.readNbt(nbt);
+        @Override
+        public void readNbt(NbtCompound nbt, WrapperLookup lookup) {
+            super.readNbt(nbt, lookup);
             if (nbt.contains("StationType")) {
                 try {
                     this.stationType = StationType.valueOf(nbt.getString("StationType"));

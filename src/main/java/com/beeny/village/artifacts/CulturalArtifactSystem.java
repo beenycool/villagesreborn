@@ -292,32 +292,26 @@ public class CulturalArtifactSystem {
         artifactItem.setCustomName(Text.literal(selectedArtifact.getName()).formatted(selectedArtifact.getRarity().getColor()));
         
         // Add lore
-        NbtCompound display = artifactItem.getOrCreateSubNbt("display");
+        NbtCompound display = new NbtCompound();
+        if (artifactItem.getNbt() != null && artifactItem.getNbt().contains("display", 10)) {
+            display = artifactItem.getNbt().getCompound("display");
+        }
+        
         NbtList lore = new NbtList();
         
         // Culture info
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("Culture: " + capitalize(culture)).formatted(Formatting.GRAY)
-        )));
+        lore.add(NbtString.of(Text.literal("Culture: " + capitalize(culture)).formatted(Formatting.GRAY).toString()));
         
         // Description
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal(selectedArtifact.getDescription()).formatted(Formatting.DARK_GRAY)
-        )));
+        lore.add(NbtString.of(Text.literal(selectedArtifact.getDescription()).formatted(Formatting.DARK_GRAY).toString()));
         
         // Rarity
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("Rarity: " + selectedArtifact.getRarity().name()).formatted(selectedArtifact.getRarity().getColor())
-        )));
+        lore.add(NbtString.of(Text.literal("Rarity: " + selectedArtifact.getRarity().name()).formatted(selectedArtifact.getRarity().getColor()).toString()));
         
         // Values
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).formatted(Formatting.GREEN)
-        )));
+        lore.add(NbtString.of(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).formatted(Formatting.GREEN).toString()));
         
-        lore.add(NbtString.of(Text.Serializer.toJson(
-            Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).formatted(Formatting.AQUA)
-        )));
+        lore.add(NbtString.of(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).formatted(Formatting.AQUA).toString()));
         
         display.put("Lore", lore);
         
@@ -327,7 +321,11 @@ public class CulturalArtifactSystem {
         artifactData.putString("culture", selectedArtifact.getCulture());
         artifactData.putString("rarity", selectedArtifact.getRarity().name());
         
-        artifactItem.setSubNbt("CulturalArtifact", artifactData);
+        // Create or get the root NBT
+        NbtCompound nbt = artifactItem.getNbt() != null ? artifactItem.getNbt() : new NbtCompound();
+        nbt.put("display", display);
+        nbt.put("CulturalArtifact", artifactData);
+        artifactItem.setNbt(nbt);
         
         // Register this artifact with the player
         registerArtifact(player.getUuid(), selectedArtifact.getId());

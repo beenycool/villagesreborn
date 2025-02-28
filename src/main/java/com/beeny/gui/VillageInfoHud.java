@@ -5,7 +5,6 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Formatting;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.ColorHelper;
 
 /**
  * Renders information about the current village on the player's HUD.
@@ -85,8 +84,8 @@ public class VillageInfoHud {
         
         // Background opacity based on animation
         int bgAlpha = (int)(128 * animationFactor);
-        int backgroundColor = ColorHelper.Argb.getArgb(bgAlpha, 0, 0, 0);
-        int borderColor = ColorHelper.Argb.getArgb((int)(animationFactor * 255), 68, 68, 68);
+        int backgroundColor = (bgAlpha << 24); // ARGB: alpha, 0, 0, 0
+        int borderColor = ((int)(animationFactor * 255) << 24) | (68 << 16) | (68 << 8) | 68; // ARGB
         
         // Semi-transparent background with border
         context.fill(xPos - 6, yPos - 6, xPos + 146, yPos + (lineHeight * 4) + 6, borderColor);
@@ -97,26 +96,26 @@ public class VillageInfoHud {
         context.drawTextWithShadow(textRenderer, 
             Text.literal("Village: ").append(Text.literal(cultureName).formatted(prosperityColor)),
             xPos, yPos, 
-            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
+            0xFF_FFFFFF | ((int)(animationFactor * 255) << 24));
         
         // Prosperity indicator
         context.drawTextWithShadow(textRenderer, 
             Text.literal("Prosperity: ").append(Text.literal(getBarString(prosperity)).formatted(prosperityColor)),
             xPos, yPos + lineHeight, 
-            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
+            0xFF_FFFFFF | ((int)(animationFactor * 255) << 24));
         
         // Safety indicator with color
         Formatting safetyColor = getColorForValue(safety);
         context.drawTextWithShadow(textRenderer, 
             Text.literal("Safety: ").append(Text.literal(getBarString(safety)).formatted(safetyColor)),
             xPos, yPos + lineHeight * 2, 
-            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
+            0xFF_FFFFFF | ((int)(animationFactor * 255) << 24));
         
         // Population count
         context.drawTextWithShadow(textRenderer, 
             Text.literal("Population: ").append(Text.literal(String.valueOf(population))),
             xPos, yPos + lineHeight * 3, 
-            ColorHelper.Argb.getArgb((int)(animationFactor * 255), 255, 255, 255));
+            0xFF_FFFFFF | ((int)(animationFactor * 255) << 24));
     }
     
     /**
