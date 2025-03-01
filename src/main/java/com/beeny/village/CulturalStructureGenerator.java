@@ -46,7 +46,7 @@ public class CulturalStructureGenerator {
     public void generateStructure(ServerWorld world, BlockPos pos, String structureType, double prosperityFactor) {
         String basePath = String.format("structures/%s/%s", culture, structureType.toLowerCase().replace(" ", "_"));
         // Create identifier properly for 1.21.4
-        Identifier templateId = new Identifier("villagesreborn:" + basePath);
+        Identifier templateId = new Identifier("villagesreborn", basePath);
 
         // Try to load base template
         StructureTemplateManager manager = world.getStructureTemplateManager();
