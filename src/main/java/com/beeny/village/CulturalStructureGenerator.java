@@ -108,6 +108,49 @@ public class CulturalStructureGenerator {
         Map<Block, Block> replacements = new HashMap<>();
         
         switch (culture) {
+            // Nether cultures
+            case "infernal_roman" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.NETHER_BRICKS);
+                replacements.put(Blocks.STONE, Blocks.BLACKSTONE);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.CRIMSON_PLANKS);
+            }
+            case "obsidian_egyptian" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICKS);
+                replacements.put(Blocks.STONE, Blocks.OBSIDIAN);
+                replacements.put(Blocks.COBBLESTONE, Blocks.GILDED_BLACKSTONE);
+            }
+            case "crimson_victorian" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.CRIMSON_PLANKS);
+                replacements.put(Blocks.STONE, Blocks.NETHER_BRICKS);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.CRIMSON_STEM);
+            }
+            case "warped_nyc" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.WARPED_PLANKS);
+                replacements.put(Blocks.STONE, Blocks.WARPED_STEM);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.WARPED_WART_BLOCK);
+            }
+            // End cultures
+            case "ethereal_victorian" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.END_STONE_BRICKS);
+                replacements.put(Blocks.STONE, Blocks.PURPUR_BLOCK);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.PURPUR_PILLAR);
+            }
+            case "ender_nyc" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.PURPUR_BLOCK);
+                replacements.put(Blocks.STONE, Blocks.END_STONE_BRICKS);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.END_STONE);
+            }
+            case "purpur_roman" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.PURPUR_PILLAR);
+                replacements.put(Blocks.STONE, Blocks.PURPUR_BLOCK);
+                replacements.put(Blocks.OAK_PLANKS, Blocks.END_STONE_BRICKS);
+            }
+            case "chorus_egyptian" -> {
+                replacements.put(Blocks.STONE_BRICKS, Blocks.END_STONE);
+                replacements.put(Blocks.STONE, Blocks.END_STONE_BRICKS);
+                replacements.put(Blocks.COBBLESTONE, Blocks.PURPUR_BLOCK);
+            }
+            // Original cultures
             case "egyptian" -> {
                 replacements.put(Blocks.STONE_BRICKS, Blocks.SANDSTONE);
                 replacements.put(Blocks.STONE, Blocks.SMOOTH_SANDSTONE);

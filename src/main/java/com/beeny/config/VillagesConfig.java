@@ -33,6 +33,12 @@ public class VillagesConfig {
         public Map<String, Boolean> features;
         public boolean showWelcomeSequence;
         public boolean showWelcomeForReturningPlayers;
+        // Dimensional village settings
+        public boolean enableNetherVillages = true;
+        public boolean enableEndVillages = false; // Off by default, post-dragon feature
+        public float netherVillageSpawnChance = 0.002f; // 1/500 chunks
+        public float endVillageSpawnChance = 0.01f;  // 1/100 islands
+        public boolean restrictEndVillagesToOuterIslands = true;
 
         public GeneralSettings() {
             features = new HashMap<>();
@@ -40,6 +46,8 @@ public class VillagesConfig {
             features.put("llm_behaviors", true);
             features.put("cultural_events", true);
             features.put("detailed_animations", true);
+            features.put("nether_villages", true);
+            features.put("end_villages", false);
             showWelcomeSequence = true;
             showWelcomeForReturningPlayers = false;
         }
