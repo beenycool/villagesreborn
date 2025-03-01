@@ -29,6 +29,7 @@ public class VillagerManager {
     private static final VillagerManager INSTANCE = new VillagerManager();
     
     private final Map<UUID, VillagerAI> villagerAIs;
+    private final Map<UUID, VillagerDialogue> villagerDialogues;
     private final Map<BlockPos, SpawnRegion> spawnRegions;
     private final Map<String, CulturalEvent> culturalEvents;
     private final Map<BlockPos, VillageStats> villageStats;
@@ -50,6 +51,7 @@ public class VillagerManager {
 
     private VillagerManager() {
         this.villagerAIs = new ConcurrentHashMap<>();
+        this.villagerDialogues = new ConcurrentHashMap<>();
         this.spawnRegions = new HashMap<>();
         this.culturalEvents = new HashMap<>();
         this.villageStats = new ConcurrentHashMap<>();
@@ -542,19 +544,29 @@ public class VillagerManager {
                 VillagerAI ai = new VillagerAI(villager, personality);
                 villagerAIs.put(villager.getUuid(), ai);
 
+                // Initialize dialogue system with villager memory
+                VillagerMemory memory = new VillagerMemory();
+                VillagerDialogue dialogue = new VillagerDialogue(
+                    villager,
+                    memory,
+                    region.getCulture(),
+                    villager.getVillagerData().getProfession().toString()
+                );
+                villagerDialogues.put(villager.getUuid(), dialogue);
+
                 // Generate initial thoughts about their role
-                String situation = String.format("Starting life as a %s in a %s village", 
+                String situation = String.format("Starting life as a %s in a %s village",
                     villager.getVillagerData().getProfession(),
                     region.getCulture()
                 );
                 ai.generateBehavior(situation);
             }),
-            nameGenerator.generateName(region.getCulture(), 
+            nameGenerator.generateName(region.getCulture(),
                 villager.getVillagerData().getProfession().toString())
                 .thenAccept(name -> {
                     villager.setCustomName(Text.of(name));
                     villager.setCustomNameVisible(true);
-                    LOGGER.info("Initialized new villager: {} in {} village", 
+                    LOGGER.info("Initialized new villager: {} in {} village",
                         name, region.getCulture());
                 })
         ).exceptionally(e -> {
@@ -584,10 +596,19 @@ public class VillagerManager {
 
     public void removeVillager(UUID uuid) {
         villagerAIs.remove(uuid);
+        villagerDialogues.remove(uuid);
     }
 
     public VillagerAI getVillagerAI(UUID uuid) {
         return villagerAIs.get(uuid);
+    }
+
+    public VillagerDialogue getVillagerDialogue(VillagerEntity villager) {
+        return villagerDialogues.get(villager.getUuid());
+    }
+
+    public VillagerDialogue getVillagerDialogue(UUID uuid) {
+        return villagerDialogues.get(uuid);
     }
 
     public SpawnRegion getNearestSpawnRegion(BlockPos pos) {
@@ -637,16 +658,40 @@ public class VillagerManager {
     }
 
     public void handleVillagerInteraction(ServerPlayerEntity player, VillagerEntity villager) {
-        VillagerAI villagerAI = villagerAIs.get(villager.getUuid());
-        if (villagerAI != null) {
-            String situation = String.format("Player %s approaches to talk", 
-                player.getName().getString());
-                
-            villagerAI.generateDialogue(situation, null)
-                .thenAccept(dialogue -> {
+        VillagerDialogue dialogue = villagerDialogues.get(villager.getUuid());
+        if (dialogue != null) {
+            dialogue.generatePlayerInteraction(player, "general_conversation")
+                .thenAccept(response -> {
+                    Map<String, String> parsed = parseResponse(response);
+                    String greeting = parsed.getOrDefault("GREETING", "");
+                    String dialogueText = parsed.getOrDefault("DIALOGUE", "");
+                    String actions = parsed.getOrDefault("ACTIONS", "");
+                    
+                    // Send greeting if present
+                    if (!greeting.isEmpty()) {
+                        player.sendMessage(Text.literal(
+                            "§6" + villager.getName().getString() + ": §f" + greeting
+                        ), false);
+                    }
+                    
+                    // Send main dialogue
                     player.sendMessage(Text.literal(
-                        villager.getName().getString() + ": " + dialogue
+                        "§6" + villager.getName().getString() + ": §f" + dialogueText
                     ), false);
+                    
+                    // Show actions if present
+                    if (!actions.isEmpty()) {
+                        player.sendMessage(Text.literal(
+                            "§7* " + villager.getName().getString() + " " + actions
+                        ), false);
+                    }
+                })
+                .exceptionally(e -> {
+                    LOGGER.error("Error generating dialogue", e);
+                    player.sendMessage(Text.literal(
+                        villager.getName().getString() + ": ..."
+                    ), false);
+                    return null;
                 });
         }
     }
