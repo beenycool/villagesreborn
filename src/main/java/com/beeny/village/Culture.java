@@ -616,7 +616,7 @@ public class Culture {
     }
 
     public boolean isPreferredBiome(Biome biome) {
-        Identifier biomeId = Registries.BIOME.getEntrySet().stream()
+        Identifier biomeId = RegistryKeys.BIOME.registry().getEntrySet().stream()
             .filter(entry -> entry.getValue().equals(biome))
             .findFirst()
             .map(entry -> entry.getKey().getValue())

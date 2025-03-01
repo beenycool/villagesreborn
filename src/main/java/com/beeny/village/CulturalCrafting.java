@@ -162,9 +162,13 @@ public class CulturalCrafting {
             this.additionalData = new HashMap<>();
             
             // Add cultural NBT data to the item
-            NbtCompound nbt = this.itemRepresentation.getOrCreateNbt();
+            NbtCompound nbt = this.itemRepresentation.getNbt();
+            if (nbt == null) {
+                nbt = new NbtCompound();
+            }
             nbt.putString("cultural_artifact_id", id);
             nbt.putString("culture_type", cultureType.getId());
+            this.itemRepresentation = this.itemRepresentation.copyWithNbt(nbt);
         }
         
         /**

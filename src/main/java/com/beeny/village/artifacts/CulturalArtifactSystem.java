@@ -294,7 +294,10 @@ public class CulturalArtifactSystem {
         
         // Add lore
         NbtCompound display = new NbtCompound();
-        NbtCompound rootNbt = artifactItem.getOrCreateNbt();
+        NbtCompound rootNbt = artifactItem.getNbt();
+        if (rootNbt == null) {
+            rootNbt = new NbtCompound();
+        }
         if (rootNbt.contains("display", 10)) {
             display = rootNbt.getCompound("display");
         }
@@ -329,6 +332,9 @@ public class CulturalArtifactSystem {
         // Add to the root NBT
         rootNbt.put("display", display);
         rootNbt.put("CulturalArtifact", artifactData);
+        
+        // Set the NBT on the item
+        artifactItem = artifactItem.copyWithNbt(rootNbt);
         
         // Register this artifact with the player
         registerArtifact(player.getUuid(), selectedArtifact.getId());
