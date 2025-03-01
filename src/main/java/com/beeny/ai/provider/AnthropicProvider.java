@@ -42,7 +42,7 @@ public class AnthropicProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.model = config.getOrDefault("model", "claude-3-opus");
+        this.model = config.getOrDefault("model", "claude-sonnet-3.7");
         
         if (apiKey == null) {
             LOGGER.error("Anthropic provider initialization failed: missing API key");
@@ -95,7 +95,16 @@ public class AnthropicProvider implements AIProvider {
         // Create request body
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
-        requestBody.addProperty("max_tokens", 1024);
+        // Set max tokens based on model
+        int maxTokens = 1024;
+        if (model.startsWith("claude-3-opus")) {
+            maxTokens = 4096;
+        } else if (model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5")) {
+            maxTokens = 4096;
+        } else if (model.startsWith("claude-3")) {
+            maxTokens = 2048;
+        }
+        requestBody.addProperty("max_tokens", maxTokens);
         requestBody.addProperty("system", systemPrompt.toString());
         requestBody.addProperty("temperature", 0.7);
         

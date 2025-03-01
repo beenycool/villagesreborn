@@ -21,10 +21,10 @@ public class LLMConfig {
     private final Path configPath;
     private final transient Gson gson;
     
-    @Expose private String modelType = "gpt-3.5-turbo";
-    @Expose private String endpoint = "https://api.openai.com/v1";
+    @Expose private String modelType = "deepseek-coder";
+    @Expose private String endpoint = "https://api.deepseek.ai/v1";
     @Expose private String apiKey = "";
-    @Expose private String provider = "openai";
+    @Expose private String provider = "deepseek";
     @Expose private int contextLength = 2048;
     @Expose private double temperature = 0.7;
     @Expose private boolean useGPU = false;

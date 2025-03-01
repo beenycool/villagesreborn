@@ -1,13 +1,6 @@
 package com.beeny.ai;
 
-import com.beeny.ai.provider.AIProvider;
-import com.beeny.ai.provider.AzureOpenAIProvider;
-import com.beeny.ai.provider.OpenAIProvider;
-import com.beeny.ai.provider.AnthropicProvider;
-import com.beeny.ai.provider.GeminiProvider;
-import com.beeny.ai.provider.CohereProvider;
-import com.beeny.ai.provider.MistralProvider;
-import com.beeny.ai.provider.DeepSeekProvider;
+import com.beeny.ai.provider.*;
 import com.beeny.setup.LLMConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +20,14 @@ public class LLMService {
 
     private LLMService() {
         // Register available providers
-        providers.put("azure", new AzureOpenAIProvider());
-        providers.put("openai", new OpenAIProvider());
-        providers.put("anthropic", new AnthropicProvider());
-        providers.put("gemini", new GeminiProvider());
-        providers.put("cohere", new CohereProvider());
+        providers.put("deepseek", new DeepSeekProvider()); // Cheapest option by default
+        providers.put("openrouter", new OpenRouterProvider());
         providers.put("mistral", new MistralProvider());
-        providers.put("deepseek", new DeepSeekProvider());
+        providers.put("gemini", new GeminiProvider());
+        providers.put("anthropic", new AnthropicProvider());
+        providers.put("openai", new OpenAIProvider());
+        providers.put("azure", new AzureOpenAIProvider());
+        providers.put("cohere", new CohereProvider());
     }
 
     public static LLMService getInstance() {
@@ -46,8 +40,8 @@ public class LLMService {
         currentProvider = providers.get(providerName);
         
         if (currentProvider == null) {
-            LOGGER.error("Provider {} not found, falling back to Azure", providerName);
-            currentProvider = providers.get("azure");
+            LOGGER.error("Provider {} not found, falling back to DeepSeek", providerName);
+            currentProvider = providers.get("deepseek");
         }
 
         Map<String, String> providerConfig = new HashMap<>();

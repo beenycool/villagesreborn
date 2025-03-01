@@ -11,9 +11,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-public class GeminiProvider implements AIProvider {
+public class OpenRouterProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1/models/";
+    private static final String API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
     private OkHttpClient client;
@@ -21,7 +21,7 @@ public class GeminiProvider implements AIProvider {
     private String model;
     private boolean initialized = false;
 
-    public GeminiProvider() {
+    public OpenRouterProvider() {
         client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -32,78 +32,59 @@ public class GeminiProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.model = config.getOrDefault("modelName", "gemini-2.0-flash-lite");
+        this.model = config.getOrDefault("modelName", "openrouter/command-r");
         
         if (apiKey == null) {
-            LOGGER.error("Gemini provider initialization failed: missing API key");
+            LOGGER.error("OpenRouter provider initialization failed: missing API key");
             return;
         }
         
         initialized = true;
-        LOGGER.info("Gemini provider initialized with model: {}", model);
+        LOGGER.info("OpenRouter provider initialized with model: {}", model);
     }
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         if (!initialized) {
             CompletableFuture<String> future = new CompletableFuture<>();
-            future.completeExceptionally(new IllegalStateException("Gemini provider not initialized"));
+            future.completeExceptionally(new IllegalStateException("OpenRouter provider not initialized"));
             return future;
         }
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String url = API_URL + model + ":generateContent?key=" + apiKey;
-                
                 JsonObject requestBody = new JsonObject();
-                JsonArray contents = new JsonArray();
+                requestBody.addProperty("model", model);
+                
+                JsonArray messages = new JsonArray();
                 
                 // Add system prompt if available
                 if (context.containsKey("system_prompt")) {
                     JsonObject systemMessage = new JsonObject();
-                    JsonObject systemRole = new JsonObject();
-                    systemRole.addProperty("role", "system");
-                    systemMessage.add("role", systemRole);
-                    systemMessage.addProperty("parts", context.get("system_prompt"));
-                    contents.add(systemMessage);
+                    systemMessage.addProperty("role", "system");
+                    systemMessage.addProperty("content", context.get("system_prompt"));
+                    messages.add(systemMessage);
                 }
                 
                 // Add user prompt
                 JsonObject userMessage = new JsonObject();
-                JsonObject parts = new JsonObject();
-                parts.addProperty("text", prompt);
-                JsonArray partsArray = new JsonArray();
-                partsArray.add(parts);
                 userMessage.addProperty("role", "user");
-                userMessage.add("parts", partsArray);
-                contents.add(userMessage);
+                userMessage.addProperty("content", prompt);
+                messages.add(userMessage);
                 
-                requestBody.add("contents", contents);
+                requestBody.add("messages", messages);
                 
                 // Add generation config
-                JsonObject generationConfig = new JsonObject();
-                generationConfig.addProperty("temperature", 0.7);
-                int maxTokens = 0;
-                switch(model) {
-                    case "gemini-2.0-pro":
-                        maxTokens = 128000;
-                        break;
-                    case "gemini-2.0-flash":
-                        maxTokens = 128000;
-                        break;
-                    case "gemini-2.0-flash-lite":
-                    default:
-                        maxTokens = 32000;
-                }
-                generationConfig.addProperty("maxOutputTokens", maxTokens);
-                generationConfig.addProperty("candidateCount", 1);
-                generationConfig.add("stopSequences", new JsonArray());
-                requestBody.add("generationConfig", generationConfig);
+                requestBody.addProperty("temperature", 0.7);
+                requestBody.addProperty("max_tokens", getMaxTokensForModel(model));
                 
                 RequestBody body = RequestBody.create(requestBody.toString(), JSON);
                 Request request = new Request.Builder()
-                    .url(url)
+                    .url(API_URL)
                     .post(body)
+                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .addHeader("HTTP-Referer", "https://github.com/beeny/villagesreborn")
+                    .addHeader("X-Title", "Villagesreborn Minecraft Mod")
                     .build();
 
                 try (Response response = client.newCall(request).execute()) {
@@ -113,21 +94,27 @@ public class GeminiProvider implements AIProvider {
                     
                     String responseBody = response.body().string();
                     JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.getAsJsonArray("candidates")
+                    String generatedText = jsonResponse.getAsJsonArray("choices")
                         .get(0).getAsJsonObject()
-                        .getAsJsonArray("content")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonArray("parts")
-                        .get(0).getAsJsonObject()
-                        .get("text").getAsString();
+                        .getAsJsonObject("message")
+                        .get("content").getAsString();
                     
                     return generatedText;
                 }
             } catch (Exception e) {
-                LOGGER.error("Error generating response from Gemini", e);
-                throw new RuntimeException("Failed to generate response from Gemini", e);
+                LOGGER.error("Error generating response from OpenRouter", e);
+                throw new RuntimeException("Failed to generate response from OpenRouter", e);
             }
         });
+    }
+
+    private int getMaxTokensForModel(String model) {
+        return switch (model) {
+            case "openrouter/command-r" -> 4096;
+            case "openrouter/solar" -> 8192;
+            case "openrouter/neural-chat" -> 4096;
+            default -> 4096;
+        };
     }
 
     @Override
@@ -137,7 +124,7 @@ public class GeminiProvider implements AIProvider {
 
     @Override
     public String getName() {
-        return "gemini";
+        return "openrouter";
     }
 
     @Override
