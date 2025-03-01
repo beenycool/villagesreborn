@@ -29,6 +29,7 @@ public class LLMConfig {
     @Expose private double temperature = 0.7;
     @Expose private boolean useGPU = false;
     @Expose private boolean setupComplete = false;
+    @Expose private boolean quickStartMode = false;
     @Expose private Map<UUID, Boolean> welcomeSequenceShown = new HashMap<>();
 
     public LLMConfig() {
@@ -169,6 +170,15 @@ public class LLMConfig {
 
     public void setUseGPU(boolean useGPU) {
         this.useGPU = useGPU;
+        saveConfig();
+    }
+
+    public boolean isQuickStartMode() {
+        return quickStartMode;
+    }
+
+    public void setQuickStartMode(boolean quickStartMode) {
+        this.quickStartMode = quickStartMode;
         saveConfig();
     }
 }

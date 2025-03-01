@@ -39,18 +39,27 @@ public class LLMService {
         String providerName = config.getProvider();
         currentProvider = providers.get(providerName);
         
-        if (currentProvider == null) {
-            LOGGER.error("Provider {} not found, falling back to DeepSeek", providerName);
+        if (currentProvider == null || config.isQuickStartMode()) {
+            LOGGER.info("Using DeepSeek provider for {}",
+                config.isQuickStartMode() ? "Quick Start mode" : "fallback");
             currentProvider = providers.get("deepseek");
         }
 
         Map<String, String> providerConfig = new HashMap<>();
-        providerConfig.put("apiKey", config.getApiKey());
-        providerConfig.put("endpoint", config.getEndpoint());
-        providerConfig.put("modelName", config.getModelType());
+        if (config.isQuickStartMode()) {
+            // Use default configuration for Quick Start
+            providerConfig.put("apiKey", "");  // DeepSeek will use rule-based fallback
+            providerConfig.put("endpoint", "https://api.deepseek.ai/v1");
+            providerConfig.put("modelName", "deepseek-coder");
+        } else {
+            providerConfig.put("apiKey", config.getApiKey());
+            providerConfig.put("endpoint", config.getEndpoint());
+            providerConfig.put("modelName", config.getModelType());
+        }
         
         currentProvider.initialize(providerConfig);
-        LOGGER.info("LLMService initialized with provider: {}", currentProvider.getName());
+        LOGGER.info("LLMService initialized with provider: {} (Quick Start: {})",
+            currentProvider.getName(), config.isQuickStartMode());
     }
 
     public CompletableFuture<String> generateResponse(String prompt) {
@@ -81,10 +90,40 @@ public class LLMService {
     }
 
     private String getDefaultResponse(String prompt) {
+        prompt = prompt.toLowerCase();
+        
+        // Basic villager roles
         if (prompt.contains("farmer")) {
-            return "ACTION: work\nTARGET: nearest_farm\nDURATION: 6000\nDETAIL: tending crops";
+            return "ACTION: work\nTARGET: nearest_farm\nDURATION: 6000\nDETAIL: tending crops and harvesting";
         }
-        return "ACTION: walk\nTARGET: village_center\nDURATION: 2400\nDETAIL: patrolling";
+        if (prompt.contains("fisherman")) {
+            return "ACTION: work\nTARGET: nearest_water\nDURATION: 4800\nDETAIL: fishing at the pond";
+        }
+        if (prompt.contains("trader") || prompt.contains("merchant")) {
+            return "ACTION: trade\nTARGET: nearest_player\nDURATION: 3000\nDETAIL: offering special deals";
+        }
+        
+        // Time of day behaviors
+        if (prompt.contains("night") || prompt.contains("sleeping")) {
+            return "ACTION: sleep\nTARGET: nearest_bed\nDURATION: 8000\nDETAIL: resting until morning";
+        }
+        if (prompt.contains("eating") || prompt.contains("hungry")) {
+            return "ACTION: eat\nTARGET: nearest_food\nDURATION: 1200\nDETAIL: having a meal";
+        }
+        
+        // Cultural variations
+        if (prompt.contains("roman")) {
+            return "ACTION: gather\nTARGET: forum\nDURATION: 3600\nDETAIL: discussing politics at the forum";
+        }
+        if (prompt.contains("egyptian")) {
+            return "ACTION: pray\nTARGET: temple\nDURATION: 3600\nDETAIL: offering prayers to the gods";
+        }
+        if (prompt.contains("victorian")) {
+            return "ACTION: socialize\nTARGET: tea_room\nDURATION: 3000\nDETAIL: enjoying afternoon tea";
+        }
+        
+        // Default wandering behavior
+        return "ACTION: walk\nTARGET: village_center\nDURATION: 2400\nDETAIL: exploring the village";
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {

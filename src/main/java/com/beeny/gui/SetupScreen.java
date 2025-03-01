@@ -30,21 +30,35 @@ public class SetupScreen extends Screen {
         int buttonHeight = 20;
         int centerX = width / 2 - buttonWidth / 2;
         int centerY = height / 2;
+        int spacing = 24;
 
-        // "Yes, let's go!" button
-        addDrawableChild(ButtonWidget.builder(Text.literal("Yes, let's go!"), button -> {
-            client.setScreen(new ModelDownloadScreen(this, llmConfig));
+        // Quick Start button
+        addDrawableChild(ButtonWidget.builder(Text.literal("Quick Start (Recommended)"), button -> {
+            llmConfig.setQuickStartMode(true);
+            llmConfig.setSetupComplete(true);
+            llmConfig.setModelType("deepseek-coder");
+            llmConfig.setProvider("deepseek");
+            llmConfig.saveConfig();
+            close();
         })
-        .dimensions(centerX, centerY - 12, buttonWidth, buttonHeight)
+        .dimensions(centerX, centerY - spacing, buttonWidth, buttonHeight)
         .build());
 
-        // "Skip for now" button
-        addDrawableChild(ButtonWidget.builder(Text.literal("Skip for now"), button -> {
+        // Advanced Setup button
+        addDrawableChild(ButtonWidget.builder(Text.literal("Advanced Setup"), button -> {
+            llmConfig.setQuickStartMode(false);
+            client.setScreen(new ModelDownloadScreen(this, llmConfig));
+        })
+        .dimensions(centerX, centerY, buttonWidth, buttonHeight)
+        .build());
+
+        // Skip button
+        addDrawableChild(ButtonWidget.builder(Text.literal("Skip AI Features"), button -> {
             llmConfig.setSetupComplete(true);
             llmConfig.saveConfig();
             close();
         })
-        .dimensions(centerX, centerY + 12, buttonWidth, buttonHeight)
+        .dimensions(centerX, centerY + spacing, buttonWidth, buttonHeight)
         .build());
     }
 
@@ -66,9 +80,25 @@ public class SetupScreen extends Screen {
         context.drawText(textRenderer, title, titleX, height / 4, 0xFFFFFF, true);
 
         // Draw subtitle
-        String subtitle = "Want smarter villagers?";
+        String subtitle = "Choose Your Setup Mode";
         int subtitleX = centerX - textRenderer.getWidth(subtitle) / 2;
         context.drawText(textRenderer, subtitle, subtitleX, height / 4 + 20, 0xFFFFFF, true);
+
+        // Draw option descriptions
+        int descY = height / 2 - 48;
+        int descColor = 0xAAAAAA;
+        
+        String quickStartDesc = "Start playing immediately with basic AI features";
+        context.drawText(textRenderer, quickStartDesc,
+            centerX - textRenderer.getWidth(quickStartDesc) / 2, descY, descColor, true);
+            
+        String advancedDesc = "Configure advanced AI settings and models";
+        context.drawText(textRenderer, advancedDesc,
+            centerX - textRenderer.getWidth(advancedDesc) / 2, descY + 24, descColor, true);
+            
+        String skipDesc = "Play without AI-enhanced features";
+        context.drawText(textRenderer, skipDesc,
+            centerX - textRenderer.getWidth(skipDesc) / 2, descY + 48, descColor, true);
 
         // Draw background image
         int imageSize = 128;
