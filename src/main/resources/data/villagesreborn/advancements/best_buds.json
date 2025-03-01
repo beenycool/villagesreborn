@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:event_goer",
+  "display": {
+    "icon": {
+      "item": "minecraft:golden_apple"
+    },
+    "title": "Best Buds",
+    "description": "Reach maximum friendship level with a villager",
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "max_friendship": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{VillagerFriendship:[{level:10}]}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 100,
+    "loot": [
+      "villagesreborn:friendship_reward"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 package com.beeny.gui;
 
 import com.beeny.config.VillagesConfig;
+import com.beeny.village.VillagerManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -19,8 +20,25 @@ public class ConversationHud {
     private static final long CONVERSATION_TIMEOUT = 30000; // 30 seconds of inactivity ends conversation
     private boolean isVisible = false;
     private HudPosition position = HudPosition.BOTTOM_RIGHT;
-    // Fixed: Use the public constructor with namespace
     private final Identifier ICON_TEXTURE = Identifier.of("villagesreborn", "textures/gui/conversation_icon.png");
+    
+    // Friendship colors for different levels
+    private static final int[] FRIENDSHIP_COLORS = {
+        0xFFFF3333, // Level 1-2 (Red)
+        0xFFFF9933, // Level 3-4 (Orange)
+        0xFFFFFF33, // Level 5-6 (Yellow)
+        0xFF99FF33, // Level 7-8 (Light Green)
+        0xFF33FF33  // Level 9-10 (Green)
+    };
+    
+    private int getFriendshipColor(int level) {
+        int index = Math.min((level - 1) / 2, FRIENDSHIP_COLORS.length - 1);
+        return FRIENDSHIP_COLORS[Math.max(0, index)];
+    }
+    
+    private int getFriendshipLevel(VillagerEntity villager) {
+        return VillagerManager.getInstance().getVillagerAI(villager.getUuid()).getFriendshipLevel();
+    }
     
     // Available positions for the conversation indicator
     public enum HudPosition {
@@ -127,9 +145,15 @@ public class ConversationHud {
         } else if (uiSettings.showProfession) {
             detailsWidth = textRenderer.getWidth(profession);
         }
+        // Get friendship level
+        VillagerAI villagerAI = VillagerManager.getInstance().getVillagerAI(currentVillager.getUuid());
+        int friendshipLevel = villagerAI != null ? villagerAI.getFriendshipLevel() : 0;
+        String friendshipText = String.format("Friendship: %d/10", friendshipLevel);
+        int friendshipWidth = textRenderer.getWidth(friendshipText);
+
+        int boxWidth = Math.max(Math.max(textWidth, detailsWidth), friendshipWidth) + 30; // Extra space for icon
+        int boxHeight = (uiSettings.showCulture || uiSettings.showProfession) ? 52 : 36; // Extra height for friendship bar
         
-        int boxWidth = Math.max(textWidth, detailsWidth) + 30; // Extra space for icon
-        int boxHeight = (uiSettings.showCulture || uiSettings.showProfession) ? 36 : 20; // Height for text plus padding
         
         // Calculate position based on user preference
         int x, y;

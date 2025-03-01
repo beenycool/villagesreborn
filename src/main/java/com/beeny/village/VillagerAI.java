@@ -145,6 +145,19 @@ public class VillagerAI {
         setHappiness(this.happiness + amount);
     }
 
+    public int getFriendshipLevel() {
+        // Calculate friendship level (1-10) based on happiness and relationships
+        int baseLevel = Math.max(1, Math.min(10, (happiness / 10)));
+        
+        // Boost level based on positive relationships
+        long friendCount = relationships.values().stream()
+            .filter(r -> r == RelationshipType.FRIEND || r == RelationshipType.FAMILY)
+            .count();
+        
+        int relationshipBonus = (int) Math.min(3, friendCount / 2);
+        return Math.min(10, baseLevel + relationshipBonus);
+    }
+
     private Map<Integer, ActivitySchedule> createSchedule(String profession) {
         StringBuilder prompt = new StringBuilder()
             .append(String.format(
@@ -638,6 +651,7 @@ public class VillagerAI {
             case FRIEND -> "friend";
             case FAMILY -> "family";
             case RIVAL -> "rival";
+            case NEUTRAL -> "neutral";
         };
     }
 

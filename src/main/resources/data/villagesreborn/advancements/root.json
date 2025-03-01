@@ -1,0 +1,21 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:emerald"
+    },
+    "title": "Villages Reborn",
+    "description": "Discover a reborn village",
+    "background": "minecraft:textures/block/stone.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true
+  },
+  "criteria": {
+    "in_village": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "feature": "village"
+      }
+    }
+  }
+}

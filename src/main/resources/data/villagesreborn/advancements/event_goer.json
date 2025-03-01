@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:village_newbie",
+  "display": {
+    "icon": {
+      "item": "minecraft:bell"
+    },
+    "title": "Event Goer",
+    "description": "Participate in a village cultural event",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "participated_in_event": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{VillageEvents:[{participated:1b}]}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 50,
+    "loot": [
+      "villagesreborn:event_reward"
+    ]
+  }
+}

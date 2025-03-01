@@ -1,0 +1,27 @@
+{
+  "parent": "villagesreborn:root",
+  "display": {
+    "icon": {
+      "item": "minecraft:villager_spawn_egg"
+    },
+    "title": "Village Newbie",
+    "description": "Talk to a villager in a reborn village",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "talked_to_villager": {
+      "trigger": "minecraft:player_interacted_with_entity",
+      "conditions": {
+        "entity": {
+          "type": "minecraft:villager"
+        }
+      }
+    }
+  },
+  "rewards": {
+    "experience": 10
+  }
+}

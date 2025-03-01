@@ -1,5 +1,6 @@
 package com.beeny.mixin;
 
+import com.beeny.gui.TutorialScreen;
 import com.beeny.gui.VillageCraftingScreen;
 import com.beeny.village.SpawnRegion;
 import com.beeny.village.VillagerAI;
@@ -24,19 +25,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(VillagerEntity.class)
 public class VillagerInteractionMixin {
-    
     @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
     private void onInteract(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+        VillagerEntity thisVillager = (VillagerEntity) (Object) this;
+
+        // Show tutorial when targeting villager (client-side)
+        if (player.getWorld().isClient) {
+            TutorialScreen.showIfRelevant(net.minecraft.client.MinecraftClient.getInstance(), "targeting_villager");
+        }
         VillagerEntity villager = (VillagerEntity) (Object) this;
         
         // Initialize the VillagerAI if it doesn't exist yet
         VillagerManager vm = VillagerManager.getInstance();
-        VillagerAI villagerAI = vm.getVillagerAI(villager.getUuid());
+        VillagerAI villagerAI = vm.getVillagerAI(thisVillager.getUuid());
         if (villagerAI == null && !player.getWorld().isClient) {
             // Track this villager in our system
             // Fixed: Pass the ServerWorld, not ServerPlayerEntity
-            vm.onVillagerSpawn(villager, (ServerWorld) player.getWorld());
-            villagerAI = vm.getVillagerAI(villager.getUuid());
+            vm.onVillagerSpawn(thisVillager, (ServerWorld) player.getWorld());
+            villagerAI = vm.getVillagerAI(thisVillager.getUuid());
         }
         
         // Only proceed with custom interaction if we have an AI for this villager
@@ -44,11 +50,11 @@ public class VillagerInteractionMixin {
             if (!player.getWorld().isClient) {
                 // Server-side handling
                 if (player instanceof ServerPlayerEntity serverPlayer) {
-                    SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+                    SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
                     String culture = region != null ? region.getCulture() : "default";
                     
                     // Check if the villager is at their workstation
-                    if (isAtWorkstation(villager)) {
+                    if (isAtWorkstation(thisVillager)) {
                         // Update villager activity
                         if (villagerAI != null) {
                             villagerAI.updateActivity("trading");
@@ -62,48 +68,56 @@ public class VillagerInteractionMixin {
                             villagerAI.updateActivity("conversing");
                             
                             // Add animation - villager looks at player
-                            villager.getLookControl().lookAt(player, 30F, 30F);
-                            VillagerFeedbackHelper.showTalkingAnimation(villager);
+                            thisVillager.getLookControl().lookAt(player, 30F, 30F);
+                            VillagerFeedbackHelper.showTalkingAnimation(thisVillager);
                             
                             // Generate contextual greeting with thinking effect
-                            VillagerFeedbackHelper.showThinkingEffect(villager);
+                            VillagerFeedbackHelper.showThinkingEffect(thisVillager);
                             
-                            // Check if player has met this villager before using Nbt
-                            // Update to use getPersistentData() for 1.21.4
-                            NbtCompound playerData = serverPlayer.getDataTracker().getPersistentData();
-                            String metTag = "met_" + villager.getUuid().toString();
+                            // Check if player has met this villager before using NBT data
+                            NbtCompound playerData = serverPlayer.writeNbt(new NbtCompound());
+                            String metTag = "met_villager_" + thisVillager.getUuid().toString();
+                            
                             if (!playerData.contains(metTag)) {
-                                playerData.putBoolean(metTag, true);
+                                // Show first meeting tutorial
+                                if (serverPlayer.getWorld().isClient) {
+                                    TutorialScreen.showIfRelevant(net.minecraft.client.MinecraftClient.getInstance(), "first_meeting");
+                                }
+                                
+                                // Store the meeting in NBT
+                                NbtCompound newData = serverPlayer.writeNbt(new NbtCompound());
+                                newData.putBoolean(metTag, true);
+                                serverPlayer.readNbt(newData);
                                 
                                 villagerAI.generateDialogue("First meeting", null)
                                     .thenAccept(greeting -> {
                                         // Format response based on profession
-                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String profession = thisVillager.getVillagerData().getProfession().toString();
                                         String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
                                         
                                         serverPlayer.sendMessage(
-                                            Text.of("§6" + villager.getName().getString() + "§r: " + formattedGreeting),
+                                            Text.of("§6" + thisVillager.getName().getString() + "§r: " + formattedGreeting),
                                             false
                                         );
                                         
                                         // Show speaking effect
-                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                                        VillagerFeedbackHelper.showSpeakingEffect(thisVillager);
                                     });
                             } else {
                                 // Regular greeting
                                 villagerAI.generateDialogue("Greeting", null)
                                     .thenAccept(greeting -> {
                                         // Format response based on profession
-                                        String profession = villager.getVillagerData().getProfession().toString();
+                                        String profession = thisVillager.getVillagerData().getProfession().toString();
                                         String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
                                         
                                         serverPlayer.sendMessage(
-                                            Text.of("§6" + villager.getName().getString() + "§r: " + formattedGreeting),
+                                            Text.of("§6" + thisVillager.getName().getString() + "§r: " + formattedGreeting),
                                             false
                                         );
                                         
                                         // Show speaking effect
-                                        VillagerFeedbackHelper.showSpeakingEffect(villager);
+                                        VillagerFeedbackHelper.showSpeakingEffect(thisVillager);
                                     });
                             }
                             
@@ -119,13 +133,13 @@ public class VillagerInteractionMixin {
                 }
             } else {
                 // Client-side handling - only open crafting screen when at workstation
-                if (isAtWorkstation(villager)) {
-                    SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+                if (isAtWorkstation(thisVillager)) {
+                    SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
                     String culture = region != null ? region.getCulture() : "default";
                     
                     // Open crafting screen when at workstation
                     net.minecraft.client.MinecraftClient.getInstance().setScreen(
-                        new VillageCraftingScreen(villager, culture)
+                        new VillageCraftingScreen(thisVillager, culture)
                     );
                     cir.setReturnValue(ActionResult.SUCCESS);
                 }
