@@ -34,12 +34,40 @@ public class SpawnRegion {
     private final Map<String, BlockPos> culturalStructures = new HashMap<>();
     private final List<String> pendingConstructions = new ArrayList<>();
     public SpawnRegion(BlockPos center, int radius, String culture) {
-        this.center = center;
-        this.radius = radius;
-        this.culture = culture.toLowerCase();
-        initializeCulturalStructures();
-        LOGGER.info("Creating new {} village region at {} with radius {}", culture, center, radius);
-    }
+            this(center, radius, culture, null);
+        }
+    
+        public SpawnRegion(BlockPos center, int radius, String culture, World world) {
+            this.center = center;
+            this.radius = radius;
+            this.culture = (world != null) ? pickDimensionCulture(world) : culture.toLowerCase();
+            initializeCulturalStructures();
+            LOGGER.info("Creating new {} village region at {} with radius {}", culture, center, radius);
+        }
+    
+        private static String pickDimensionCulture(World world) {
+            String dimension = world.getRegistryKey().getValue().toString();
+            return switch (dimension) {
+                case "minecraft:the_nether" -> pickNetherCulture(world.getRandom());
+                case "minecraft:the_end" -> pickEndCulture(world.getRandom());
+                default -> pickOverworldCulture(world.getRandom());
+            };
+        }
+    
+        private static String pickNetherCulture(net.minecraft.util.math.random.Random random) {
+            String[] cultures = {"infernal_roman", "obsidian_egyptian", "crimson_victorian", "warped_nyc"};
+            return cultures[random.nextInt(cultures.length)];
+        }
+    
+        private static String pickEndCulture(net.minecraft.util.math.random.Random random) {
+            String[] cultures = {"ethereal_victorian", "ender_nyc", "purpur_roman", "chorus_egyptian"};
+            return cultures[random.nextInt(cultures.length)];
+        }
+    
+        private static String pickOverworldCulture(net.minecraft.util.math.random.Random random) {
+            String[] cultures = {"roman", "egyptian", "victorian", "nyc"};
+            return cultures[random.nextInt(cultures.length)];
+        }
 
     private void initializeCulturalStructures() {
         generateCulturalStructuresList().thenAccept(structures -> {

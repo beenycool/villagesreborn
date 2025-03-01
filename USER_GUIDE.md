@@ -4,7 +4,13 @@ Welcome to Villages Reborn, a comprehensive overhaul mod that transforms Minecra
 
 ## Getting Started
 
-After installing the mod, you'll soon discover enhanced villages around the world. These villages come in four cultural variations:
+When you first launch the game with Villages Reborn installed, you'll be presented with three setup options:
+
+1. **Quick Start (Recommended)**: Jump right into playing with basic AI features enabled. No configuration needed!
+2. **Advanced Setup**: Configure custom LLM settings for enhanced villager intelligence.
+3. **Skip AI Features**: Play with basic village enhancements only.
+
+After setup, you'll discover enhanced villages around the world. These villages come in four cultural variations:
 
 - **Roman**: Mediterranean-inspired architecture with forums, villas, and bathhouses
 - **Egyptian**: Desert settlements with temples, pyramids, and oases
@@ -45,14 +51,21 @@ Villages Reborn adds several useful commands:
 
 ## Settings and Configuration
 
-Access the mod settings through the Options menu in Minecraft. Key settings include:
+Access the mod settings through the Options menu in Minecraft. The available settings depend on your chosen setup mode:
 
-### LLM Settings
+### Quick Start Mode
+- No API configuration required
+- Pre-configured for immediate play
+- Basic AI features using built-in responses
+- Can upgrade to Advanced mode anytime
+
+### Advanced Mode Settings
 - API Key: For connecting to language model services
 - Endpoint: The server endpoint for AI requests
-- Local Model: Option to download and use a local AI model
+- Model Selection: Choose from various AI providers
+- Performance Settings: Adjust response caching and context length
 
-### General Settings
+### General Settings (All Modes)
 - Feature toggles for various mod components
 - Performance options for complex village features
 - Villager behavior adjustments
@@ -62,9 +75,23 @@ Access the mod settings through the Options menu in Minecraft. Key settings incl
 Common issues and solutions:
 
 1. **Game Crashes**: Try setting `detailedAnimations` to false in the config file
-2. **Villagers Not Responding**: Check that you have properly configured the LLM settings
-3. **Poor Performance**: Lower the values for `maxVillagerAI` and `maxStructureComplexity`
-4. **Missing Structures**: Verify that all required resource packs are enabled
+
+2. **AI-Related Issues**:
+   - If using Quick Start mode: Verify you have the latest mod version
+   - If using Advanced mode: Check that your API key and endpoint are correctly configured
+   - If neither works: Try switching to Quick Start mode temporarily
+
+3. **Performance Issues**:
+   - Lower the values for `maxVillagerAI` and `maxStructureComplexity`
+   - Switch to Quick Start mode which has optimized default settings
+   - Reduce the number of active village events
+
+4. **Setup Problems**:
+   - If unsure which mode to choose, start with Quick Start
+   - Advanced mode not working? Verify your internet connection and API credentials
+   - Can't switch modes? Try deleting the config file and restarting
+
+5. **Missing Structures**: Verify that all required resource packs are enabled
 
 ## Compatibility
 
@@ -76,5 +103,19 @@ Villages Reborn is compatible with most mods that don't fundamentally alter vill
 ## Support
 
 For help, bug reports, or feature suggestions:
+
+### Community Support
 - GitHub Issues: [https://github.com/beeny/villages-reborn/issues](https://github.com/beeny/villages-reborn/issues)
 - Discord: [Villages Reborn Community](https://discord.gg/villagesreborn)
+- Wiki: [Villages Reborn Wiki](https://villagesreborn.net/wiki)
+
+### Mode-Specific Help
+- Quick Start Mode: [Getting Started Guide](https://villagesreborn.net/quickstart)
+- Advanced Mode: [AI Setup Tutorial](https://villagesreborn.net/advanced)
+- Performance Tips: [Optimization Guide](https://villagesreborn.net/performance)
+
+When reporting issues, please include:
+- Your setup mode (Quick Start/Advanced/Skip AI)
+- Mod version number
+- Minecraft version
+- Error logs (if applicable)

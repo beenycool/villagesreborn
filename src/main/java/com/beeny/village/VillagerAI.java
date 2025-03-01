@@ -4,6 +4,8 @@ import com.beeny.ai.LLMService;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.passive.VillagerEntity;
 import com.beeny.village.event.VillageEvent;
 import net.minecraft.particle.ParticleTypes;
@@ -109,13 +111,23 @@ public class VillagerAI {
     }
 
     public VillagerAI(VillagerEntity villager, String personality) {
-        this.villager = villager;
-        this.personality = personality;
-        this.homePos = villager.getBlockPos();
-        this.currentActivity = "idle";
-        this.schedule = createSchedule(villager.getVillagerData().getProfession().toString());
-        this.happiness = 50; // Default happiness level
-    }
+            this.villager = villager;
+            this.personality = personality;
+            this.homePos = villager.getBlockPos();
+            this.currentActivity = "idle";
+            this.schedule = createSchedule(villager.getVillagerData().getProfession().toString());
+            this.happiness = 50; // Default happiness level
+            applyDimensionTraits();
+        }
+    
+        public void applyDimensionTraits() {
+            String culture = getCurrentCulturalContext();
+            if (culture.startsWith("infernal_") || culture.startsWith("obsidian_") ||
+                culture.startsWith("crimson_") || culture.startsWith("warped_")) {
+                villager.addStatusEffect(new StatusEffectInstance(
+                    StatusEffects.FIRE_RESISTANCE, Integer.MAX_VALUE, 0, false, false));
+            }
+        }
 
     /**
      * Check if the villager is currently busy with an activity that shouldn't be interrupted

@@ -5,6 +5,24 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.potion.PotionUtil;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import com.mojang.brigadier.CommandDispatcher;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.potion.Potions;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -13,6 +31,25 @@ import java.util.function.Consumer;
  * celebrations, disasters, and political activities.
  */
 public class VillageEvent {
+    public void giveCompletionRewards() {
+        for (PlayerEntity player : participatingPlayers) {
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                if (culture.getType().toString().startsWith("infernal_")) {
+                    if (Random.create().nextFloat() < 0.1f) { // 10% chance for permanent reward
+                        serverPlayer.getServer().getCommandManager().execute(
+                            serverPlayer.getCommandSource(),
+                            "/attribute @s minecraft:generic.nether_fire_resistance base set 1"
+                        ); // Hypothetical custom attribute
+                        serverPlayer.sendMessage(Text.of("§6You’ve gained Nether Affinity! Immune to fire in the Nether."), false);
+                    } else {
+                        ItemStack potion = new ItemStack(Items.POTION);
+                        PotionUtil.setPotion(potion, Potions.FIRE_RESISTANCE);
+                        serverPlayer.giveItemStack(potion);
+                    }
+                }
+            }
+        }
+    }
     private final String id;
     private final String name;
     private final EventType type;
