@@ -46,22 +46,25 @@ public class VillageUISettingsScreen extends Screen {
         
         // Position dropdown
         ConversationHud.HudPosition currentPosition = ConversationHud.HudPosition.valueOf(uiSettings.conversationHudPosition);
-        this.positionButton = CyclingButtonWidget.builder(ConversationHud.HudPosition::name)
-            .values(ConversationHud.HudPosition.values())
+        this.positionButton = CyclingButtonWidget.<ConversationHud.HudPosition>builder(
+                position -> Text.literal(position.name()))
+            .values((Object[])ConversationHud.HudPosition.values())
             .initially(currentPosition)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Position"));
         this.addDrawableChild(this.positionButton);
         startY += 30;
         
         // Show culture toggle
-        this.showCultureButton = CyclingButtonWidget.onOffBuilder(Text.literal("On"), Text.literal("Off"))
+        this.showCultureButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
+            .values(true, false)
             .initially(uiSettings.showCulture)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Culture"));
         this.addDrawableChild(this.showCultureButton);
         startY += 30;
         
         // Show profession toggle
-        this.showProfessionButton = CyclingButtonWidget.onOffBuilder(Text.literal("On"), Text.literal("Off"))
+        this.showProfessionButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
+            .values(true, false)
             .initially(uiSettings.showProfession)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Profession"));
         this.addDrawableChild(this.showProfessionButton);

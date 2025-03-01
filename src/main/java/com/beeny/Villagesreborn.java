@@ -4,6 +4,7 @@ import net.fabricmc.api.ModInitializer;
 import com.beeny.village.VillageCraftingManager;
 import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
+import net.minecraft.entity.player.PlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,17 @@ public class Villagesreborn implements ModInitializer {
     /** Configuration for LLM (Large Language Model) integration */
     private static LLMConfig llmConfig;
 
+    /** Singleton instance */
+    private static Villagesreborn INSTANCE;
+
+    /**
+     * Get the singleton instance of the mod
+     * @return Mod instance
+     */
+    public static Villagesreborn getInstance() {
+        return INSTANCE;
+    }
+    
     /**
      * Initializes the mod components when Minecraft loads.
      * <p>
@@ -38,6 +50,9 @@ public class Villagesreborn implements ModInitializer {
     @Override
     public void onInitialize() {
         LOGGER.info("Initializing Villages Reborn mod");
+        
+        // Set singleton instance
+        INSTANCE = this;
         
         // Initialize system specifications
         systemSpecs = new SystemSpecs();
@@ -81,5 +96,15 @@ public class Villagesreborn implements ModInitializer {
             llmConfig = new LLMConfig();
         }
         return llmConfig;
+    }
+
+    /**
+     * Request village information for the player's current location
+     * @param player The player to get village information for
+     */
+    public void pingVillageInfo(PlayerEntity player) {
+        // This would be implemented to send village info to the client
+        // For now it's a stub to fix compilation issues
+        LOGGER.info("Village info requested for player: " + player.getName().getString());
     }
 }

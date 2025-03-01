@@ -407,4 +407,146 @@ public class VillageEvent {
         
         return cultureEvents;
     }
+
+    /**
+     * Check if the event is active based on the given world time
+     * 
+     * @param currentTime The current world time in ticks
+     * @return Whether the event is still active
+     */
+    public boolean isActive(long currentTime) {
+        return !isCompleted() && !isExpired();
+    }
+
+    /**
+     * Builder class for creating VillageEvent objects
+     */
+    public static class Builder {
+        private String id = UUID.randomUUID().toString();
+        private String type;
+        private String culture;
+        private String description;
+        private BlockPos location;
+        private int radius = 20; // Default radius
+        private long startTime;
+        private long duration = 60 * 60 * 1000; // 1 hour default
+        private final Set<UUID> participants = new HashSet<>();
+        private String district;
+        private String outcome;
+
+        /**
+         * Set the event type
+         */
+        public Builder type(String type) {
+            this.type = type;
+            return this;
+        }
+
+        /**
+         * Set the event culture
+         */
+        public Builder culture(String culture) {
+            this.culture = culture;
+            return this;
+        }
+
+        /**
+         * Set the event description
+         */
+        public Builder description(String description) {
+            this.description = description;
+            return this;
+        }
+
+        /**
+         * Set the event location
+         */
+        public Builder location(BlockPos location) {
+            this.location = location;
+            return this;
+        }
+
+        /**
+         * Set the event radius
+         */
+        public Builder radius(int radius) {
+            this.radius = radius;
+            return this;
+        }
+
+        /**
+         * Set the event start time in world ticks
+         */
+        public Builder startTime(long startTime) {
+            this.startTime = startTime;
+            return this;
+        }
+
+        /**
+         * Set the event duration in milliseconds
+         */
+        public Builder duration(long duration) {
+            this.duration = duration;
+            return this;
+        }
+
+        /**
+         * Add participants by UUID list
+         */
+        public Builder participants(List<UUID> participants) {
+            this.participants.addAll(participants);
+            return this;
+        }
+
+        /**
+         * Set the event district
+         */
+        public Builder district(String district) {
+            this.district = district;
+            return this;
+        }
+
+        /**
+         * Set the event outcome
+         */
+        public Builder outcome(String outcome) {
+            this.outcome = outcome;
+            return this;
+        }
+
+        /**
+         * Build the VillageEvent object
+         */
+        public VillageEvent build() {
+            // Use existing eventId with culture and type if available
+            if (culture != null && type != null) {
+                this.id = generateEventId(culture, type);
+            }
+            
+            VillageEvent event = new VillageEvent(
+                id, type, culture, description, location, radius, duration
+            );
+            
+            // Add participants
+            // Static method can't access instance methods directly, use VillageEvent's static method
+            for (UUID uuid : participants) {
+                // We can't add participants directly here since we can't access instance method getPlayerById
+                // Instead, we'll store the UUIDs and let the caller handle participant addition
+                event.participants.add(uuid);
+            }
+            
+            // Set additional data
+            if (district != null) {
+                event.setEventData("district", district);
+            }
+            if (outcome != null) {
+                event.setOutcome(outcome);
+            }
+            
+            // Register event
+            registerEvent(event);
+            
+            return event;
+        }
+    }
 }

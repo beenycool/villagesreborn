@@ -19,7 +19,8 @@ public class ConversationHud {
     private static final long CONVERSATION_TIMEOUT = 30000; // 30 seconds of inactivity ends conversation
     private boolean isVisible = false;
     private HudPosition position = HudPosition.BOTTOM_RIGHT;
-    private final Identifier ICON_TEXTURE = new Identifier("villagesreborn", "textures/gui/conversation_icon.png");
+    // Fixed: Use the public constructor with namespace
+    private final Identifier ICON_TEXTURE = Identifier.of("villagesreborn", "textures/gui/conversation_icon.png");
     
     // Available positions for the conversation indicator
     public enum HudPosition {

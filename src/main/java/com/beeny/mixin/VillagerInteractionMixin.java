@@ -11,6 +11,7 @@ import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -33,7 +34,8 @@ public class VillagerInteractionMixin {
         VillagerAI villagerAI = vm.getVillagerAI(villager.getUuid());
         if (villagerAI == null && !player.getWorld().isClient) {
             // Track this villager in our system
-            vm.onVillagerSpawn(villager, (ServerPlayerEntity) player);
+            // Fixed: Pass the ServerWorld, not ServerPlayerEntity
+            vm.onVillagerSpawn(villager, (ServerWorld) player.getWorld());
             villagerAI = vm.getVillagerAI(villager.getUuid());
         }
         
@@ -67,7 +69,8 @@ public class VillagerInteractionMixin {
                             VillagerFeedbackHelper.showThinkingEffect(villager);
                             
                             // Check if player has met this villager before using NBT
-                            NbtCompound playerData = player.getDataTracker().get(PlayerEntity.PLAYER_DATA);
+                            // Fixed: Use the player's persistent data directly instead of PLAYER_DATA field
+                            NbtCompound playerData = serverPlayer.getCustomData();
                             String metTag = "met_" + villager.getUuid().toString();
                             if (!playerData.contains(metTag)) {
                                 playerData.putBoolean(metTag, true);
@@ -142,7 +145,7 @@ public class VillagerInteractionMixin {
             workstation = Blocks.LECTERN;
         } else if (profession == VillagerProfession.ARMORER) {
             workstation = Blocks.BLAST_FURNACE;
-        } else if (profession == VillagerProfession.WEAPONSMITH) {
+        } else if ( profession == VillagerProfession.WEAPONSMITH) {
             workstation = Blocks.GRINDSTONE;
         } else if (profession == VillagerProfession.TOOLSMITH) {
             workstation = Blocks.SMITHING_TABLE;
