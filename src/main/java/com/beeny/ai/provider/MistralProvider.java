@@ -32,7 +32,7 @@ public class MistralProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.model = config.getOrDefault("modelName", "mistral-large-latest");
+        this.model = config.getOrDefault("modelName", "mistral-large");
         
         if (apiKey == null) {
             LOGGER.error("Mistral provider initialization failed: missing API key");
@@ -74,7 +74,9 @@ public class MistralProvider implements AIProvider {
                 
                 requestBody.add("messages", messages);
                 requestBody.addProperty("temperature", 0.7);
-                requestBody.addProperty("max_tokens", 1024);
+                requestBody.addProperty("max_tokens", model.contains("large") ? 4096 : 2048);
+                requestBody.addProperty("top_p", 0.9);
+                requestBody.addProperty("response_format", "text");
                 
                 RequestBody body = RequestBody.create(requestBody.toString(), JSON);
                 Request request = new Request.Builder()

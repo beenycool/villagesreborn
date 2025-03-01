@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 public class GeminiProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
-    private static final String API_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
+    private static final String API_URL = "https://generativelanguage.googleapis.com/v1/models/";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
     private OkHttpClient client;
@@ -83,7 +83,9 @@ public class GeminiProvider implements AIProvider {
                 // Add generation config
                 JsonObject generationConfig = new JsonObject();
                 generationConfig.addProperty("temperature", 0.7);
-                generationConfig.addProperty("maxOutputTokens", 1024);
+                generationConfig.addProperty("maxOutputTokens", model.contains("pro") ? 2048 : 1024);
+                generationConfig.addProperty("candidateCount", 1);
+                generationConfig.add("stopSequences", new JsonArray());
                 requestBody.add("generationConfig", generationConfig);
                 
                 RequestBody body = RequestBody.create(requestBody.toString(), JSON);

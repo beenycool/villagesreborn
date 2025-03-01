@@ -29,7 +29,7 @@ public class AnthropicProvider implements AIProvider {
     private final Gson gson = new Gson();
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final String ANTHROPIC_API_VERSION = "2023-06-01";
+    private static final String ANTHROPIC_API_VERSION = "2024-02-01";
 
     public AnthropicProvider() {
         client = new OkHttpClient.Builder()
@@ -42,7 +42,7 @@ public class AnthropicProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.model = config.getOrDefault("model", "claude-2.1");
+        this.model = config.getOrDefault("model", "claude-3-opus");
         
         if (apiKey == null) {
             LOGGER.error("Anthropic provider initialization failed: missing API key");
@@ -95,20 +95,26 @@ public class AnthropicProvider implements AIProvider {
         // Create request body
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
-        requestBody.addProperty("max_tokens", 300);
+        requestBody.addProperty("max_tokens", 1024);
         requestBody.addProperty("system", systemPrompt.toString());
+        requestBody.addProperty("temperature", 0.7);
         
         // Add messages
         JsonObject message = new JsonObject();
         message.addProperty("role", "user");
         message.addProperty("content", prompt);
         requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+
+        // Add response format for newer models
+        if (model.startsWith("claude-3")) {
+            requestBody.addProperty("response_format", "text");
+        }
         
         // Create request
         Request request = new Request.Builder()
             .url(API_URL)
             .post(RequestBody.create(requestBody.toString(), JSON))
-            .header("X-API-Key", apiKey)
+            .header("anthropic-api-key", apiKey)
             .header("anthropic-version", ANTHROPIC_API_VERSION)
             .header("Content-Type", "application/json")
             .build();

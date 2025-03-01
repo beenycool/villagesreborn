@@ -42,7 +42,7 @@ public class OpenAIProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.modelName = config.getOrDefault("modelName", "gpt-3.5-turbo");
+        this.modelName = config.getOrDefault("modelName", "gpt-4-turbo-preview");
         
         if (apiKey == null || apiKey.isEmpty()) {
             LOGGER.error("OpenAI provider initialization failed: missing API key");
@@ -108,7 +108,15 @@ public class OpenAIProvider implements AIProvider {
         requestBody.addProperty("model", modelName);
         requestBody.add("messages", messagesArray);
         requestBody.addProperty("temperature", 0.7);
-        requestBody.addProperty("max_tokens", 300);
+        requestBody.addProperty("max_tokens", modelName.contains("gpt-4-turbo") ? 4096 : 
+                              modelName.contains("gpt-4") ? 8192 : 4096);
+        
+        // Add response format for newer models
+        if (modelName.startsWith("gpt-4-turbo") || modelName.startsWith("gpt-4")) {
+            JsonObject responseFormat = new JsonObject();
+            responseFormat.addProperty("type", "text");
+            requestBody.add("response_format", responseFormat);
+        }
         
         // Create request
         Request request = new Request.Builder()
