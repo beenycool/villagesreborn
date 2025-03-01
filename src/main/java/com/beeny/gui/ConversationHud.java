@@ -2,6 +2,7 @@ package com.beeny.gui;
 
 import com.beeny.config.VillagesConfig;
 import com.beeny.village.VillagerManager;
+import com.beeny.village.VillagerAI;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -124,10 +125,16 @@ public class ConversationHud {
         int screenWidth = client.getWindow().getScaledWidth();
         int screenHeight = client.getWindow().getScaledHeight();
         
+        // Get villager information
         String villagerName = currentVillager.getName().getString();
         String culture = getCulture(currentVillager);
         String profession = currentVillager.getVillagerData().getProfession().toString();
         profession = formatProfession(profession);
+
+        // Get friendship information
+        VillagerAI villagerAI = VillagerManager.getInstance().getVillagerAI(currentVillager.getUuid());
+        int friendshipLevel = villagerAI != null ? villagerAI.getFriendshipLevel() : 0;
+        String friendshipText = String.format("Friendship: %d/10", friendshipLevel);
         
         // Format the label with villager name
         String labelFormat = uiSettings.conversationLabelFormat;
@@ -145,12 +152,8 @@ public class ConversationHud {
         } else if (uiSettings.showProfession) {
             detailsWidth = textRenderer.getWidth(profession);
         }
-        // Get friendship level
-        VillagerAI villagerAI = VillagerManager.getInstance().getVillagerAI(currentVillager.getUuid());
-        int friendshipLevel = villagerAI != null ? villagerAI.getFriendshipLevel() : 0;
-        String friendshipText = String.format("Friendship: %d/10", friendshipLevel);
-        int friendshipWidth = textRenderer.getWidth(friendshipText);
 
+        int friendshipWidth = textRenderer.getWidth(friendshipText);
         int boxWidth = Math.max(Math.max(textWidth, detailsWidth), friendshipWidth) + 30; // Extra space for icon
         int boxHeight = (uiSettings.showCulture || uiSettings.showProfession) ? 52 : 36; // Extra height for friendship bar
         
@@ -209,9 +212,30 @@ public class ConversationHud {
         }
             
         if (uiSettings.showProfession) {
-            context.drawText(textRenderer, 
-                Text.literal((uiSettings.showCulture ? " " : "") + profession).formatted(Formatting.GRAY), 
+            context.drawText(textRenderer,
+                Text.literal((uiSettings.showCulture ? " " : "") + profession).formatted(Formatting.GRAY),
                 detailsX, detailsY, 0xFFFFFFFF, true);
+        }
+
+        // Draw friendship bar if AI is available
+        if (villagerAI != null) {
+            int barWidth = boxWidth - 10;
+            int barHeight = 4;
+            int barY = detailsY + 16;
+            int barX = x + 5;
+
+            // Draw background bar
+            context.fill(barX, barY, barX + barWidth, barY + barHeight, 0x80000000);
+
+            // Draw filled portion
+            int filledWidth = (int)((friendshipLevel / 10.0f) * barWidth);
+            int friendshipColor = getFriendshipColor(friendshipLevel);
+            context.fill(barX, barY, barX + filledWidth, barY + barHeight, friendshipColor);
+
+            // Draw friendship level text
+            context.drawText(textRenderer,
+                Text.literal(friendshipText).formatted(Formatting.WHITE),
+                barX, barY - 10, 0xFFFFFFFF, true);
         }
     }
     
