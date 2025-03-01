@@ -290,20 +290,13 @@ public class CulturalArtifactSystem {
         ItemStack artifactItem = new ItemStack(selectedArtifact.getBaseItem());
         
         // Set custom name with appropriate color
-        artifactItem.setCustomName(Text.literal(selectedArtifact.getName()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())));
+        artifactItem.getOrCreateSubNbt("display").putString("Name", Text.Serialization.toJsonString(Text.literal(selectedArtifact.getName()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor()))));
         
-        // Add lore
+        // Create new NBT compound
+        NbtCompound nbt = new NbtCompound();
         NbtCompound display = new NbtCompound();
-        NbtCompound rootNbt = artifactItem.getNbt();
-        if (rootNbt == null) {
-            rootNbt = new NbtCompound();
-        }
-        if (rootNbt.contains("display", 10)) {
-            display = rootNbt.getCompound("display");
-        }
-        
         NbtList lore = new NbtList();
-        
+
         // Create a WrapperLookup instance for serialization
         net.minecraft.registry.RegistryWrapper.WrapperLookup wrapperLookup = null;
         
@@ -318,23 +311,22 @@ public class CulturalArtifactSystem {
         
         // Values
         lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).setStyle(Style.EMPTY.withColor(Formatting.GREEN)), wrapperLookup)));
-        
         lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).setStyle(Style.EMPTY.withColor(Formatting.AQUA)), wrapperLookup)));
         
         display.put("Lore", lore);
-        
+        nbt.put("display", display);
+
         // Add hidden artifact data
         NbtCompound artifactData = new NbtCompound();
         artifactData.putString("id", selectedArtifact.getId());
         artifactData.putString("culture", selectedArtifact.getCulture());
         artifactData.putString("rarity", selectedArtifact.getRarity().name());
-        
-        // Add to the root NBT
-        rootNbt.put("display", display);
-        rootNbt.put("CulturalArtifact", artifactData);
-        
+        nbt.put("CulturalArtifact", artifactData);
+
         // Set the NBT on the item
-        artifactItem = artifactItem.copyWithNbt(rootNbt);
+        ItemStack newItem = artifactItem.copy();
+        newItem.getOrCreateNbt().copyFrom(nbt);
+        artifactItem = newItem;
         
         // Register this artifact with the player
         registerArtifact(player.getUuid(), selectedArtifact.getId());
