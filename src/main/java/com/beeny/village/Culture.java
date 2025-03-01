@@ -616,10 +616,10 @@ public class Culture {
     }
 
     public boolean isPreferredBiome(Biome biome) {
-        Identifier biomeId = RegistryKeys.BIOME.streamEntries()
-            .filter(entry -> entry.value().equals(biome))
+        Identifier biomeId = Registries.BIOME.getEntrySet().stream()
+            .filter(entry -> entry.getValue().equals(biome))
             .findFirst()
-            .map(entry -> entry.key().getValue())
+            .map(entry -> entry.getKey().getValue())
             .orElse(null);
             
         if (biomeId == null) return false;

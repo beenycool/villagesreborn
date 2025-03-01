@@ -24,7 +24,7 @@ public class VillageDebugScreen extends Screen {
     private static final int BORDER_COLOR = 0xFF444444;
     private static final int TITLE_COLOR = 0xFFFFDD00;
     private static final int TEXT_COLOR = 0xFFFFFFFF;
-    private static final Identifier BACKGROUND_TEXTURE = new Identifier("minecraft", "textures/gui/options_background.png");
+    private static final Identifier BACKGROUND_TEXTURE = Identifier.of("minecraft", "textures/gui/options_background.png");
     
     private List<String> villageStats = new ArrayList<>();
     private int scrollOffset = 0;
@@ -136,7 +136,7 @@ public class VillageDebugScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw the default dark background using correct parameters for 1.21.4
-        context.drawTexture(BACKGROUND_TEXTURE, 0, 0, 0, 0, width, height, 32, 32);
+        context.drawTexture(id -> net.minecraft.client.render.RenderLayer.getGuiTexture(id), BACKGROUND_TEXTURE, 0, 0, 0, 0, width, height, 32, 32);
         
         // Calculate dimensions
         int screenWidth = this.width;

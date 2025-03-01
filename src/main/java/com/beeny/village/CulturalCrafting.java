@@ -324,7 +324,7 @@ public class CulturalCrafting {
             // For example, adding attribute modifiers for stats
             
             // Notify player of bonus
-            player.sendMessage(Text.of("You feel the power of the artifact: " + description));
+            player.sendMessage(Text.of("You feel the power of the artifact: " + description), false);
         }
         
         /**

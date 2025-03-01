@@ -315,7 +315,7 @@ public class VillageEvent {
         
         // Notify players that the event has ended
         for (PlayerEntity player : participatingPlayers) {
-            player.sendMessage(Text.of("The " + name + " event has concluded!"));
+            player.sendMessage(Text.of("The " + name + " event has concluded!"), false);
         }
     }
     
@@ -324,7 +324,7 @@ public class VillageEvent {
      */
     public void addParticipant(PlayerEntity player) {
         participatingPlayers.add(player);
-        player.sendMessage(Text.of("You are now participating in the " + name + " event!"));
+        player.sendMessage(Text.of("You are now participating in the " + name + " event!"), false);
     }
     
     /**
