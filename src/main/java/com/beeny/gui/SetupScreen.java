@@ -270,11 +270,10 @@ public class SetupScreen extends Screen {
             .build(leftX, currentY, fieldWidth, fieldHeight, Text.literal("Provider"));
 
         // After provider selection, update the model types accordingly
-        providerButton.onChange(provider -> updateModelListForProvider(provider));
+        providerButton.onValueChange(provider -> updateModelListForProvider(provider));
         
         // Add a button press listener
         providerButton.setMessage(Text.literal("Provider: " + providerButton.getValue()));
-        providerButton.onChange(provider -> updateModelListForProvider(provider));
         
         addDrawableChild(providerButton);
         currentY += padding;

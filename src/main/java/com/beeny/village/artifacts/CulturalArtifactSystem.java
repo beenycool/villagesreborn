@@ -9,6 +9,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -289,29 +290,29 @@ public class CulturalArtifactSystem {
         ItemStack artifactItem = new ItemStack(selectedArtifact.getBaseItem());
         
         // Set custom name with appropriate color
-        artifactItem.setCustomName(Text.of(selectedArtifact.getName()).formatted(selectedArtifact.getRarity().getColor()));
+        artifactItem.setCustomName(Text.literal(selectedArtifact.getName()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())));
         
         // Add lore
         NbtCompound display = new NbtCompound();
-        if (artifactItem.hasNbt() && artifactItem.getOrCreateNbt().contains("display", 10)) {
-            display = artifactItem.getOrCreateNbt().getCompound("display");
+        if (artifactItem.getNbt() != null && artifactItem.getNbt().contains("display", 10)) {
+            display = artifactItem.getNbt().getCompound("display");
         }
         
         NbtList lore = new NbtList();
         
         // Culture info
-        lore.add(NbtString.of(Text.literal("Culture: " + capitalize(culture)).formatted(Formatting.GRAY).asTruncatedString(Integer.MAX_VALUE)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Culture: " + capitalize(culture)).setStyle(Style.EMPTY.withColor(Formatting.GRAY)))));
         
         // Description
-        lore.add(NbtString.of(Text.literal(selectedArtifact.getDescription()).formatted(Formatting.DARK_GRAY).asTruncatedString(Integer.MAX_VALUE)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal(selectedArtifact.getDescription()).setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)))));
         
         // Rarity
-        lore.add(NbtString.of(Text.literal("Rarity: " + selectedArtifact.getRarity().name()).formatted(selectedArtifact.getRarity().getColor()).asTruncatedString(Integer.MAX_VALUE)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Rarity: " + selectedArtifact.getRarity().name()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())))));
         
         // Values
-        lore.add(NbtString.of(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).formatted(Formatting.GREEN).asTruncatedString(Integer.MAX_VALUE)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).setStyle(Style.EMPTY.withColor(Formatting.GREEN)))));
         
-        lore.add(NbtString.of(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).formatted(Formatting.AQUA).asTruncatedString(Integer.MAX_VALUE)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).setStyle(Style.EMPTY.withColor(Formatting.AQUA)))));
         
         display.put("Lore", lore);
         
@@ -322,7 +323,7 @@ public class CulturalArtifactSystem {
         artifactData.putString("rarity", selectedArtifact.getRarity().name());
         
         // Create or get the root NBT
-        NbtCompound nbt = artifactItem.hasNbt() ? artifactItem.getOrCreateNbt() : new NbtCompound();
+        NbtCompound nbt = artifactItem.getNbt() != null ? artifactItem.getNbt() : new NbtCompound();
         nbt.put("display", display);
         nbt.put("CulturalArtifact", artifactData);
         artifactItem.setNbt(nbt);

@@ -8,6 +8,8 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.Arrays;
+import java.util.List;
 
 public class VillageUISettingsScreen extends Screen {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -48,7 +50,7 @@ public class VillageUISettingsScreen extends Screen {
         ConversationHud.HudPosition currentPosition = ConversationHud.HudPosition.valueOf(uiSettings.conversationHudPosition);
         this.positionButton = CyclingButtonWidget.<ConversationHud.HudPosition>builder(
                 position -> Text.literal(position.name()))
-            .values((Object[])ConversationHud.HudPosition.values())
+            .values(Arrays.asList(ConversationHud.HudPosition.values()))
             .initially(currentPosition)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Position"));
         this.addDrawableChild(this.positionButton);
@@ -56,7 +58,7 @@ public class VillageUISettingsScreen extends Screen {
         
         // Show culture toggle
         this.showCultureButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
-            .values(true, false)
+            .values(List.of(true, false))
             .initially(uiSettings.showCulture)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Culture"));
         this.addDrawableChild(this.showCultureButton);
@@ -64,7 +66,7 @@ public class VillageUISettingsScreen extends Screen {
         
         // Show profession toggle
         this.showProfessionButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
-            .values(true, false)
+            .values(List.of(true, false))
             .initially(uiSettings.showProfession)
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Profession"));
         this.addDrawableChild(this.showProfessionButton);

@@ -9,6 +9,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +24,7 @@ public class VillageDebugScreen extends Screen {
     private static final int BORDER_COLOR = 0xFF444444;
     private static final int TITLE_COLOR = 0xFFFFDD00;
     private static final int TEXT_COLOR = 0xFFFFFFFF;
+    private static final Identifier BACKGROUND_TEXTURE = new Identifier("textures/gui/options_background.png");
     
     private List<String> villageStats = new ArrayList<>();
     private int scrollOffset = 0;
@@ -134,7 +136,7 @@ public class VillageDebugScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw the default dark background using correct parameters for 1.21.4
-        context.drawBackground(BACKGROUND_TEXTURE, 0, 0, width, height);
+        renderBackgroundTexture(context);
         
         // Calculate dimensions
         int screenWidth = this.width;
