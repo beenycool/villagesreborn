@@ -68,9 +68,9 @@ public class VillagerInteractionMixin {
                             // Generate contextual greeting with thinking effect
                             VillagerFeedbackHelper.showThinkingEffect(villager);
                             
-                            // Check if player has met this villager before using NBT
-                            // Fixed: Use the player's persistent data directly instead of PLAYER_DATA field
-                            NbtCompound playerData = serverPlayer.getCustomData();
+                            // Check if player has met this villager before using Nbt
+                            // Update to use getPersistentData() for 1.21.4
+                            NbtCompound playerData = serverPlayer.getDataTracker().getPersistentData();
                             String metTag = "met_" + villager.getUuid().toString();
                             if (!playerData.contains(metTag)) {
                                 playerData.putBoolean(metTag, true);
