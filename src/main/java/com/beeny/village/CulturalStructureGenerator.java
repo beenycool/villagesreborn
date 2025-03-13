@@ -5,7 +5,6 @@ import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
-import net.minecraft.structure.Structure;
 import net.minecraft.structure.StructurePlacementData;
 import net.minecraft.util.Identifier;
 import net.minecraft.server.world.ServerWorld;
@@ -183,18 +182,18 @@ public class CulturalStructureGenerator {
         StructureTemplate modified = new StructureTemplate();
         
         // Get all blocks from the structure
-        List<Structure.StructureBlockInfo> processedBlocks = new ArrayList<>();
+        List<StructureTemplate.StructureBlockInfo> processedBlocks = new ArrayList<>();
         
         // Process each block individually
-        List<Structure.StructureBlockInfo> blocks = original.getInfosForBlock();
-        for (Structure.StructureBlockInfo info : blocks) {
+        List<StructureTemplate.StructureBlockInfo> blocks = original.getInfosForBlock();
+        for (StructureTemplate.StructureBlockInfo info : blocks) {
             BlockState currentState = info.state();
             Block currentBlock = currentState.getBlock();
 
             // Check if this block should be replaced
             if (replacements.containsKey(currentBlock)) {
                 Block replacementBlock = replacements.get(currentBlock);
-                processedBlocks.add(new Structure.StructureBlockInfo(
+                processedBlocks.add(new StructureTemplate.StructureBlockInfo(
                     info.pos(),
                     replacementBlock.getDefaultState(),
                     info.nbt() != null ? info.nbt().copy() : null
@@ -272,7 +271,7 @@ public class CulturalStructureGenerator {
         int length = 5;
         
         StructureTemplate template = new StructureTemplate();
-        List<Structure.StructureBlockInfo> blocks = new ArrayList<>();
+        List<StructureTemplate.StructureBlockInfo> blocks = new ArrayList<>();
         
         // Generate a simple building
         for (int x = 0; x < width; x++) {
@@ -289,7 +288,7 @@ public class CulturalStructureGenerator {
                     }
                     
                     Block block = getBlockForStructure(y == 0, y == height - 1);
-                    blocks.add(new Structure.StructureBlockInfo(
+                    blocks.add(new StructureTemplate.StructureBlockInfo(
                         new BlockPos(x, y, z),
                         block.getDefaultState(),
                         null

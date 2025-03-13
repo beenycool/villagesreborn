@@ -15,8 +15,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.text.Style;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
-import net.minecraft.component.type.EnchantmentComponentType;
-import net.minecraft.component.type.EnchantmentsComponent;
+import net.minecraft.item.component.EnchantmentComponentType;
+import net.minecraft.item.component.EnchantmentsComponent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
