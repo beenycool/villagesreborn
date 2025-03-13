@@ -9,13 +9,17 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.text.Style;
 import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.registry.tag.TagKey;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,11 +55,27 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments directly
-        Map<Enchantment, Integer> enchantments = new HashMap<>();
-        enchantments.put(Enchantments.SHARPNESS, 3);
-        enchantments.put(Enchantments.UNBREAKING, 2);
-        EnchantmentHelper.set(enchantments, gladius);
+        // Add enchantments directly using NBT Component
+        NbtList enchantmentsList = new NbtList();
+        
+        // Add Sharpness III
+        NbtCompound sharpness = new NbtCompound();
+        sharpness.putString("id", "minecraft:sharpness");
+        sharpness.putInt("lvl", 3);
+        enchantmentsList.add(sharpness);
+        
+        // Add Unbreaking II
+        NbtCompound unbreaking = new NbtCompound();
+        unbreaking.putString("id", "minecraft:unbreaking");
+        unbreaking.putInt("lvl", 2);
+        enchantmentsList.add(unbreaking);
+        
+        // Set enchantments to the component
+        NbtCompound enchantmentsNbt = new NbtCompound();
+        enchantmentsNbt.put("Enchantments", enchantmentsList);
+        
+        // Apply the NBT component
+        gladius.set(DataComponentTypes.ENCHANTMENTS, ItemEnchantmentsComponent.fromNbt(enchantmentsList));
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -81,11 +101,23 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments directly
-        Map<Enchantment, Integer> loricaEnchantments = new HashMap<>();
-        loricaEnchantments.put(Enchantments.PROTECTION, 3);
-        loricaEnchantments.put(Enchantments.UNBREAKING, 2);
-        EnchantmentHelper.set(loricaEnchantments, lorica);
+        // Add enchantments directly using NBT Component
+        NbtList loricaEnchantList = new NbtList();
+        
+        // Add Protection III
+        NbtCompound protection = new NbtCompound();
+        protection.putString("id", "minecraft:protection");
+        protection.putInt("lvl", 3);
+        loricaEnchantList.add(protection);
+        
+        // Add Unbreaking II
+        NbtCompound loricaUnbreaking = new NbtCompound();
+        loricaUnbreaking.putString("id", "minecraft:unbreaking");
+        loricaUnbreaking.putInt("lvl", 2);
+        loricaEnchantList.add(loricaUnbreaking);
+        
+        // Apply the NBT component
+        lorica.set(DataComponentTypes.ENCHANTMENTS, ItemEnchantmentsComponent.fromNbt(loricaEnchantList));
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -135,10 +167,17 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments directly
-        Map<Enchantment, Integer> staffEnchantments = new HashMap<>();
-        staffEnchantments.put(Enchantments.FIRE_ASPECT, 2);
-        EnchantmentHelper.set(staffEnchantments, staff);
+        // Add enchantments directly using NBT Component
+        NbtList staffEnchantList = new NbtList();
+        
+        // Add Fire Aspect II
+        NbtCompound fireAspect = new NbtCompound();
+        fireAspect.putString("id", "minecraft:fire_aspect");
+        fireAspect.putInt("lvl", 2);
+        staffEnchantList.add(fireAspect);
+        
+        // Apply the NBT component
+        staff.set(DataComponentTypes.ENCHANTMENTS, ItemEnchantmentsComponent.fromNbt(staffEnchantList));
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
@@ -268,27 +307,6 @@ public class CulturalRecipeInitializer {
         // Add potion type using custom data component
         NbtCompound customData = new NbtCompound();
         customData.putString("Potion", potionId);
-        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-    }
-    
-    /**
-     * Helper method to add status effect
-     */
-    private static void addStatusEffect(ItemStack stack, String name, byte id, int duration, byte amplifier) {
-        // Add custom name using Components
-        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
-        
-        // Add effect using custom data component
-        NbtCompound customData = new NbtCompound();
-        NbtList effects = new NbtList();
-        NbtCompound effect = new NbtCompound();
-        effect.putByte("Id", id);
-        effect.putInt("Duration", duration);
-        effect.putByte("Amplifier", amplifier);
-        effect.putBoolean("ShowParticles", false);
-        effects.add(effect);
-        customData.put("CustomPotionEffects", effects);
-        
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
     }
     
