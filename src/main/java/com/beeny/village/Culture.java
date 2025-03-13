@@ -6,6 +6,10 @@ import net.minecraft.registry.Registry;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.biome.Biome;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.world.ServerWorld;
+
 import java.util.*;
 
 public class Culture {
@@ -616,14 +620,38 @@ public class Culture {
     }
 
     public boolean isPreferredBiome(Biome biome) {
-        Identifier biomeId = RegistryKeys.BIOME.registry().getEntrySet().stream()
-            .filter(entry -> entry.getValue().equals(biome))
-            .findFirst()
-            .map(entry -> entry.getKey().getValue())
-            .orElse(null);
-            
-        if (biomeId == null) return false;
-        return preferredBiomes.contains(biomeId.getPath());
+        // In 1.21.4, registry() is no longer available
+        // We need to use a different approach to get the biome ID
+        // This assumes we have access to a ServerWorld or MinecraftServer
+        // If not, we'll need to modify this method to take one as a parameter
+        
+        // As a fallback, we can check if the biome matches any patterns in the preferred biomes set
+        String biomeName = biome.toString().toLowerCase();
+        for (String preferredBiome : preferredBiomes) {
+            if (biomeName.contains(preferredBiome.toLowerCase())) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Alternative approach that takes a ServerWorld parameter
+    public boolean isPreferredBiome(Biome biome, ServerWorld world) {
+        Optional<RegistryEntry<Biome>> biomeEntry = world.getBiome(biome);
+        
+        if (biomeEntry.isPresent()) {
+            Identifier biomeId = world.getRegistryManager()
+                .get(RegistryKeys.BIOME)
+                .getId(biome);
+                
+            if (biomeId != null) {
+                return preferredBiomes.contains(biomeId.getPath());
+            }
+        }
+        
+        // Fallback to pattern matching
+        return isPreferredBiome(biome);
     }
     
     // Method to get seasonal events

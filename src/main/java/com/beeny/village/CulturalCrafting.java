@@ -8,6 +8,9 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
+
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -144,7 +147,7 @@ public class CulturalCrafting {
         private final String id;
         private final String name;
         private final Culture.CultureType cultureType;
-        private final ItemStack itemRepresentation;
+        private ItemStack itemRepresentation;
         private final String description;
         private final int durability; // -1 for infinite durability
         private final List<ArtifactBonus> bonuses;
@@ -161,14 +164,21 @@ public class CulturalCrafting {
             this.bonuses = new ArrayList<>();
             this.additionalData = new HashMap<>();
             
-            // Add cultural NBT data to the item
-            NbtCompound nbt = this.itemRepresentation.getNbt();
-            if (nbt == null) {
-                nbt = new NbtCompound();
-            }
-            nbt.putString("cultural_artifact_id", id);
-            nbt.putString("culture_type", cultureType.getId());
-            this.itemRepresentation = this.itemRepresentation.copyWithNbt(nbt);
+            // Add cultural data using Item Components
+            // Create custom data to store artifact information
+            NbtCompound customData = itemRepresentation.getOrDefault(
+                DataComponentTypes.CUSTOM_DATA, 
+                NbtComponent.DEFAULT
+            ).copyNbt();
+            
+            customData.putString("cultural_artifact_id", id);
+            customData.putString("culture_type", cultureType.getId());
+            
+            // Apply the custom data to the item
+            this.itemRepresentation.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+            
+            // Set a custom name for the item
+            this.itemRepresentation.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
         }
         
         /**

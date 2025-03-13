@@ -5,7 +5,7 @@ import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
-import net.minecraft.structure.StructureTemplate;
+import net.minecraft.structure.Structure;
 import net.minecraft.structure.StructurePlacementData;
 import net.minecraft.util.Identifier;
 import net.minecraft.server.world.ServerWorld;
@@ -16,7 +16,7 @@ import com.beeny.ai.LLMService;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.block.BlockState;
 import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.structure.StructureTemplate;
 import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.util.math.random.Random;
@@ -45,8 +45,8 @@ public class CulturalStructureGenerator {
 
     public void generateStructure(ServerWorld world, BlockPos pos, String structureType, double prosperityFactor) {
         String basePath = String.format("structures/%s/%s", culture, structureType.toLowerCase().replace(" ", "_"));
-        // Create identifier properly for 1.21.4
-        Identifier templateId = new Identifier("villagesreborn", basePath);
+        // Create identifier correctly in 1.21.4
+        Identifier templateId = Identifier.of("villagesreborn", basePath);
 
         // Try to load base template
         StructureTemplateManager manager = world.getStructureTemplateManager();
@@ -177,33 +177,38 @@ public class CulturalStructureGenerator {
     }
 
     private StructureTemplate applyBlockReplacements(StructureTemplate original, Map<Block, Block> replacements) {
+        // In Minecraft 1.21.4, the template processing needs to be done differently
+        // as the PalettedBlockInfoList constructor is no longer accessible and 
+        // setPalettes() method no longer exists
         StructureTemplate modified = new StructureTemplate();
-        List<StructureBlockInfo> allInfos = new ArrayList<>();
         
-        // Process each palette in the original template
-        for (var palette : original.getBlockInfoLists()) {
-            for (var info : palette.getAll()) {
-                BlockState currentState = info.getState();
-                Block currentBlock = currentState.getBlock();
+        // Get all blocks from the structure
+        List<Structure.StructureBlockInfo> processedBlocks = new ArrayList<>();
+        
+        // Process each block individually
+        List<Structure.StructureBlockInfo> blocks = original.getInfosForBlock();
+        for (Structure.StructureBlockInfo info : blocks) {
+            BlockState currentState = info.state();
+            Block currentBlock = currentState.getBlock();
 
-                if (replacements.containsKey(currentBlock)) {
-                    Block replacementBlock = replacements.get(currentBlock);
-                    allInfos.add(new StructureBlockInfo(
-                        info.pos,
-                        replacementBlock.getDefaultState(),
-                        info.nbt != null ? info.nbt.copy() : null
-                    ));
-                } else {
-                    allInfos.add(info);
-                }
+            // Check if this block should be replaced
+            if (replacements.containsKey(currentBlock)) {
+                Block replacementBlock = replacements.get(currentBlock);
+                processedBlocks.add(new Structure.StructureBlockInfo(
+                    info.pos(),
+                    replacementBlock.getDefaultState(),
+                    info.nbt() != null ? info.nbt().copy() : null
+                ));
+            } else {
+                processedBlocks.add(info);
             }
         }
-
-        // Create a new palette with all the blocks
-        var palette = new StructureTemplate.PalettedBlockInfoList(allInfos);
-        modified.setPalettes(List.of(palette));
-        modified.setAuthor("VillagesReborn");
         
+        // Create a new template with the modifications
+        // In 1.21.4, we need to manually copy all the relevant data
+        modified.setAuthor("VillagesReborn");
+        modified.addBlocksFromStructure(processedBlocks, original.getSize());
+
         return modified;
     }
 
@@ -267,7 +272,7 @@ public class CulturalStructureGenerator {
         int length = 5;
         
         StructureTemplate template = new StructureTemplate();
-        List<StructureBlockInfo> blocks = new ArrayList<>();
+        List<Structure.StructureBlockInfo> blocks = new ArrayList<>();
         
         // Generate a simple building
         for (int x = 0; x < width; x++) {
@@ -284,7 +289,7 @@ public class CulturalStructureGenerator {
                     }
                     
                     Block block = getBlockForStructure(y == 0, y == height - 1);
-                    blocks.add(new StructureBlockInfo(
+                    blocks.add(new Structure.StructureBlockInfo(
                         new BlockPos(x, y, z),
                         block.getDefaultState(),
                         null
@@ -293,9 +298,10 @@ public class CulturalStructureGenerator {
             }
         }
         
-        var palette = new StructureTemplate.PalettedBlockInfoList(blocks);
-        template.setPalettes(List.of(palette));
+        // Add blocks to the template
         template.setAuthor("VillagesReborn");
+        template.addBlocksFromStructure(blocks, new Vec3i(width, height, length));
+        
         modifyAndPlaceTemplate(world, pos, template, prosperityFactor);
     }
     

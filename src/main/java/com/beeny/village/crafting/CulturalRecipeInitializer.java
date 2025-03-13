@@ -6,18 +6,22 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
-import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.text.Style;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
+import net.minecraft.component.type.EnchantmentComponentType;
+import net.minecraft.component.type.EnchantmentsComponent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Cultural recipe initialization system
@@ -42,22 +46,16 @@ public class CulturalRecipeInitializer {
     private static void registerRomanRecipes() {
         // Roman Gladius
         ItemStack gladius = new ItemStack(Items.IRON_SWORD);
-        NbtCompound nbt = new NbtCompound();
         
-        // Add display name
-        NbtCompound display = new NbtCompound();
-        // Use Text.Serialization.toJsonString with the WrapperLookup parameter
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal("Roman Gladius"), wrapperLookup));
-        nbt.put("display", display);
+        // Add custom name using Components
+        gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments
-        NbtList enchList = new NbtList();
-        addEnchantmentNbt(enchList, "minecraft:sharpness", 3);
-        addEnchantmentNbt(enchList, "minecraft:unbreaking", 2);
-        nbt.put("Enchantments", enchList);
-        
-        // Set NBT data on the item
-        gladius.setNbt(nbt);
+        // Add enchantments using Components
+        EnchantmentsComponent enchantments = EnchantmentsComponent.builder()
+            .add(Enchantments.SHARPNESS, 3)
+            .add(Enchantments.UNBREAKING, 2)
+            .build();
+        gladius.set(DataComponentTypes.ENCHANTMENTS, enchantments);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -79,19 +77,16 @@ public class CulturalRecipeInitializer {
 
         // Roman Lorica Segmentata
         ItemStack lorica = new ItemStack(Items.IRON_CHESTPLATE);
-        NbtCompound loricaNbt = new NbtCompound();
         
-        NbtCompound loricaDisplay = new NbtCompound();
-        loricaDisplay.putString("Name", Text.Serialization.toJsonString(Text.literal("Roman Lorica Segmentata"), wrapperLookup));
-        loricaNbt.put("display", loricaDisplay);
+        // Add custom name using Components
+        lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        NbtList loricaEnch = new NbtList();
-        addEnchantmentNbt(loricaEnch, "minecraft:protection", 3);
-        addEnchantmentNbt(loricaEnch, "minecraft:unbreaking", 2);
-        loricaNbt.put("Enchantments", loricaEnch);
-        
-        // Set NBT data on the item
-        lorica.setNbt(loricaNbt);
+        // Add enchantments using Components
+        EnchantmentsComponent loricaEnchantments = EnchantmentsComponent.builder()
+            .add(Enchantments.PROTECTION, 3)
+            .add(Enchantments.UNBREAKING, 2)
+            .build();
+        lorica.set(DataComponentTypes.ENCHANTMENTS, loricaEnchantments);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -137,18 +132,15 @@ public class CulturalRecipeInitializer {
 
         // Pharaoh's Staff
         ItemStack staff = new ItemStack(Items.BLAZE_ROD);
-        NbtCompound nbt = new NbtCompound();
         
-        NbtCompound display = new NbtCompound();
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal("Pharaoh's Staff"), wrapperLookup));
-        nbt.put("display", display);
+        // Add custom name using Components
+        staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        NbtList enchList = new NbtList();
-        addEnchantmentNbt(enchList, "minecraft:fire_aspect", 2);
-        nbt.put("Enchantments", enchList);
-        
-        // Set NBT data on the item
-        staff.setNbt(nbt);
+        // Add enchantments using Components
+        EnchantmentsComponent staffEnchantments = EnchantmentsComponent.builder()
+            .add(Enchantments.FIRE_ASPECT, 2)
+            .build();
+        staff.set(DataComponentTypes.ENCHANTMENTS, staffEnchantments);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
@@ -174,20 +166,17 @@ public class CulturalRecipeInitializer {
     private static void registerVictorianRecipes() {
         // Victorian Pocket Watch
         ItemStack pocketWatch = new ItemStack(Items.CLOCK);
-        NbtCompound nbt = new NbtCompound();
         
-        NbtCompound display = new NbtCompound();
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal("Victorian Pocket Watch"), wrapperLookup));
+        // Add custom name using Components
+        pocketWatch.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Victorian Pocket Watch"));
         
-        NbtList lore = new NbtList();
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
+        // Add lore using Components and custom NBT
+        NbtCompound customData = new NbtCompound();
+        NbtList loreList = new NbtList();
+        loreList.add(NbtString.of(Text.Serialization.toJsonString(
             Text.literal("A finely crafted timepiece"), wrapperLookup)));
-        display.put("Lore", lore);
-        
-        nbt.put("display", display);
-        
-        // Set NBT data on the item
-        pocketWatch.setNbt(nbt);
+        customData.put("Lore", loreList);
+        pocketWatch.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 3),
@@ -234,24 +223,24 @@ public class CulturalRecipeInitializer {
     private static void registerNYCRecipes() {
         // NYC-style Pizza
         ItemStack pizza = new ItemStack(Items.COOKED_BEEF);
-        NbtCompound nbt = new NbtCompound();
         
-        NbtCompound display = new NbtCompound();
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal("NYC-Style Pizza"), wrapperLookup));
+        // Add custom name using Components
+        pizza.set(DataComponentTypes.CUSTOM_NAME, Text.literal("NYC-Style Pizza"));
         
-        NbtList lore = new NbtList();
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
+        // Add lore and food properties using custom data component
+        NbtCompound customData = new NbtCompound();
+        
+        // Add lore
+        NbtList loreList = new NbtList();
+        loreList.add(NbtString.of(Text.Serialization.toJsonString(
             Text.literal("The best slice in town"), wrapperLookup)));
-        display.put("Lore", lore);
-        
-        nbt.put("display", display);
+        customData.put("Lore", loreList);
         
         // Add food properties
-        nbt.putInt("FoodLevel", 8);
-        nbt.putFloat("Saturation", 0.8f);
+        customData.putInt("FoodLevel", 8);
+        customData.putFloat("Saturation", 0.8f);
         
-        // Set NBT data on the item
-        pizza.setNbt(nbt);
+        pizza.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.BREAD, 1),
@@ -272,47 +261,27 @@ public class CulturalRecipeInitializer {
     }
     
     /**
-     * Helper method to add enchantment NBT
-     */
-    private static void addEnchantmentNbt(NbtList enchList, String enchantmentId, int level) {
-        NbtCompound enchTag = new NbtCompound();
-        enchTag.putString("id", enchantmentId);
-        enchTag.putInt("lvl", level);
-        enchList.add(enchTag);
-    }
-    
-    /**
      * Helper method to add potion effect
      */
     private static void addPotionEffect(ItemStack stack, String potionId, String name) {
-        NbtCompound nbt = new NbtCompound();
+        // Add custom name using Components
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
         
-        // Add potion type
-        nbt.putString("Potion", potionId);
-        
-        // Add custom name
-        NbtCompound display = new NbtCompound();
-        // Use Text.Serialization.toJsonString with the WrapperLookup parameter
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal(name), wrapperLookup));
-        nbt.put("display", display);
-        
-        // Set NBT data on the item
-        stack.setNbt(nbt);
+        // Add potion type using custom data component
+        NbtCompound customData = new NbtCompound();
+        customData.putString("Potion", potionId);
+        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
     }
     
     /**
      * Helper method to add status effect
      */
     private static void addStatusEffect(ItemStack stack, String name, byte id, int duration, byte amplifier) {
-        NbtCompound nbt = new NbtCompound();
+        // Add custom name using Components
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
         
-        // Add custom name
-        NbtCompound display = new NbtCompound();
-        // Use Text.Serialization.toJsonString with the WrapperLookup parameter
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal(name), wrapperLookup));
-        nbt.put("display", display);
-        
-        // Add effect
+        // Add effect using custom data component
+        NbtCompound customData = new NbtCompound();
         NbtList effects = new NbtList();
         NbtCompound effect = new NbtCompound();
         effect.putByte("Id", id);
@@ -320,25 +289,20 @@ public class CulturalRecipeInitializer {
         effect.putByte("Amplifier", amplifier);
         effect.putBoolean("ShowParticles", false);
         effects.add(effect);
-        nbt.put("CustomPotionEffects", effects);
+        customData.put("CustomPotionEffects", effects);
         
-        // Set NBT data on the item
-        stack.setNbt(nbt);
+        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
     }
     
     /**
      * Helper method to add firework effect
      */
     private static void addFireworkEffect(ItemStack stack, String name, byte flight, int[] colors) {
-        NbtCompound nbt = new NbtCompound();
+        // Add custom name using Components
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
         
-        // Add custom name
-        NbtCompound display = new NbtCompound();
-        // Use Text.Serialization.toJsonString with the WrapperLookup parameter
-        display.putString("Name", Text.Serialization.toJsonString(Text.literal(name), wrapperLookup));
-        nbt.put("display", display);
-        
-        // Add firework data
+        // Add firework data using custom data component
+        NbtCompound customData = new NbtCompound();
         NbtCompound fireworks = new NbtCompound();
         fireworks.putByte("Flight", flight);
         
@@ -349,9 +313,8 @@ public class CulturalRecipeInitializer {
         explosions.add(explosion);
         
         fireworks.put("Explosions", explosions);
-        nbt.put("Fireworks", fireworks);
+        customData.put("Fireworks", fireworks);
         
-        // Set NBT data on the item
-        stack.setNbt(nbt);
+        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
     }
 }

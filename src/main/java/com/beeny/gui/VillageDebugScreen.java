@@ -7,6 +7,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.render.GameRenderer;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.Identifier;
@@ -135,8 +136,8 @@ public class VillageDebugScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Draw the default dark background using correct parameters for 1.21.4
-        context.drawTexture(id -> net.minecraft.client.render.RenderLayer.getGuiTexture(id), BACKGROUND_TEXTURE, 0, 0, 0, 0, width, height, 32, 32);
+        // In 1.21.4, the correct way to get a GUI texture render layer is using GameRenderer
+        context.drawTexture(GameRenderer::getPositionTexProgram, BACKGROUND_TEXTURE, 0, 0, 0, 0, width, height, 32, 32);
         
         // Calculate dimensions
         int screenWidth = this.width;

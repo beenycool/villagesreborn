@@ -15,6 +15,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -294,18 +296,15 @@ public class CulturalArtifactSystem {
         // Pick a random artifact
         ArtifactDefinition selectedArtifact = rarityArtifacts.get(random.nextInt(rarityArtifacts.size()));
         
-        // Create the artifact item
-        ItemStack artifactItem = new ItemStack(selectedArtifact.getBaseItem());
-        
-        // Create NBT compound for the item
-        NbtCompound nbt = new NbtCompound();
-        NbtCompound display = new NbtCompound();
+        // Create the artifact item with the selected base item
+        ItemStack result = new ItemStack(selectedArtifact.getBaseItem());
         
         // Set custom name with appropriate color
-        display.putString("Name", Text.Serialization.toJsonString(
-            Text.literal(selectedArtifact.getName())
-                .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())), 
-            wrapperLookup));
+        result.set(DataComponentTypes.CUSTOM_NAME, Text.literal(selectedArtifact.getName())
+            .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())));
+        
+        // Create custom data for lore and artifact properties
+        NbtCompound customData = new NbtCompound();
         
         // Create lore list
         NbtList lore = new NbtList();
@@ -339,19 +338,18 @@ public class CulturalArtifactSystem {
                 .setStyle(Style.EMPTY.withColor(Formatting.AQUA)), 
             wrapperLookup)));
         
-        display.put("Lore", lore);
-        nbt.put("display", display);
-
+        // Add lore to custom data
+        customData.put("Lore", lore);
+        
         // Add hidden artifact data
         NbtCompound artifactData = new NbtCompound();
         artifactData.putString("id", selectedArtifact.getId());
         artifactData.putString("culture", selectedArtifact.getCulture());
         artifactData.putString("rarity", selectedArtifact.getRarity().name());
-        nbt.put("CulturalArtifact", artifactData);
+        customData.put("CulturalArtifact", artifactData);
 
-        // Set the NBT on the item using the new API
-        ItemStack result = ItemStack.fromNbt(nbt);
-        result.setItem(selectedArtifact.getBaseItem());
+        // Apply the custom data to the item stack
+        result.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
         
         // Register this artifact with the player
         registerArtifact(player.getUuid(), selectedArtifact.getId());
