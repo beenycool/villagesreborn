@@ -1,5 +1,6 @@
 package com.beeny.village;
 
+import net.minecraft.nbt.NbtList;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
@@ -8,21 +9,12 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.potion.PotionUtil;
+import net.minecraft.item.PotionItem;
+import net.minecraft.nbt.NbtCompound;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.server.command.ServerCommandSource;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.server.command.ServerCommandSource;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.server.command.ServerCommandSource;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.server.command.ServerCommandSource;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.server.command.ServerCommandSource;
-import com.mojang.brigadier.CommandDispatcher;
-import net.minecraft.server.command.ServerCommandSource;
+
 import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.potion.Potions;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -36,15 +28,17 @@ public class VillageEvent {
             if (player instanceof ServerPlayerEntity serverPlayer) {
                 if (culture.getType().toString().startsWith("infernal_")) {
                     if (Random.create().nextFloat() < 0.1f) { // 10% chance for permanent reward
-                        serverPlayer.getServer().getCommandManager().execute(
+                        serverPlayer.getServer().getCommandManager().executeWithPrefix(
                             serverPlayer.getCommandSource(),
-                            "/attribute @s minecraft:generic.nether_fire_resistance base set 1"
+                            "attribute @s minecraft:generic.nether_fire_resistance base set 1"
                         ); // Hypothetical custom attribute
-                        serverPlayer.sendMessage(Text.of("§6You’ve gained Nether Affinity! Immune to fire in the Nether."), false);
+                        serverPlayer.sendMessage(Text.of("§6You've gained Nether Affinity! Immune to fire in the Nether."), false);
                     } else {
-                        ItemStack potion = new ItemStack(Items.POTION);
-                        PotionUtil.setPotion(potion, Potions.FIRE_RESISTANCE);
-                        serverPlayer.giveItemStack(potion);
+                        // Give fire resistance potion using command
+                        serverPlayer.getServer().getCommandManager().executeWithPrefix(
+                            serverPlayer.getCommandSource(),
+                            "give " + serverPlayer.getName().getString() + " potion{CustomPotionEffects:[{Id:12,Amplifier:0,Duration:3600}]}"
+                        );
                     }
                 }
             }

@@ -8,6 +8,7 @@ import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -34,12 +35,19 @@ public class CulturalArtifactSystem {
     // Random for generating artifacts
     private final Random random = new Random();
     
+    // WrapperLookup for NBT serialization
+    private WrapperLookup wrapperLookup = null;
+    
     private CulturalArtifactSystem() {
         initializeArtifactDefinitions();
     }
     
     public static CulturalArtifactSystem getInstance() {
         return INSTANCE;
+    }
+    
+    public void setWrapperLookup(WrapperLookup lookup) {
+        this.wrapperLookup = lookup;
     }
     
     /**
@@ -241,7 +249,7 @@ public class CulturalArtifactSystem {
         // Check if culture has artifacts
         List<ArtifactDefinition> availableArtifacts = artifactDefinitions.get(culture.toLowerCase());
         if (availableArtifacts == null || availableArtifacts.isEmpty()) {
-            return null;
+            return new ItemStack(Items.AIR);
         }
         
         // Determine rarity based on event type and player reputation
@@ -289,29 +297,47 @@ public class CulturalArtifactSystem {
         // Create the artifact item
         ItemStack artifactItem = new ItemStack(selectedArtifact.getBaseItem());
         
-        // Set custom name with appropriate color
-        artifactItem.getOrCreateSubNbt("display").putString("Name", Text.Serialization.toJsonString(Text.literal(selectedArtifact.getName()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor()))));
-        
-        // Create new NBT compound
+        // Create NBT compound for the item
         NbtCompound nbt = new NbtCompound();
         NbtCompound display = new NbtCompound();
+        
+        // Set custom name with appropriate color
+        display.putString("Name", Text.Serialization.toJsonString(
+            Text.literal(selectedArtifact.getName())
+                .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())), 
+            wrapperLookup));
+        
+        // Create lore list
         NbtList lore = new NbtList();
-
-        // Create a WrapperLookup instance for serialization
-        net.minecraft.registry.RegistryWrapper.WrapperLookup wrapperLookup = null;
         
         // Culture info
-        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Culture: " + capitalize(culture)).setStyle(Style.EMPTY.withColor(Formatting.GRAY)), wrapperLookup)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(
+            Text.literal("Culture: " + capitalize(culture))
+                .setStyle(Style.EMPTY.withColor(Formatting.GRAY)), 
+            wrapperLookup)));
         
         // Description
-        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal(selectedArtifact.getDescription()).setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), wrapperLookup)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(
+            Text.literal(selectedArtifact.getDescription())
+                .setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), 
+            wrapperLookup)));
         
         // Rarity
-        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Rarity: " + selectedArtifact.getRarity().name()).setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())), wrapperLookup)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(
+            Text.literal("Rarity: " + selectedArtifact.getRarity().name())
+                .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())), 
+            wrapperLookup)));
         
         // Values
-        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus()).setStyle(Style.EMPTY.withColor(Formatting.GREEN)), wrapperLookup)));
-        lore.add(NbtString.of(Text.Serialization.toJsonString(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue()).setStyle(Style.EMPTY.withColor(Formatting.AQUA)), wrapperLookup)));
+        lore.add(NbtString.of(Text.Serialization.toJsonString(
+            Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus())
+                .setStyle(Style.EMPTY.withColor(Formatting.GREEN)), 
+            wrapperLookup)));
+            
+        lore.add(NbtString.of(Text.Serialization.toJsonString(
+            Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue())
+                .setStyle(Style.EMPTY.withColor(Formatting.AQUA)), 
+            wrapperLookup)));
         
         display.put("Lore", lore);
         nbt.put("display", display);
@@ -323,15 +349,14 @@ public class CulturalArtifactSystem {
         artifactData.putString("rarity", selectedArtifact.getRarity().name());
         nbt.put("CulturalArtifact", artifactData);
 
-        // Set the NBT on the item
-        ItemStack newItem = artifactItem.copy();
-        newItem.getOrCreateNbt().copyFrom(nbt);
-        artifactItem = newItem;
+        // Set the NBT on the item using the new API
+        ItemStack result = ItemStack.fromNbt(nbt);
+        result.setItem(selectedArtifact.getBaseItem());
         
         // Register this artifact with the player
         registerArtifact(player.getUuid(), selectedArtifact.getId());
         
-        return artifactItem;
+        return result;
     }
     
     /**

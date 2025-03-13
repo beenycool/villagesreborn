@@ -165,10 +165,9 @@ public class CulturalCraftingStation {
         }
         
         @Override
-        public NbtCompound writeNbt(NbtCompound nbt, WrapperLookup lookup) {
+        public void writeNbt(NbtCompound nbt, WrapperLookup lookup) {
             super.writeNbt(nbt, lookup);
             nbt.putString("StationType", stationType.name());
-            return nbt;
         }
         
         @Override
