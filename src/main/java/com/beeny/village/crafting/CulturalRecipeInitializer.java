@@ -19,7 +19,9 @@ import net.minecraft.enchantment.EnchantmentHelper;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -49,12 +51,11 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments using Components
-        EnchantmentsComponent enchantments = EnchantmentsComponent.builder()
-            .add(Enchantments.SHARPNESS, 3)
-            .add(Enchantments.UNBREAKING, 2)
-            .build();
-        gladius.set(DataComponentTypes.ENCHANTMENTS, enchantments);
+        // Add enchantments directly
+        Map<Enchantment, Integer> enchantments = new HashMap<>();
+        enchantments.put(Enchantments.SHARPNESS, 3);
+        enchantments.put(Enchantments.UNBREAKING, 2);
+        EnchantmentHelper.set(enchantments, gladius);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -80,12 +81,11 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments using Components
-        EnchantmentsComponent loricaEnchantments = EnchantmentsComponent.builder()
-            .add(Enchantments.PROTECTION, 3)
-            .add(Enchantments.UNBREAKING, 2)
-            .build();
-        lorica.set(DataComponentTypes.ENCHANTMENTS, loricaEnchantments);
+        // Add enchantments directly
+        Map<Enchantment, Integer> loricaEnchantments = new HashMap<>();
+        loricaEnchantments.put(Enchantments.PROTECTION, 3);
+        loricaEnchantments.put(Enchantments.UNBREAKING, 2);
+        EnchantmentHelper.set(loricaEnchantments, lorica);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -135,11 +135,10 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments using Components
-        EnchantmentsComponent staffEnchantments = EnchantmentsComponent.builder()
-            .add(Enchantments.FIRE_ASPECT, 2)
-            .build();
-        staff.set(DataComponentTypes.ENCHANTMENTS, staffEnchantments);
+        // Add enchantments directly
+        Map<Enchantment, Integer> staffEnchantments = new HashMap<>();
+        staffEnchantments.put(Enchantments.FIRE_ASPECT, 2);
+        EnchantmentHelper.set(staffEnchantments, staff);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
