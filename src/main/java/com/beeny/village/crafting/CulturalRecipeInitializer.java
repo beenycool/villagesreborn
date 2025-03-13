@@ -6,6 +6,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.registry.Registry;
@@ -56,7 +57,7 @@ public class CulturalRecipeInitializer {
         nbt.put("Enchantments", enchList);
         
         // Set NBT data on the item
-        gladius = ItemStack.fromNbt(nbt);
+        gladius.setNbt(nbt);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -90,7 +91,7 @@ public class CulturalRecipeInitializer {
         loricaNbt.put("Enchantments", loricaEnch);
         
         // Set NBT data on the item
-        lorica = ItemStack.fromNbt(loricaNbt);
+        lorica.setNbt(loricaNbt);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -147,7 +148,7 @@ public class CulturalRecipeInitializer {
         nbt.put("Enchantments", enchList);
         
         // Set NBT data on the item
-        staff = ItemStack.fromNbt(nbt);
+        staff.setNbt(nbt);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
@@ -186,7 +187,7 @@ public class CulturalRecipeInitializer {
         nbt.put("display", display);
         
         // Set NBT data on the item
-        pocketWatch = ItemStack.fromNbt(nbt);
+        pocketWatch.setNbt(nbt);
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 3),
@@ -250,7 +251,7 @@ public class CulturalRecipeInitializer {
         nbt.putFloat("Saturation", 0.8f);
         
         // Set NBT data on the item
-        pizza = ItemStack.fromNbt(nbt);
+        pizza.setNbt(nbt);
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.BREAD, 1),
@@ -296,9 +297,7 @@ public class CulturalRecipeInitializer {
         nbt.put("display", display);
         
         // Set NBT data on the item
-        ItemStack newStack = ItemStack.fromNbt(nbt);
-        stack.setCount(newStack.getCount());
-        stack.copyNbtFrom(newStack);
+        stack.setNbt(nbt);
     }
     
     /**
@@ -324,9 +323,7 @@ public class CulturalRecipeInitializer {
         nbt.put("CustomPotionEffects", effects);
         
         // Set NBT data on the item
-        ItemStack newStack = ItemStack.fromNbt(nbt);
-        stack.setCount(newStack.getCount());
-        stack.copyNbtFrom(newStack);
+        stack.setNbt(nbt);
     }
     
     /**
@@ -355,8 +352,6 @@ public class CulturalRecipeInitializer {
         nbt.put("Fireworks", fireworks);
         
         // Set NBT data on the item
-        ItemStack newStack = ItemStack.fromNbt(nbt);
-        stack.setCount(newStack.getCount());
-        stack.copyNbtFrom(newStack);
+        stack.setNbt(nbt);
     }
 }
