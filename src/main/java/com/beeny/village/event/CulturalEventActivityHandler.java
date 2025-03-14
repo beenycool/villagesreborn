@@ -15,6 +15,8 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.text.MutableText;
 
 import java.util.*;
 
@@ -403,54 +405,54 @@ public class CulturalEventActivityHandler {
             case "roman" -> {
                 if (activity.equals("bathhouse")) {
                     reward = new ItemStack(Items.HONEY_BOTTLE);
-                    reward.setCustomName(Text.of("Roman Bath Essence"));
+                    setCustomItemName(reward, "Roman Bath Essence");
                 } else if (activity.equals("ritual")) {
                     reward = new ItemStack(Items.GOLD_NUGGET, 3);
-                    reward.setCustomName(Text.of("Roman Ceremonial Coin"));
+                    setCustomItemName(reward, "Roman Ceremonial Coin");
                 } else {
                     reward = new ItemStack(Items.BRICK, 4);
-                    reward.setCustomName(Text.of("Roman Architectural Fragment"));
+                    setCustomItemName(reward, "Roman Architectural Fragment");
                 }
             }
             case "egyptian" -> {
                 if (activity.equals("ritual")) {
                     reward = new ItemStack(Items.GOLD_NUGGET, 3);
-                    reward.setCustomName(Text.of("Egyptian Scarab Token"));
+                    setCustomItemName(reward, "Egyptian Scarab Token");
                 } else if (activity.equals("craft")) {
                     reward = new ItemStack(Items.PAPER, 2);
-                    reward.setCustomName(Text.of("Egyptian Papyrus"));
+                    setCustomItemName(reward, "Egyptian Papyrus");
                 } else {
                     reward = new ItemStack(Items.SAND, 4);
-                    reward.setCustomName(Text.of("Egyptian Fine Sand"));
+                    setCustomItemName(reward, "Egyptian Fine Sand");
                 }
             }
             case "victorian" -> {
                 if (activity.equals("trade")) {
                     reward = new ItemStack(Items.IRON_NUGGET, 5);
-                    reward.setCustomName(Text.of("Victorian Trade Coin"));
+                    setCustomItemName(reward, "Victorian Trade Coin");
                 } else if (activity.equals("craft")) {
                     reward = new ItemStack(Items.REDSTONE, 3);
-                    reward.setCustomName(Text.of("Victorian Mechanical Parts"));
+                    setCustomItemName(reward, "Victorian Mechanical Parts");
                 } else {
                     reward = new ItemStack(Items.PAPER, 2);
-                    reward.setCustomName(Text.of("Victorian Certificate"));
+                    setCustomItemName(reward, "Victorian Certificate");
                 }
             }
             case "nyc" -> {
                 if (activity.equals("dance")) {
                     reward = new ItemStack(Items.NOTE_BLOCK);
-                    reward.setCustomName(Text.of("NYC Music Box"));
+                    setCustomItemName(reward, "NYC Music Box");
                 } else if (activity.equals("trade")) {
                     reward = new ItemStack(Items.EMERALD, 1);
-                    reward.setCustomName(Text.of("NYC Dollar"));
+                    setCustomItemName(reward, "NYC Dollar");
                 } else {
                     reward = new ItemStack(Items.COOKIE, 4);
-                    reward.setCustomName(Text.of("NYC Cookie"));
+                    setCustomItemName(reward, "NYC Cookie");
                 }
             }
             default -> {
                 reward = new ItemStack(Items.GOLD_NUGGET);
-                reward.setCustomName(Text.of("Cultural Token"));
+                    setCustomItemName(reward, "Cultural Token");
             }
         }
         
@@ -477,6 +479,14 @@ public class CulturalEventActivityHandler {
     /**
      * Get the description of an activity
      */
+    /**
+     * Helper method to set custom name on an ItemStack
+     */
+    private void setCustomItemName(ItemStack stack, String name) {
+        Text customName = Text.literal(name);
+        stack.setCustomName(customName);
+    }
+
     public String getActivityDescription(String activity) {
         return activityDescriptions.getOrDefault(activity, activity);
     }

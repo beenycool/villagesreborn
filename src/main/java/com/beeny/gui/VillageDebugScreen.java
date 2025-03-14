@@ -1,4 +1,4 @@
-package com.beeny.gui;
+﻿﻿package com.beeny.gui;
 
 import com.beeny.village.SpawnRegion;
 import com.beeny.village.VillagerAI;
@@ -7,7 +7,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.Identifier;
@@ -16,10 +16,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Debug screen for Villages Reborn mod.
- * Shows detailed information about villages and villagers.
- */
 public class VillageDebugScreen extends Screen {
     private static final int BACKGROUND_COLOR = 0x88000000;
     private static final int BORDER_COLOR = 0xFF444444;
@@ -56,7 +52,6 @@ public class VillageDebugScreen extends Screen {
         BlockPos playerPos = client.player.getBlockPos();
         villageStats.add("Player Position: " + playerPos.getX() + ", " + playerPos.getY() + ", " + playerPos.getZ());
         
-        // Add server-side information (this will be empty in single-player preview)
         villageStats.add("");
         villageStats.add("=== Village Regions ===");
         
@@ -69,7 +64,7 @@ public class VillageDebugScreen extends Screen {
                 double distance = Math.sqrt(center.getSquaredDistance(playerPos));
                 villageStats.add(String.format(
                     "Village: %s (at %d,%d,%d, radius: %d, distance: %.1f)",
-                    region.getCulture(), center.getX(), center.getY(), center.getZ(), 
+                    region.getCulture(), center.getX(), center.getY(), center.getZ(),
                     region.getRadius(), distance
                 ));
                 
@@ -78,13 +73,12 @@ public class VillageDebugScreen extends Screen {
                     villageStats.add(String.format("  Prosperity: %d, Safety: %d", stats.prosperity, stats.safety));
                 }
                 
-                villageStats.add(String.format("  Structures: %d, POIs: %d", 
+                villageStats.add(String.format("  Structures: %d, POIs: %d",
                     region.getCulturalStructures().size(),
                     region.getPointsOfInterest().size()));
             }
         }
         
-        // Add villager information
         villageStats.add("");
         villageStats.add("=== Active Villagers ===");
         Collection<VillagerAI> villagers = VillagerManager.getInstance().getActiveVillagers();
@@ -108,11 +102,10 @@ public class VillageDebugScreen extends Screen {
             }
         }
         
-        // Add cultural event information
         villageStats.add("");
         villageStats.add("=== Current Cultural Events ===");
         List<VillagerManager.CulturalEvent> events = VillagerManager.getInstance()
-            .getCurrentEvents(playerPos, null); // Changed to only pass null as server world from client is not possible
+            .getCurrentEvents(playerPos, null);
             
         if (events.isEmpty()) {
             villageStats.add("No active cultural events");
@@ -122,12 +115,10 @@ public class VillageDebugScreen extends Screen {
             }
         }
         
-        // Add performance metrics
         villageStats.add("");
         villageStats.add("=== Performance Metrics ===");
         villageStats.add(String.format("FPS: %d", MinecraftClient.getInstance().getCurrentFps()));
         
-        // Add controls help
         villageStats.add("");
         villageStats.add("=== Controls ===");
         villageStats.add("Scroll: Mouse Wheel / Arrow Keys");
@@ -136,10 +127,8 @@ public class VillageDebugScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // In 1.21.4, the correct way to get a GUI texture render layer is using GameRenderer
-        context.drawTexture(GameRenderer::getPositionTexProgram, BACKGROUND_TEXTURE, 0, 0, 0, 0, width, height, 32, 32);
+        context.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
         
-        // Calculate dimensions
         int screenWidth = this.width;
         int screenHeight = this.height;
         int panelWidth = Math.min(600, screenWidth - 40);
@@ -147,19 +136,16 @@ public class VillageDebugScreen extends Screen {
         int panelX = (screenWidth - panelWidth) / 2;
         int panelY = (screenHeight - panelHeight) / 2;
         
-        // Draw panel background with border
         context.fill(panelX - 2, panelY - 2, panelX + panelWidth + 2, panelY + panelHeight + 2, BORDER_COLOR);
         context.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, BACKGROUND_COLOR);
         
-        // Draw title
         TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-        context.drawTextWithShadow(textRenderer, 
-            "Villages Reborn Debug", 
-            panelX + (panelWidth - textRenderer.getWidth("Villages Reborn Debug")) / 2, 
-            panelY + 10, 
+        context.drawTextWithShadow(textRenderer,
+            "Villages Reborn Debug",
+            panelX + (panelWidth - textRenderer.getWidth("Villages Reborn Debug")) / 2,
+            panelY + 10,
             TITLE_COLOR);
         
-        // Draw stats content with scrolling
         int lineY = panelY + 30;
         int lineHeight = 12;
         int visibleLines = (panelHeight - 40) / lineHeight;
@@ -171,13 +157,11 @@ public class VillageDebugScreen extends Screen {
             lineY += lineHeight;
         }
         
-        // Draw scroll indicator if needed
         if (villageStats.size() > visibleLines) {
             int scrollBarHeight = panelHeight - 40;
             int scrollThumbHeight = Math.max(20, scrollBarHeight * visibleLines / villageStats.size());
             int scrollThumbY = panelY + 20 + (scrollBarHeight - scrollThumbHeight) * scrollOffset / maxScroll;
             
-            // Draw scroll track
             context.fill(
                 panelX + panelWidth - 12,
                 panelY + 20,
@@ -186,7 +170,6 @@ public class VillageDebugScreen extends Screen {
                 0x44FFFFFF
             );
             
-            // Draw scroll thumb
             context.fill(
                 panelX + panelWidth - 12,
                 scrollThumbY,
@@ -210,13 +193,12 @@ public class VillageDebugScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // Handle arrow keys for scrolling
-        if (keyCode == 264) { // Down arrow
+        if (keyCode == 264) {
             if (maxScroll > 0) {
                 scrollOffset = Math.min(maxScroll, scrollOffset + 1);
                 return true;
             }
-        } else if (keyCode == 265) { // Up arrow
+        } else if (keyCode == 265) {
             scrollOffset = Math.max(0, scrollOffset - 1);
             return true;
         }
@@ -228,13 +210,11 @@ public class VillageDebugScreen extends Screen {
     public void tick() {
         super.tick();
         
-        // Update stats periodically - using frame count instead of tick counter
         MinecraftClient client = MinecraftClient.getInstance();
         if (client != null && client.world != null && client.world.getTime() % 20 == 0) {
             updateVillageStats();
             maxScroll = Math.max(0, villageStats.size() - (height / 12));
             
-            // Keep scrollOffset within bounds after update
             if (maxScroll > 0 && scrollOffset > maxScroll) {
                 scrollOffset = maxScroll;
             }
@@ -243,7 +223,6 @@ public class VillageDebugScreen extends Screen {
     
     @Override
     public boolean shouldPause() {
-        // Don't pause the game when debug screen is open
         return false;
     }
 }
