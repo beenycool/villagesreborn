@@ -58,7 +58,7 @@ public class EventNotificationManager {
      * @param client The Minecraft client
      * @param tickDelta The partial tick
      */
-    public void render(DrawContext context, MinecraftClient client, float tickDelta) {
+    public void render(DrawContext context, MinecraftClient client, net.minecraft.client.render.RenderTickCounter tickDelta) {
         if (activeNotifications.isEmpty()) {
             return;
         }

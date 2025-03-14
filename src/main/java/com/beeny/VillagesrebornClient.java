@@ -115,7 +115,7 @@ public class VillagesrebornClient implements ClientModInitializer {
                 
                 // Render event notifications
                 // Fix: Pass tickDelta directly as it's already a float in the callback
-                eventManager.render(context, client, tickDelta);
+                eventManager.render(context, client, tickDelta.tickDelta);
                 
                 // Render conversation indicator
                 conversationHud.render(context, client);
