@@ -19,8 +19,6 @@ import net.minecraft.structure.StructureTemplate;
 import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.world.ServerWorldAccess;
 import net.minecraft.util.math.random.Random;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
