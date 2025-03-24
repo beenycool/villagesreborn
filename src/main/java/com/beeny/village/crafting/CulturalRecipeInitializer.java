@@ -55,25 +55,11 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments directly using NBT
-        NbtList enchantmentsList = new NbtList();
-        
-        // Add Sharpness III
-        NbtCompound sharpness = new NbtCompound();
-        sharpness.putString("id", "minecraft:sharpness");
-        sharpness.putInt("lvl", 3);
-        enchantmentsList.add(sharpness);
-        
-        // Add Unbreaking II
-        NbtCompound unbreaking = new NbtCompound();
-        unbreaking.putString("id", "minecraft:unbreaking");
-        unbreaking.putInt("lvl", 2);
-        enchantmentsList.add(unbreaking);
-        
-        // Set enchantments using NBT
-        NbtCompound nbt = new NbtCompound();
-        nbt.put("Enchantments", enchantmentsList);
-        gladius.setNbt(nbt);
+        // Add enchantments using EnchantmentHelper
+        Map<Enchantment, Integer> enchants = new HashMap<>();
+        enchants.put(Enchantments.SHARPNESS.get(), 3);
+        enchants.put(Enchantments.UNBREAKING.get(), 2);
+        EnchantmentHelper.set(enchants, gladius);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -99,16 +85,26 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments directly using NBT
-        NbtList loricaEnchantList = new NbtList();
-        
-        // Add Protection III
-        NbtCompound protection = new NbtCompound();
-        protection.putString("id", "minecraft:protection");
-        protection.putInt("lvl", 3);
-        loricaEnchantList.add(protection);
-        
-        // Add Unbreaking II
+        // Add enchantments using EnchantmentHelper
+        enchants = new HashMap<>();
+        enchants.put(Enchantments.PROTECTION.get(), 3);
+        enchants.put(Enchantments.UNBREAKING.get(), 2);
+        EnchantmentHelper.set(enchants, lorica);
+
+        ingredients = Arrays.asList(
+            new ItemStack(Items.IRON_INGOT, 7),
+            new ItemStack(Items.LEATHER, 2)
+        );
+
+        CulturalCraftingStation.RecipeRegistry.registerRecipe(
+            new CulturalCraftingStation.CulturalRecipe(
+                "roman_lorica",
+                ingredients,
+                lorica,
+                CulturalCraftingStation.StationType.ROMAN_FORGE,
+                120,
+                250
+            )
         );
     }
     
@@ -143,12 +139,10 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments
-        Map<Enchantment, Integer> enchantments = new HashMap<>();
-        enchantments.put(Enchantments.FIRE_ASPECT, 2);
-        
-        // Apply enchantments using EnchantmentHelper
-        EnchantmentHelper.set(enchantments, staff);
+        // Add enchantments using EnchantmentHelper
+        enchants = new HashMap<>();
+        enchants.put(Enchantments.FIRE_ASPECT.get(), 2);
+        EnchantmentHelper.set(enchants, staff);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),

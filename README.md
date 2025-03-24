@@ -1,15 +1,16 @@
 # Villages Reborn
 
-A comprehensive village overhaul mod for Minecraft 1.21.4 that enhances villager AI and introduces cultural variations to villages.
+Villages Reborn is a Minecraft mod that breathes new life into your villages! Explore culturally rich and diverse communities with villagers that have unique personalities and relationships.
 
-## Features
+## Key Features:
 
-- **Enhanced Villager AI**: Villagers with personalities, relationships, and intelligent behaviors
-- **Cultural Villages**: Different village themes including Roman, Egyptian, Victorian, and NYC-style
-- **Procedural Generation**: Culturally appropriate structures and decorations
-- **Dynamic Events**: Village-wide events and festivals based on culture
-- **Villager Crafting System**: Special crafting recipes accessible through villagers
-- **Advanced Social Systems**: Villagers form relationships, remember interactions, and have emotions
+- **Explore Diverse Cultures**: Discover villages inspired by Roman, Egyptian, Victorian, and NYC themes. Each village boasts unique architecture, decorations, and cultural elements.
+- **Meet Intelligent Villagers**: Interact with villagers powered by advanced AI. They have distinct personalities, form relationships, and remember past interactions.
+- **Experience Dynamic Events**: Immerse yourself in village-specific events and festivals that reflect the unique culture of each community.
+- **Master the Crafting System**: Unlock special crafting recipes through your relationships with villagers, adding a new dimension to your gameplay.
+- **Witness Advanced Social Dynamics**: Observe how villagers form bonds, develop emotions, and create a thriving social ecosystem.
+- **AI-Powered Villager Behavior**: The mod leverages Large Language Models (LLMs) to drive advanced villager behaviors, bringing unprecedented realism to your Minecraft world.
+- **Optimized Performance**: The mod analyzes your system specifications to optimize AI performance, ensuring a smooth and enjoyable experience.
 
 ## Install
 
@@ -35,6 +36,10 @@ For developers looking to contribute or extend the mod, see the [Developer Guide
 ## Credits
 
 Developed by Beeny
+
+## Contributing
+
+We welcome contributions to Villages Reborn! If you're interested in helping improve the mod, please see our [Contribution Guidelines](CONTRIBUTING.md) for more information.
 
 ## License
 
