@@ -27,6 +27,18 @@ public class SystemSpecs {
     private final int performanceTier;
     private final Map<String, Integer> aiCallQuotas = new HashMap<>();
     private final Map<String, Long> lastAiCalls = new HashMap<>();
+    
+    // Performance monitoring
+    private double cpuUsage;
+    private double memoryUsage;
+    private long lastUpdateTime;
+    private static final long MONITORING_INTERVAL = 5000; // 5 seconds
+    
+    // AI complexity settings
+    private static int aiComplexityLevel = 2; // 0: Basic, 1: Moderate, 2: Full
+    private static boolean adaptiveScaling = true;
+    private static final double HIGH_LOAD_THRESHOLD = 0.85; // 85% resource usage
+    private static final double LOW_LOAD_THRESHOLD = 0.60; // 60% resource usage
 
     public SystemSpecs() {
         this.availableProcessors = Runtime.getRuntime().availableProcessors();
@@ -151,6 +163,59 @@ public class SystemSpecs {
                renderer.contains("RX 5") ||
                renderer.contains("Iris") ||
                renderer.contains("Vega");
+    }
+
+    // Performance monitoring methods
+    public void updatePerformanceMetrics() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastUpdateTime < MONITORING_INTERVAL) {
+            return;
+        }
+        
+        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        cpuUsage = osBean.getCpuLoad();
+        memoryUsage = 1.0 - (osBean.getFreeMemorySize() / (double) osBean.getTotalMemorySize());
+        lastUpdateTime = currentTime;
+        
+        if (adaptiveScaling) {
+            adjustAIComplexity();
+        }
+    }
+
+    private void adjustAIComplexity() {
+        double resourceUsage = Math.max(cpuUsage, memoryUsage);
+        
+        if (resourceUsage > HIGH_LOAD_THRESHOLD && aiComplexityLevel > 0) {
+            aiComplexityLevel--;
+            LOGGER.info("Reducing AI complexity to level {}", aiComplexityLevel);
+        } else if (resourceUsage < LOW_LOAD_THRESHOLD && aiComplexityLevel < 2) {
+            aiComplexityLevel++;
+            LOGGER.info("Increasing AI complexity to level {}", aiComplexityLevel);
+        }
+    }
+
+    public static void setAIComplexity(int level) {
+        aiComplexityLevel = Math.max(0, Math.min(2, level));
+    }
+
+    public static void setAdaptiveScaling(boolean enabled) {
+        adaptiveScaling = enabled;
+    }
+
+    public int getAIComplexity() {
+        return aiComplexityLevel;
+    }
+
+    public boolean isAdaptiveScalingEnabled() {
+        return adaptiveScaling;
+    }
+
+    public double getCpuUsage() {
+        return cpuUsage;
+    }
+
+    public double getMemoryUsage() {
+        return memoryUsage;
     }
 
     private int calculatePerformanceTier() {

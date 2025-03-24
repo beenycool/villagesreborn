@@ -17,14 +17,19 @@ public class VillagesRebornSettingsScreen extends Screen {
     private final Screen parent;
     private final GameOptions gameOptions;
     private final LLMConfig llmConfig;
+    private final SystemSpecs systemSpecs;
     private TextFieldWidget apiKeyField;
     private TextFieldWidget endpointField;
+    private ButtonWidget adaptiveScalingButton;
+    private ButtonWidget aiComplexityButton;
 
     public VillagesRebornSettingsScreen(Screen parent, GameOptions gameOptions, LLMConfig llmConfig) {
         super(Text.literal("Villages Reborn Settings"));
         this.parent = parent;
         this.gameOptions = gameOptions;
         this.llmConfig = llmConfig;
+        this.systemSpecs = new SystemSpecs();
+        this.systemSpecs.analyzeSystem();
     }
 
     @Override
@@ -61,6 +66,20 @@ public class VillagesRebornSettingsScreen extends Screen {
             .build());
 
         startY += 30;
+        this.adaptiveScalingButton = this.addDrawableChild(ButtonWidget.builder(
+            Text.literal("Adaptive Scaling: " + (systemSpecs.isAdaptiveScalingEnabled() ? "ON" : "OFF")),
+            button -> toggleAdaptiveScaling())
+            .dimensions(centerX, startY, buttonWidth, buttonHeight)
+            .build());
+
+        startY += 30;
+        this.aiComplexityButton = this.addDrawableChild(ButtonWidget.builder(
+            Text.literal("AI Complexity: " + getComplexityLabel(systemSpecs.getAIComplexity())),
+            button -> cycleAIComplexity())
+            .dimensions(centerX, startY, buttonWidth, buttonHeight)
+            .build());
+
+        startY += 30;
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Back"), button -> this.client.setScreen(parent))
             .dimensions(centerX, startY, buttonWidth, buttonHeight)
             .build());
@@ -70,6 +89,20 @@ public class VillagesRebornSettingsScreen extends Screen {
     public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        
+        // Update and display performance metrics
+        systemSpecs.updatePerformanceMetrics();
+        int centerX = this.width / 2 - 100; // Match button width positioning
+        int metricsY = 250; // Position below other elements
+        
+        context.drawTextWithShadow(this.textRenderer, 
+            String.format("CPU Usage: %.1f%%", systemSpecs.getCpuUsage() * 100), 
+            centerX, metricsY, 0xFFFFFF);
+        
+        context.drawTextWithShadow(this.textRenderer,
+            String.format("Memory Usage: %.1f%%", systemSpecs.getMemoryUsage() * 100),
+            centerX, metricsY + 15, 0xFFFFFF);
+        
         super.render(context, mouseX, mouseY, delta);
     }
 
@@ -78,6 +111,31 @@ public class VillagesRebornSettingsScreen extends Screen {
         llmConfig.setEndpoint(endpointField.getText());
         llmConfig.saveConfig();
         LOGGER.info("Settings saved: API Key={}, Endpoint={}", apiKeyField.getText(), endpointField.getText());
+        
+        // Update system specs when saving
+        systemSpecs.updatePerformanceMetrics();
+    }
+
+    private void toggleAdaptiveScaling() {
+        boolean newState = !systemSpecs.isAdaptiveScalingEnabled();
+        SystemSpecs.setAdaptiveScaling(newState);
+        adaptiveScalingButton.setMessage(Text.literal("Adaptive Scaling: " + (newState ? "ON" : "OFF")));
+    }
+
+    private void cycleAIComplexity() {
+        int currentLevel = systemSpecs.getAIComplexity();
+        int newLevel = (currentLevel + 1) % 3;
+        SystemSpecs.setAIComplexity(newLevel);
+        aiComplexityButton.setMessage(Text.literal("AI Complexity: " + getComplexityLabel(newLevel)));
+    }
+
+    private String getComplexityLabel(int level) {
+        return switch(level) {
+            case 0 -> "Basic";
+            case 1 -> "Moderate";
+            case 2 -> "Full";
+            default -> "Unknown";
+        };
     }
     
     private void openUISettings() {
