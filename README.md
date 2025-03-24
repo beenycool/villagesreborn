@@ -11,10 +11,10 @@ A comprehensive village overhaul mod for Minecraft 1.21.4 that enhances villager
 - **Villager Crafting System**: Special crafting recipes accessible through villagers
 - **Advanced Social Systems**: Villagers form relationships, remember interactions, and have emotions
 
-## Installation
+## Install
 
 1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.4
-2. Download Villages Reborn from [Modrinth](https://modrinth.com/mod/villages-reborn) or the [GitHub Releases](https://github.com/beeny/villages-reborn/releases)
+2. Download Villages Reborn from [Modrinth](https://modrinth.com/mod/villages-reborn) 
 3. Place the downloaded JAR file into your Minecraft mods folder
 4. Launch the game with Fabric loader
 
