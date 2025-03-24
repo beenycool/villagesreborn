@@ -57,9 +57,9 @@ public class CulturalRecipeInitializer {
         
         // Add enchantments using EnchantmentHelper
         Map<Enchantment, Integer> enchants = new HashMap<>();
-        enchants.put(Enchantments.SHARPNESS.get(), 3);
-        enchants.put(Enchantments.UNBREAKING.get(), 2);
-        EnchantmentHelper.set(enchants, gladius);
+        enchants.put(Enchantments.SHARPNESS, 3);
+        enchants.put(Enchantments.UNBREAKING, 2);
+        EnchantmentHelper.setEnchantments(enchants, gladius);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -87,9 +87,9 @@ public class CulturalRecipeInitializer {
         
         // Add enchantments using EnchantmentHelper
         enchants = new HashMap<>();
-        enchants.put(Enchantments.PROTECTION.get(), 3);
-        enchants.put(Enchantments.UNBREAKING.get(), 2);
-        EnchantmentHelper.set(enchants, lorica);
+        enchants.put(Enchantments.PROTECTION, 3);
+        enchants.put(Enchantments.UNBREAKING, 2);
+        EnchantmentHelper.setEnchantments(enchants, lorica);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -140,9 +140,9 @@ public class CulturalRecipeInitializer {
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
         // Add enchantments using EnchantmentHelper
-        enchants = new HashMap<>();
-        enchants.put(Enchantments.FIRE_ASPECT.get(), 2);
-        EnchantmentHelper.set(enchants, staff);
+        Map<Enchantment, Integer> enchants = new HashMap<>();
+        enchants.put(Enchantments.FIRE_ASPECT, 2);
+        EnchantmentHelper.setEnchantments(enchants, staff);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
