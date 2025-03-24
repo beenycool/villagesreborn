@@ -98,7 +98,7 @@ public class VillagesConfig {
     private static class ConfigData {
         String villageSpawnRate = "MEDIUM";
         String aiProvider = "OPENAI";
-        List<String> enabledCultures = new ArrayList<>(List.of("ROMAN", "EGYPTIAN", "VICTORIAN", "NYC"));
+        List<String> enabledCultures = new ArrayList<>(List.of("ROMAN", "EGYPTIAN", "VICTORIAN", "NYC", "NETHER", "END"));
         boolean villagerPvPEnabled = false;
         boolean theftDetectionEnabled = true;
     }

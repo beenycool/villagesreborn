@@ -1,11 +1,17 @@
 package com.beeny.village;
 
 import com.beeny.ai.LLMService;
+import com.beeny.config.VillagesConfig;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.ai.goal.ActiveTargetGoal;
+import net.minecraft.entity.ai.goal.RevengeGoal;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.mob.Monster;
 import net.minecraft.entity.passive.VillagerEntity;
 import com.beeny.village.event.VillageEvent;
 import net.minecraft.particle.ParticleTypes;
@@ -28,9 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -52,6 +56,8 @@ public class VillagerAI {
     private static final Map<String, CachedBehavior> behaviorCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHE_SIZE = 1000;
     private static final long CACHE_EXPIRY_MS = 1800000; // 30 minutes
+    // Store the PvP goal references to allow removal
+    private static final Map<UUID, ActiveTargetGoal<VillagerEntity>> pvpGoals = new ConcurrentHashMap<>();
 
     private static class CachedBehavior {
         final String behavior;
@@ -85,6 +91,30 @@ public class VillagerAI {
     // Add a busy flag for the villager
     private boolean busy = false;
 
+    // Store theft records for this villager's memory
+    private final Map<UUID, List<TheftRecord>> theftMemory = new ConcurrentHashMap<>();
+    // Track if this villager has PvP goals added
+    private boolean pvpEnabled = false;
+
+    public static class TheftRecord {
+        public final UUID playerID;
+        public final long timestamp;
+        public final String stolenItem;
+        public final BlockPos location;
+        
+        public TheftRecord(UUID playerID, String stolenItem, BlockPos location) {
+            this.playerID = playerID;
+            this.timestamp = System.currentTimeMillis();
+            this.stolenItem = stolenItem;
+            this.location = location;
+        }
+        
+        public boolean isRecent() {
+            // Consider thefts within the last 24 hours (real time) as recent
+            return System.currentTimeMillis() - timestamp < 86400000;
+        }
+    }
+
     public static class ActivitySchedule {
         public final String activity;
         public final BlockPos location;
@@ -101,13 +131,149 @@ public class VillagerAI {
         FRIEND(10),
         FAMILY(20),
         RIVAL(-10),
-        NEUTRAL(0); // Added NEUTRAL relationship type
+        NEUTRAL(0), // Added NEUTRAL relationship type
+        ENEMY(-20); // Added ENEMY relationship type for serious conflicts
 
         public final int moodModifier;
 
         RelationshipType(int moodModifier) {
             this.moodModifier = moodModifier;
         }
+    }
+
+    // Addition: Add PvP goals to villager
+    /**
+     * Add PvP goals to this villager if PvP is enabled in config
+     * This allows villagers to target and attack other villagers they have negative relationships with
+     */
+    public void addPvPGoals() {
+        // Check if villager PvP is enabled in config
+        if (!VillagesConfig.getInstance().isVillagerPvPEnabled()) {
+            return;
+        }
+        
+        if (pvpEnabled) {
+            return; // Already has PvP goals
+        }
+
+        // Set up revenge goal - villager will target entities that attack it
+        RevengeGoal revengeGoal = new RevengeGoal((MobEntity)(Object)villager, VillagerEntity.class);
+        ((MobEntity)(Object)villager).targetSelector.add(1, revengeGoal);
+        
+        // Setup attack goal for enemy villagers
+        ActiveTargetGoal<VillagerEntity> targetGoal = new ActiveTargetGoal<>((MobEntity)(Object)villager, 
+            VillagerEntity.class, 10, true, false, (potentialTarget) -> {
+                if (!(potentialTarget instanceof VillagerEntity otherVillager)) {
+                    return false;
+                }
+                RelationshipType relationship = getRelationshipWith(otherVillager.getUuid());
+                // Only attack enemies or rivals who are too close
+                return relationship == RelationshipType.ENEMY || 
+                       (relationship == RelationshipType.RIVAL && 
+                        otherVillager.squaredDistanceTo(villager) < 5);
+            });
+            
+        ((MobEntity)(Object)villager).targetSelector.add(2, targetGoal);
+        pvpGoals.put(villager.getUuid(), targetGoal);
+        pvpEnabled = true;
+        
+        // Modify villager's movement speed when angry for better combat
+        if (((MobEntity)(Object)villager).getTarget() != null) {
+            villager.addStatusEffect(new StatusEffectInstance(
+                StatusEffects.SPEED, 100, 1, false, false));
+        }
+        
+        LOGGER.debug("Added PvP goals to villager: {}", villager.getName().getString());
+    }
+    
+    /**
+     * Remove PvP goals from this villager
+     */
+    public void removePvPGoals() {
+        if (!pvpEnabled) {
+            return;
+        }
+        
+        ActiveTargetGoal<VillagerEntity> targetGoal = pvpGoals.remove(villager.getUuid());
+        if (targetGoal != null) {
+            ((MobEntity)(Object)villager).targetSelector.remove(targetGoal);
+        }
+        pvpEnabled = false;
+        LOGGER.debug("Removed PvP goals from villager: {}", villager.getName().getString());
+    }
+    
+    /**
+     * Record a theft committed by a player against this villager's property
+     */
+    public void recordTheft(UUID playerID, String stolenItem, BlockPos location) {
+        theftMemory.computeIfAbsent(playerID, k -> new ArrayList<>())
+                  .add(new TheftRecord(playerID, stolenItem, location));
+        
+        // Deteriorate relationship with thief
+        relationships.put(playerID, RelationshipType.ENEMY);
+        adjustHappiness(-10); // Stealing makes villagers unhappy
+        
+        // If PvP is enabled, consider the thief an enemy
+        if (VillagesConfig.getInstance().isVillagerPvPEnabled() && 
+            VillagesConfig.getInstance().isTheftDetectionEnabled()) {
+            addPvPGoals(); // Make sure PvP goals are added
+        }
+        
+        // Alert nearby villagers about theft
+        World world = villager.getWorld();
+        if (world instanceof ServerWorld serverWorld) {
+            alertNearbyVillagersAboutTheft(serverWorld, playerID, location);
+        }
+    }
+    
+    /**
+     * Alert nearby villagers about a theft
+     */
+    private void alertNearbyVillagersAboutTheft(ServerWorld world, UUID thiefID, BlockPos location) {
+        // Find nearby villagers within 32 blocks
+        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
+            VillagerEntity.class, 
+            new Box(location).expand(32),
+            v -> v != villager
+        );
+        
+        for (VillagerEntity otherVillager : nearbyVillagers) {
+            VillagerAI otherAI = VillagerManager.getInstance().getVillagerAI(otherVillager.getUuid());
+            if (otherAI != null) {
+                // Make them aware of the theft with a reduced severity
+                otherAI.onTheftWitnessed(thiefID, location);
+            }
+        }
+    }
+    
+    /**
+     * Called when this villager witnesses a theft but wasn't the direct victim
+     */
+    public void onTheftWitnessed(UUID thiefID, BlockPos location) {
+        // Deteriorate relationship but not as severely as the direct victim
+        RelationshipType currentRelationship = relationships.getOrDefault(thiefID, RelationshipType.NEUTRAL);
+        
+        if (currentRelationship != RelationshipType.ENEMY) {
+            relationships.put(thiefID, RelationshipType.RIVAL);
+            adjustHappiness(-5); // Witnessing theft causes unhappiness
+        }
+        
+        // Add memory of witnessing the theft
+        theftMemory.computeIfAbsent(thiefID, k -> new ArrayList<>())
+                  .add(new TheftRecord(thiefID, "witnessed theft", location));
+    }
+
+    /**
+     * Check if a player is known to have stolen from this villager
+     * @return true if player has stolen from this villager recently
+     */
+    public boolean hasPlayerStolen(UUID playerID) {
+        List<TheftRecord> records = theftMemory.get(playerID);
+        if (records == null || records.isEmpty()) {
+            return false;
+        }
+        // Only consider recent thefts
+        return records.stream().anyMatch(TheftRecord::isRecent);
     }
 
     public VillagerAI(VillagerEntity villager, String personality) {
@@ -664,6 +830,7 @@ public class VillagerAI {
             case FAMILY -> "family";
             case RIVAL -> "rival";
             case NEUTRAL -> "neutral";
+            case ENEMY -> "enemy";
         };
     }
 
@@ -1035,175 +1202,6 @@ public class VillagerAI {
 
             String type = parts.getOrDefault("ACTION", "walk");
             String targetStr = parts.get("TARGET");
-            int duration = Integer.parseInt(parts.getOrDefault("DURATION", "2400"));
-            String detail = parts.getOrDefault("DETAIL", type);
-            int priority = Integer.parseInt(parts.getOrDefault("PRIORITY", "1"));
-
-            // Adjust priority based on context
-            if (type.equalsIgnoreCase("rest") && happiness < 30) priority += 2;
-            if (type.equalsIgnoreCase("work") && professionSkills.getOrDefault(type, 0) < 50) priority += 1;
-            if (type.equalsIgnoreCase("socialize") && relationships.size() < 3) priority += 1;
-
-            // Validate and adjust duration
-            duration = Math.max(1200, Math.min(duration, 12000));
-
-            // Find appropriate target location
-            BlockPos target = targetStr != null ? findActivityTarget(targetStr) : villager.getBlockPos();
-
-            return new Activity(type, target, duration, detail, priority);
-        } catch (Exception e) {
-            LOGGER.error("Error parsing activity from response: {}", response, e);
-            return new Activity("idle", villager.getBlockPos(), 1200, "error recovery", 1);
-        }
-    }
-    
-    private List<String> getCurrentGoals() {
-        List<String> goals = new ArrayList<>();
-        String profession = villager.getVillagerData().getProfession().toString();
-        VillagerManager vm = VillagerManager.getInstance();
-        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        ServerWorld world = (ServerWorld) villager.getWorld();
-        long timeOfDay = world.getTimeOfDay() % 24000;
-        boolean isNight = timeOfDay > 12000;
-
-        // Priority 1: Emergency needs
-        if (happiness < 30) {
-            goals.add("Find ways to improve mood quickly");
-            goals.add("Seek social interaction for comfort");
-        }
-
-        // Priority 2: Basic needs
-        if (isNight && !villager.getBlockPos().isWithinDistance(homePos, 20)) {
-            goals.add("Return home for rest");
-        }
-
-        // Priority 3: Professional goals
-        int skillLevel = professionSkills.getOrDefault(profession.toLowerCase(), 0);
-        if (skillLevel < 100) {
-            goals.add(String.format("Improve %s skills (current: %d%%)", profession, skillLevel));
-        }
-
-        // Priority 4: Social goals
-        int friendCount = (int) relationships.values().stream()
-            .filter(relation -> relation == RelationshipType.FRIEND).count();
-        if (friendCount < 3) {
-            goals.add(String.format("Make more friends (current: %d/3)", friendCount));
-        }
-
-        // Priority 5: Cultural participation
-        if (region != null) {
-            List<VillagerManager.CulturalEvent> events = vm.getCurrentEvents(villager.getBlockPos(), world);
-            if (!events.isEmpty()) {
-                goals.add("Participate in " + events.get(0).name);
-            } else {
-                goals.add("Maintain " + region.getCulture() + " traditions");
-            }
-        }
-
-        // Priority 6: Location-based goals
-        Object successLocation = behaviorMemory.get("preferred_" + profession.toLowerCase() + "_location");
-        if (successLocation != null) {
-            goals.add("Work at preferred location");
-        }
-
-        // Priority 7: Time-based goals
-        String timeKey = "success_time_" + (timeOfDay / 1000) * 1000;
-        Integer successCount = (Integer) behaviorMemory.get(timeKey);
-        if (successCount != null && successCount > 5) {
-            goals.add("Maintain successful time schedule");
-        }
-
-        // Priority 8: Relationship maintenance
-        relationships.forEach((id, relationshipType) -> {
-            if (relationshipType == RelationshipType.FAMILY) {
-                goals.add("Spend time with family");
-            }
-        });
-
-        // Sort goals by embedded priority (implicit in the order of addition)
-        return goals.stream()
-            .limit(5) // Keep the top 5 most important goals
-            .collect(Collectors.toList());
-    }
-
-    private BlockPos findActivityTarget(String target) {
-        if (target == null) return villager.getBlockPos();
-        
-        VillagerManager vm = VillagerManager.getInstance();
-        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        
-        return switch(target.toLowerCase()) {
-            case "village_center" -> region.getCenter();
-            case "nearest_farm" -> findNearestWorkstation(Blocks.COMPOSTER);
-            case "nearest_house" -> findNearestStructure("house");
-            default -> villager.getBlockPos();
-        };
-    }
-
-    private void executeActivity(ServerWorld world) {
-        switch(currentActivityDetail.type().toLowerCase()) {
-            case "walk" -> moveToTarget(currentActivityDetail.target());
-            case "work" -> performWork(world);
-            case "trade" -> handleTrading();
-            case "rest" -> handleResting(world);
-            case "socialize" -> handleSocializing(world);
-        }
-    }
-
-    private BlockPos findNearestWorkstation(Block block) {
-        int searchRadius = 32;
-        BlockPos pos = villager.getBlockPos();
-        
-        for (int x = -searchRadius; x <= searchRadius; x++) {
-            for (int y = -4; y <= 4; y++) {
-                for (int z = -searchRadius; z <= searchRadius; z++) {
-                    BlockPos checkPos = pos.add(x, y, z);
-                    if (villager.getWorld().getBlockState(checkPos).getBlock() == block) {
-                        return checkPos;
-                    }
-                }
-            }
-        }
-        return pos;
-    }
-
-    private BlockPos findNearestStructure(String type) {
-        VillagerManager vm = VillagerManager.getInstance();
-        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        if (region == null) return villager.getBlockPos();
-        
-        return region.getCulturalStructures().entrySet().stream()
-            .filter(structMapping -> structMapping.getKey().toLowerCase().contains(type.toLowerCase()))
-            .map(Map.Entry::getValue)
-            .min(Comparator.comparingDouble(candidatePos -> candidatePos.getSquaredDistance(villager.getBlockPos())))
-            .orElse(villager.getBlockPos());
-    }
-
-    private void moveToTarget(BlockPos target) {
-        if (villager.getNavigation().isIdle()) {
-            villager.getNavigation().startMovingTo(
-                target.getX(), target.getY(), target.getZ(), 0.6);
-        }
-    }
-
-    private void performWork(ServerWorld world) {
-        if (villager.getVillagerData().getProfession() == VillagerProfession.FARMER) {
-            handleFarming(world);
-        }
-        // Add other profession-specific work
-    }
-
-    private void handleFarming(ServerWorld world) {
-        BlockPos pos = villager.getBlockPos();
-        Block block = world.getBlockState(pos.down()).getBlock();
-        
-        if (block instanceof CropBlock crop) {
-            if (crop.isMature(world.getBlockState(pos.down()))) {
-                world.breakBlock(pos.down(), true);
-                world.setBlockState(pos.down(), crop.getDefaultState());
-            }
-        }
-    }
 
     private void handleTrading() {
         // Existing trading logic

@@ -33,15 +33,31 @@ public class SpawnRegion {
             return false;
         }
 
-        // Handle dimension-specific cultures
+        // Handle dimension-specific cultures with biome specificity
         if (World.NETHER.equals(world.getRegistryKey())) {
-            return culture == Culture.NETHER;
+            if (culture != Culture.NETHER) return false;
+            
+            // Specific Nether biome checks
+            return world.getBiome(center).matchesKey(BiomeKeys.CRIMSON_FOREST) || 
+                   world.getBiome(center).matchesKey(BiomeKeys.WARPED_FOREST) || 
+                   world.getBiome(center).matchesKey(BiomeKeys.SOUL_SAND_VALLEY) || 
+                   world.getBiome(center).matchesKey(BiomeKeys.NETHER_WASTES) || 
+                   world.getBiome(center).matchesKey(BiomeKeys.BASALT_DELTAS);
         }
+        
         if (World.END.equals(world.getRegistryKey())) {
-            return culture == Culture.END;
+            if (culture != Culture.END) return false;
+            
+            // End villages should only spawn in the outer islands, not the central island
+            // Check if we're at least 1000 blocks from the center (0,0)
+            int distanceFromCenter = (int) Math.sqrt(center.getSquaredDistance(0, center.getY(), 0));
+            return distanceFromCenter > 1000 && 
+                   (world.getBiome(center).matchesKey(BiomeKeys.END_MIDLANDS) || 
+                    world.getBiome(center).matchesKey(BiomeKeys.END_HIGHLANDS) ||
+                    world.getBiome(center).matchesKey(BiomeKeys.END_BARRENS));
         }
 
-        // Get biome at position
+        // Get biome at position for overworld cultures
         return switch (culture) {
             case EGYPTIAN -> world.getBiome(center).matchesKey(BiomeKeys.DESERT);
             case ROMAN -> world.getBiome(center).matchesKey(BiomeKeys.PLAINS);
@@ -71,22 +87,52 @@ public class SpawnRegion {
     private boolean isValidNetherSpawn(World world, BlockPos pos) {
         // Check for netherrack platform and open space
         Block ground = world.getBlockState(pos.down()).getBlock();
-        return ground.getDefaultState().isOpaque() && 
-               hasEnoughSpace(world, pos, 6, 4);
+        
+        // Get biome-specific requirements
+        if (world.getBiome(pos).matchesKey(BiomeKeys.CRIMSON_FOREST)) {
+            // Crimson villages need more space for their unique structures
+            return ground.getDefaultState().isOpaque() && 
+                   hasEnoughSpace(world, pos, 8, 5);
+        } else if (world.getBiome(pos).matchesKey(BiomeKeys.WARPED_FOREST)) {
+            // Warped villages have taller structures
+            return ground.getDefaultState().isOpaque() && 
+                   hasEnoughSpace(world, pos, 7, 6);
+        } else if (world.getBiome(pos).matchesKey(BiomeKeys.SOUL_SAND_VALLEY)) {
+            // Soul Sand villages are wider and shorter
+            return ground.getDefaultState().isOpaque() && 
+                   hasEnoughSpace(world, pos, 9, 3);
+        } else {
+            // Default nether check
+            return ground.getDefaultState().isOpaque() && 
+                   hasEnoughSpace(world, pos, 6, 4);
+        }
     }
 
     private boolean isValidEndSpawn(World world, BlockPos pos) {
-        // Check for end stone platform
+        // Check for end stone platform and enough space for end structures
         Block ground = world.getBlockState(pos.down()).getBlock();
+        
+        // End villages need a lot of space for their unique floating structures
         return ground.getDefaultState().isOpaque() && 
-               hasEnoughSpace(world, pos, 8, 6);
+               hasEnoughSpace(world, pos, 12, 8);
     }
 
     private boolean isValidOverworldSpawn(World world, BlockPos pos) {
-        // Standard overworld checks
+        // Standard overworld checks with culture-specific requirements
         Block ground = world.getBlockState(pos.down()).getBlock();
-        return ground.getDefaultState().isOpaque() && 
-               hasEnoughSpace(world, pos, 5, 3);
+        
+        return switch (culture) {
+            case EGYPTIAN -> ground.getDefaultState().isOpaque() && 
+                          hasEnoughSpace(world, pos, 7, 3); // Egyptian needs wider footprint
+            case ROMAN -> ground.getDefaultState().isOpaque() && 
+                       hasEnoughSpace(world, pos, 6, 4); // Roman needs taller buildings
+            case VICTORIAN -> ground.getDefaultState().isOpaque() && 
+                           hasEnoughSpace(world, pos, 5, 5); // Victorian has tall, narrow buildings
+            case NYC -> ground.getDefaultState().isOpaque() && 
+                     hasEnoughSpace(world, pos, 4, 7); // NYC has skyscrapers
+            default -> ground.getDefaultState().isOpaque() && 
+                     hasEnoughSpace(world, pos, 5, 3); // Default
+        };
     }
 
     private boolean hasEnoughSpace(World world, BlockPos pos, int width, int height) {
