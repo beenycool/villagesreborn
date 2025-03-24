@@ -4,6 +4,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.Registries;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.registry.entry.RegistryEntry;
@@ -638,12 +639,18 @@ public class Culture {
     
     // Alternative approach that takes a ServerWorld parameter
     public boolean isPreferredBiome(Biome biome, ServerWorld world) {
-        Optional<RegistryEntry<Biome>> biomeEntry = world.getBiome(biome);
+        // Fix: Create a BlockPos for the world.getBiome method
+        BlockPos dummyPos = new BlockPos(0, 0, 0);
+        // In 1.21.4, getBiome returns RegistryEntry<Biome> directly, not an Optional
+        RegistryEntry<Biome> biomeEntry = world.getBiome(dummyPos);
         
-        if (biomeEntry.isPresent()) {
+        if (biomeEntry.value() == biome) {
+            // Fix: Get biome ID using proper registry manager API
             Identifier biomeId = world.getRegistryManager()
-                .get(RegistryKeys.BIOME)
-                .getId(biome);
+                .getOptional(RegistryKeys.BIOME)
+                .flatMap(registry -> registry.getKey(biome))
+                .map(key -> key.getValue())  // Properly refer to method without using static import
+                .orElse(null);
                 
             if (biomeId != null) {
                 return preferredBiomes.contains(biomeId.getPath());

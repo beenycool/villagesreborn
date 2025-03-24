@@ -1,6 +1,7 @@
 package com.beeny.village.event;
 
 import com.beeny.village.VillagerManager;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -350,6 +351,7 @@ public class CulturalEventActivityHandler {
             if (i > 0) {
                 result.append(i == displayCount - 1 ? " or " : ", ");
             }
+            // Use Text.getString() to safely get the string representation
             result.append(items.get(i).getName().getString());
         }
         
@@ -483,8 +485,8 @@ public class CulturalEventActivityHandler {
      * Helper method to set custom name on an ItemStack
      */
     private void setCustomItemName(ItemStack stack, String name) {
-        Text customName = Text.literal(name);
-        stack.setCustomName(customName);
+        // In Minecraft 1.21.4, we use the component system instead of the old setCustomName method
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
     }
 
     public String getActivityDescription(String activity) {

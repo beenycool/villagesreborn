@@ -2,11 +2,16 @@ package com.beeny;
 
 import net.fabricmc.api.ModInitializer;
 import com.beeny.village.VillageCraftingManager;
+import com.beeny.village.Culture;
 import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Main entry point for the Villages Reborn mod.
@@ -30,7 +35,16 @@ public class Villagesreborn implements ModInitializer {
 
     /** Singleton instance */
     private static Villagesreborn INSTANCE;
-
+    
+    /** Map to store village locations and their associated cultures */
+    private final Map<BlockPos, Culture> villageMap = new ConcurrentHashMap<>();
+    
+    /** Map to store village radiuses */
+    private final Map<BlockPos, Integer> villageRadiusMap = new ConcurrentHashMap<>();
+    
+    /** Map to store village active events */
+    private final Map<BlockPos, Integer> villageEventsMap = new ConcurrentHashMap<>();
+    
     /**
      * Get the singleton instance of the mod
      * @return Mod instance
@@ -106,5 +120,120 @@ public class Villagesreborn implements ModInitializer {
         // This would be implemented to send village info to the client
         // For now it's a stub to fix compilation issues
         LOGGER.info("Village info requested for player: " + player.getName().getString());
+    }
+    
+    /**
+     * Gets the nearest village culture to a position
+     * @param pos The position to check
+     * @return The culture of the nearest village, or null if none found
+     */
+    public Culture getNearestVillageCulture(BlockPos pos) {
+        if (villageMap.isEmpty()) {
+            return null;
+        }
+        
+        // Find the closest village center
+        BlockPos closest = null;
+        double closestDist = Double.MAX_VALUE;
+        
+        for (BlockPos center : villageMap.keySet()) {
+            double dist = center.getSquaredDistance(pos);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = center;
+            }
+        }
+        
+        if (closest != null) {
+            return villageMap.get(closest);
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Gets the center position of the village at a given position
+     * @param pos The position to check
+     * @return The center position of the village, or null if none found
+     */
+    public BlockPos getVillageCenterPos(BlockPos pos) {
+        if (villageMap.isEmpty()) {
+            return null;
+        }
+        
+        // Find the closest village center
+        BlockPos closest = null;
+        double closestDist = Double.MAX_VALUE;
+        
+        for (BlockPos center : villageMap.keySet()) {
+            double dist = center.getSquaredDistance(pos);
+            int radius = villageRadiusMap.getOrDefault(center, 64);
+            
+            // Check if position is within village radius
+            if (dist <= radius * radius && dist < closestDist) {
+                closestDist = dist;
+                closest = center;
+            }
+        }
+        
+        return closest;
+    }
+    
+    /**
+     * Gets the radius of the village at a position
+     * @param pos The position to check
+     * @return The radius of the village, or 0 if none found
+     */
+    public int getVillageRadius(BlockPos pos) {
+        BlockPos center = getVillageCenterPos(pos);
+        if (center != null) {
+            return villageRadiusMap.getOrDefault(center, 64);
+        }
+        return 0;
+    }
+    
+    /**
+     * Gets the number of active events in the village at a position
+     * @param pos The position to check
+     * @return The number of active events, or 0 if none found
+     */
+    public int getActiveEventCount(BlockPos pos) {
+        BlockPos center = getVillageCenterPos(pos);
+        if (center != null) {
+            return villageEventsMap.getOrDefault(center, 0);
+        }
+        return 0;
+    }
+    
+    /**
+     * Gets all villages in the world
+     * @return A collection of all village cultures
+     */
+    public Collection<Culture> getAllVillages() {
+        return villageMap.values();
+    }
+    
+    /**
+     * Registers a village with the system
+     * @param center The center position of the village
+     * @param culture The culture of the village
+     * @param radius The radius of the village
+     */
+    public void registerVillage(BlockPos center, Culture culture, int radius) {
+        villageMap.put(center, culture);
+        villageRadiusMap.put(center, radius);
+        villageEventsMap.put(center, 0);
+        LOGGER.info("Registered village: " + culture.getType().getId() + " at " + center);
+    }
+    
+    /**
+     * Updates the active event count for a village
+     * @param center The center of the village
+     * @param eventCount The new event count
+     */
+    public void updateVillageEvents(BlockPos center, int eventCount) {
+        if (villageMap.containsKey(center)) {
+            villageEventsMap.put(center, eventCount);
+        }
     }
 }
