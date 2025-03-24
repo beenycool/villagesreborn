@@ -48,7 +48,7 @@ public class CulturalEventCommands {
                     BlockPosArgumentType.getBlockPos(context, "position"),
                     IntegerArgumentType.getInteger(context, "radius"),
                     IntegerArgumentType.getInteger(context, "durationMinutes")
-                ))))))))
+                )))))))))
         );
         
         dispatcher.register(CommandManager.literal("culturalevent")
@@ -303,21 +303,21 @@ public class CulturalEventCommands {
         
         source.sendFeedback(() -> Text.of("§6===== Nearby Cultural Events =====§r"), false);
         
-        int i = 1;
-        for (VillageEvent event : nearbyEvents) {
+        // Use indexed for loop with final counter for lambda
+        for (int i = 0; i < nearbyEvents.size(); i++) {
+            final int eventNum = i + 1; // Make a final copy for lambda
+            VillageEvent event = nearbyEvents.get(i);
             BlockPos pos = event.getLocation();
             int distance = (int)Math.sqrt(playerPos.getSquaredDistance(pos));
             long remainingMinutes = event.getTimeRemaining() / (1000 * 60);
             
             source.sendFeedback(() -> Text.of(
-                i + ". §b" + event.getDescription() + "§r" +
+                eventNum + ". §b" + event.getDescription() + "§r" +
                 "\n  §7ID:§r " + event.getId() +
                 "\n  §7Distance:§r " + distance + " blocks away" +
                 "\n  §7Remaining Time:§r " + remainingMinutes + " minutes" +
                 "\n  §7Use:§r /culturalevent join " + event.getId() + " to participate"
             ), false);
-            
-            i++;
         }
         
         return nearbyEvents.size();
