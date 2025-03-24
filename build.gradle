@@ -7,9 +7,13 @@ version = project.mod_version
 group = project.maven_group
 
 sourceSets {
-    client {
-        compileClasspath += main.compileClasspath
-        runtimeClasspath += main.runtimeClasspath
+    main {
+        java {
+            srcDirs = ['src/main/java', 'src/client/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources', 'src/client/resources']
+        }
     }
 }
 
