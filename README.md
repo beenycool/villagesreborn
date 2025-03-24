@@ -14,9 +14,10 @@ A comprehensive village overhaul mod for Minecraft 1.21.4 that enhances villager
 ## Install
 
 1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.4
-2. Download Villages Reborn from [Modrinth](https://modrinth.com/mod/villages-reborn) 
-3. Place the downloaded JAR file into your Minecraft mods folder
-4. Launch the game with Fabric loader
+2. Install it in your favourite launcher
+3. Download Villages Reborn from [Modrinth](https://modrinth.com/mod/villages-reborn) 
+4. Place the downloaded JAR file into your Minecraft mods folder
+5. Launch the game with Fabric loader
 
 ## Configuration
 
