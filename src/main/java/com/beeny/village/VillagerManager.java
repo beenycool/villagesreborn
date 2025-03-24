@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import com.beeny.ai.LLMService;
 import com.beeny.ai.CulturalPromptTemplates;
 import com.beeny.util.NameGenerator;
-import com.beeny.VillagesrebornClient;
+import com.beeny.api.VillageHudAPI;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
@@ -351,11 +351,11 @@ public class VillagerManager {
                         updateVillageStatsHeuristically(stats, region, villagerCount);
                     }
                     
-                    // Update client HUD for nearby players
-                    if (nearestPlayer != null) {
-                        VillagesrebornClient.getInstance().updateVillageInfo(
-                            stats.culture, stats.prosperity, stats.safety, villagerCount);
-                    }
+        // Update client HUD for nearby players
+        if (nearestPlayer != null) {
+            VillageHudAPI.getInstance().updateVillageInfo(
+                stats.culture, stats.prosperity, stats.safety, villagerCount);
+        }
                 }
             }
         } finally {
@@ -500,7 +500,7 @@ public class VillagerManager {
                     for (ServerPlayerEntity player : world.getPlayers()) {
                         SpawnRegion region = getNearestSpawnRegion(player.getBlockPos());
                         if (region != null && region.getCulture().equals(culture)) {
-                            VillagesrebornClient.getInstance().showEventNotification(
+                            VillageHudAPI.getInstance().showEventNotification(
                                 eventName, description, 200);
                         }
                     }

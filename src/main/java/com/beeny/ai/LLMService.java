@@ -2,6 +2,7 @@ package com.beeny.ai;
 
 import com.beeny.ai.provider.*;
 import com.beeny.setup.LLMConfig;
+import com.beeny.setup.SystemSpecs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,8 +18,10 @@ public class LLMService {
     private AIProvider currentProvider;
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
+    private SystemSpecs systemSpecs;
 
     private LLMService() {
+        this.systemSpecs = new SystemSpecs();
         // Register available providers
         providers.put("deepseek", new DeepSeekProvider()); // Cheapest option by default
         providers.put("openrouter", new OpenRouterProvider());
@@ -67,6 +70,10 @@ public class LLMService {
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
+        // Update performance metrics before generating response
+        systemSpecs.updatePerformanceMetrics();
+        int complexityLevel = systemSpecs.getAIComplexity();
+
         if (currentProvider == null || !currentProvider.isAvailable()) {
             return CompletableFuture.failedFuture(
                 new IllegalStateException("No available AI provider")
@@ -78,18 +85,43 @@ public class LLMService {
             return CompletableFuture.completedFuture(contextCache.get(cacheKey));
         }
 
-        return currentProvider.generateResponse(prompt, context)
+        // Add complexity level to context
+        context.put("complexity_level", String.valueOf(complexityLevel));
+        
+        // If on basic complexity (0), use default responses
+        if (complexityLevel == 0) {
+            String response = getDefaultResponse(prompt);
+            contextCache.put(cacheKey, response);
+            return CompletableFuture.completedFuture(response);
+        }
+
+        // For moderate complexity (1), use simpler prompts
+        final String finalPrompt = complexityLevel == 1 ? simplifyPrompt(prompt) : prompt;
+
+        return currentProvider.generateResponse(finalPrompt, context)
             .thenApply(response -> {
                 contextCache.put(cacheKey, response);
                 return response;
             })
             .exceptionally(e -> {
                 LOGGER.error("Error generating response", e);
-                return getDefaultResponse(prompt);
+                return getDefaultResponse(finalPrompt);
             });
     }
 
+    private String simplifyPrompt(String prompt) {
+        // Remove complex context and additional details
+        String simplified = prompt.replaceAll("\\{.*?\\}", "")  // Remove JSON-like context
+                                .replaceAll("\\[.*?\\]", "")    // Remove bracketed content
+                                .trim();
+        
+        // Add structure hints for simpler responses
+        return simplified + "\nPlease provide a simple response using basic actions and descriptions.";
+    }
+
     private String getDefaultResponse(String prompt) {
+        // Update performance metrics to check system load
+        systemSpecs.updatePerformanceMetrics();
         prompt = prompt.toLowerCase();
         
         // Basic villager roles
