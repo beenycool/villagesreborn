@@ -56,12 +56,24 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments
-        ItemEnchantmentsComponent enchantments = new ItemEnchantmentsComponent();
-        Registry<Enchantment> enchantmentRegistry = wrapperLookup.getRegistryLookup(RegistryKeys.ENCHANTMENT).orElseThrow();
-        enchantments.add(enchantmentRegistry.getEntry(Enchantments.SHARPNESS).get(), 3);
-        enchantments.add(enchantmentRegistry.getEntry(Enchantments.UNBREAKING).get(), 2);
-        gladius.set(DataComponentTypes.ENCHANTMENTS, enchantments);
+        // Add enchantments using custom NBT data component
+        NbtCompound enchantmentData = new NbtCompound();
+        NbtList enchantmentList = new NbtList();
+        
+        // Sharpness enchantment
+        NbtCompound sharpness = new NbtCompound();
+        sharpness.putString("id", "minecraft:sharpness");
+        sharpness.putShort("lvl", (short)3);
+        enchantmentList.add(sharpness);
+        
+        // Unbreaking enchantment
+        NbtCompound unbreaking = new NbtCompound();
+        unbreaking.putString("id", "minecraft:unbreaking");
+        unbreaking.putShort("lvl", (short)2);
+        enchantmentList.add(unbreaking);
+        
+        enchantmentData.put("Enchantments", enchantmentList);
+        gladius.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -87,11 +99,24 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments
-        ItemEnchantmentsComponent loricaEnchantments = new ItemEnchantmentsComponent();
-        loricaEnchantments.add(enchantmentRegistry.getEntry(Enchantments.PROTECTION).get(), 3);
-        loricaEnchantments.add(enchantmentRegistry.getEntry(Enchantments.UNBREAKING).get(), 2);
-        lorica.set(DataComponentTypes.ENCHANTMENTS, loricaEnchantments);
+        // Add enchantments using custom NBT data component
+        enchantmentData = new NbtCompound();
+        enchantmentList = new NbtList();
+        
+        // Protection enchantment
+        NbtCompound protection = new NbtCompound();
+        protection.putString("id", "minecraft:protection");
+        protection.putShort("lvl", (short)3);
+        enchantmentList.add(protection);
+        
+        // Unbreaking enchantment
+        unbreaking = new NbtCompound();
+        unbreaking.putString("id", "minecraft:unbreaking");
+        unbreaking.putShort("lvl", (short)2);
+        enchantmentList.add(unbreaking);
+        
+        enchantmentData.put("Enchantments", enchantmentList);
+        lorica.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -141,11 +166,18 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments
-        ItemEnchantmentsComponent staffEnchantments = new ItemEnchantmentsComponent();
-        Registry<Enchantment> enchantmentRegistry = wrapperLookup.getRegistryLookup(RegistryKeys.ENCHANTMENT).orElseThrow();
-        staffEnchantments.add(enchantmentRegistry.getEntry(Enchantments.FIRE_ASPECT).get(), 2);
-        staff.set(DataComponentTypes.ENCHANTMENTS, staffEnchantments);
+        // Add enchantments using custom NBT data component
+        NbtCompound enchantmentData = new NbtCompound();
+        NbtList enchantmentList = new NbtList();
+        
+        // Fire Aspect enchantment
+        NbtCompound fireAspect = new NbtCompound();
+        fireAspect.putString("id", "minecraft:fire_aspect");
+        fireAspect.putShort("lvl", (short)2);
+        enchantmentList.add(fireAspect);
+        
+        enchantmentData.put("Enchantments", enchantmentList);
+        staff.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
