@@ -20,6 +20,7 @@ import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.registry.tag.TagKey;
+import net.minecraft.registry.Registry;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,11 +56,12 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments using EnchantmentHelper
-        Map<Enchantment, Integer> enchants = new HashMap<>();
-        enchants.put(Enchantments.SHARPNESS, 3);
-        enchants.put(Enchantments.UNBREAKING, 2);
-        EnchantmentHelper.setEnchantments(enchants, gladius);
+        // Add enchantments
+        ItemEnchantmentsComponent enchantments = new ItemEnchantmentsComponent();
+        Registry<Enchantment> enchantmentRegistry = wrapperLookup.getRegistryLookup(RegistryKeys.ENCHANTMENT).orElseThrow();
+        enchantments.add(enchantmentRegistry.getEntry(Enchantments.SHARPNESS).get(), 3);
+        enchantments.add(enchantmentRegistry.getEntry(Enchantments.UNBREAKING).get(), 2);
+        gladius.set(DataComponentTypes.ENCHANTMENTS, enchantments);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -85,11 +87,11 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments using EnchantmentHelper
-        enchants = new HashMap<>();
-        enchants.put(Enchantments.PROTECTION, 3);
-        enchants.put(Enchantments.UNBREAKING, 2);
-        EnchantmentHelper.setEnchantments(enchants, lorica);
+        // Add enchantments
+        ItemEnchantmentsComponent loricaEnchantments = new ItemEnchantmentsComponent();
+        loricaEnchantments.add(enchantmentRegistry.getEntry(Enchantments.PROTECTION).get(), 3);
+        loricaEnchantments.add(enchantmentRegistry.getEntry(Enchantments.UNBREAKING).get(), 2);
+        lorica.set(DataComponentTypes.ENCHANTMENTS, loricaEnchantments);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -139,10 +141,11 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments using EnchantmentHelper
-        Map<Enchantment, Integer> enchants = new HashMap<>();
-        enchants.put(Enchantments.FIRE_ASPECT, 2);
-        EnchantmentHelper.setEnchantments(enchants, staff);
+        // Add enchantments
+        ItemEnchantmentsComponent staffEnchantments = new ItemEnchantmentsComponent();
+        Registry<Enchantment> enchantmentRegistry = wrapperLookup.getRegistryLookup(RegistryKeys.ENCHANTMENT).orElseThrow();
+        staffEnchantments.add(enchantmentRegistry.getEntry(Enchantments.FIRE_ASPECT).get(), 2);
+        staff.set(DataComponentTypes.ENCHANTMENTS, staffEnchantments);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
