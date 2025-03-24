@@ -48,7 +48,7 @@ public class CulturalEventCommands {
                     BlockPosArgumentType.getBlockPos(context, "position"),
                     IntegerArgumentType.getInteger(context, "radius"),
                     IntegerArgumentType.getInteger(context, "durationMinutes")
-                )))))))))
+                ))))))
         );
         
         dispatcher.register(CommandManager.literal("culturalevent")
