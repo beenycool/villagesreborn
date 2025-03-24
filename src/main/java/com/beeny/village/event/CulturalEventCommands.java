@@ -164,13 +164,16 @@ public class CulturalEventCommands {
         
         source.sendFeedback(() -> Text.of("§6===== Active Cultural Events =====§r"), false);
         
-        int i = 1;
-        for (VillageEvent event : events) {
+        // Convert to array to access by index
+        VillageEvent[] eventsArray = events.toArray(new VillageEvent[0]);
+        for (int i = 0; i < eventsArray.length; i++) {
+            final int eventNum = i + 1; // Make a final copy for lambda
+            VillageEvent event = eventsArray[i];
             BlockPos pos = event.getLocation();
             long remainingMinutes = event.getTimeRemaining() / (1000 * 60);
             
             source.sendFeedback(() -> Text.of(
-                i + ". §b" + event.getDescription() + "§r" +
+                eventNum + ". §b" + event.getDescription() + "§r" +
                 "\n  §7ID:§r " + event.getId() +
                 "\n  §7Location:§r " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() +
                 "\n  §7Radius:§r " + event.getRadius() + " blocks" +
