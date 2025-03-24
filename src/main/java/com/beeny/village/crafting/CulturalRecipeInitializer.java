@@ -55,7 +55,7 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius"));
         
-        // Add enchantments directly using NBT Component
+        // Add enchantments directly using NBT
         NbtList enchantmentsList = new NbtList();
         
         // Add Sharpness III
@@ -70,36 +70,10 @@ public class CulturalRecipeInitializer {
         unbreaking.putInt("lvl", 2);
         enchantmentsList.add(unbreaking);
         
-        // Set enchantments to the component
-        NbtCompound enchantmentsNbt = new NbtCompound();
-        enchantmentsNbt.put("Enchantments", enchantmentsList);
-        
-        // Apply the enchantments using the appropriate method for Minecraft 1.21.4
-        // Create a hash map to store enchantments and their levels
-        Object2IntOpenHashMap<RegistryEntry<Enchantment>> enchantMap = new Object2IntOpenHashMap<>();
-        
-        for (int i = 0; i < enchantmentsList.size(); i++) {
-            NbtCompound enchant = enchantmentsList.getCompound(i);
-            String id = enchant.getString("id");
-            int level = enchant.getInt("lvl");
-            
-            // Create identifier with namespace and path (minecraft:sharpness)
-            String[] parts = id.split(":", 2);
-            String namespace = parts.length > 1 ? parts[0] : "minecraft";
-            String path = parts.length > 1 ? parts[1] : id;
-            Identifier enchantId = new Identifier(namespace, path);
-            
-            Optional<RegistryEntry<Enchantment>> enchantment = wrapperLookup.getOptional(RegistryKeys.ENCHANTMENT)
-                .flatMap(registry -> registry.getRegistryLookup().get(enchantId));
-                
-            if (enchantment.isPresent()) {
-                enchantMap.put(enchantment.get(), level);
-            }
-        }
-        
-        // Create ItemEnchantmentsComponent with the correct constructor parameters
-        ItemEnchantmentsComponent enchantmentComponent = new ItemEnchantmentsComponent(enchantMap, false);
-        gladius.set(DataComponentTypes.ENCHANTMENTS, enchantmentComponent);
+        // Set enchantments using NBT
+        NbtCompound nbt = new NbtCompound();
+        nbt.put("Enchantments", enchantmentsList);
+        gladius.setNbt(nbt);
 
         // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
@@ -125,7 +99,7 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata"));
         
-        // Add enchantments directly using NBT Component
+        // Add enchantments directly using NBT
         NbtList loricaEnchantList = new NbtList();
         
         // Add Protection III
@@ -135,50 +109,6 @@ public class CulturalRecipeInitializer {
         loricaEnchantList.add(protection);
         
         // Add Unbreaking II
-        NbtCompound loricaUnbreaking = new NbtCompound();
-        loricaUnbreaking.putString("id", "minecraft:unbreaking");
-        loricaUnbreaking.putInt("lvl", 2);
-        loricaEnchantList.add(loricaUnbreaking);
-        
-        // Apply the enchantments using the appropriate method for Minecraft 1.21.4
-        Object2IntOpenHashMap<RegistryEntry<Enchantment>> loricaEnchantMap = new Object2IntOpenHashMap<>();
-        for (int i = 0; i < loricaEnchantList.size(); i++) {
-            NbtCompound enchant = loricaEnchantList.getCompound(i);
-            String id = enchant.getString("id");
-            int level = enchant.getInt("lvl");
-            
-            // Create identifier with namespace and path
-            String[] parts = id.split(":", 2);
-            String namespace = parts.length > 1 ? parts[0] : "minecraft";
-            String path = parts.length > 1 ? parts[1] : id;
-            Identifier enchantId = new Identifier(namespace, path);
-            
-            Optional<RegistryEntry<Enchantment>> enchantment = wrapperLookup.getOptional(RegistryKeys.ENCHANTMENT)
-                .flatMap(registry -> registry.getRegistryLookup().get(enchantId));
-                
-            if (enchantment.isPresent()) {
-                loricaEnchantMap.put(enchantment.get(), level);
-            }
-        }
-        
-        // Create component with correct constructor
-        ItemEnchantmentsComponent loricaEnchantComponent = new ItemEnchantmentsComponent(loricaEnchantMap, false);
-        lorica.set(DataComponentTypes.ENCHANTMENTS, loricaEnchantComponent);
-
-        ingredients = Arrays.asList(
-            new ItemStack(Items.IRON_INGOT, 7),
-            new ItemStack(Items.LEATHER, 2)
-        );
-
-        CulturalCraftingStation.RecipeRegistry.registerRecipe(
-            new CulturalCraftingStation.CulturalRecipe(
-                "roman_lorica",
-                ingredients,
-                lorica,
-                CulturalCraftingStation.StationType.ROMAN_FORGE,
-                120,
-                250
-            )
         );
     }
     
@@ -213,39 +143,12 @@ public class CulturalRecipeInitializer {
         // Add custom name using Components
         staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff"));
         
-        // Add enchantments directly using NBT Component
-        NbtList staffEnchantList = new NbtList();
+        // Add enchantments
+        Map<Enchantment, Integer> enchantments = new HashMap<>();
+        enchantments.put(Enchantments.FIRE_ASPECT, 2);
         
-        // Add Fire Aspect II
-        NbtCompound fireAspect = new NbtCompound();
-        fireAspect.putString("id", "minecraft:fire_aspect");
-        fireAspect.putInt("lvl", 2);
-        staffEnchantList.add(fireAspect);
-        
-        // Apply the enchantments using the appropriate method for Minecraft 1.21.4
-        Object2IntOpenHashMap<RegistryEntry<Enchantment>> staffEnchantMap = new Object2IntOpenHashMap<>();
-        for (int i = 0; i < staffEnchantList.size(); i++) {
-            NbtCompound enchant = staffEnchantList.getCompound(i);
-            String id = enchant.getString("id");
-            int level = enchant.getInt("lvl");
-            
-            // Create identifier with namespace and path
-            String[] parts = id.split(":", 2);
-            String namespace = parts.length > 1 ? parts[0] : "minecraft";
-            String path = parts.length > 1 ? parts[1] : id;
-            Identifier enchantId = new Identifier(namespace, path);
-            
-            Optional<RegistryEntry<Enchantment>> enchantment = wrapperLookup.getOptional(RegistryKeys.ENCHANTMENT)
-                .flatMap(registry -> registry.getRegistryLookup().get(enchantId));
-                
-            if (enchantment.isPresent()) {
-                staffEnchantMap.put(enchantment.get(), level);
-            }
-        }
-        
-        // Create component with correct constructor
-        ItemEnchantmentsComponent staffEnchantComponent = new ItemEnchantmentsComponent(staffEnchantMap, false);
-        staff.set(DataComponentTypes.ENCHANTMENTS, staffEnchantComponent);
+        // Apply enchantments using EnchantmentHelper
+        EnchantmentHelper.set(enchantments, staff);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),

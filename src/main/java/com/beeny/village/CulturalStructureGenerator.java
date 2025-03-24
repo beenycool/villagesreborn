@@ -190,7 +190,7 @@ public class CulturalStructureGenerator {
             Blocks.STONE, Blocks.STONE_BRICKS, Blocks.OAK_PLANKS, Blocks.SPRUCE_PLANKS, 
             Blocks.BIRCH_PLANKS, Blocks.JUNGLE_PLANKS, Blocks.ACACIA_PLANKS, Blocks.DARK_OAK_PLANKS, 
             Blocks.SANDSTONE, Blocks.SMOOTH_SANDSTONE, Blocks.CUT_SANDSTONE,
-            Blocks.COBBLESTONE, Blocks.BRICK_BLOCK
+            Blocks.COBBLESTONE, Blocks.BRICKS
         };
         
         // Process each block individually
