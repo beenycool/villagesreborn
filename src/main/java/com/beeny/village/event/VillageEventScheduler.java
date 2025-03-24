@@ -471,11 +471,14 @@ public class VillageEventScheduler {
             90  // 90 minutes duration
         );
         
+        // Store needed data in final variables before using in lambda
+        final String eventType_final = matchingTemplate.type;
+        
         // Notify nearby players
         notifyNearbyPlayers(world, center, radius * 2, player -> {
             player.sendMessage(Text.of("§6§lSpecial Event: " + description + "§r"), false);
             player.sendMessage(Text.of("§eA " + culture + " " + 
-                matchingTemplate.type + " has begun nearby!§r"), false);
+                eventType_final + " has begun nearby!§r"), false);
             player.sendMessage(Text.of("§eJoin in to earn reputation and rewards.§r"), false);
         });
         
