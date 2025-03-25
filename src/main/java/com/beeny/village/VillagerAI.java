@@ -223,7 +223,7 @@ public class VillagerAI {
         List<Monster> threats = world.getEntitiesByClass(
             Monster.class,
             new Box(pos).expand(8),
-            monster -> monster != null && monster instanceof Monster // Refined predicate to ensure compatibility
+            monster -> monster != null && Monster.class.isAssignableFrom(monster.getClass()) // Adjusted predicate for compatibility
         );
 
         return threats.isEmpty();
