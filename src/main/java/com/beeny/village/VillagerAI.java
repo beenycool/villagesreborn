@@ -1202,9 +1202,222 @@ public class VillagerAI {
 
             String type = parts.getOrDefault("ACTION", "walk");
             String targetStr = parts.get("TARGET");
+            BlockPos target;
+            
+            if (targetStr == null || targetStr.isEmpty()) {
+                target = villager.getBlockPos();
+            } else if (targetStr.equalsIgnoreCase("home")) {
+                target = homePos;
+            } else if (targetStr.equalsIgnoreCase("work")) {
+                target = findNearestWorkstation(villager.getVillagerData().getProfession().toString());
+            } else if (targetStr.equalsIgnoreCase("village")) {
+                target = findVillageCenter();
+            } else {
+                // Try to parse coordinates if provided
+                String[] coords = targetStr.split("\\s+");
+                if (coords.length == 3) {
+                    try {
+                        int x = Integer.parseInt(coords[0]);
+                        int y = Integer.parseInt(coords[1]);
+                        int z = Integer.parseInt(coords[2]);
+                        target = new BlockPos(x, y, z);
+                    } catch (NumberFormatException e) {
+                        target = villager.getBlockPos();
+                    }
+                } else {
+                    target = villager.getBlockPos();
+                }
+            }
+            
+            int duration = Integer.parseInt(parts.getOrDefault("DURATION", "1200"));
+            String detail = parts.getOrDefault("DETAIL", type);
+            int priority = Integer.parseInt(parts.getOrDefault("PRIORITY", "1"));
+            
+            return new Activity(type, target, duration, detail, priority);
+        } catch (Exception e) {
+            LOGGER.error("Error parsing activity: {}", e.getMessage());
+            return new Activity("idle", villager.getBlockPos(), 1200, "default activity", 1);
+        }
+    }
+
+    private List<String> getCurrentGoals() {
+        List<String> goals = new ArrayList<>();
+        
+        // Add goals based on current state
+        if (happiness < 50) {
+            goals.add("improve happiness");
+        }
+        
+        // Add profession-based goals
+        String profession = villager.getVillagerData().getProfession().toString().toLowerCase();
+        switch (profession) {
+            case "farmer":
+                goals.add("tend crops");
+                goals.add("harvest mature plants");
+                break;
+            case "librarian":
+                goals.add("organize books");
+                goals.add("read and learn");
+                break;
+            case "blacksmith":
+                goals.add("forge new tools");
+                goals.add("repair damaged equipment");
+                break;
+            case "cleric":
+                goals.add("brew potions");
+                goals.add("gather ingredients");
+                break;
+            default:
+                goals.add("work at profession station");
+        }
+        
+        // Time-based goals
+        if (villager.getWorld().getTimeOfDay() % 24000 > 12000) {
+            goals.add("rest for the night");
+        } else {
+            goals.add("be productive during day");
+        }
+        
+        // Social goals if relationships exist
+        if (!relationships.isEmpty()) {
+            goals.add("socialize with friends");
+        }
+        
+        return goals;
+    }
+
+    private void executeActivity(ServerWorld world) {
+        if (currentActivityDetail == null) return;
+        
+        String activityType = currentActivityDetail.type().toLowerCase();
+        
+        switch (activityType) {
+            case "walk":
+                moveToTarget(currentActivityDetail.target());
+                break;
+            case "work":
+                handleWorking(world);
+                break;
+            case "trade":
+                handleTrading();
+                break;
+            case "rest":
+                handleResting(world);
+                break;
+            case "socialize":
+                handleSocializing(world);
+                break;
+            case "hide":
+                // Find safe location and move there
+                BlockPos safeSpot = findSafeLocation(world);
+                moveToTarget(safeSpot);
+                break;
+            default:
+                // Default behavior - move towards target location
+                moveToTarget(currentActivityDetail.target());
+        }
+    }
+    
+    private BlockPos findSafeLocation(ServerWorld world) {
+        // Find nearby safe location (indoors or away from threats)
+        BlockPos pos = villager.getBlockPos();
+        for (int y = 0; y <= 2; y++) {
+            for (int r = 1; r <= 10; r++) {
+                for (int x = -r; x <= r; x++) {
+                    for (int z = -r; z <= r; z++) {
+                        if (Math.abs(x) != r && Math.abs(z) != r) continue; // Only check the perimeter
+                        
+                        BlockPos checkPos = pos.add(x, y, z);
+                        if (isSafeLocation(world, checkPos)) {
+                            return checkPos;
+                        }
+                    }
+                }
+            }
+        }
+        return homePos; // Default to home if no safe spot found
+    }
+    
+    private boolean isSafeLocation(ServerWorld world, BlockPos pos) {
+        // Check if position is safe (has roof overhead, no monsters nearby)
+        boolean hasRoof = false;
+        for (int y = 1; y <= 4; y++) {
+            if (!world.getBlockState(pos.up(y)).isAir()) {
+                hasRoof = true;
+                break;
+            }
+        }
+        
+        if (!hasRoof) return false;
+        
+        // Check for nearby threats
+        List<Monster> threats = world.getEntitiesByClass(
+            Monster.class,
+            new Box(pos).expand(8),
+            e -> true
+        );
+        
+        return threats.isEmpty();
+    }
+    
+    private void moveToTarget(BlockPos target) {
+        if (target == null) return;
+        
+        // Only navigate if not already at target
+        if (villager.getBlockPos().getSquaredDistance(target) > 2) {
+            villager.getNavigation().startMovingTo(
+                target.getX(), target.getY(), target.getZ(), 0.5D);
+        }
+    }
+
+    private BlockPos findNearestStructure(String structureType) {
+        // Simple implementation - return home position for now
+        return homePos;
+    }
+    
+    private void handleWorking(ServerWorld world) {
+        String profession = villager.getVillagerData().getProfession().toString().toLowerCase();
+        BlockPos workstation = findNearestWorkstation(profession);
+        
+        moveToTarget(workstation);
+        
+        // Work animations and particles
+        if (villager.getBlockPos().isWithinDistance(workstation, 2)) {
+            villager.swingHand(Hand.MAIN_HAND);
+            world.spawnParticles(
+                ParticleTypes.CRIT,
+                workstation.getX(), workstation.getY() + 1, workstation.getZ(),
+                3, 0.2, 0.2, 0.2, 0.01
+            );
+        }
+    }
 
     private void handleTrading() {
-        // Existing trading logic
+        // Check for nearby players to trade with
+        List<PlayerEntity> nearbyPlayers = villager.getWorld().getEntitiesByClass(
+            PlayerEntity.class,
+            new Box(villager.getBlockPos()).expand(5),
+            p -> true
+        );
+        
+        if (!nearbyPlayers.isEmpty()) {
+            PlayerEntity player = nearbyPlayers.get(0);
+            villager.getLookControl().lookAt(player, 30.0F, 30.0F);
+            
+            // Generate trade offers if none exist
+            if (villager.getOffers().isEmpty()) {
+                generateTrades();
+            }
+        }
+    }
+    
+    private void generateTrades() {
+        // Simple method to ensure villager has some basic trades
+        if (villager.getOffers() == null || villager.getOffers().isEmpty()) {
+            TradeOfferList offers = new TradeOfferList();
+            // Add fallback trades based on profession
+            villager.setOffers(offers);
+        }
     }
 
     private void handleResting(ServerWorld world) {
