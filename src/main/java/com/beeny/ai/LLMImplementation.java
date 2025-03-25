@@ -24,27 +24,22 @@ public class LLMImplementation {
 
     public LLMImplementation() {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
-        
         this.client = new OpenAIClientBuilder()
             .credential(new AzureKeyCredential(settings.getApiKey()))
             .endpoint(settings.getEndpoint())
             .buildClient();
-
         this.responseCache = new TTLCache(settings.getMaxCacheSize());
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         String cacheKey = generateCacheKey(prompt, context);
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
-
         String cachedResponse = responseCache.get(cacheKey);
         if (cachedResponse != null) {
             return CompletableFuture.completedFuture(cachedResponse);
         }
-
         CompletableFuture<String> future = new CompletableFuture<>();
         pendingRequests.put(cacheKey, future);
-
         executor.submit(() -> {
             try {
                 String response = callLLMWithRetry(prompt, context, 0);
@@ -56,27 +51,22 @@ public class LLMImplementation {
                 pendingRequests.remove(cacheKey);
             }
         });
-
         return future;
     }
 
     private String callLLMWithRetry(String prompt, Map<String, String> context, int retryCount) throws Exception {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
-
         try {
             List<ChatMessage> messages = new ArrayList<>();
             messages.add(new ChatMessage(ChatRole.SYSTEM, getSystemPrompt(context)));
             messages.add(new ChatMessage(ChatRole.USER, prompt));
-
             ChatCompletions completions = client.getChatCompletions(
                 settings.getModelType(),
                 new ChatCompletionsOptions(messages)
                     .setTemperature(Double.valueOf(settings.getTemperature()))
                     .setMaxTokens(settings.getContextLength())
             );
-
             return completions.getChoices().get(0).getMessage().getContent();
-
         } catch (Exception e) {
             if (retryCount < MAX_RETRIES) {
                 LOGGER.warn("LLM call failed, retrying ({}/{})", retryCount + 1, MAX_RETRIES);
@@ -93,14 +83,12 @@ public class LLMImplementation {
         systemPrompt.append("Generate specific, practical responses that can be implemented in Minecraft.\n");
         systemPrompt.append("Consider available blocks, game mechanics, and maintain cultural authenticity.\n");
         systemPrompt.append("Keep responses concise and focused on the requested format.\n\n");
-
         if (!context.isEmpty()) {
             systemPrompt.append("Current context:\n");
             context.forEach((key, value) -> 
                 systemPrompt.append("- ").append(key).append(": ").append(value).append("\n")
             );
         }
-
         return systemPrompt.toString();
     }
 
@@ -113,16 +101,13 @@ public class LLMImplementation {
     private static class CacheEntry {
         private final String value;
         private final long timestamp;
-
         public CacheEntry(String value) {
             this.value = value;
             this.timestamp = System.currentTimeMillis();
         }
-
         public boolean isExpired(long ttlMillis) {
             return System.currentTimeMillis() - timestamp > ttlMillis;
         }
-
         public String getValue() {
             return value;
         }
@@ -136,13 +121,10 @@ public class LLMImplementation {
                 return size() > maxSize || eldest.getValue().isExpired(settings.getCacheTTLSeconds() * 1000);
             }
         };
-        
         private final int maxSize;
-
         public TTLCache(int maxSize) {
             this.maxSize = maxSize;
         }
-
         public synchronized String get(String key) {
             CacheEntry entry = cache.get(key);
             if (entry != null) {
@@ -155,15 +137,12 @@ public class LLMImplementation {
             }
             return null;
         }
-
         public synchronized void put(String key, String value) {
             cache.put(key, new CacheEntry(value));
         }
-
         public synchronized int size() {
             return cache.size();
         }
-
         public synchronized void clear() {
             cache.clear();
         }
