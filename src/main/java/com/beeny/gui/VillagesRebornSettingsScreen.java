@@ -55,7 +55,7 @@ public class VillagesRebornSettingsScreen extends Screen {
     }
 
     private void openCulturesScreen() {
-        // TODO: Implement cultures configuration screen
+        client.setScreen(new CulturesConfigScreen(this, null));
     }
 
     private void toggleVillagerPvP() {
