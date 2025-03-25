@@ -47,7 +47,8 @@ public class VillagerManager {
     private final ReentrantReadWriteLock culturalEventLock = new ReentrantReadWriteLock();
     
     private ServerWorld world;
-    private String currentCulture;
+    private Culture.CultureType currentCulture;
+    private MinecraftServer server;
 
     private VillagerManager() {
         this.villagerAIs = new ConcurrentHashMap<>();
@@ -69,13 +70,15 @@ public class VillagerManager {
         return INSTANCE;
     }
 
-    public void registerSpawnRegion(BlockPos center, int radius, String culture) {
+    public void registerSpawnRegion(BlockPos center, int radius, String cultureName) {
         villageLock.writeLock().lock();
         try {
+            // Create a culture from the name
+            Culture culture = new Culture(Culture.CultureType.valueOf(cultureName.toUpperCase()));
             SpawnRegion region = new SpawnRegion(culture, center, radius);
             spawnRegions.put(center, region);
-            addVillageStats(center, culture.toString());
-            LOGGER.info("Registered new {} village at {}", culture.toString(), center);
+            addVillageStats(center, cultureName);
+            LOGGER.info("Registered new {} village at {}", cultureName, center);
         } finally {
             villageLock.writeLock().unlock();
         }
@@ -437,7 +440,7 @@ public class VillagerManager {
     }
 
     private void generateCulturalEvent(ServerWorld world) {
-        String culture = getCulture();
+        String culture = getCultureName();
         if (culture == null) return;
         
         culturalEventLock.writeLock().lock();
@@ -499,7 +502,7 @@ public class VillagerManager {
                     // Send event notification to nearby players
                     for (ServerPlayerEntity player : world.getPlayers()) {
                         SpawnRegion region = getNearestSpawnRegion(player.getBlockPos());
-                        if (region != null && region.getCulture().equals(culture)) {
+                        if (region != null && region.getCulture().toString().equals(culture)) {
                             VillageHudAPI.getInstance().showEventNotification(
                                 eventName, description, 200);
                         }
@@ -520,12 +523,16 @@ public class VillagerManager {
         });
     }
 
-    public void setCulture(String culture) {
-        this.currentCulture = culture;
+    public void setCulture(String cultureName) {
+        this.currentCulture = Culture.CultureType.valueOf(cultureName.toUpperCase());
     }
 
-    public String getCulture() {
+    public Culture.CultureType getCulture() {
         return currentCulture;
+    }
+    
+    public String getCultureName() {
+        return currentCulture != null ? currentCulture.getDisplayName() : "Unknown";
     }
 
     public void onVillagerSpawn(VillagerEntity villager, ServerWorld world) {
@@ -540,7 +547,7 @@ public class VillagerManager {
         // Generate personality and name asynchronously
         CompletableFuture.allOf(
             CompletableFuture.runAsync(() -> {
-                String personality = generatePersonality(region.getCulture());
+                String personality = generatePersonality(region.getCulture().toString());
                 VillagerAI ai = new VillagerAI(villager, personality);
                 villagerAIs.put(villager.getUuid(), ai);
 
@@ -549,7 +556,7 @@ public class VillagerManager {
                 VillagerDialogue dialogue = new VillagerDialogue(
                     villager,
                     memory,
-                    region.getCulture(),
+                    region.getCulture().toString(),
                     villager.getVillagerData().getProfession().toString()
                 );
                 villagerDialogues.put(villager.getUuid(), dialogue);
@@ -557,17 +564,17 @@ public class VillagerManager {
                 // Generate initial thoughts about their role
                 String situation = String.format("Starting life as a %s in a %s village",
                     villager.getVillagerData().getProfession(),
-                    region.getCulture()
+                    region.getCulture().toString()
                 );
                 ai.generateBehavior(situation);
             }),
-            nameGenerator.generateName(region.getCulture(),
+            nameGenerator.generateName(region.getCulture().toString(),
                 villager.getVillagerData().getProfession().toString())
                 .thenAccept(name -> {
                     villager.setCustomName(Text.of(name));
                     villager.setCustomNameVisible(true);
                     LOGGER.info("Initialized new villager: {} in {} village",
-                        name, region.getCulture());
+                        name, region.getCulture().toString());
                 })
         ).exceptionally(e -> {
             LOGGER.error("Error initializing villager", e);

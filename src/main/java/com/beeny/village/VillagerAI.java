@@ -615,7 +615,8 @@ public class VillagerAI {
         SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
         if (region == null) return "unknown culture";
         
-        StringBuilder context = new StringBuilder(region.getCulture());
+        StringBuilder context = new StringBuilder();
+        context.append(region.getCulture().toString());
         
         // Add active cultural events
         List<VillagerManager.CulturalEvent> events = vm.getCurrentEvents(villager.getBlockPos(), (ServerWorld)villager.getWorld());

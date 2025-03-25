@@ -9,12 +9,21 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.world.biome.BiomeKeys;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 public class SpawnRegion {
     private final Culture culture;
     private final BlockPos center;
     private final int radius;
 
+    public SpawnRegion(String cultureName, BlockPos center, int radius) {
+        // Convert String to Culture object
+        this.culture = new Culture(Culture.CultureType.valueOf(cultureName.toUpperCase()));
+        this.center = center;
+        this.radius = radius;
+    }
+    
     public SpawnRegion(Culture culture, BlockPos center, int radius) {
         this.culture = culture;
         this.center = center;
@@ -23,7 +32,9 @@ public class SpawnRegion {
 
     public boolean canSpawnInDimension(World world) {
         RegistryKey<World> dimension = world.getRegistryKey();
-        return switch (culture) {
+        Culture.CultureType cultureType = culture.getType();
+        
+        return switch (cultureType) {
             case NETHER -> World.NETHER.equals(dimension);
             case END -> World.END.equals(dimension);
             default -> World.OVERWORLD.equals(dimension);
@@ -35,9 +46,11 @@ public class SpawnRegion {
             return false;
         }
 
+        Culture.CultureType cultureType = culture.getType();
+
         // Handle dimension-specific cultures with biome specificity
         if (World.NETHER.equals(world.getRegistryKey())) {
-            if (culture != Culture.NETHER) return false;
+            if (cultureType != Culture.CultureType.NETHER) return false;
             
             // Specific Nether biome checks
             return world.getBiome(center).matchesKey(BiomeKeys.CRIMSON_FOREST) || 
@@ -48,7 +61,7 @@ public class SpawnRegion {
         }
         
         if (World.END.equals(world.getRegistryKey())) {
-            if (culture != Culture.END) return false;
+            if (cultureType != Culture.CultureType.END) return false;
             
             // End villages should only spawn in the outer islands, not the central island
             // Check if we're at least 1000 blocks from the center (0,0)
@@ -60,11 +73,11 @@ public class SpawnRegion {
         }
 
         // Get biome at position for overworld cultures
-        return switch (culture) {
+        return switch (cultureType) {
             case EGYPTIAN -> world.getBiome(center).matchesKey(BiomeKeys.DESERT);
             case ROMAN -> world.getBiome(center).matchesKey(BiomeKeys.PLAINS);
             case VICTORIAN -> world.getBiome(center).matchesKey(BiomeKeys.FOREST);
-            case NYC -> world.getBiome(center).matchesKey(BiomeKeys.WINDSWEPT_HILLS);
+            case MODERN -> world.getBiome(center).matchesKey(BiomeKeys.WINDSWEPT_HILLS);
             default -> false;
         };
     }
@@ -75,10 +88,12 @@ public class SpawnRegion {
             return false;
         }
 
+        Culture.CultureType cultureType = culture.getType();
+        
         // Dimension-specific checks
-        if (culture == Culture.NETHER) {
+        if (cultureType == Culture.CultureType.NETHER) {
             return isValidNetherSpawn(world, pos);
-        } else if (culture == Culture.END) {
+        } else if (cultureType == Culture.CultureType.END) {
             return isValidEndSpawn(world, pos);
         }
 
@@ -123,15 +138,17 @@ public class SpawnRegion {
         // Standard overworld checks with culture-specific requirements
         Block ground = world.getBlockState(pos.down()).getBlock();
         
-        return switch (culture) {
+        Culture.CultureType cultureType = culture.getType();
+        
+        return switch (cultureType) {
             case EGYPTIAN -> ground.getDefaultState().isOpaque() && 
                           hasEnoughSpace(world, pos, 7, 3); // Egyptian needs wider footprint
             case ROMAN -> ground.getDefaultState().isOpaque() && 
                        hasEnoughSpace(world, pos, 6, 4); // Roman needs taller buildings
             case VICTORIAN -> ground.getDefaultState().isOpaque() && 
                            hasEnoughSpace(world, pos, 5, 5); // Victorian has tall, narrow buildings
-            case NYC -> ground.getDefaultState().isOpaque() && 
-                     hasEnoughSpace(world, pos, 4, 7); // NYC has skyscrapers
+            case MODERN -> ground.getDefaultState().isOpaque() && 
+                     hasEnoughSpace(world, pos, 4, 7); // Modern has skyscrapers
             default -> ground.getDefaultState().isOpaque() && 
                      hasEnoughSpace(world, pos, 5, 3); // Default
         };
@@ -154,6 +171,10 @@ public class SpawnRegion {
     public Culture getCulture() {
         return culture;
     }
+    
+    public String getCultureName() {
+        return culture.toString();
+    }
 
     public BlockPos getCenter() {
         return center;
@@ -167,8 +188,17 @@ public class SpawnRegion {
         return new ArrayList<>(); // Placeholder implementation
     }
 
+    public Map<String, BlockPos> getCulturalStructuresByType() {
+        return new HashMap<>(); // Placeholder implementation
+    }
+
     public List<BlockPos> getPointsOfInterest() {
         return new ArrayList<>(); // Placeholder implementation
+    }
+    
+    public BlockPos getDistrictAtPosition(BlockPos pos) {
+        // Placeholder implementation
+        return null;
     }
 
     public boolean isWithinRegion(BlockPos pos) {

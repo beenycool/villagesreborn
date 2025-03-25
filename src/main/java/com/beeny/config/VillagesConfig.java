@@ -105,6 +105,11 @@ public class VillagesConfig {
     public UISettings getUISettings() {
         return uiSettings;
     }
+    
+    // Get LLMSettings
+    public LLMSettings getLLMSettings() {
+        return llmSettings;
+    }
 
     private static class ConfigData {
         String villageSpawnRate = "MEDIUM";
@@ -124,6 +129,16 @@ public class VillagesConfig {
         private int villageMarkerRange = 64;
         private boolean compactVillagerInfo = false;
         private String colorScheme = "DEFAULT";
+        
+        // Added missing fields
+        private String conversationLabelFormat = "Speaking to: {name}";
+        private String conversationHudPosition = "BOTTOM_RIGHT";
+        private boolean showCulture = true;
+        private boolean showProfession = true;
+        private int backgroundColor = 0x80000000; // Semi-transparent black
+        private int borderColor = 0x80FFFFFF;     // Semi-transparent white
+        private int labelColor = 0xFFFFFFFF;      // White
+        private int nameColor = 0xFFFFFF00;       // Yellow
         
         public boolean isShowVillagerNameTags() {
             return showVillagerNameTags;
@@ -187,6 +202,84 @@ public class VillagesConfig {
         
         public void toggleCompactInfo() {
             this.compactVillagerInfo = !this.compactVillagerInfo;
+        }
+    }
+    
+    /**
+     * Settings related to the LLM (Language Learning Model) configuration
+     */
+    public class LLMSettings {
+        private String apiKey = "";
+        private String model = "gpt-3.5-turbo";
+        private String endpoint = "https://api.openai.com/v1/chat/completions";
+        private int maxTokens = 1000;
+        private boolean localModel = false;
+        private String localModelPath = "";
+        private int contextLength = 4;
+        private boolean useMemory = true;
+        
+        public String getApiKey() {
+            return apiKey;
+        }
+        
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+        
+        public String getModel() {
+            return model;
+        }
+        
+        public void setModel(String model) {
+            this.model = model;
+        }
+        
+        public String getEndpoint() {
+            return endpoint;
+        }
+        
+        public void setEndpoint(String endpoint) {
+            this.endpoint = endpoint;
+        }
+        
+        public int getMaxTokens() {
+            return maxTokens;
+        }
+        
+        public void setMaxTokens(int maxTokens) {
+            this.maxTokens = maxTokens;
+        }
+        
+        public boolean isLocalModel() {
+            return localModel;
+        }
+        
+        public void setLocalModel(boolean localModel) {
+            this.localModel = localModel;
+        }
+        
+        public String getLocalModelPath() {
+            return localModelPath;
+        }
+        
+        public void setLocalModelPath(String localModelPath) {
+            this.localModelPath = localModelPath;
+        }
+        
+        public int getContextLength() {
+            return contextLength;
+        }
+        
+        public void setContextLength(int contextLength) {
+            this.contextLength = contextLength;
+        }
+        
+        public boolean isUseMemory() {
+            return useMemory;
+        }
+        
+        public void setUseMemory(boolean useMemory) {
+            this.useMemory = useMemory;
         }
     }
 }
