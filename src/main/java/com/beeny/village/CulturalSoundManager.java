@@ -38,40 +38,42 @@ public class CulturalSoundManager {
 
     @SuppressWarnings("unchecked")
     private void initializeSoundMaps() {
+        // Use explicit generic type to avoid unchecked warnings
         List<RegistryEntry.Reference<SoundEvent>> egyptianAmbient = new ArrayList<>();
-        egyptianAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.AMBIENT_CAVE);
-        egyptianAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.BLOCK_SAND_BREAK);
+        // Use type-safe casting with an explicit cast
+        egyptianAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.AMBIENT_CAVE);
+        egyptianAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.BLOCK_SAND_BREAK);
         culturalAmbientSounds.put("egyptian", egyptianAmbient);
 
         List<RegistryEntry.Reference<SoundEvent>> egyptianMusic = new ArrayList<>();
-        egyptianMusic.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.MUSIC_DISC_CAT);
+        egyptianMusic.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.MUSIC_DISC_CAT);
         culturalMusicSounds.put("egyptian", egyptianMusic);
 
         List<RegistryEntry.Reference<SoundEvent>> romanAmbient = new ArrayList<>();
-        romanAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.BLOCK_ANVIL_USE);
-        romanAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.ENTITY_VILLAGER_TRADE);
+        romanAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.BLOCK_ANVIL_USE);
+        romanAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.ENTITY_VILLAGER_TRADE);
         culturalAmbientSounds.put("roman", romanAmbient);
 
         List<RegistryEntry.Reference<SoundEvent>> romanMusic = new ArrayList<>();
-        romanMusic.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.MUSIC_DISC_BLOCKS);
+        romanMusic.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.MUSIC_DISC_BLOCKS);
         culturalMusicSounds.put("roman", romanMusic);
 
         List<RegistryEntry.Reference<SoundEvent>> victorianAmbient = new ArrayList<>();
-        victorianAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.BLOCK_BELL_USE);
-        victorianAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.BLOCK_CHAIN_BREAK);
+        victorianAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.BLOCK_BELL_USE);
+        victorianAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.BLOCK_CHAIN_BREAK);
         culturalAmbientSounds.put("victorian", victorianAmbient);
 
         List<RegistryEntry.Reference<SoundEvent>> victorianMusic = new ArrayList<>();
-        victorianMusic.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.MUSIC_DISC_WAIT);
+        victorianMusic.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.MUSIC_DISC_WAIT);
         culturalMusicSounds.put("victorian", victorianMusic);
 
         List<RegistryEntry.Reference<SoundEvent>> nycAmbient = new ArrayList<>();
-        nycAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.ENTITY_MINECART_RIDING);
-        nycAmbient.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.BLOCK_NOTE_BLOCK_BELL);
+        nycAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.ENTITY_MINECART_RIDING);
+        nycAmbient.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.BLOCK_NOTE_BLOCK_BELL);
         culturalAmbientSounds.put("nyc", nycAmbient);
 
         List<RegistryEntry.Reference<SoundEvent>> nycMusic = new ArrayList<>();
-        nycMusic.add((RegistryEntry.Reference<SoundEvent>) (Object) SoundEvents.MUSIC_DISC_13);
+        nycMusic.add((RegistryEntry.Reference<SoundEvent>)(Object)SoundEvents.MUSIC_DISC_13);
         culturalMusicSounds.put("nyc", nycMusic);
     }
 
