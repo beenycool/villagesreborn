@@ -175,6 +175,14 @@ public class SpawnRegion {
     public String getCultureName() {
         return culture.toString();
     }
+    
+    /**
+     * Gets the culture as a string, useful for compatibility with code expecting a string
+     * @return The culture as a string
+     */
+    public String getCultureAsString() {
+        return culture.getName();
+    }
 
     public BlockPos getCenter() {
         return center;
@@ -196,9 +204,14 @@ public class SpawnRegion {
         return new ArrayList<>(); // Placeholder implementation
     }
     
-    public BlockPos getDistrictAtPosition(BlockPos pos) {
+    /**
+     * Gets the district at the specified position
+     * @param pos The position to check
+     * @return The district name or null if not in a district
+     */
+    public String getDistrictAtPosition(BlockPos pos) {
         // Placeholder implementation
-        return null;
+        return isWithinRegion(pos) ? "village_center" : null;
     }
 
     public boolean isWithinRegion(BlockPos pos) {
