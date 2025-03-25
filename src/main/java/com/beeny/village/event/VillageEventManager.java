@@ -111,8 +111,8 @@ public class VillageEventManager {
         if (random.nextFloat() < 0.05f) { // 5% chance per tick
             VillagerManager.getInstance().getSpawnRegions().forEach(region -> {
                 List<VillagerAI> villagers = getVillagersInRegion(region);
-                if (!villagers.isEmpty() && getActiveEvents(region.getCulture()).size() < 3) {
-                    generateRandomEvent(region.getCulture(), world, villagers)
+                if (!villagers.isEmpty() && getActiveEvents(region.getCultureAsString()).size() < 3) {
+                    generateRandomEvent(region.getCultureAsString(), world, villagers)
                         .thenAccept(this::startEvent);
                 }
             });
@@ -191,10 +191,10 @@ public class VillageEventManager {
         }
 
         // Try to find culturally appropriate location based on event type
-        Map<String, BlockPos> structures = region.getCulturalStructures();
+        Map<String, BlockPos> structures = region.getCulturalStructuresByType();
         String eventType = "gathering"; // Default type
         
-        switch(region.getCulture().toLowerCase()) {
+        switch(region.getCultureAsString().toLowerCase()) {
             case "roman" -> {
                 // For bathing or social events, prefer bathhouse
                 if (eventType.toLowerCase().contains("bath") ||
@@ -253,8 +253,8 @@ public class VillageEventManager {
         return VillagerManager.getInstance().getActiveVillagers().stream()
             .filter(ai -> {
                 BlockPos pos = ai.getVillager().getBlockPos();
-                return region.isWithinRegion(pos) && 
-                       isAppropriateEventParticipant(ai, region.getCulture());
+                return region.isWithinRegion(pos) &&
+                       isAppropriateEventParticipant(ai, region.getCultureAsString());
             })
             .collect(Collectors.toList());
     }
