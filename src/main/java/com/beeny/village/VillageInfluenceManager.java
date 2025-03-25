@@ -2,11 +2,13 @@ package com.beeny.village;
 
 import com.beeny.village.event.PlayerEventParticipation;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 import net.minecraft.particle.ParticleTypes;
 import java.util.*;
@@ -275,6 +277,15 @@ public class VillageInfluenceManager {
         }
         
         /**
+         * Add a player as contributor to this village
+         */
+        public void addContributor(UUID playerUUID) {
+            if (!contributors.contains(playerUUID)) {
+                contributors.add(playerUUID);
+            }
+        }
+        
+        /**
          * Check if village should level up based on development points
          */
         private void checkForLevelUp() {
@@ -483,8 +494,7 @@ public class VillageInfluenceManager {
                  culture2.equals("roman") && culture1.equals("egyptian")) {
             // Historical rivalry
             relationship.adjustRelationship(-20, "Historical tensions");
-        } else if (culture1.equals("victorian") && culture2.equals("nyc") || 
-                 culture2.equals("victorian") && culture1.equals("nyc")) {
+        } else if (culture1.equals("victorian") && culture2.equals("nyc")) {
             // Modern cultures understand each other
             relationship.adjustRelationship(20, "Modern cultural similarities");
         }
