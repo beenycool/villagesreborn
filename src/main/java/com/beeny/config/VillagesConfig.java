@@ -203,6 +203,71 @@ public class VillagesConfig {
         public void toggleCompactInfo() {
             this.compactVillagerInfo = !this.compactVillagerInfo;
         }
+        
+        // Add getters and setters for UI-related fields
+        public String getConversationLabelFormat() {
+            return conversationLabelFormat;
+        }
+        
+        public void setConversationLabelFormat(String conversationLabelFormat) {
+            this.conversationLabelFormat = conversationLabelFormat;
+        }
+        
+        public String getConversationHudPosition() {
+            return conversationHudPosition;
+        }
+        
+        public void setConversationHudPosition(String conversationHudPosition) {
+            this.conversationHudPosition = conversationHudPosition;
+        }
+        
+        public boolean isShowCulture() {
+            return showCulture;
+        }
+        
+        public void setShowCulture(boolean showCulture) {
+            this.showCulture = showCulture;
+        }
+        
+        public boolean isShowProfession() {
+            return showProfession;
+        }
+        
+        public void setShowProfession(boolean showProfession) {
+            this.showProfession = showProfession;
+        }
+        
+        public int getBackgroundColor() {
+            return backgroundColor;
+        }
+        
+        public void setBackgroundColor(int backgroundColor) {
+            this.backgroundColor = backgroundColor;
+        }
+        
+        public int getBorderColor() {
+            return borderColor;
+        }
+        
+        public void setBorderColor(int borderColor) {
+            this.borderColor = borderColor;
+        }
+        
+        public int getLabelColor() {
+            return labelColor;
+        }
+        
+        public void setLabelColor(int labelColor) {
+            this.labelColor = labelColor;
+        }
+        
+        public int getNameColor() {
+            return nameColor;
+        }
+        
+        public void setNameColor(int nameColor) {
+            this.nameColor = nameColor;
+        }
     }
     
     /**
@@ -217,6 +282,11 @@ public class VillagesConfig {
         private String localModelPath = "";
         private int contextLength = 4;
         private boolean useMemory = true;
+        // Add missing fields
+        private String modelType = "gpt-3.5-turbo";
+        private float temperature = 0.7f;
+        private int maxCacheSize = 100;
+        private int cacheTTLSeconds = 300; // 5 minutes
         
         public String getApiKey() {
             return apiKey;
@@ -280,6 +350,39 @@ public class VillagesConfig {
         
         public void setUseMemory(boolean useMemory) {
             this.useMemory = useMemory;
+        }
+        
+        // Add getters and setters for new fields
+        public String getModelType() {
+            return modelType;
+        }
+        
+        public void setModelType(String modelType) {
+            this.modelType = modelType;
+        }
+        
+        public float getTemperature() {
+            return temperature;
+        }
+        
+        public void setTemperature(float temperature) {
+            this.temperature = temperature;
+        }
+        
+        public int getMaxCacheSize() {
+            return maxCacheSize;
+        }
+        
+        public void setMaxCacheSize(int maxCacheSize) {
+            this.maxCacheSize = maxCacheSize;
+        }
+        
+        public int getCacheTTLSeconds() {
+            return cacheTTLSeconds;
+        }
+        
+        public void setCacheTTLSeconds(int cacheTTLSeconds) {
+            this.cacheTTLSeconds = cacheTTLSeconds;
         }
     }
 }

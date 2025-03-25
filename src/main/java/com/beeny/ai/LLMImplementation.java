@@ -26,11 +26,11 @@ public class LLMImplementation {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
         
         this.client = new OpenAIClientBuilder()
-            .credential(new AzureKeyCredential(settings.apiKey))
-            .endpoint(settings.endpoint)
+            .credential(new AzureKeyCredential(settings.getApiKey()))
+            .endpoint(settings.getEndpoint())
             .buildClient();
 
-        this.responseCache = new TTLCache(settings.maxCacheSize);
+        this.responseCache = new TTLCache(settings.getMaxCacheSize());
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
@@ -69,10 +69,10 @@ public class LLMImplementation {
             messages.add(new ChatMessage(ChatRole.USER, prompt));
 
             ChatCompletions completions = client.getChatCompletions(
-                settings.modelType,
+                settings.getModelType(),
                 new ChatCompletionsOptions(messages)
-                    .setTemperature(settings.temperature)
-                    .setMaxTokens(settings.contextLength)
+                    .setTemperature(settings.getTemperature())
+                    .setMaxTokens(settings.getContextLength())
             );
 
             return completions.getChoices().get(0).getMessage().getContent();
@@ -133,7 +133,7 @@ public class LLMImplementation {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
                 VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
-                return size() > maxSize || eldest.getValue().isExpired(settings.cacheTTLSeconds * 1000);
+                return size() > maxSize || eldest.getValue().isExpired(settings.getCacheTTLSeconds() * 1000);
             }
         };
         
@@ -147,7 +147,7 @@ public class LLMImplementation {
             CacheEntry entry = cache.get(key);
             if (entry != null) {
                 VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
-                if (!entry.isExpired(settings.cacheTTLSeconds * 1000)) {
+                if (!entry.isExpired(settings.getCacheTTLSeconds() * 1000)) {
                     return entry.getValue();
                 } else {
                     cache.remove(key);
