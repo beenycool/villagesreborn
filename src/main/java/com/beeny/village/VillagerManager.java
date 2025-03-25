@@ -72,10 +72,10 @@ public class VillagerManager {
     public void registerSpawnRegion(BlockPos center, int radius, String culture) {
         villageLock.writeLock().lock();
         try {
-            SpawnRegion region = new SpawnRegion(center, radius, culture);
+            SpawnRegion region = new SpawnRegion(culture, center, radius);
             spawnRegions.put(center, region);
-            addVillageStats(center, culture);
-            LOGGER.info("Registered new {} village at {}", culture, center);
+            addVillageStats(center, culture.toString());
+            LOGGER.info("Registered new {} village at {}", culture.toString(), center);
         } finally {
             villageLock.writeLock().unlock();
         }
@@ -221,7 +221,7 @@ public class VillagerManager {
             String timeContext = getTimeContext(world.getTimeOfDay());
             String sharedHistory = getSharedHistory(villager1, villager2);
             SpawnRegion region = getNearestSpawnRegion(v1.getBlockPos());
-            String culturalContext = region != null ? region.getCulture() : "unknown";
+            String culturalContext = region != null ? region.getCulture().toString() : "unknown";
             String weather = world.isRaining() ? "raining" : "clear";
             String nearbyActivities = getNearbyActivities(world, v1.getBlockPos());
             

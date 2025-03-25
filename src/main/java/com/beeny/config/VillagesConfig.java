@@ -19,6 +19,7 @@ public class VillagesConfig {
     
     // Add UISettings instance
     private UISettings uiSettings;
+    private LLMSettings llmSettings; // Placeholder for LLMSettings
 
     private VillagesConfig() {
         configFile = FabricLoader.getInstance().getConfigDir().resolve("villagesreborn.json").toFile();

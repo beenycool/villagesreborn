@@ -7,6 +7,8 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.world.biome.BiomeKeys;
+import java.util.List;
+import java.util.ArrayList;
 
 public class SpawnRegion {
     private final Culture culture;
@@ -159,5 +161,22 @@ public class SpawnRegion {
 
     public int getRadius() {
         return radius;
+    }
+
+    public List<BlockPos> getCulturalStructures() {
+        return new ArrayList<>(); // Placeholder implementation
+    }
+
+    public List<BlockPos> getPointsOfInterest() {
+        return new ArrayList<>(); // Placeholder implementation
+    }
+
+    public boolean isWithinRegion(BlockPos pos) {
+        double distance = pos.getSquaredDistance(center);
+        return distance <= radius * radius;
+    }
+
+    public void addPointOfInterest(BlockPos poi) {
+        // Placeholder implementation
     }
 }

@@ -1,35 +1,75 @@
 package com.beeny.village;
 
-public enum Culture {
-    ROMAN("roman", "Roman"),
-    EGYPTIAN("egyptian", "Egyptian"),
-    VICTORIAN("victorian", "Victorian"),
-    NYC("nyc", "NYC"),
-    NETHER("nether", "Nether"),
-    END("end", "End");
+import java.util.*;
 
-    private final String id;
-    private final String displayName;
-
-    Culture(String id, String displayName) {
-        this.id = id;
-        this.displayName = displayName;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public String getDisplayName() {
-        return displayName;
+public class Culture {
+    private final CultureType type;
+    private final CultureType secondaryType;
+    private final float hybridRatio;
+    private final Set<CulturalTrait> traits;
+    private final Set<String> preferredBiomes;
+    
+    public Culture(CultureType type) {
+        this(type, null, 0.0f);
     }
     
-    // Missing nested types that are referenced by other classes
-    
+    public Culture(CultureType type, CultureType secondaryType, float hybridRatio) {
+        this.type = type;
+        this.secondaryType = secondaryType;
+        this.hybridRatio = hybridRatio;
+        this.traits = new HashSet<>();
+        this.preferredBiomes = new HashSet<>();
+    }
+
+    public CultureType getType() {
+        return type;
+    }
+
+    public CultureType getSecondaryType() {
+        return secondaryType;
+    }
+
+    public boolean isHybrid() {
+        return secondaryType != null;
+    }
+
+    public float getHybridRatio() {
+        return hybridRatio;
+    }
+
+    public Set<CulturalTrait> getTraits() {
+        return Collections.unmodifiableSet(traits);
+    }
+
+    public void addTrait(CulturalTrait trait) {
+        traits.add(trait);
+    }
+
+    public void removeTrait(CulturalTrait trait) {
+        traits.remove(trait);
+    }
+
+    public Set<String> getPreferredBiomes() {
+        return Collections.unmodifiableSet(preferredBiomes);
+    }
+
+    public void addPreferredBiome(String biome) {
+        preferredBiomes.add(biome);
+    }
+
+    @Override
+    public String toString() {
+        return type.getDisplayName() + (isHybrid() ? "-" + secondaryType.getDisplayName() : "");
+    }
+
     /**
      * Represents different cultural types for resource generation and crafting
      */
     public enum CultureType {
+        MEDIEVAL("medieval", "Medieval"),
+        GREEK("greek", "Greek"),
+        JAPANESE("japanese", "Japanese"),
+        MAYAN("mayan", "Mayan"),
         ROMAN("roman", "Roman"),
         EGYPTIAN("egyptian", "Egyptian"),
         VICTORIAN("victorian", "Victorian"),
@@ -92,12 +132,12 @@ public enum Culture {
      */
     public enum CulturalTrait {
         TRADITIONAL("traditional", "Traditional"),
-        PROGRESSIVE("progressive", "Progressive"),
-        PEACEFUL("peaceful", "Peaceful"),
-        AGGRESSIVE("aggressive", "Aggressive"),
-        DIPLOMATIC("diplomatic", "Diplomatic"),
-        ISOLATIONIST("isolationist", "Isolationist"),
-        INDUSTRIOUS("industrious", "Industrious"),
+        INNOVATIVE("innovative", "Innovative"),
+        COMMUNAL("communal", "Communal"),
+        INDIVIDUALISTIC("individualistic", "Individualistic"),
+        CONSERVATIVE("conservative", "Conservative"),
+        ADAPTABLE("adaptable", "Adaptable"),
+        CRAFTING_FOCUSED("crafting_focused", "Crafting Focused"),
         ARTISTIC("artistic", "Artistic"),
         SCHOLARLY("scholarly", "Scholarly"),
         SPIRITUAL("spiritual", "Spiritual");

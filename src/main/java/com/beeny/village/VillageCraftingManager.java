@@ -64,7 +64,7 @@ public class VillageCraftingManager {
         VillagerAI ai = villagerManager.getVillagerAI(villager.getUuid());
         VillagerManager vm = VillagerManager.getInstance();
         SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        String culture = region != null ? region.getCulture() : "unknown";
+        String culture = region != null ? region.getCulture().toString() : "unknown";
         CraftingRecipe recipe = findRecipe(culture, recipeId);
 
         if (recipe == null) {
