@@ -452,6 +452,13 @@ public class VillageInfluenceManager {
     /**
      * Register a new village for development tracking
      */
+    public void registerVillage(BlockPos center, Culture culture) {
+        registerVillage(center, culture.getName());
+    }
+    
+    /**
+     * Register a new village for development tracking with culture as string
+     */
     public void registerVillage(BlockPos center, String culture) {
         if (!villageDevelopment.containsKey(center)) {
             villageDevelopment.put(center, new VillageDevelopmentData(center, culture));
@@ -478,23 +485,27 @@ public class VillageInfluenceManager {
     private VillageRelationship createInitialRelationship(String culture1, String culture2) {
         VillageRelationship relationship = new VillageRelationship();
         
+        // Convert culture names to lowercase for comparison
+        String c1 = culture1.toLowerCase();
+        String c2 = culture2.toLowerCase();
+        
         // Different cultures may have predisposed relationships
-        if (culture1.equals(culture2)) {
+        if (c1.equals(c2)) {
             // Same culture tends to be friendly
             relationship.adjustRelationship(30, "Cultural kinship");
-        } else if ((culture1.equals("nether") && !culture2.equals("end")) || 
-                 (culture2.equals("nether") && !culture1.equals("end"))) {
+        } else if ((c1.equals("nether") && !c2.equals("end")) || 
+                 (c2.equals("nether") && !c1.equals("end"))) {
             // Nether villages tend to be hostile to non-End villages
             relationship.adjustRelationship(-40, "Cultural tensions");
-        } else if ((culture1.equals("end") && culture2.equals("nether")) || 
-                 (culture2.equals("end") && culture1.equals("nether"))) {
+        } else if ((c1.equals("end") && c2.equals("nether")) || 
+                 (c2.equals("end") && c1.equals("nether"))) {
             // End and Nether have an ancient understanding
             relationship.adjustRelationship(10, "Dimensional understanding");
-        } else if (culture1.equals("roman") && culture2.equals("egyptian") || 
-                 culture2.equals("roman") && culture1.equals("egyptian")) {
+        } else if (c1.equals("roman") && c2.equals("egyptian") || 
+                 c2.equals("roman") && c1.equals("egyptian")) {
             // Historical rivalry
             relationship.adjustRelationship(-20, "Historical tensions");
-        } else if (culture1.equals("victorian") && culture2.equals("nyc")) {
+        } else if (c1.equals("victorian") && c2.equals("nyc")) {
             // Modern cultures understand each other
             relationship.adjustRelationship(20, "Modern cultural similarities");
         }
