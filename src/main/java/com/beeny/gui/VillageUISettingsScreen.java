@@ -41,13 +41,13 @@ public class VillageUISettingsScreen extends Screen {
         // Label format field
         this.labelFormatField = new TextFieldWidget(
             this.textRenderer, centerX, startY, buttonWidth, buttonHeight, Text.literal("Label Format"));
-        this.labelFormatField.setText(uiSettings.conversationLabelFormat);
+        this.labelFormatField.setText(uiSettings.getConversationLabelFormat());
         this.labelFormatField.setMaxLength(50);
         this.addDrawableChild(this.labelFormatField);
         startY += 30;
         
         // Position dropdown
-        ConversationHud.HudPosition currentPosition = ConversationHud.HudPosition.valueOf(uiSettings.conversationHudPosition);
+        ConversationHud.HudPosition currentPosition = ConversationHud.HudPosition.valueOf(uiSettings.getConversationHudPosition());
         this.positionButton = CyclingButtonWidget.<ConversationHud.HudPosition>builder(
                 position -> Text.literal(position.name()))
             .values(Arrays.asList(ConversationHud.HudPosition.values()))
@@ -59,7 +59,7 @@ public class VillageUISettingsScreen extends Screen {
         // Show culture toggle
         this.showCultureButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
             .values(List.of(true, false))
-            .initially(uiSettings.showCulture)
+            .initially(uiSettings.isShowCulture())
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Culture"));
         this.addDrawableChild(this.showCultureButton);
         startY += 30;
@@ -67,7 +67,7 @@ public class VillageUISettingsScreen extends Screen {
         // Show profession toggle
         this.showProfessionButton = CyclingButtonWidget.<Boolean>builder(value -> value ? Text.literal("On") : Text.literal("Off"))
             .values(List.of(true, false))
-            .initially(uiSettings.showProfession)
+            .initially(uiSettings.isShowProfession())
             .build(centerX, startY, buttonWidth, buttonHeight, Text.literal("Show Profession"));
         this.addDrawableChild(this.showProfessionButton);
         startY += 30;
@@ -75,7 +75,7 @@ public class VillageUISettingsScreen extends Screen {
         // Background color field (hex format)
         this.backgroundColorField = new TextFieldWidget(
             this.textRenderer, centerX, startY, buttonWidth, buttonHeight, Text.literal("Background Color"));
-        this.backgroundColorField.setText(String.format("%08X", uiSettings.backgroundColor));
+        this.backgroundColorField.setText(String.format("%08X", uiSettings.getBackgroundColor()));
         this.backgroundColorField.setMaxLength(8);
         this.addDrawableChild(this.backgroundColorField);
         startY += 30;
@@ -83,7 +83,7 @@ public class VillageUISettingsScreen extends Screen {
         // Border color field (hex format)
         this.borderColorField = new TextFieldWidget(
             this.textRenderer, centerX, startY, buttonWidth, buttonHeight, Text.literal("Border Color"));
-        this.borderColorField.setText(String.format("%08X", uiSettings.borderColor));
+        this.borderColorField.setText(String.format("%08X", uiSettings.getBorderColor()));
         this.borderColorField.setMaxLength(8);
         this.addDrawableChild(this.borderColorField);
         startY += 30;
@@ -91,7 +91,7 @@ public class VillageUISettingsScreen extends Screen {
         // Label color field
         this.labelColorField = new TextFieldWidget(
             this.textRenderer, centerX, startY, buttonWidth, buttonHeight, Text.literal("Label Color"));
-        this.labelColorField.setText(String.format("%08X", uiSettings.labelColor));
+        this.labelColorField.setText(String.format("%08X", uiSettings.getLabelColor()));
         this.labelColorField.setMaxLength(8);
         this.addDrawableChild(this.labelColorField);
         startY += 30;
@@ -99,7 +99,7 @@ public class VillageUISettingsScreen extends Screen {
         // Name color field
         this.nameColorField = new TextFieldWidget(
             this.textRenderer, centerX, startY, buttonWidth, buttonHeight, Text.literal("Name Color"));
-        this.nameColorField.setText(String.format("%08X", uiSettings.nameColor));
+        this.nameColorField.setText(String.format("%08X", uiSettings.getNameColor()));
         this.nameColorField.setMaxLength(8);
         this.addDrawableChild(this.nameColorField);
         startY += 30;
@@ -148,10 +148,10 @@ public class VillageUISettingsScreen extends Screen {
         context.drawTextWithShadow(this.textRenderer, helpText, this.width / 2 - helpWidth / 2, 330, 0xAAAAAA);
         
         // Draw color preview boxes
-        showColorPreview(context, uiSettings.backgroundColor, this.width / 2 + 110, 40 + 30 * 4);
-        showColorPreview(context, uiSettings.borderColor, this.width / 2 + 110, 40 + 30 * 5);
-        showColorPreview(context, uiSettings.labelColor, this.width / 2 + 110, 40 + 30 * 6);
-        showColorPreview(context, uiSettings.nameColor, this.width / 2 + 110, 40 + 30 * 7);
+        showColorPreview(context, uiSettings.getBackgroundColor(), this.width / 2 + 110, 40 + 30 * 4);
+        showColorPreview(context, uiSettings.getBorderColor(), this.width / 2 + 110, 40 + 30 * 5);
+        showColorPreview(context, uiSettings.getLabelColor(), this.width / 2 + 110, 40 + 30 * 6);
+        showColorPreview(context, uiSettings.getNameColor(), this.width / 2 + 110, 40 + 30 * 7);
         
         super.render(context, mouseX, mouseY, delta);
     }
@@ -171,23 +171,23 @@ public class VillageUISettingsScreen extends Screen {
         // Save all settings to config
         try {
             // Save position
-            uiSettings.conversationHudPosition = positionButton.getValue().name();
+            uiSettings.setConversationHudPosition(positionButton.getValue().name());
             
             // Save display options
-            uiSettings.conversationLabelFormat = labelFormatField.getText();
-            if (uiSettings.conversationLabelFormat.isEmpty()) {
-                uiSettings.conversationLabelFormat = "Speaking to: {name}";
+            uiSettings.setConversationLabelFormat(labelFormatField.getText());
+            if (uiSettings.getConversationLabelFormat().isEmpty()) {
+                uiSettings.setConversationLabelFormat("Speaking to: {name}");
             }
             
-            uiSettings.showCulture = showCultureButton.getValue();
-            uiSettings.showProfession = showProfessionButton.getValue();
+            uiSettings.setShowCulture(showCultureButton.getValue());
+            uiSettings.setShowProfession(showProfessionButton.getValue());
             
             // Parse color values (with error handling)
             try {
-                uiSettings.backgroundColor = Integer.parseUnsignedInt(backgroundColorField.getText(), 16);
-                uiSettings.borderColor = Integer.parseUnsignedInt(borderColorField.getText(), 16);
-                uiSettings.labelColor = Integer.parseUnsignedInt(labelColorField.getText(), 16);
-                uiSettings.nameColor = Integer.parseUnsignedInt(nameColorField.getText(), 16);
+                uiSettings.setBackgroundColor(Integer.parseUnsignedInt(backgroundColorField.getText(), 16));
+                uiSettings.setBorderColor(Integer.parseUnsignedInt(borderColorField.getText(), 16));
+                uiSettings.setLabelColor(Integer.parseUnsignedInt(labelColorField.getText(), 16));
+                uiSettings.setNameColor(Integer.parseUnsignedInt(nameColorField.getText(), 16));
             } catch (NumberFormatException e) {
                 LOGGER.error("Failed to parse color value", e);
             }

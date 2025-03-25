@@ -8,6 +8,7 @@ public class Culture {
     private final float hybridRatio;
     private final Set<CulturalTrait> traits;
     private final Set<String> preferredBiomes;
+    private final Map<Season, String> seasonalEvents;
     
     public Culture(CultureType type) {
         this(type, null, 0.0f);
@@ -19,6 +20,7 @@ public class Culture {
         this.hybridRatio = hybridRatio;
         this.traits = new HashSet<>();
         this.preferredBiomes = new HashSet<>();
+        this.seasonalEvents = new HashMap<>();
     }
 
     public CultureType getType() {
@@ -56,10 +58,32 @@ public class Culture {
     public void addPreferredBiome(String biome) {
         preferredBiomes.add(biome);
     }
+    
+    public String getSeasonalEvent(Season season) {
+        return seasonalEvents.getOrDefault(season, "Festival");
+    }
+    
+    public void setSeasonalEvent(Season season, String eventName) {
+        seasonalEvents.put(season, eventName);
+    }
+    
+    /**
+     * Returns the culture as a string for compatibility purposes
+     */
+    public String getName() {
+        return toString();
+    }
 
     @Override
     public String toString() {
         return type.getDisplayName() + (isHybrid() ? "-" + secondaryType.getDisplayName() : "");
+    }
+    
+    /**
+     * Returns a string representation of the culture in lowercase for string comparisons
+     */
+    public String toLowerCase() {
+        return toString().toLowerCase();
     }
 
     /**
@@ -140,7 +164,11 @@ public class Culture {
         CRAFTING_FOCUSED("crafting_focused", "Crafting Focused"),
         ARTISTIC("artistic", "Artistic"),
         SCHOLARLY("scholarly", "Scholarly"),
-        SPIRITUAL("spiritual", "Spiritual");
+        SPIRITUAL("spiritual", "Spiritual"),
+        // Added missing traits referenced in code
+        DIPLOMATIC("diplomatic", "Diplomatic"),
+        ISOLATIONIST("isolationist", "Isolationist"),
+        INDUSTRIOUS("industrious", "Industrious");
         
         private final String id;
         private final String displayName;

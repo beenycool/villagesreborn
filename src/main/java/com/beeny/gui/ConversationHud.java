@@ -85,7 +85,7 @@ public class ConversationHud {
         
         // Also update the config
         VillagesConfig.UISettings uiSettings = VillagesConfig.getInstance().getUISettings();
-        uiSettings.conversationHudPosition = position.name();
+        uiSettings.setConversationHudPosition(position.name());
         VillagesConfig.getInstance().save();
     }
     
@@ -116,7 +116,7 @@ public class ConversationHud {
         VillagesConfig.UISettings uiSettings = VillagesConfig.getInstance().getUISettings();
         
         // Set position from config if different
-        HudPosition configPosition = HudPosition.valueOf(uiSettings.conversationHudPosition);
+        HudPosition configPosition = HudPosition.valueOf(uiSettings.getConversationHudPosition());
         if (configPosition != position) {
             position = configPosition;
         }
@@ -137,7 +137,7 @@ public class ConversationHud {
         String friendshipText = String.format("Friendship: %d/10", friendshipLevel);
         
         // Format the label with villager name
-        String labelFormat = uiSettings.conversationLabelFormat;
+        String labelFormat = uiSettings.getConversationLabelFormat();
         String label = labelFormat.replace("{name}", villagerName);
         
         // Calculate text dimensions
@@ -145,17 +145,17 @@ public class ConversationHud {
         int detailsWidth = 0;
         
         // Calculate details width if shown
-        if (uiSettings.showCulture && uiSettings.showProfession) {
+        if (uiSettings.isShowCulture() && uiSettings.isShowProfession()) {
             detailsWidth = textRenderer.getWidth(culture + " " + profession);
-        } else if (uiSettings.showCulture) {
+        } else if (uiSettings.isShowCulture()) {
             detailsWidth = textRenderer.getWidth(culture);
-        } else if (uiSettings.showProfession) {
+        } else if (uiSettings.isShowProfession()) {
             detailsWidth = textRenderer.getWidth(profession);
         }
 
         int friendshipWidth = textRenderer.getWidth(friendshipText);
         int boxWidth = Math.max(Math.max(textWidth, detailsWidth), friendshipWidth) + 30; // Extra space for icon
-        int boxHeight = (uiSettings.showCulture || uiSettings.showProfession) ? 52 : 36; // Extra height for friendship bar
+        int boxHeight = (uiSettings.isShowCulture() || uiSettings.isShowProfession()) ? 52 : 36; // Extra height for friendship bar
         
         
         // Calculate position based on user preference
@@ -181,8 +181,8 @@ public class ConversationHud {
         }
         
         // Draw background with configured colors
-        int backgroundColor = uiSettings.backgroundColor;
-        int borderColor = uiSettings.borderColor;
+        int backgroundColor = uiSettings.getBackgroundColor();
+        int borderColor = uiSettings.getBorderColor();
         
         context.fill(x, y, x + boxWidth, y + boxHeight, backgroundColor);
         context.drawBorder(x, y, boxWidth, boxHeight, borderColor);
@@ -197,13 +197,13 @@ public class ConversationHud {
         // Draw formatted label (includes villager name) in configured color
         context.drawText(textRenderer, 
             Text.literal(label).formatted(Formatting.WHITE), 
-            textX, textY, uiSettings.labelColor, true);
+            textX, textY, uiSettings.getLabelColor(), true);
         
         // Draw culture and profession on second line if enabled
         int detailsY = textY + 16;
         int detailsX = textX;
         
-        if (uiSettings.showCulture) {
+        if (uiSettings.isShowCulture()) {
             context.drawText(textRenderer, 
                 Text.literal(culture).formatted(getCultureFormatting(culture)), 
                 detailsX, detailsY, 0xFFFFFFFF, true);
@@ -211,9 +211,9 @@ public class ConversationHud {
             detailsX += textRenderer.getWidth(culture);
         }
             
-        if (uiSettings.showProfession) {
+        if (uiSettings.isShowProfession()) {
             context.drawText(textRenderer,
-                Text.literal((uiSettings.showCulture ? " " : "") + profession).formatted(Formatting.GRAY),
+                Text.literal((uiSettings.isShowCulture() ? " " : "") + profession).formatted(Formatting.GRAY),
                 detailsX, detailsY, 0xFFFFFFFF, true);
         }
 
