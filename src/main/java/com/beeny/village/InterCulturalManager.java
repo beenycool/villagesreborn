@@ -41,11 +41,11 @@ public class InterCulturalManager {
             SpawnRegion region2, 
             ServerWorld world) {
         
-        String cultureKey = getCulturePairKey(region1.getCulture(), region2.getCulture());
+        String cultureKey = getCulturePairKey(region1.getCultureAsString(), region2.getCultureAsString());
         
         Map<String, String> context = new HashMap<>();
-        context.put("culture1", region1.getCulture());
-        context.put("culture2", region2.getCulture());
+        context.put("culture1", region1.getCultureAsString());
+        context.put("culture2", region2.getCultureAsString());
         context.put("distance", String.valueOf(getDistance(region1.getCenter(), region2.getCenter())));
         context.put("previous_interactions", getPreviousInteractions(cultureKey));
         
@@ -76,7 +76,7 @@ public class InterCulturalManager {
             .generateResponse(prompt, context)
             .thenApply(response -> {
                 Map<String, String> interaction = parseInteraction(response);
-                recordInteraction(region1.getCulture(), region2.getCulture(), 
+                recordInteraction(region1.getCultureAsString(), region2.getCultureAsString(),
                     interaction.get("TYPE"), interaction.get("OUTCOME"));
                 
                 return generateAdaptations(interaction.get("ADAPTATIONS"));
@@ -84,8 +84,8 @@ public class InterCulturalManager {
     }
 
     private String getCulturePairKey(String culture1, String culture2) {
-        return culture1.compareTo(culture2) < 0 ? 
-            culture1 + "_" + culture2 : 
+        return culture1.compareTo(culture2) < 0 ?
+            culture1 + "_" + culture2 :
             culture2 + "_" + culture1;
     }
 
@@ -138,7 +138,7 @@ public class InterCulturalManager {
                 
                 if (shouldInteract(region1, region2)) {
                     generateCulturalInteraction(region1, region2, world)
-                        .thenAccept(adaptations -> 
+                        .thenAccept(adaptations ->
                             applyAdaptations(adaptations, region1, region2, world));
                 }
             }
@@ -147,7 +147,7 @@ public class InterCulturalManager {
 
     private boolean shouldInteract(SpawnRegion region1, SpawnRegion region2) {
         int distance = getDistance(region1.getCenter(), region2.getCenter());
-        String culturePair = getCulturePairKey(region1.getCulture(), region2.getCulture());
+        String culturePair = getCulturePairKey(region1.getCultureAsString(), region2.getCultureAsString());
         List<InteractionEvent> history = interactionHistory.getOrDefault(culturePair, Collections.emptyList());
         
         // More likely to interact if close or have history
@@ -162,10 +162,10 @@ public class InterCulturalManager {
         List<VillagerAI> village1Villagers = getVillagersInRegion(region1);
         List<VillagerAI> village2Villagers = getVillagersInRegion(region2);
         
-        evolution.evolveVillageCulture(region1.getCulture(), world, village1Villagers)
+        evolution.evolveVillageCulture(region1.getCultureAsString(), world, village1Villagers)
             .thenAccept(summary -> LOGGER.info("Village 1 evolution: {}", summary));
             
-        evolution.evolveVillageCulture(region2.getCulture(), world, village2Villagers)
+        evolution.evolveVillageCulture(region2.getCultureAsString(), world, village2Villagers)
             .thenAccept(summary -> LOGGER.info("Village 2 evolution: {}", summary));
     }
 
