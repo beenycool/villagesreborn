@@ -55,16 +55,10 @@ public class OpenAIProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        if (!initialized) {
-            return CompletableFuture.failedFuture(
-                new IllegalStateException("OpenAI provider not initialized")
-            );
-        }
+        if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("OpenAI provider not initialized"));
 
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(cache.get(cacheKey));
-        }
+        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -79,62 +73,44 @@ public class OpenAIProvider implements AIProvider {
     }
     
     private String callOpenAIApi(String prompt, Map<String, String> context) throws IOException {
-        // Create message array with system message for context and user message for prompt
         JsonArray messagesArray = new JsonArray();
-        
-        // Add system message with context if available
         if (context != null && !context.isEmpty()) {
             StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
             context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) {
-                    systemContent.append(" ").append(key).append(": ").append(value).append(".");
-                }
+                if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append(".");
             });
-            
             JsonObject systemMessage = new JsonObject();
             systemMessage.addProperty("role", "system");
             systemMessage.addProperty("content", systemContent.toString());
             messagesArray.add(systemMessage);
         }
-        
-        // Add user message with prompt
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
         userMessage.addProperty("content", prompt);
         messagesArray.add(userMessage);
-        
-        // Create request body
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", modelName);
         requestBody.add("messages", messagesArray);
         requestBody.addProperty("temperature", 0.7);
-        requestBody.addProperty("max_tokens", modelName.contains("gpt-4-turbo") ? 4096 : 
-                              modelName.contains("gpt-4") ? 8192 : 4096);
-        
-        // Add response format for newer models
+        requestBody.addProperty("max_tokens", modelName.contains("gpt-4-turbo") ? 4096 : modelName.contains("gpt-4") ? 8192 : 4096);
         if (modelName.startsWith("gpt-4-turbo") || modelName.startsWith("gpt-4")) {
             JsonObject responseFormat = new JsonObject();
             responseFormat.addProperty("type", "text");
             requestBody.add("response_format", responseFormat);
         }
-        
-        // Create request
         Request request = new Request.Builder()
             .url(API_URL)
             .post(RequestBody.create(requestBody.toString(), JSON))
             .header("Authorization", "Bearer " + apiKey)
             .header("Content-Type", "application/json")
             .build();
-        
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 LOGGER.error("OpenAI API error: {} - {}", response.code(), response.message());
                 throw new IOException("OpenAI API error: " + response.code() + " - " + response.message());
             }
-            
             String responseBody = response.body().string();
             JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
-            
             if (jsonResponse.has("choices") && jsonResponse.getAsJsonArray("choices").size() > 0) {
                 return jsonResponse.getAsJsonArray("choices").get(0)
                     .getAsJsonObject().getAsJsonObject("message")
@@ -145,19 +121,14 @@ public class OpenAIProvider implements AIProvider {
             }
         } catch (IOException e) {
             LOGGER.error("OpenAI API communication error", e);
-            return mockResponse(prompt); // Fallback to mock response on error
+            return mockResponse(prompt);
         }
     }
 
     private String mockResponse(String prompt) {
-        // This is a temporary mock implementation
-        if (prompt.toLowerCase().contains("name")) {
-            return "Maria the Skilled Artisan";
-        } else if (prompt.toLowerCase().contains("personality")) {
-            return "Creative, dedicated, and meticulous crafter";
-        } else {
-            return "How can I assist you today?";
-        }
+        if (prompt.toLowerCase().contains("name")) return "Maria the Skilled Artisan";
+        else if (prompt.toLowerCase().contains("personality")) return "Creative, dedicated, and meticulous crafter";
+        else return "How can I assist you today?";
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {

@@ -58,7 +58,6 @@ public class OpenRouterProvider implements AIProvider {
                 
                 JsonArray messages = new JsonArray();
                 
-                // Add system prompt if available
                 if (context.containsKey("system_prompt")) {
                     JsonObject systemMessage = new JsonObject();
                     systemMessage.addProperty("role", "system");
@@ -66,15 +65,12 @@ public class OpenRouterProvider implements AIProvider {
                     messages.add(systemMessage);
                 }
                 
-                // Add user prompt
                 JsonObject userMessage = new JsonObject();
                 userMessage.addProperty("role", "user");
                 userMessage.addProperty("content", prompt);
                 messages.add(userMessage);
                 
                 requestBody.add("messages", messages);
-                
-                // Add generation config
                 requestBody.addProperty("temperature", 0.7);
                 requestBody.addProperty("max_tokens", getMaxTokensForModel(model));
                 

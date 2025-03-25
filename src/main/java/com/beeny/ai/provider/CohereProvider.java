@@ -1,7 +1,6 @@
 package com.beeny.ai.provider;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonArray;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,49 +52,47 @@ public class CohereProvider implements AIProvider {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                JsonObject requestBody = new JsonObject();
-                
-                // Add system prompt if available
-                String systemPrompt = context.getOrDefault("system_prompt", "");
-                String fullPrompt = systemPrompt.isEmpty() ? prompt : systemPrompt + "\n\n" + prompt;
-                
-                requestBody.addProperty("model", model);
-                requestBody.addProperty("prompt", fullPrompt);
-                requestBody.addProperty("max_tokens", 1024);
-                requestBody.addProperty("temperature", 0.7);
-                requestBody.addProperty("k", 0);
-                requestBody.addProperty("stop_sequences", "");
-                requestBody.addProperty("return_likelihoods", "NONE");
-                
-                RequestBody body = RequestBody.create(requestBody.toString(), JSON);
-                Request request = new Request.Builder()
-                    .url(API_URL)
-                    .post(body)
-                    .addHeader("Authorization", "Bearer " + apiKey)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        throw new IOException("Unexpected response code: " + response);
-                    }
-                    
-                    String responseBody = response.body().string();
-                    JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.get("generations")
-                        .getAsJsonArray()
-                        .get(0)
-                        .getAsJsonObject()
-                        .get("text")
-                        .getAsString();
-                    
-                    return generatedText.trim();
-                }
+                String response = callCohereApi(prompt, context);
+                return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Cohere", e);
                 throw new RuntimeException("Failed to generate response from Cohere", e);
             }
         });
+    }
+
+    private String callCohereApi(String prompt, Map<String, String> context) throws IOException {
+        JsonObject requestBody = new JsonObject();
+        String systemPrompt = context.getOrDefault("system_prompt", "");
+        String fullPrompt = systemPrompt.isEmpty() ? prompt : systemPrompt + "\n\n" + prompt;
+        requestBody.addProperty("model", model);
+        requestBody.addProperty("prompt", fullPrompt);
+        requestBody.addProperty("max_tokens", 1024);
+        requestBody.addProperty("temperature", 0.7);
+        requestBody.addProperty("k", 0);
+        requestBody.addProperty("stop_sequences", "");
+        requestBody.addProperty("return_likelihoods", "NONE");
+        RequestBody body = RequestBody.create(requestBody.toString(), JSON);
+        Request request = new Request.Builder()
+            .url(API_URL)
+            .post(body)
+            .addHeader("Authorization", "Bearer " + apiKey)
+            .addHeader("Content-Type", "application/json")
+            .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected response code: " + response);
+            }
+            String responseBody = response.body().string();
+            JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
+            String generatedText = jsonResponse.get("generations")
+                .getAsJsonArray()
+                .get(0)
+                .getAsJsonObject()
+                .get("text")
+                .getAsString();
+            return generatedText.trim();
+        }
     }
 
     @Override

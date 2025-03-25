@@ -17,21 +17,17 @@ public class VillagesConfig {
     private final File configFile;
     private ConfigData data;
     
-    // Add UISettings instance
     private UISettings uiSettings;
-    private LLMSettings llmSettings; // Placeholder for LLMSettings
+    private LLMSettings llmSettings;
 
     private VillagesConfig() {
         configFile = FabricLoader.getInstance().getConfigDir().resolve("villagesreborn.json").toFile();
         load();
-        // Initialize UISettings
         uiSettings = new UISettings();
     }
 
     public static VillagesConfig getInstance() {
-        if (instance == null) {
-            instance = new VillagesConfig();
-        }
+        if (instance == null) instance = new VillagesConfig();
         return instance;
     }
 
@@ -43,9 +39,7 @@ public class VillagesConfig {
                 e.printStackTrace();
             }
         }
-        if (data == null) {
-            data = new ConfigData();
-        }
+        if (data == null) data = new ConfigData();
     }
 
     public void save() {
@@ -101,12 +95,10 @@ public class VillagesConfig {
         data.theftDetectionEnabled = !data.theftDetectionEnabled;
     }
     
-    // Get UISettings
     public UISettings getUISettings() {
         return uiSettings;
     }
     
-    // Get LLMSettings
     public LLMSettings getLLMSettings() {
         return llmSettings;
     }
@@ -119,9 +111,6 @@ public class VillagesConfig {
         boolean theftDetectionEnabled = true;
     }
     
-    /**
-     * Settings related to the UI display and customization
-     */
     public class UISettings {
         private boolean showVillagerNameTags = true;
         private boolean showVillagerHealthBars = true;
@@ -130,15 +119,14 @@ public class VillagesConfig {
         private boolean compactVillagerInfo = false;
         private String colorScheme = "DEFAULT";
         
-        // Added missing fields
         private String conversationLabelFormat = "Speaking to: {name}";
         private String conversationHudPosition = "BOTTOM_RIGHT";
         private boolean showCulture = true;
         private boolean showProfession = true;
-        private int backgroundColor = 0x80000000; // Semi-transparent black
-        private int borderColor = 0x80FFFFFF;     // Semi-transparent white
-        private int labelColor = 0xFFFFFFFF;      // White
-        private int nameColor = 0xFFFFFF00;       // Yellow
+        private int backgroundColor = 0x80000000;
+        private int borderColor = 0x80FFFFFF;
+        private int labelColor = 0xFFFFFFFF;
+        private int nameColor = 0xFFFFFF00;
         
         public boolean isShowVillagerNameTags() {
             return showVillagerNameTags;
@@ -204,7 +192,6 @@ public class VillagesConfig {
             this.compactVillagerInfo = !this.compactVillagerInfo;
         }
         
-        // Add getters and setters for UI-related fields
         public String getConversationLabelFormat() {
             return conversationLabelFormat;
         }
@@ -270,9 +257,6 @@ public class VillagesConfig {
         }
     }
     
-    /**
-     * Settings related to the LLM (Language Learning Model) configuration
-     */
     public class LLMSettings {
         private String apiKey = "";
         private String model = "gpt-3.5-turbo";
@@ -282,11 +266,10 @@ public class VillagesConfig {
         private String localModelPath = "";
         private int contextLength = 4;
         private boolean useMemory = true;
-        // Add missing fields
         private String modelType = "gpt-3.5-turbo";
         private float temperature = 0.7f;
         private int maxCacheSize = 100;
-        private int cacheTTLSeconds = 300; // 5 minutes
+        private int cacheTTLSeconds = 300;
         
         public String getApiKey() {
             return apiKey;
@@ -352,7 +335,6 @@ public class VillagesConfig {
             this.useMemory = useMemory;
         }
         
-        // Add getters and setters for new fields
         public String getModelType() {
             return modelType;
         }
