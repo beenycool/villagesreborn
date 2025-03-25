@@ -51,7 +51,7 @@ public class VillagerInteractionMixin {
                 // Server-side handling
                 if (player instanceof ServerPlayerEntity serverPlayer) {
                     SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
-                    String culture = region != null ? region.getCulture() : "default";
+                    String culture = region != null ? region.getCultureAsString() : "default";
                     
                     // Check if the villager is at their workstation
                     if (isAtWorkstation(thisVillager)) {
@@ -135,7 +135,7 @@ public class VillagerInteractionMixin {
                 // Client-side handling - only open crafting screen when at workstation
                 if (isAtWorkstation(thisVillager)) {
                     SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
-                    String culture = region != null ? region.getCulture() : "default";
+                    String culture = region != null ? region.getCultureAsString() : "default";
                     
                     // Open crafting screen when at workstation
                     net.minecraft.client.MinecraftClient.getInstance().setScreen(

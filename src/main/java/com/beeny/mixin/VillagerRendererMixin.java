@@ -20,7 +20,7 @@ public class VillagerRendererMixin {
         SpawnRegion region = manager.getNearestSpawnRegion(villager.getBlockPos());
         
         if (region != null) {
-            String culture = region.getCulture();
+            String culture = region.getCultureAsString();
             Identifier customTexture = CulturalTextureManager.getTextureForCulture(culture);
             cir.setReturnValue(customTexture);
         }

@@ -157,23 +157,23 @@ public class VillagerAI {
         }
 
         // Set up revenge goal - villager will target entities that attack it
-        RevengeGoal revengeGoal = new RevengeGoal((MobEntity)(Object)villager, VillagerEntity.class);
-        ((MobEntity)(Object)villager).targetSelector.add(1, revengeGoal);
+        RevengeGoal revengeGoal = new RevengeGoal((PathAwareEntity)villager, VillagerEntity.class);
+        ((PathAwareEntity)villager).targetSelector.add(1, revengeGoal);
         
         // Setup attack goal for enemy villagers
-        ActiveTargetGoal<VillagerEntity> targetGoal = new ActiveTargetGoal<>((MobEntity)(Object)villager, 
+        ActiveTargetGoal<VillagerEntity> targetGoal = new ActiveTargetGoal<>((PathAwareEntity)villager,
             VillagerEntity.class, 10, true, false, (potentialTarget) -> {
                 if (!(potentialTarget instanceof VillagerEntity otherVillager)) {
                     return false;
                 }
                 RelationshipType relationship = getRelationshipWith(otherVillager.getUuid());
                 // Only attack enemies or rivals who are too close
-                return relationship == RelationshipType.ENEMY || 
-                       (relationship == RelationshipType.RIVAL && 
+                return relationship == RelationshipType.ENEMY ||
+                       (relationship == RelationshipType.RIVAL &&
                         otherVillager.squaredDistanceTo(villager) < 5);
             });
             
-        ((MobEntity)(Object)villager).targetSelector.add(2, targetGoal);
+        ((PathAwareEntity)villager).targetSelector.add(2, targetGoal);
         pvpGoals.put(villager.getUuid(), targetGoal);
         pvpEnabled = true;
         
@@ -196,7 +196,7 @@ public class VillagerAI {
         
         ActiveTargetGoal<VillagerEntity> targetGoal = pvpGoals.remove(villager.getUuid());
         if (targetGoal != null) {
-            ((MobEntity)(Object)villager).targetSelector.remove(targetGoal);
+            ((PathAwareEntity)villager).targetSelector.remove(targetGoal);
         }
         pvpEnabled = false;
         LOGGER.debug("Removed PvP goals from villager: {}", villager.getName().getString());
@@ -1355,7 +1355,7 @@ public class VillagerAI {
         List<Monster> threats = world.getEntitiesByClass(
             Monster.class,
             new Box(pos).expand(8),
-            e -> true
+            e -> e instanceof Monster
         );
         
         return threats.isEmpty();
