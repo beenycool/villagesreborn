@@ -69,6 +69,22 @@ public class VillagerManager {
     public static VillagerManager getInstance() {
         return INSTANCE;
     }
+    
+    /**
+     * Gets the Minecraft server instance
+     * @return The current server instance
+     */
+    public MinecraftServer getServer() {
+        return server;
+    }
+    
+    /**
+     * Sets the Minecraft server instance
+     * @param server The server instance to set
+     */
+    public void setServer(MinecraftServer server) {
+        this.server = server;
+    }
 
     public void registerSpawnRegion(BlockPos center, int radius, String cultureName) {
         villageLock.writeLock().lock();
