@@ -57,7 +57,7 @@ public class LLMImplementation {
     private String callLLMWithRetry(String prompt, Map<String, String> context, int retryCount) throws Exception {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
         try {
-            List<ChatMessage> messages = new ArrayList<>();
+            var messages = new ArrayList<ChatMessage>();
             messages.add(new ChatMessage(ChatRole.SYSTEM, getSystemPrompt(context)));
             messages.add(new ChatMessage(ChatRole.USER, prompt));
             ChatCompletions completions = client.getChatCompletions(
