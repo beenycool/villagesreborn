@@ -55,9 +55,9 @@ public class AnthropicProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
+        String cacheKey = generateCacheKey(prompt, context); int maxTokens = 1024;
         if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("Anthropic provider not initialized"));
 
-        String cacheKey = generateCacheKey(prompt, context);
         if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
 
         return CompletableFuture.supplyAsync(() -> {

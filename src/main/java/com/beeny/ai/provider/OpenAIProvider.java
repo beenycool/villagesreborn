@@ -57,7 +57,7 @@ public class OpenAIProvider implements AIProvider {
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("OpenAI provider not initialized"));
 
-        String cacheKey = generateCacheKey(prompt, context);
+        String cacheKey = generateCacheKey(prompt, context); int maxTokens = 1024;
         if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
 
         return CompletableFuture.supplyAsync(() -> {

@@ -65,13 +65,12 @@ public class LLMService {
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         systemSpecs.updatePerformanceMetrics();
-        int complexityLevel = systemSpecs.getAIComplexity();
+        String cacheKey = generateCacheKey(prompt, context); int complexityLevel = systemSpecs.getAIComplexity();
         if (currentProvider == null || !currentProvider.isAvailable()) {
             return CompletableFuture.failedFuture(
                 new IllegalStateException("No available AI provider")
             );
         }
-        String cacheKey = generateCacheKey(prompt, context);
         if (contextCache.containsKey(cacheKey)) {
             return CompletableFuture.completedFuture(contextCache.get(cacheKey));
         }
