@@ -40,9 +40,7 @@ public class ModelChecker {
             Path modelPath = getModelPath();
             Path modelsDir = modelPath.getParent();
             try {
-                if (!Files.exists(modelsDir)) {
-                    Files.createDirectories(modelsDir);
-                }
+                if (!Files.exists(modelsDir)) Files.createDirectories(modelsDir);
                 LOGGER.info("Starting download of Llama 3.2 model...");
                 progressCallback.accept(0.0);
                 Path tempFile = Files.createTempFile("llama-download", ".tmp");
@@ -75,8 +73,7 @@ public class ModelChecker {
                 HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
                 HttpRequest request = HttpRequest.newBuilder().uri(URI.create(LLAMA_MODEL_URL)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
                 HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
-                boolean requiresLogin = response.statusCode() == 401 || response.statusCode() == 403 || response.uri().toString().contains("login");
-                return requiresLogin;
+                return response.statusCode() == 401 || response.statusCode() == 403 || response.uri().toString().contains("login");
             } catch (Exception e) {
                 LOGGER.error("Error checking model access requirements", e);
                 return true;

@@ -55,16 +55,10 @@ public class AnthropicProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        if (!initialized) {
-            return CompletableFuture.failedFuture(
-                new IllegalStateException("Anthropic provider not initialized")
-            );
-        }
+        if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("Anthropic provider not initialized"));
 
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(cache.get(cacheKey));
-        }
+        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -73,7 +67,6 @@ public class AnthropicProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Anthropic", e);
-                // Fall back to mock response
                 String mockResp = mockResponse(prompt);
                 cache.put(cacheKey, mockResp);
                 return mockResp;
@@ -82,44 +75,30 @@ public class AnthropicProvider implements AIProvider {
     }
 
     private String callAnthropicApi(String prompt, Map<String, String> context) throws IOException {
-        // Build system prompt from context
         StringBuilder systemPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
         if (context != null && !context.isEmpty()) {
             context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) {
-                    systemPrompt.append(" ").append(key).append(": ").append(value).append(".");
-                }
+                if (value != null && !value.isEmpty()) systemPrompt.append(" ").append(key).append(": ").append(value).append(".");
             });
         }
 
-        // Create request body
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", model);
-        // Set max tokens based on model
         int maxTokens = 1024;
-        if (model.startsWith("claude-3-opus")) {
-            maxTokens = 4096;
-        } else if (model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5")) {
-            maxTokens = 4096;
-        } else if (model.startsWith("claude-3")) {
-            maxTokens = 2048;
-        }
+        if (model.startsWith("claude-3-opus")) maxTokens = 4096;
+        else if (model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5")) maxTokens = 4096;
+        else if (model.startsWith("claude-3")) maxTokens = 2048;
         requestBody.addProperty("max_tokens", maxTokens);
         requestBody.addProperty("system", systemPrompt.toString());
         requestBody.addProperty("temperature", 0.7);
         
-        // Add messages
         JsonObject message = new JsonObject();
         message.addProperty("role", "user");
         message.addProperty("content", prompt);
         requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
 
-        // Add response format for newer models
-        if (model.startsWith("claude-3")) {
-            requestBody.addProperty("response_format", "text");
-        }
+        if (model.startsWith("claude-3")) requestBody.addProperty("response_format", "text");
         
-        // Create request
         Request request = new Request.Builder()
             .url(API_URL)
             .post(RequestBody.create(requestBody.toString(), JSON))
@@ -151,14 +130,9 @@ public class AnthropicProvider implements AIProvider {
     }
 
     private String mockResponse(String prompt) {
-        // This is a temporary mock implementation
-        if (prompt.toLowerCase().contains("name")) {
-            return "Elena the Wise Scholar";
-        } else if (prompt.toLowerCase().contains("personality")) {
-            return "Intellectual, curious, and knowledgeable librarian";
-        } else {
-            return "I'd be happy to assist you with that inquiry.";
-        }
+        if (prompt.toLowerCase().contains("name")) return "Elena the Wise Scholar";
+        else if (prompt.toLowerCase().contains("personality")) return "Intellectual, curious, and knowledgeable librarian";
+        else return "I'd be happy to assist you with that inquiry.";
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {

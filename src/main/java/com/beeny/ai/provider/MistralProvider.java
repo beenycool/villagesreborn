@@ -58,7 +58,6 @@ public class MistralProvider implements AIProvider {
                 
                 JsonArray messages = new JsonArray();
                 
-                // Add system prompt if available
                 if (context.containsKey("system_prompt")) {
                     JsonObject systemMessage = new JsonObject();
                     systemMessage.addProperty("role", "system");
@@ -66,7 +65,6 @@ public class MistralProvider implements AIProvider {
                     messages.add(systemMessage);
                 }
                 
-                // Add user message
                 JsonObject userMessage = new JsonObject();
                 userMessage.addProperty("role", "user");
                 userMessage.addProperty("content", prompt);
@@ -106,10 +104,11 @@ public class MistralProvider implements AIProvider {
             }
         });
     }
-@Override
-public boolean isAvailable() {
-    return initialized && apiKey != null && !apiKey.isEmpty();
-}
+
+    @Override
+    public boolean isAvailable() {
+        return initialized && apiKey != null && !apiKey.isEmpty();
+    }
 
     @Override
     public String getName() {
