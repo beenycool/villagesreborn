@@ -35,9 +35,7 @@ public class LLMImplementation {
         String cacheKey = generateCacheKey(prompt, context);
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
         String cachedResponse = responseCache.get(cacheKey);
-        if (cachedResponse != null) {
-            return CompletableFuture.completedFuture(cachedResponse);
-        }
+        if (cachedResponse != null) return CompletableFuture.completedFuture(cachedResponse);
         CompletableFuture<String> future = new CompletableFuture<>();
         pendingRequests.put(cacheKey, future);
         executor.submit(() -> {

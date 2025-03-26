@@ -22,23 +22,17 @@ public class GeminiProvider implements AIProvider {
     private boolean initialized = false;
 
     public GeminiProvider() {
-        client = new OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .build();
+        client = new OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).build();
     }
 
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
         this.model = config.getOrDefault("modelName", "gemini-2.0-flash-lite");
-        
         if (apiKey == null) {
             LOGGER.error("Gemini provider initialization failed: missing API key");
             return;
         }
-        
         initialized = true;
         LOGGER.info("Gemini provider initialized with model: {}", model);
     }
@@ -50,15 +44,11 @@ public class GeminiProvider implements AIProvider {
             future.completeExceptionally(new IllegalStateException("Gemini provider not initialized"));
             return future;
         }
-
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String url = API_URL + model + ":generateContent?key=" + apiKey;
-                
                 JsonObject requestBody = new JsonObject();
                 JsonArray contents = new JsonArray();
-                
-                // Add system prompt if available
                 if (context.containsKey("system_prompt")) {
                     JsonObject systemMessage = new JsonObject();
                     JsonObject systemRole = new JsonObject();
@@ -67,8 +57,6 @@ public class GeminiProvider implements AIProvider {
                     systemMessage.addProperty("parts", context.get("system_prompt"));
                     contents.add(systemMessage);
                 }
-                
-                // Add user prompt
                 JsonObject userMessage = new JsonObject();
                 JsonObject parts = new JsonObject();
                 parts.addProperty("text", prompt);
@@ -77,10 +65,7 @@ public class GeminiProvider implements AIProvider {
                 userMessage.addProperty("role", "user");
                 userMessage.add("parts", partsArray);
                 contents.add(userMessage);
-                
                 requestBody.add("contents", contents);
-                
-                // Add generation config
                 JsonObject generationConfig = new JsonObject();
                 generationConfig.addProperty("temperature", 0.7);
                 int maxTokens = 0;
@@ -99,28 +84,15 @@ public class GeminiProvider implements AIProvider {
                 generationConfig.addProperty("candidateCount", 1);
                 generationConfig.add("stopSequences", new JsonArray());
                 requestBody.add("generationConfig", generationConfig);
-                
                 RequestBody body = RequestBody.create(requestBody.toString(), JSON);
-                Request request = new Request.Builder()
-                    .url(url)
-                    .post(body)
-                    .build();
-
+                Request request = new Request.Builder().url(url).post(body).build();
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) {
                         throw new IOException("Unexpected response code: " + response);
                     }
-                    
                     String responseBody = response.body().string();
                     JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.getAsJsonArray("candidates")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonArray("content")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonArray("parts")
-                        .get(0).getAsJsonObject()
-                        .get("text").getAsString();
-                    
+                    String generatedText = jsonResponse.getAsJsonArray("candidates").get(0).getAsJsonObject().getAsJsonArray("content").get(0).getAsJsonObject().getAsJsonArray("parts").get(0).getAsJsonObject().get("text").getAsString();
                     return generatedText;
                 }
             } catch (Exception e) {

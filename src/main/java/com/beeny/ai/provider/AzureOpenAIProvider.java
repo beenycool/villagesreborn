@@ -50,19 +50,9 @@ public class AzureOpenAIProvider implements AIProvider {
         }
     }
 
-    @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        if (!initialized) {
-            return CompletableFuture.failedFuture(
-                new IllegalStateException("Azure OpenAI provider not initialized")
-            );
-        }
-
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(cache.get(cacheKey));
-        }
-
+        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String response = callAzureOpenAI(prompt, context);
@@ -70,8 +60,6 @@ public class AzureOpenAIProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Azure OpenAI", e);
-                
-                // Fall back to mock response if API call fails
                 String mockResp = mockResponse(prompt);
                 cache.put(cacheKey, mockResp);
                 return mockResp;
@@ -81,33 +69,20 @@ public class AzureOpenAIProvider implements AIProvider {
 
     private String callAzureOpenAI(String prompt, Map<String, String> context) {
         try {
-            // Create the messages for the chat completion
             List<ChatMessage> chatMessages = new ArrayList<>();
-            
-            // Add system message with context if available
             if (context != null && !context.isEmpty()) {
                 StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
                 context.forEach((key, value) -> {
-                    if (value != null && !value.isEmpty()) {
-                        systemContent.append(" ").append(key).append(": ").append(value).append(".");
-                    }
+                    if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append(".");
                 });
-                
                 chatMessages.add(new ChatMessage(ChatRole.SYSTEM, systemContent.toString()));
             }
-            
-            // Add user message with the prompt
             chatMessages.add(new ChatMessage(ChatRole.USER, prompt));
-            
-            // Create chat completion options
             ChatCompletionsOptions options = new ChatCompletionsOptions(chatMessages);
             options.setMaxTokens(300);
             options.setTemperature(0.7);
             options.setModel(modelName);
-            
-            // Call the Azure OpenAI service
             ChatCompletions completions = client.getChatCompletions(modelName, options);
-            
             if (completions != null && !completions.getChoices().isEmpty()) {
                 ChatChoice choice = completions.getChoices().get(0);
                 return choice.getMessage().getContent();
@@ -122,14 +97,9 @@ public class AzureOpenAIProvider implements AIProvider {
     }
 
     private String mockResponse(String prompt) {
-        // This is a temporary mock implementation
-        if (prompt.toLowerCase().contains("name")) {
-            return "John the Wise Trader";
-        } else if (prompt.toLowerCase().contains("personality")) {
-            return "Friendly, wise, and generous merchant";
-        } else {
-            return "I understand, let me help you with that.";
-        }
+        if (prompt.toLowerCase().contains("name")) return "John the Wise Trader";
+        else if (prompt.toLowerCase().contains("personality")) return "Friendly, wise, and generous merchant";
+        else return "I understand, let me help you with that.";
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {
