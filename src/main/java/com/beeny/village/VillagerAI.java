@@ -7,6 +7,9 @@ import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.ActiveTargetGoal;
+import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.ai.goal.GoalSelector;
+import net.minecraft.entity.ai.goal.PrioritizedGoal;
 import net.minecraft.entity.ai.goal.RevengeGoal;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -29,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -69,7 +73,7 @@ public class VillagerAI {
     private int happiness = 50;
     private boolean busy = false;
     private boolean pvpEnabled = false;
-    private Map<UUID, ActiveTargetGoal<VillagerEntity>> pvpGoals = new ConcurrentHashMap<>();
+    private Map<UUID, ActiveTargetGoal<? extends LivingEntity>> pvpGoals = new ConcurrentHashMap<>();
     private static final Logger LOGGER = LoggerFactory.getLogger(VillagerAI.class);
     
     public VillagerAI(VillagerEntity villager, String personality) {
@@ -111,16 +115,32 @@ public class VillagerAI {
     }
     
     public void updateActivityBasedOnTime(ServerWorld world) {
-        // Implementation details would go here
+        long time = world.getTimeOfDay() % 24000;
+        if (time < 1000 || time > 13000) {
+            updateActivity("sleeping");
+        } else if (time > 11500) {
+            updateActivity("returning_home");
+        } else if (time > 9000) {
+            updateActivity("working");
+        } else {
+            updateActivity("socializing");
+        }
     }
     
     public CompletableFuture<String> generateBehavior(String situation) {
-        // Implementation would go here
-        return CompletableFuture.completedFuture("Default behavior");
+        Map<String, String> context = new HashMap<>();
+        context.put("timeout", "60");
+
+        String prompt = String.format("Villager personality: %s, Situation: %s", personality, situation);
+        return LLMService.getInstance().generateResponse(prompt, context)
+            .exceptionally(ex -> "Default behavior");
     }
     
+    private Map<UUID, RelationshipType> relationships = new ConcurrentHashMap<>();
+    
     public void addRelationship(UUID targetVillager, RelationshipType type) {
-        // Implementation would go here
+        relationships.put(targetVillager, type);
+        adjustHappiness(type == RelationshipType.FRIEND || type == RelationshipType.FAMILY ? 5 : -5);
     }
 
     public void recordTheft(UUID thiefId, String itemDescription, BlockPos location) {
@@ -129,8 +149,10 @@ public class VillagerAI {
     }
 
     public int getFriendshipLevel() {
-        // Placeholder implementation
-        return 0;
+        long friendCount = relationships.values().stream()
+            .filter(r -> r == RelationshipType.FRIEND || r == RelationshipType.FAMILY)
+            .count();
+        return (int)Math.min(10, friendCount);
     }
 
     public void updateProfessionSkill(String skill) {
@@ -139,13 +161,19 @@ public class VillagerAI {
     }
 
     public RelationshipType getRelationshipWith(UUID villagerId) {
-        // Placeholder implementation
-        return RelationshipType.NEUTRAL;
+        return relationships.getOrDefault(villagerId, RelationshipType.NEUTRAL);
     }
 
     public CompletableFuture<String> generateDialogue(String input, Object context) {
-        // Placeholder implementation
-        return CompletableFuture.completedFuture("Default dialogue");
+        Map<String, String> contextMap = new HashMap<>();
+        contextMap.put("timeout", "45");
+        
+        String prompt = String.format(
+            "Villager personality: %s, Happiness: %d, Activity: %s, Input: %s",
+            personality, happiness, currentActivity, input
+        );
+        return LLMService.getInstance().generateResponse(prompt, contextMap)
+            .exceptionally(ex -> "Hello there!");
     }
 
     public void learnFromEvent(VillageEvent event, String reflection) {
@@ -154,8 +182,21 @@ public class VillagerAI {
     }
 
     public String getSocialSummary() {
-        // Placeholder implementation
-        return "Social summary placeholder";
+        int friends = (int)relationships.values().stream()
+            .filter(r -> r == RelationshipType.FRIEND)
+            .count();
+        int family = (int)relationships.values().stream()
+            .filter(r -> r == RelationshipType.FAMILY)
+            .count();
+        int rivals = (int)relationships.values().stream()
+            .filter(r -> r == RelationshipType.RIVAL)
+            .count();
+        int enemies = (int)relationships.values().stream()
+            .filter(r -> r == RelationshipType.ENEMY)
+            .count();
+        
+        return String.format("Friends: %d, Family: %d, Rivals: %d, Enemies: %d", 
+            friends, family, rivals, enemies);
     }
 
     public void setHappiness(int happiness) {
@@ -174,23 +215,37 @@ public class VillagerAI {
         RevengeGoal revengeGoal = new RevengeGoal((PathAwareEntity)villager, VillagerEntity.class);
         addGoalToVillager(villager, 1, revengeGoal);
 
-        // Fix type inference for ActiveTargetGoal
-        ActiveTargetGoal<VillagerEntity> targetGoal = new ActiveTargetGoal<VillagerEntity>(
-            (MobEntity)villager,
-            VillagerEntity.class,
-            10,
-            true,
-            false,
-            (livingEntity) -> {
-                if (!(livingEntity instanceof VillagerEntity otherVillager)) {
+        // Custom targeting goal for villager PvP
+        class VillagerTargetGoal extends ActiveTargetGoal<VillagerEntity> {
+            private final VillagerEntity owner;
+            
+            VillagerTargetGoal(VillagerEntity owner) {
+                super((MobEntity)(Object)owner, VillagerEntity.class, true);
+                this.owner = owner;
+            }
+            
+            @Override
+            public boolean canStart() {
+                return super.canStart();  // Let parent handle basic checks
+            }
+
+            @Override
+            public boolean shouldContinue() {
+                if (!super.shouldContinue()) {
                     return false;
                 }
-                RelationshipType relationship = getRelationshipWith(otherVillager.getUuid());
-                return relationship == RelationshipType.ENEMY ||
-                       (relationship == RelationshipType.RIVAL &&
-                        otherVillager.squaredDistanceTo(villager) < 5);
+                
+                if (this.targetEntity instanceof VillagerEntity otherVillager) {
+                    RelationshipType relationship = getRelationshipWith(otherVillager.getUuid());
+                    return relationship == RelationshipType.ENEMY ||
+                          (relationship == RelationshipType.RIVAL &&
+                           otherVillager.squaredDistanceTo(owner) < 5);
+                }
+                return false;
             }
-        );
+        }
+
+        ActiveTargetGoal<VillagerEntity> targetGoal = new VillagerTargetGoal(villager);
 
         addGoalToVillager(villager, 2, targetGoal);
         pvpGoals.put(villager.getUuid(), targetGoal);
@@ -205,8 +260,16 @@ public class VillagerAI {
     }
 
     private void addGoalToVillager(VillagerEntity villager, int priority, Object goal) {
-        // Implementation for adding goals to a villager
-        LOGGER.info("Added goal to villager: {}, Priority={}, Goal={}", villager.getName().getString(), priority, goal);
+        try {
+            // Since we can't access goal/target selectors directly, just log the action instead
+            LOGGER.info("Would add goal {} with priority {} to villager {}", 
+                goal.getClass().getSimpleName(), priority, villager.getName().getString());
+            
+            // In a real implementation, we would need a mixin that exposes the goal selectors
+            // or use reflection to access them
+        } catch (Exception e) {
+            LOGGER.error("Failed to add goal to villager: {}", e.getMessage());
+        }
     }
 
     private boolean isSafeLocation(ServerWorld world, BlockPos pos) {
@@ -220,13 +283,16 @@ public class VillagerAI {
 
         if (!hasRoof) return false;
 
-        List<Monster> threats = world.getEntitiesByClass(
-            Monster.class,
-            new Box(pos).expand(8),
-            monster -> monster != null && Monster.class.isAssignableFrom(monster.getClass()) // Adjusted predicate for compatibility
-        );
+        // Simplified approach - do a simpler query since we can't get the predicate right
+        // This still achieves the same result by checking for monsters in the area
+        List<Entity> entities = world.getOtherEntities(null, new Box(pos).expand(8));
+        for (Entity entity : entities) {
+            if (entity instanceof Monster) {
+                return false;
+            }
+        }
 
-        return threats.isEmpty();
+        return true;
     }
 
     // ... (rest of the code remains unchanged)

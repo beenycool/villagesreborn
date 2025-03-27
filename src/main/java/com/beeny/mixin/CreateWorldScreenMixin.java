@@ -20,6 +20,6 @@ public class CreateWorldScreenMixin extends Screen {
     private void addVillagesRebornButton(CallbackInfo info) {
         this.addDrawableChild(ButtonWidget.builder(Text.of("Villages Reborn"), button -> {
             this.client.setScreen(new VillagesRebornSettingsScreen(this));
-        }).dimensions(this.width / 2 - 75, this.height / 4 + 48 + 24, 150, 20).build());
+        }).dimensions(this.width / 2 - 85, this.height / 4 + 48 + 24, 150, 20).build());
     }
 }

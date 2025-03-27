@@ -58,11 +58,33 @@ public class CulturalStructureGenerator {
         }
     }
 
+    private boolean areChunksLoaded(ServerWorld world, BlockPos pos, BlockPos size) {
+        int startChunkX = pos.getX() >> 4;
+        int startChunkZ = pos.getZ() >> 4;
+        int endChunkX = (pos.getX() + size.getX()) >> 4;
+        int endChunkZ = (pos.getZ() + size.getZ()) >> 4;
+
+        for (int chunkX = startChunkX; chunkX <= endChunkX; chunkX++) {
+            for (int chunkZ = startChunkZ; chunkZ <= endChunkZ; chunkZ++) {
+                if (!world.isChunkLoaded(chunkX, chunkZ)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private void modifyAndPlaceTemplate(ServerWorld world, BlockPos pos, StructureTemplate template, double prosperityFactor) {
         StructurePlacementData placement = createPlacementData(prosperityFactor);
         Vec3i size = template.getSize();
         BlockPos templateSize = new BlockPos(size.getX(), size.getY(), size.getZ());
         BlockPos finalPos = adjustForTerrain(world, pos, templateSize);
+
+        // Verify chunks are loaded before proceeding
+        if (!areChunksLoaded(world, finalPos, templateSize)) {
+            LOGGER.warn("Attempted to generate structure at {} but chunks were not loaded", finalPos);
+            return;
+        }
 
         // Apply cultural variations before placing
         Map<Block, Block> blockReplacements = getCulturalBlockReplacements();
@@ -235,39 +257,53 @@ public class CulturalStructureGenerator {
         }
     }
 
+    private boolean isChunkLoaded(ServerWorld world, BlockPos pos) {
+        int chunkX = pos.getX() >> 4;
+        int chunkZ = pos.getZ() >> 4;
+        return world.isChunkLoaded(chunkX, chunkZ);
+    }
+
     private void addEgyptianDecorations(ServerWorld world, BlockPos pos, BlockPos size, int count) {
         for (int i = 0; i < count; i++) {
             BlockPos decorPos = getRandomPositionInStructure(pos, size);
-            world.setBlockState(decorPos, random.nextBoolean() ? 
-                Blocks.CHISELED_SANDSTONE.getDefaultState() : 
-                Blocks.CUT_SANDSTONE.getDefaultState());
+            if (isChunkLoaded(world, decorPos)) {
+                world.setBlockState(decorPos, random.nextBoolean() ? 
+                    Blocks.CHISELED_SANDSTONE.getDefaultState() : 
+                    Blocks.CUT_SANDSTONE.getDefaultState());
+            }
         }
     }
 
     private void addRomanDecorations(ServerWorld world, BlockPos pos, BlockPos size, int count) {
         for (int i = 0; i < count; i++) {
             BlockPos decorPos = getRandomPositionInStructure(pos, size);
-            world.setBlockState(decorPos, random.nextBoolean() ? 
-                Blocks.CHISELED_STONE_BRICKS.getDefaultState() : 
-                Blocks.STONE_BRICK_WALL.getDefaultState());
+            if (isChunkLoaded(world, decorPos)) {
+                world.setBlockState(decorPos, random.nextBoolean() ? 
+                    Blocks.CHISELED_STONE_BRICKS.getDefaultState() : 
+                    Blocks.STONE_BRICK_WALL.getDefaultState());
+            }
         }
     }
 
     private void addVictorianDecorations(ServerWorld world, BlockPos pos, BlockPos size, int count) {
         for (int i = 0; i < count; i++) {
             BlockPos decorPos = getRandomPositionInStructure(pos, size);
-            world.setBlockState(decorPos, random.nextBoolean() ? 
-                Blocks.IRON_BARS.getDefaultState() : 
-                Blocks.LANTERN.getDefaultState());
+            if (isChunkLoaded(world, decorPos)) {
+                world.setBlockState(decorPos, random.nextBoolean() ? 
+                    Blocks.IRON_BARS.getDefaultState() : 
+                    Blocks.LANTERN.getDefaultState());
+            }
         }
     }
 
     private void addNYCDecorations(ServerWorld world, BlockPos pos, BlockPos size, int count) {
         for (int i = 0; i < count; i++) {
             BlockPos decorPos = getRandomPositionInStructure(pos, size);
-            world.setBlockState(decorPos, random.nextBoolean() ? 
-                Blocks.SEA_LANTERN.getDefaultState() : 
-                Blocks.GLASS_PANE.getDefaultState());
+            if (isChunkLoaded(world, decorPos)) {
+                world.setBlockState(decorPos, random.nextBoolean() ? 
+                    Blocks.SEA_LANTERN.getDefaultState() : 
+                    Blocks.GLASS_PANE.getDefaultState());
+            }
         }
     }
 
@@ -283,6 +319,13 @@ public class CulturalStructureGenerator {
         int width = 5;
         int height = 3;
         int length = 5;
+        
+        // Check if all required chunks are loaded first
+        BlockPos size = new BlockPos(width, height, length);
+        if (!areChunksLoaded(world, pos, size)) {
+            LOGGER.warn("Attempted to generate basic structure at {} but chunks were not loaded", pos);
+            return;
+        }
         
         // Instead of manually creating a structure template, use the world to directly place blocks
         BlockPos.Mutable mutablePos = new BlockPos.Mutable();

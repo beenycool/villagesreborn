@@ -21,23 +21,23 @@ public class VillagesRebornSettingsScreen extends Screen {
 
         // Village generation frequency
         this.addDrawableChild(ButtonWidget.builder(Text.of("Village Spawn Rate: " + config.getVillageSpawnRate()), 
-            button -> cycleVillageSpawnRate()).dimensions(this.width / 2 - 100, y, 200, 20).build());
+            button -> cycleVillageSpawnRate()).tooltip(Tooltip.of(Text.of("Adjusts how often Villages Reborn villages generate."))).dimensions(this.width / 2 - 100, y, 200, 20).build());
 
         // AI Provider selection
         this.addDrawableChild(ButtonWidget.builder(Text.of("AI Provider: " + config.getAIProvider()), 
-            button -> cycleAIProvider()).dimensions(this.width / 2 - 100, y + 24, 200, 20).build());
+            button -> cycleAIProvider()).tooltip(Tooltip.of(Text.of("Select the AI service used for villager dialogue (e.g., OpenAI, Anthropic)."))).dimensions(this.width / 2 - 100, y + 24, 200, 20).build());
 
         // Cultures selection
         this.addDrawableChild(ButtonWidget.builder(Text.of("Configure Cultures"), 
-            button -> openCulturesScreen()).dimensions(this.width / 2 - 100, y + 48, 200, 20).build());
+            button -> openCulturesScreen()).tooltip(Tooltip.of(Text.of("Configure which villager cultures can appear in your world."))).dimensions(this.width / 2 - 100, y + 48, 200, 20).build());
 
         // Villager PvP
         this.addDrawableChild(ButtonWidget.builder(Text.of("Villager PvP: " + (config.isVillagerPvPEnabled() ? "ON" : "OFF")), 
-            button -> toggleVillagerPvP()).dimensions(this.width / 2 - 100, y + 72, 200, 20).build());
+            button -> toggleVillagerPvP()).tooltip(Tooltip.of(Text.of("Enable or disable villagers attacking players or other villagers."))).dimensions(this.width / 2 - 100, y + 72, 200, 20).build());
 
         // Theft Detection
         this.addDrawableChild(ButtonWidget.builder(Text.of("Theft Detection: " + (config.isTheftDetectionEnabled() ? "ON" : "OFF")), 
-            button -> toggleTheftDetection()).dimensions(this.width / 2 - 100, y + 96, 200, 20).build());
+            button -> toggleTheftDetection()).tooltip(Tooltip.of(Text.of("Enable or disable villagers reacting to players stealing items."))).dimensions(this.width / 2 - 100, y + 96, 200, 20).build());
 
         // Done button
         this.addDrawableChild(ButtonWidget.builder(Text.of("Done"), 
