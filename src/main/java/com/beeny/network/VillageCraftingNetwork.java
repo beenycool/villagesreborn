@@ -8,14 +8,26 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Box;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import java.util.List;
 import java.util.UUID;
 
 public class VillageCraftingNetwork {
-    public static final Identifier CRAFT_PACKET = Identifier.of("villagesreborn", "craft");
+    public static final Identifier CRAFT_PACKET = new Identifier("villagesreborn", "craft_recipe");
 
     public static void register() {
+        // Register server-side packet receiver
+        ServerPlayNetworking.registerGlobalReceiver(CRAFT_PACKET, (server, player, handler, buf, responseSender) -> {
+            UUID villagerUuid = buf.readUuid();
+            String recipeId = buf.readString();
+            
+            // Execute on the server thread
+            server.execute(() -> {
+                handleCraftRequest(villagerUuid, recipeId, player);
+            });
+        });
+        
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             // Initialize connection - no packet handling needed here
         });

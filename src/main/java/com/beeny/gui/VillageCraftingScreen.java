@@ -1,12 +1,12 @@
 package com.beeny.gui;
 
 import com.beeny.village.VillageCraftingManager;
+import com.beeny.network.VillageCraftingClientNetwork;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
-import net.minecraft.server.network.ServerPlayerEntity;
 import java.util.List;
 import java.util.Arrays;
 
@@ -103,16 +103,10 @@ public class VillageCraftingScreen extends Screen {
         if (selectedRecipe >= 0 && selectedRecipe < recipes.size() && client.player != null) {
             VillageCraftingManager.CraftingRecipe recipe = recipes.get(selectedRecipe);
             
-            // On client side, just trigger the interaction
-            // The actual crafting will be handled server-side via interaction events
-            if (client.interactionManager != null) {
-                client.interactionManager.interactEntity(
-                    client.player,
-                    villager,
-                    client.player.getActiveHand()
-                );
-            }
+            // Send crafting request to server via the network handler
+            VillageCraftingClientNetwork.sendCraftingRequest(villager, recipe.getId());
             
+            // Close the screen after sending the request
             close();
         }
     }

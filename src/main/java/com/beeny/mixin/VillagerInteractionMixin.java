@@ -8,6 +8,7 @@ import com.beeny.village.VillagerDialogue;
 import com.beeny.village.VillagerFeedbackHelper;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.VillagerMemory;
+import com.beeny.village.crafting.VillageCraftingScreenHandler;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -168,9 +169,32 @@ public abstract class VillagerInteractionMixin {
                     net.minecraft.client.MinecraftClient.getInstance().setScreen(
                         new VillageCraftingScreen(thisVillager, culture)));
       } else {
+        // Server-side workstation interaction handling
         vr_LOGGER.debug(
             "Server handling workstation interaction for Villager {}", thisVillager.getUuid());
-        if (villagerAI != null) villagerAI.updateActivity("interacting_workstation");
+        
+        if (villagerAI != null) {
+          villagerAI.updateActivity("interacting_workstation");
+          
+          // If the player is a server player, create a screen handler for tracking the interaction
+          if (player instanceof ServerPlayerEntity serverPlayer) {
+            SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
+            String culture = (region != null) ? region.getCultureAsString() : "default";
+            
+            // No need to create an active screen handler here as we'll use the networking system
+            // to handle crafting requests when they come in
+            
+            // The client will send a crafting request when a recipe is selected
+            // which will be handled by the VillageCraftingNetwork class
+            
+            // Just give visual feedback that the villager is ready for crafting
+            serverPlayer.sendMessage(
+                Text.literal("§6" + thisVillager.getName().getString() + ": §f" + 
+                              "What would you like me to craft for you?"),
+                false);
+            VillagerFeedbackHelper.showTalkingAnimation(thisVillager);
+          }
+        }
       }
       cir.setReturnValue(ActionResult.SUCCESS); // Prevent vanilla trading screen
 

@@ -28,6 +28,7 @@ import com.beeny.village.VillagerManager; // Import VillagerManager
 import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
 import com.beeny.worldgen.VillagesRebornStructures;
+import com.beeny.network.VillageCraftingNetwork; // Import VillageCraftingNetwork
 import net.minecraft.entity.Entity; // Import Entity
 import net.minecraft.entity.passive.VillagerEntity; // Import VillagerEntity
 import net.minecraft.entity.player.PlayerEntity;
@@ -87,6 +88,10 @@ public class Villagesreborn implements ModInitializer {
         // Initialize Managers (ensure correct order if dependencies exist)
         VillagerManager.getInstance(); // Initialize VillagerManager
         VillageCraftingManager.getInstance(); // Initialize Crafting Manager
+        
+        // Register networking components
+        registerNetworking();
+        
         // Initialize other managers like VillageInfluenceManager, CulturalEventSystem etc. if needed here
 
         // Register Commands
@@ -122,6 +127,15 @@ public class Villagesreborn implements ModInitializer {
         VillagesRebornStructures.registerStructures();
 
         LOGGER.info("Villages Reborn mod initialization complete");
+    }
+    
+    /**
+     * Registers networking components for the mod
+     */
+    private void registerNetworking() {
+        LOGGER.info("Registering networking handlers");
+        // Register the village crafting network handler
+        VillageCraftingNetwork.register();
     }
 
     /**
