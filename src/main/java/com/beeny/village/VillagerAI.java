@@ -89,6 +89,11 @@ public class VillagerAI {
     private Map<String, Goal> activeGoals = new HashMap<>();
     private Map<String, Integer> goalPriorities = new HashMap<>();
     
+    // Track LLM-suggested activities and their durations
+    private String llmSuggestedActivity = null;
+    private long llmActivityExpiration = 0;
+    private long lastActivityTransition = 0;
+    
     public VillagerAI(VillagerEntity villager, String personality) {
         this.villager = villager;
         this.personality = personality;
@@ -124,20 +129,139 @@ public class VillagerAI {
     }
     
     public void updateActivity(String activity) {
+        if (!activity.equals(currentActivity)) {
+            // Only log if activity actually changes
+            LOGGER.debug("Villager {} activity changed from {} to {}", 
+                villager.getName().getString(), currentActivity, activity);
+            
+            // Fire the activity change callback for other systems to respond
+            if (villager.getWorld() instanceof ServerWorld serverWorld) {
+                VillagerActivityCallback.EVENT.invoker().onActivity(
+                    villager, serverWorld, activity, villager.getBlockPos());
+            }
+        }
         this.currentActivity = activity;
     }
     
+    /**
+     * Sets an activity suggested by the LLM with an expiration time
+     * @param activity The suggested activity
+     * @param durationTicks How long the activity should last in game ticks
+     */
+    public void setLLMSuggestedActivity(String activity, long durationTicks) {
+        this.llmSuggestedActivity = activity;
+        this.llmActivityExpiration = villager.getWorld().getTime() + durationTicks;
+        updateActivity(activity);
+        LOGGER.debug("LLM suggested activity {} for {} ticks for villager {}", 
+            activity, durationTicks, villager.getName().getString());
+    }
+    
+    /**
+     * Updates the villager's activity based on time of day, considering cultural context
+     * and any LLM-suggested activities.
+     * 
+     * @param world The server world
+     */
     public void updateActivityBasedOnTime(ServerWorld world) {
-        long time = world.getTimeOfDay() % 24000;
-        if (time < 1000 || time > 13000) {
-            updateActivity("sleeping");
-        } else if (time > 11500) {
-            updateActivity("returning_home");
-        } else if (time > 9000) {
-            updateActivity("working");
-        } else {
-            updateActivity("socializing");
+        long currentTime = world.getTimeOfDay();
+        long timeSinceLastTransition = currentTime - lastActivityTransition;
+        
+        // Check if there's an active LLM-suggested activity
+        if (llmSuggestedActivity != null && currentTime < llmActivityExpiration) {
+            // The LLM-suggested activity is still valid, keep it
+            return;
+        } else if (llmSuggestedActivity != null) {
+            // The LLM-suggested activity has expired
+            llmSuggestedActivity = null;
         }
+        
+        // Get cultural context for more specific behaviors
+        VillagerManager vm = VillagerManager.getInstance();
+        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+        String culture = region != null ? region.getCultureAsString().toLowerCase() : "generic";
+        
+        // Apply time-based default behavior
+        String newActivity;
+        long timeOfDay = currentTime % 24000;
+        
+        if (timeOfDay < 1000 || timeOfDay > 13000) {
+            newActivity = "sleeping";
+        } else if (timeOfDay > 11500) {
+            newActivity = "returning_home";
+        } else if (timeOfDay > 9000) {
+            newActivity = "working";
+        } else {
+            newActivity = "socializing";
+        }
+        
+        // Don't change activity if we're busy with something important
+        if (busy) {
+            return;
+        }
+        
+        // Apply the new activity if it's different from the current one
+        if (!newActivity.equals(currentActivity)) {
+            // Record the transition time
+            lastActivityTransition = currentTime;
+            
+            // Update the activity
+            updateActivity(newActivity);
+            
+            // Apply appropriate behavior goals based on the new activity
+            switch (newActivity) {
+                case "sleeping":
+                    applyRestGoals("bed");
+                    break;
+                case "returning_home":
+                    // Find and move to home location
+                    villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME)
+                        .ifPresent(pos -> moveToPosition(pos, 0.6D, 1));
+                    break;
+                case "working":
+                    // Apply work goals appropriate for their profession
+                    applyWorkGoals("job");
+                    break;
+                case "socializing":
+                    // Apply socialize goals
+                    applySocializeGoals("villager");
+                    break;
+                default:
+                    // Default to wandering
+                    applyWanderGoals("around");
+            }
+            
+            // For major activity transitions, potentially generate LLM behavior
+            if ((timeOfDay == 1000 || timeOfDay == 9000 || timeOfDay == 13000) && 
+                    Math.random() < 0.3) { // 30% chance to use LLM at key transitions
+                String situation = String.format("It's %s and this villager is %s in a %s village", 
+                    getTimeDescription(timeOfDay), newActivity, culture);
+                
+                generateBehavior(situation)
+                    .thenAccept(behavior -> {
+                        // The behavior will be automatically applied when the LLM responds
+                        LOGGER.debug("Generated behavior for {} during activity transition: {}", 
+                            villager.getName().getString(), behavior);
+                    })
+                    .exceptionally(e -> {
+                        LOGGER.error("Error generating behavior during activity transition", e);
+                        return null;
+                    });
+            }
+        }
+    }
+    
+    /**
+     * Provides a human-readable description of the time of day
+     * @param timeOfDay The time in ticks (0-24000)
+     * @return A description of the time
+     */
+    private String getTimeDescription(long timeOfDay) {
+        if (timeOfDay < 1000) return "dawn";
+        if (timeOfDay < 6000) return "morning";
+        if (timeOfDay < 9000) return "midday";
+        if (timeOfDay < 11500) return "afternoon";
+        if (timeOfDay < 13000) return "evening";
+        return "night";
     }
     
     public CompletableFuture<String> generateBehavior(String situation) {
