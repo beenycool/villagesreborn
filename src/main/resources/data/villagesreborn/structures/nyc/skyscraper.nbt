@@ -1,0 +1,50 @@
+{
+  "size": [11, 30, 11],
+  "entities": [],
+  "blocks": [
+    // Foundation
+    {"nbt": {"pos":[0,0,0], "size":[11,1,11]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    // Lobby level
+    {"nbt": {"pos":[0,1,0], "size":[11,4,11]}, "state": "minecraft:gray_concrete", "mode": "outline"},
+    {"nbt": {"pos":[1,1,1], "size":[9,4,9]}, "state": "minecraft:air", "mode": "fill"},
+    // Lobby glass entrance
+    {"nbt": {"pos":[4,1,0], "size":[3,3,1]}, "state": "minecraft:glass", "mode": "fill"},
+    // Central tower
+    {"nbt": {"pos":[1,5,1], "size":[9,24,9]}, "state": "minecraft:light_gray_concrete", "mode": "outline"},
+    {"nbt": {"pos":[2,5,2], "size":[7,24,7]}, "state": "minecraft:air", "mode": "fill"},
+    // Floor separators
+    {"nbt": {"pos":[1,8,1], "size":[9,1,9]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[2,8,2], "size":[7,1,7]}, "state": "minecraft:air", "mode": "fill"},
+    {"nbt": {"pos":[1,12,1], "size":[9,1,9]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[2,12,2], "size":[7,1,7]}, "state": "minecraft:air", "mode": "fill"},
+    {"nbt": {"pos":[1,16,1], "size":[9,1,9]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[2,16,2], "size":[7,1,7]}, "state": "minecraft:air", "mode": "fill"},
+    {"nbt": {"pos":[1,20,1], "size":[9,1,9]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[2,20,2], "size":[7,1,7]}, "state": "minecraft:air", "mode": "fill"},
+    {"nbt": {"pos":[1,24,1], "size":[9,1,9]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[2,24,2], "size":[7,1,7]}, "state": "minecraft:air", "mode": "fill"},
+    // Windows pattern
+    {"nbt": {"pos":[1,6,1], "size":[9,2,9]}, "state": "minecraft:black_stained_glass", "mode": "windowPattern", "pattern": "vertical"},
+    {"nbt": {"pos":[1,9,1], "size":[9,2,9]}, "state": "minecraft:black_stained_glass", "mode": "windowPattern", "pattern": "vertical"},
+    {"nbt": {"pos":[1,13,1], "size":[9,2,9]}, "state": "minecraft:black_stained_glass", "mode": "windowPattern", "pattern": "vertical"},
+    {"nbt": {"pos":[1,17,1], "size":[9,2,9]}, "state": "minecraft:black_stained_glass", "mode": "windowPattern", "pattern": "vertical"},
+    {"nbt": {"pos":[1,21,1], "size":[9,2,9]}, "state": "minecraft:black_stained_glass", "mode": "windowPattern", "pattern": "vertical"},
+    // Penthouse/top floor
+    {"nbt": {"pos":[2,25,2], "size":[7,3,7]}, "state": "minecraft:light_blue_concrete", "mode": "outline"},
+    {"nbt": {"pos":[3,25,3], "size":[5,3,5]}, "state": "minecraft:air", "mode": "fill"},
+    // Roof details
+    {"nbt": {"pos":[3,28,3], "size":[5,1,5]}, "state": "minecraft:light_gray_concrete", "mode": "fill"},
+    {"nbt": {"pos":[4,29,4], "size":[3,1,3]}, "state": "minecraft:gray_concrete", "mode": "fill"},
+    // Antenna
+    {"nbt": {"pos":[5,29,5], "size":[1,3,1]}, "state": "minecraft:iron_bars", "mode": "fill"},
+    // Interior details - elevator shaft
+    {"nbt": {"pos":[5,1,5], "size":[1,28,1]}, "state": "minecraft:iron_bars", "mode": "fill"},
+    // Lobby furniture
+    {"pos": [3, 1, 3], "state": "minecraft:oak_fence"},
+    {"pos": [3, 2, 3], "state": "minecraft:oak_fence"},
+    {"pos": [3, 3, 3], "state": "minecraft:lantern"},
+    {"pos": [7, 1, 7], "state": "minecraft:oak_fence"},
+    {"pos": [7, 2, 7], "state": "minecraft:oak_fence"},
+    {"pos": [7, 3, 7], "state": "minecraft:lantern"}
+  ]
+}

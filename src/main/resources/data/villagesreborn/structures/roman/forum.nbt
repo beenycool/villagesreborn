@@ -1,22 +1,69 @@
 {
   "type": "structure",
+  "size": [21, 12, 31],
   "blocks": [
-    {
-      "pos": [0, 0, 0],
-      "state": "minecraft:stone_bricks"
-    },
-    {
-      "pos": [1, 0, 0],
-      "state": "minecraft:stone_bricks"
-    },
-    {
-      "pos": [0, 1, 0],
-      "state": "minecraft:stone_brick_slab"
-    },
-    {
-      "pos": [1, 1, 0],
-      "state": "minecraft:stone_brick_slab"
-    }
+    // Main plaza foundation
+    {"nbt": {"pos":[0,0,0], "size":[21,1,31]}, "state": "minecraft:stone_bricks", "mode": "fill"},
+    // Plaza central area with decorative pattern
+    {"nbt": {"pos":[3,1,3], "size":[15,1,25]}, "state": "minecraft:polished_andesite", "mode": "fill"},
+    {"nbt": {"pos":[5,1,5], "size":[11,1,21]}, "state": "minecraft:polished_granite", "mode": "fill"},
+    {"nbt": {"pos":[7,1,7], "size":[7,1,17]}, "state": "minecraft:polished_diorite", "mode": "fill"},
+    // Colonnade on east and west sides
+    // East side
+    {"nbt": {"pos":[1,1,3], "size":[1,5,25]}, "state": "minecraft:stone_bricks", "mode": "frame", "step": 4},
+    {"nbt": {"pos":[1,1,3], "size":[1,1,25]}, "state": "minecraft:stone_brick_stairs[facing=west]", "mode": "fill"},
+    // West side
+    {"nbt": {"pos":[19,1,3], "size":[1,5,25]}, "state": "minecraft:stone_bricks", "mode": "frame", "step": 4},
+    {"nbt": {"pos":[19,1,3], "size":[1,1,25]}, "state": "minecraft:stone_brick_stairs[facing=east]", "mode": "fill"},
+    // Columns - east side
+    {"nbt": {"pos":[1,2,3], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,7], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,11], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,15], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,19], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,23], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[1,2,27], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    // Columns - west side
+    {"nbt": {"pos":[19,2,3], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,7], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,11], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,15], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,19], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,23], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[19,2,27], "size":[1,3,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    // North end - government building with steps
+    {"nbt": {"pos":[3,1,28], "size":[15,1,3]}, "state": "minecraft:stone_brick_stairs[facing=south]", "mode": "fill"},
+    {"nbt": {"pos":[3,2,29], "size":[15,1,2]}, "state": "minecraft:stone_brick_stairs[facing=south]", "mode": "fill"},
+    {"nbt": {"pos":[3,3,30], "size":[15,1,1]}, "state": "minecraft:stone_brick_stairs[facing=south]", "mode": "fill"},
+    // Government building structure
+    {"nbt": {"pos":[3,4,26], "size":[15,5,5]}, "state": "minecraft:quartz_block", "mode": "outline"},
+    {"nbt": {"pos":[4,4,27], "size":[13,5,3]}, "state": "minecraft:air", "mode": "fill"},
+    // Government building decorative features
+    {"nbt": {"pos":[3,9,26], "size":[15,1,5]}, "state": "minecraft:quartz_slab", "mode": "fill"},
+    {"nbt": {"pos":[3,8,26], "size":[15,1,1]}, "state": "minecraft:chiseled_quartz_block", "mode": "fill"},
+    // South end - temple structure
+    {"nbt": {"pos":[6,1,0], "size":[9,1,3]}, "state": "minecraft:stone_brick_stairs[facing=north]", "mode": "fill"},
+    {"nbt": {"pos":[7,2,0], "size":[7,1,2]}, "state": "minecraft:stone_brick_stairs[facing=north]", "mode": "fill"},
+    {"nbt": {"pos":[8,3,0], "size":[5,1,1]}, "state": "minecraft:stone_brick_stairs[facing=north]", "mode": "fill"},
+    // Temple columns
+    {"nbt": {"pos":[6,2,3], "size":[1,6,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[14,2,3], "size":[1,6,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[7,2,3], "size":[1,6,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    {"nbt": {"pos":[13,2,3], "size":[1,6,1]}, "state": "minecraft:quartz_pillar", "mode": "fill"},
+    // Temple structure
+    {"nbt": {"pos":[6,8,0], "size":[9,1,4]}, "state": "minecraft:quartz_block", "mode": "fill"},
+    {"nbt": {"pos":[7,9,1], "size":[7,1,2]}, "state": "minecraft:quartz_slab", "mode": "fill"},
+    // Decorative statues
+    {"pos": [10, 2, 8], "state": "minecraft:armor_stand", "nbt": {"ShowArms":1,"Invisible":0,"NoBasePlate":1}},
+    {"pos": [10, 2, 22], "state": "minecraft:armor_stand", "nbt": {"ShowArms":1,"Invisible":0,"NoBasePlate":1}},
+    // Water features
+    {"nbt": {"pos":[5,1,14], "size":[2,1,2]}, "state": "minecraft:water", "mode": "fill"},
+    {"nbt": {"pos":[14,1,14], "size":[2,1,2]}, "state": "minecraft:water", "mode": "fill"},
+    // Market stalls
+    {"pos": [4, 1, 5], "state": "minecraft:barrel"},
+    {"pos": [16, 1, 5], "state": "minecraft:barrel"},
+    {"pos": [4, 1, 20], "state": "minecraft:crafting_table"},
+    {"pos": [16, 1, 20], "state": "minecraft:smoker"}
   ],
   "entities": []
 }

@@ -1,0 +1,52 @@
+{
+  "size": [11, 12, 9],
+  "entities": [],
+  "blocks": [
+    // Foundation
+    {"nbt": {"pos":[0,0,0], "size":[11,1,9]}, "state": "minecraft:cobblestone", "mode": "fill"},
+    // First floor walls
+    {"nbt": {"pos":[0,1,0], "size":[11,3,9]}, "state": "minecraft:oak_planks", "mode": "outline"},
+    {"nbt": {"pos":[1,1,1], "size":[9,3,7]}, "state": "minecraft:air", "mode": "fill"},
+    // Second floor framework
+    {"nbt": {"pos":[0,4,0], "size":[11,1,9]}, "state": "minecraft:stripped_dark_oak_log", "mode": "outline"},
+    {"nbt": {"pos":[1,4,1], "size":[9,1,7]}, "state": "minecraft:oak_planks", "mode": "fill"},
+    // Second floor walls with Tudor-style framing
+    {"nbt": {"pos":[0,5,0], "size":[11,3,9]}, "state": "minecraft:white_concrete", "mode": "outline"},
+    {"nbt": {"pos":[1,5,1], "size":[9,3,7]}, "state": "minecraft:air", "mode": "fill"},
+    // Tudor-style wood framing
+    {"nbt": {"pos":[0,5,0], "size":[11,3,1]}, "state": "minecraft:dark_oak_log", "mode": "frame", "step": 2},
+    {"nbt": {"pos":[0,5,8], "size":[11,3,1]}, "state": "minecraft:dark_oak_log", "mode": "frame", "step": 2},
+    {"nbt": {"pos":[0,5,0], "size":[1,3,9]}, "state": "minecraft:dark_oak_log", "mode": "frame", "step": 2},
+    {"nbt": {"pos":[10,5,0], "size":[1,3,9]}, "state": "minecraft:dark_oak_log", "mode": "frame", "step": 2},
+    // X-pattern in the Tudor framing
+    {"nbt": {"pos":[2,5,0], "size":[2,2,1]}, "state": "minecraft:dark_oak_log", "mode": "x-pattern"},
+    {"nbt": {"pos":[7,5,0], "size":[2,2,1]}, "state": "minecraft:dark_oak_log", "mode": "x-pattern"},
+    {"nbt": {"pos":[2,5,8], "size":[2,2,1]}, "state": "minecraft:dark_oak_log", "mode": "x-pattern"},
+    {"nbt": {"pos":[7,5,8], "size":[2,2,1]}, "state": "minecraft:dark_oak_log", "mode": "x-pattern"},
+    // Steep Victorian roof
+    {"nbt": {"pos":[0,8,0], "size":[11,1,9]}, "state": "minecraft:dark_oak_planks", "mode": "fill"},
+    {"nbt": {"pos":[1,9,1], "size":[9,1,7]}, "state": "minecraft:dark_oak_planks", "mode": "fill"},
+    {"nbt": {"pos":[2,10,2], "size":[7,1,5]}, "state": "minecraft:dark_oak_planks", "mode": "fill"},
+    {"nbt": {"pos":[3,11,3], "size":[5,1,3]}, "state": "minecraft:dark_oak_planks", "mode": "fill"},
+    // Victorian tower on corner
+    {"nbt": {"pos":[0,8,0], "size":[3,4,3]}, "state": "minecraft:blue_concrete", "mode": "outline"},
+    {"nbt": {"pos":[1,12,1], "size":[1,1,1]}, "state": "minecraft:dark_oak_fence", "mode": "fill"},
+    // Windows
+    {"pos": [2, 2, 0], "state": "minecraft:glass_pane"},
+    {"pos": [3, 2, 0], "state": "minecraft:glass_pane"},
+    {"pos": [7, 2, 0], "state": "minecraft:glass_pane"},
+    {"pos": [8, 2, 0], "state": "minecraft:glass_pane"},
+    {"pos": [2, 6, 0], "state": "minecraft:glass_pane"},
+    {"pos": [3, 6, 0], "state": "minecraft:glass_pane"},
+    {"pos": [7, 6, 0], "state": "minecraft:glass_pane"},
+    {"pos": [8, 6, 0], "state": "minecraft:glass_pane"},
+    // Door
+    {"pos": [5, 1, 0], "state": "minecraft:dark_oak_door[half=lower]"},
+    {"pos": [5, 2, 0], "state": "minecraft:dark_oak_door[half=upper]"},
+    // Interior details
+    {"pos": [5, 1, 4], "state": "minecraft:oak_stairs[facing=north]"},
+    {"pos": [5, 1, 5], "state": "minecraft:oak_stairs[facing=north]"},
+    {"pos": [2, 1, 7], "state": "minecraft:furnace[facing=south]"},
+    {"pos": [8, 1, 7], "state": "minecraft:crafting_table"}
+  ]
+}
