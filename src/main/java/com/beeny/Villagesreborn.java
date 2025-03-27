@@ -27,6 +27,7 @@ import com.beeny.village.Culture;
 import com.beeny.village.VillagerManager; // Import VillagerManager
 import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
+import com.beeny.worldgen.VillagesRebornStructures;
 import net.minecraft.entity.Entity; // Import Entity
 import net.minecraft.entity.passive.VillagerEntity; // Import VillagerEntity
 import net.minecraft.entity.player.PlayerEntity;
@@ -117,6 +118,8 @@ public class Villagesreborn implements ModInitializer {
         // Register Structure Modifications (Placeholder - Needs specific implementation)
         registerStructureModifications();
 
+        // Register new structure system with the Fabric BiomeModifications API
+        VillagesRebornStructures.registerStructures();
 
         LOGGER.info("Villages Reborn mod initialization complete");
     }
