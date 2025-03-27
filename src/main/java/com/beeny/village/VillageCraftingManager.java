@@ -14,8 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class VillageCraftingManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger("VillageCraftingManager");
     private static VillageCraftingManager instance;
     private final Map<String, List<CraftingRecipe>> culturalRecipes = new HashMap<>();
     private final VillagerManager villagerManager;
@@ -61,18 +64,22 @@ public class VillageCraftingManager {
     }
 
     public CompletableFuture<String> assignTask(VillagerEntity villager, String recipeId, ServerPlayerEntity player) {
+        LOGGER.info("Assigning crafting task to villager {} for recipe {}", villager.getUuid(), recipeId);
+        
         VillagerAI ai = villagerManager.getVillagerAI(villager.getUuid());
         VillagerManager vm = VillagerManager.getInstance();
         SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        String culture = region != null ? region.getCulture().toString() : "unknown";
+        String culture = region != null ? region.getCultureAsString() : "default";
         CraftingRecipe recipe = findRecipe(culture, recipeId);
 
         if (recipe == null) {
+            LOGGER.warn("Unknown recipe: {} for culture: {}", recipeId, culture);
             return CompletableFuture.completedFuture("Unknown recipe");
         }
         
         // Check if villager is on cooldown for this recipe
-        if (isOnCooldown(villager.getUuid(), recipeId)) {
+        if (isOnCooldown(villager.getUuid(), recipeId, player.getWorld().getTime())) {
+            LOGGER.info("Villager {} is on cooldown for recipe {}", villager.getUuid(), recipeId);
             return CompletableFuture.completedFuture(villager.getName().getString() + " needs to rest before crafting this again.");
         }
 
@@ -89,6 +96,7 @@ public class VillageCraftingManager {
             
             if (missingItems.length() > 0) {
                 missingItems.setLength(missingItems.length() - 2); // Remove trailing comma and space
+                LOGGER.info("Player {} missing materials for recipe {}: {}", player.getName().getString(), recipeId, missingItems);
                 return CompletableFuture.completedFuture("Missing materials: " + missingItems);
             }
         }
@@ -124,11 +132,14 @@ public class VillageCraftingManager {
                 player.sendMessage(Text.literal("Received: " + result.getName().getString()).formatted(Formatting.GREEN), true);
                 player.sendMessage(Text.literal(response), false);
                 
+                LOGGER.info("Villager {} successfully crafted {} for player {}", 
+                    villager.getUuid(), recipeId, player.getName().getString());
+                
                 return response;
             });
     }
     
-    private boolean isOnCooldown(UUID villagerUuid, String recipeId) {
+    private boolean isOnCooldown(UUID villagerUuid, String recipeId, long currentGameTime) {
         Map<String, Long> villagerCooldowns = craftingCooldowns.get(villagerUuid);
         if (villagerCooldowns == null) {
             return false;
@@ -139,9 +150,8 @@ public class VillageCraftingManager {
             return false;
         }
         
-        // Check if current time is still within cooldown period
-        long currentTime = System.currentTimeMillis();
-        return currentTime < cooldownUntil;
+        // Check if current game time is still within cooldown period
+        return currentGameTime < cooldownUntil;
     }
     
     private void setCooldown(UUID villagerUuid, String recipeId, long currentGameTime) {
