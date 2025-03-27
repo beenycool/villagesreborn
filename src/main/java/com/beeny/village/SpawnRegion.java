@@ -30,74 +30,111 @@ public class SpawnRegion {
         this.radius = radius;
     }
 
+    /**
+     * Determines if a culture can spawn in the specified dimension
+     * @param world The world to check
+     * @return True if the culture can spawn in this dimension
+     */
     public boolean canSpawnInDimension(World world) {
         RegistryKey<World> dimension = world.getRegistryKey();
         Culture.CultureType cultureType = culture.getType();
         
+        // Each culture type should only spawn in its appropriate dimension
         return switch (cultureType) {
             case NETHER -> World.NETHER.equals(dimension);
             case END -> World.END.equals(dimension);
+            // Overworld cultures (EGYPTIAN, ROMAN, VICTORIAN, MODERN, etc.) should only spawn in the overworld
+            case EGYPTIAN, ROMAN, VICTORIAN, MODERN -> World.OVERWORLD.equals(dimension);
+            // Default fallback for any new culture types
             default -> World.OVERWORLD.equals(dimension);
         };
     }
 
+    /**
+     * Checks if a culture can spawn in the specified biome
+     * @param biome The biome to check
+     * @param world The world containing the biome
+     * @return True if the culture can spawn in this biome
+     */
     public boolean canSpawnInBiome(Biome biome, World world) {
+        // First check if the culture can spawn in this dimension at all
         if (!canSpawnInDimension(world)) {
             return false;
         }
 
         Culture.CultureType cultureType = culture.getType();
+        RegistryKey<World> dimension = world.getRegistryKey();
 
         // Handle dimension-specific cultures with biome specificity
-        if (World.NETHER.equals(world.getRegistryKey())) {
+        if (World.NETHER.equals(dimension)) {
+            // Only NETHER culture types should spawn in the Nether
             if (cultureType != Culture.CultureType.NETHER) return false;
             
-            // Specific Nether biome checks
-            return world.getBiome(center).matchesKey(BiomeKeys.CRIMSON_FOREST) || 
-                   world.getBiome(center).matchesKey(BiomeKeys.WARPED_FOREST) || 
-                   world.getBiome(center).matchesKey(BiomeKeys.SOUL_SAND_VALLEY) || 
-                   world.getBiome(center).matchesKey(BiomeKeys.NETHER_WASTES) || 
-                   world.getBiome(center).matchesKey(BiomeKeys.BASALT_DELTAS);
+            // Specific Nether biome checks - check the biome parameter directly
+            return biome.matchesKey(BiomeKeys.CRIMSON_FOREST) || 
+                   biome.matchesKey(BiomeKeys.WARPED_FOREST) || 
+                   biome.matchesKey(BiomeKeys.SOUL_SAND_VALLEY) || 
+                   biome.matchesKey(BiomeKeys.NETHER_WASTES) || 
+                   biome.matchesKey(BiomeKeys.BASALT_DELTAS);
         }
         
-        if (World.END.equals(world.getRegistryKey())) {
+        if (World.END.equals(dimension)) {
+            // Only END culture types should spawn in the End
             if (cultureType != Culture.CultureType.END) return false;
             
             // End villages should only spawn in the outer islands, not the central island
             // Check if we're at least 1000 blocks from the center (0,0)
             int distanceFromCenter = (int) Math.sqrt(center.getSquaredDistance(0, center.getY(), 0));
             return distanceFromCenter > 1000 && 
-                   (world.getBiome(center).matchesKey(BiomeKeys.END_MIDLANDS) || 
-                    world.getBiome(center).matchesKey(BiomeKeys.END_HIGHLANDS) ||
-                    world.getBiome(center).matchesKey(BiomeKeys.END_BARRENS));
+                   (biome.matchesKey(BiomeKeys.END_MIDLANDS) || 
+                    biome.matchesKey(BiomeKeys.END_HIGHLANDS) ||
+                    biome.matchesKey(BiomeKeys.END_BARRENS));
         }
 
-        // Get biome at position for overworld cultures
+        // Overworld culture-specific biome checks
         return switch (cultureType) {
-            case EGYPTIAN -> world.getBiome(center).matchesKey(BiomeKeys.DESERT);
-            case ROMAN -> world.getBiome(center).matchesKey(BiomeKeys.PLAINS);
-            case VICTORIAN -> world.getBiome(center).matchesKey(BiomeKeys.FOREST);
-            case MODERN -> world.getBiome(center).matchesKey(BiomeKeys.WINDSWEPT_HILLS);
+            case EGYPTIAN -> biome.matchesKey(BiomeKeys.DESERT);
+            case ROMAN -> biome.matchesKey(BiomeKeys.PLAINS);
+            case VICTORIAN -> biome.matchesKey(BiomeKeys.FOREST);
+            case MODERN -> biome.matchesKey(BiomeKeys.WINDSWEPT_HILLS);
+            // Default fallback to prevent unhandled culture types from spawning everywhere
             default -> false;
         };
     }
 
+    /**
+     * Validates if a specific location is suitable for spawning a village
+     * @param world The world to check
+     * @param pos The position to check
+     * @return True if the location is suitable for spawning
+     */
     public boolean isValidSpawnLocation(World world, BlockPos pos) {
         // Basic checks
         if (!world.isChunkLoaded(pos)) {
             return false;
         }
 
+        // Check dimension and biome validity first
+        if (!canSpawnInDimension(world)) {
+            return false;
+        }
+
+        Biome biome = world.getBiome(pos).value();
+        if (!canSpawnInBiome(biome, world)) {
+            return false;
+        }
+
         Culture.CultureType cultureType = culture.getType();
+        RegistryKey<World> dimension = world.getRegistryKey();
         
-        // Dimension-specific checks
-        if (cultureType == Culture.CultureType.NETHER) {
+        // Dimension-specific location checks
+        if (World.NETHER.equals(dimension)) {
             return isValidNetherSpawn(world, pos);
-        } else if (cultureType == Culture.CultureType.END) {
+        } else if (World.END.equals(dimension)) {
             return isValidEndSpawn(world, pos);
         }
 
-        // Overworld checks
+        // Default to overworld checks
         return isValidOverworldSpawn(world, pos);
     }
 
