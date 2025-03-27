@@ -1,7 +1,9 @@
+// File: src/main/java/com/beeny/gui/VillagesRebornSettingsScreen.java
 package com.beeny.gui;
 
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.tooltip.Tooltip; // Import Tooltip
 import net.minecraft.text.Text;
 import com.beeny.config.VillagesConfig;
 
@@ -10,67 +12,90 @@ public class VillagesRebornSettingsScreen extends Screen {
     private VillagesConfig config;
 
     public VillagesRebornSettingsScreen(Screen parent) {
-        super(Text.of("Villages Reborn Settings"));
+        super(Text.literal("Villages Reborn Settings"));
         this.parent = parent;
         this.config = VillagesConfig.getInstance();
     }
 
     @Override
     protected void init() {
-        int y = this.height / 4;
+        int y = this.height / 4 + 24; // Start buttons lower
+        int buttonWidth = 200;
+        int spacing = 24;
 
-        // Village generation frequency
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Village Spawn Rate: " + config.getVillageSpawnRate()), 
-            button -> cycleVillageSpawnRate()).tooltip(Tooltip.of(Text.of("Adjusts how often Villages Reborn villages generate."))).dimensions(this.width / 2 - 100, y, 200, 20).build());
+        // --- Simplified Main Settings ---
 
-        // AI Provider selection
-        this.addDrawableChild(ButtonWidget.builder(Text.of("AI Provider: " + config.getAIProvider()), 
-            button -> cycleAIProvider()).tooltip(Tooltip.of(Text.of("Select the AI service used for villager dialogue (e.g., OpenAI, Anthropic)."))).dimensions(this.width / 2 - 100, y + 24, 200, 20).build());
+        // Village Spawn Rate (Keep as cycle for simplicity here)
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Village Spawn Rate: " + config.getVillageSpawnRate()),
+                button -> {
+                    config.cycleVillageSpawnRate();
+                    this.client.setScreen(new VillagesRebornSettingsScreen(this.parent)); // Re-initialize screen
+                })
+            .tooltip(Tooltip.of(Text.literal("Adjusts how often Villages Reborn villages generate.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
 
-        // Cultures selection
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Configure Cultures"), 
-            button -> openCulturesScreen()).tooltip(Tooltip.of(Text.of("Configure which villager cultures can appear in your world."))).dimensions(this.width / 2 - 100, y + 48, 200, 20).build());
+        // AI Settings Button
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("AI Settings"),
+                button -> this.client.setScreen(new AISettingsScreen(this))) // Link to new AI screen
+            .tooltip(Tooltip.of(Text.literal("Configure AI provider, API keys, and model settings.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
 
-        // Villager PvP
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Villager PvP: " + (config.isVillagerPvPEnabled() ? "ON" : "OFF")), 
-            button -> toggleVillagerPvP()).tooltip(Tooltip.of(Text.of("Enable or disable villagers attacking players or other villagers."))).dimensions(this.width / 2 - 100, y + 72, 200, 20).build());
+        // Gameplay Settings Button
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Gameplay Settings"),
+                button -> this.client.setScreen(new GameplaySettingsScreen(this))) // Link to new Gameplay screen
+            .tooltip(Tooltip.of(Text.literal("Configure features like Villager PvP and Theft Detection.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
 
-        // Theft Detection
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Theft Detection: " + (config.isTheftDetectionEnabled() ? "ON" : "OFF")), 
-            button -> toggleTheftDetection()).tooltip(Tooltip.of(Text.of("Enable or disable villagers reacting to players stealing items."))).dimensions(this.width / 2 - 100, y + 96, 200, 20).build());
+        // Configure Cultures Button (Assuming CulturesConfigScreen exists and works)
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Configure Cultures"),
+                button -> this.client.setScreen(new CulturesConfigScreen(this, null))) // null for activeCulture for now
+            .tooltip(Tooltip.of(Text.literal("Enable/disable specific village cultures.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
+
+        // UI Settings Button
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("UI Settings"),
+                button -> this.client.setScreen(new VillageUISettingsScreen(this))) // Link to UI settings screen
+            .tooltip(Tooltip.of(Text.literal("Customize HUD elements and UI display.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
+
 
         // Done button
-        this.addDrawableChild(ButtonWidget.builder(Text.of("Done"), 
-            button -> close()).dimensions(this.width / 2 - 100, this.height - 28, 200, 20).build());
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("Done"),
+                button -> close())
+            .dimensions(this.width / 2 - 100, this.height - 40, 200, 20) // Move Done button up slightly
+            .build());
     }
 
-    private void cycleVillageSpawnRate() {
-        config.cycleVillageSpawnRate();
-        init();
-    }
+    // Removed cycleAIProvider, toggleVillagerPvP, toggleTheftDetection - moved to sub-screens
 
-    private void cycleAIProvider() {
-        config.cycleAIProvider();
-        init();
-    }
-
-    private void openCulturesScreen() {
-        client.setScreen(new CulturesConfigScreen(this, null));
-    }
-
-    private void toggleVillagerPvP() {
-        config.toggleVillagerPvP();
-        init();
-    }
-
-    private void toggleTheftDetection() {
-        config.toggleTheftDetection();
-        init();
-    }
-
-@Override
-public void close() {
-        config.save();
+    @Override
+    public void close() {
+        config.save(); // Save config when closing the main settings screen
         this.client.setScreen(parent);
+    }
+
+     @Override
+    public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
+        // Render background darkens the screen slightly
+        this.renderBackground(context, mouseX, mouseY, delta);
+        // Draw the title centered
+        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        // Render widgets (buttons, etc.)
+        super.render(context, mouseX, mouseY, delta);
     }
 }
