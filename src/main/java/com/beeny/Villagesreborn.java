@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents; // Impo
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents; // Tick events
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry; // Needed for villager attributes if modified
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents; // Import entity load event
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents; // For player connection events
 // Structure related imports (Example - adjust if needed)
 import net.fabricmc.fabric.api.structure.v1.FabricStructurePool;
 import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
@@ -25,6 +26,10 @@ import com.beeny.event.VillagerEvents; // Import theft detection
 import com.beeny.village.VillageCraftingManager;
 import com.beeny.village.Culture;
 import com.beeny.village.VillagerManager; // Import VillagerManager
+import com.beeny.village.SpawnRegion;
+import com.beeny.village.VillageEvent;
+import com.beeny.village.event.CulturalEventSystem; // Import CulturalEventSystem
+import com.beeny.village.event.PlayerDataManager; // Import our new PlayerDataManager
 import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
 import com.beeny.worldgen.VillagesRebornStructures;
@@ -33,6 +38,7 @@ import net.minecraft.entity.Entity; // Import Entity
 import net.minecraft.entity.passive.VillagerEntity; // Import VillagerEntity
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer; // Import MinecraftServer
+import net.minecraft.server.network.ServerPlayerEntity; // Import ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld; // Import ServerWorld
 import net.minecraft.util.Identifier; // Import Identifier
 import net.minecraft.util.math.BlockPos;
@@ -93,6 +99,7 @@ public class Villagesreborn implements ModInitializer {
         registerNetworking();
         
         // Initialize other managers like VillageInfluenceManager, CulturalEventSystem etc. if needed here
+        CulturalEventSystem.getInstance(); // Initialize event system
 
         // Register Commands
         ModCommands.register();
@@ -119,6 +126,9 @@ public class Villagesreborn implements ModInitializer {
 
         // Register Villager Load Callback
         registerVillagerLoadCallback();
+
+        // Register Player Data Events
+        registerPlayerDataEvents();
 
         // Register Structure Modifications (Placeholder - Needs specific implementation)
         registerStructureModifications();
@@ -161,6 +171,57 @@ public class Villagesreborn implements ModInitializer {
             }
         });
          LOGGER.info("Registered Villager load callback.");
+    }
+
+    /**
+     * Registers event handlers for player data saving and loading
+     */
+    private void registerPlayerDataEvents() {
+        LOGGER.info("Registering player data event handlers");
+        
+        // Register player join event handler
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            ServerPlayerEntity player = handler.getPlayer();
+            LOGGER.debug("Player joined: {}", player.getName().getString());
+            
+            // Load player data on the server thread to avoid blocking the network thread
+            server.execute(() -> {
+                PlayerDataManager.getInstance().loadPlayerData(player);
+            });
+        });
+        
+        // Register player disconnect event handler
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            ServerPlayerEntity player = handler.getPlayer();
+            LOGGER.debug("Player disconnected: {}", player.getName().getString());
+            
+            // Save player data when they disconnect
+            server.execute(() -> {
+                PlayerDataManager.getInstance().savePlayerData(player);
+            });
+        });
+        
+        // Register server stopping event handler to save all player data
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            LOGGER.info("Saving all player data before server stop");
+            
+            // Save data for all online players
+            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                PlayerDataManager.getInstance().savePlayerData(player);
+            }
+        });
+        
+        // Register periodic data cleanup (every 5 minutes)
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            // Run cleanup every 5 minutes (6000 ticks)
+            if (server.getTicks() % 6000 == 0) {
+                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                    PlayerDataManager.getInstance().cleanupPlayerData(player);
+                }
+            }
+        });
+        
+        LOGGER.info("Player data event handlers registered successfully");
     }
 
     /**
