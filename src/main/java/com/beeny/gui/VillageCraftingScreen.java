@@ -191,10 +191,12 @@ public class VillageCraftingScreen extends Screen {
         // Draw the background texture with updated API for 1.21.4
         context.drawTexture(
             BACKGROUND_TEXTURE, 
-            guiLeft, guiTop,     // Position
-            0, 0,                // UV
-            BACKGROUND_WIDTH, BACKGROUND_HEIGHT, // Dimensions
-            BACKGROUND_WIDTH, BACKGROUND_HEIGHT  // Texture size
+            guiLeft, 
+            guiTop,
+            0,
+            0,
+            BACKGROUND_WIDTH,
+            BACKGROUND_HEIGHT
         );
         
         // Draw culture-specific decorative elements
@@ -531,5 +533,5 @@ public class VillageCraftingScreen extends Screen {
         return false;
     }
 }
-```
+/* 
 </copilot-edited-file>

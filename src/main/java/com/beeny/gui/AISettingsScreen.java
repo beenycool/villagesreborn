@@ -244,26 +244,28 @@ public class AISettingsScreen extends Screen {
     @Override
     public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        context.drawText(this.textRenderer, this.title, this.width / 2 - this.textRenderer.getWidth(this.title) / 2, 20, 0xFFFFFF, true);
         
         // Draw description
         String description = "Configure AI settings for village interactions";
-        context.drawCenteredTextWithShadow(
+        context.drawText(
             this.textRenderer, 
             description,
-            this.width / 2, 
+            this.width / 2 - this.textRenderer.getWidth(description) / 2, 
             35, 
-            0xAAAAAA
+            0xAAAAAA,
+            true
         );
         
-        // Draw connection status if not empty
+        // Draw connection status if not empty - fixed using drawText instead of drawCenteredText
         if (!connectionStatusText.getString().isEmpty()) {
-            context.drawCenteredText(
+            context.drawText(
                 this.textRenderer,
                 connectionStatusText,
-                this.width / 2,
+                this.width / 2 - this.textRenderer.getWidth(connectionStatusText) / 2,
                 this.height / 4 + 24 * 8 + 5, // Position below test button
-                0xFFFFFF
+                0xFFFFFF,
+                true
             );
         }
         
