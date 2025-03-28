@@ -1,5 +1,6 @@
 package com.beeny.village;
 
+import com.beeny.village.event.VillagerEventBehavior;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -407,9 +408,9 @@ public class VillageEvent {
             case ROMAN:
                 if (season == Culture.Season.SUMMER) {
                     description = "A grand celebration featuring gladiatorial contests and chariot races.";
-                    builder.withPhase(new EventPhase("Preparation", "Setting up the arena", 6000, null, null, null))
-                           .withPhase(new EventPhase("Games", "Gladiatorial contests", 24000, null, null, null))
-                           .withPhase(new EventPhase("Feast", "Celebratory feast", 18000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Preparation", "Setting up the arena", 6000, eventName))
+                           .withPhase(createFestivalPhase("Games", "Gladiatorial contests", 24000, eventName))
+                           .withPhase(createFestivalPhase("Feast", "Celebratory feast", 18000, eventName));
                 } else if (season == Culture.Season.WINTER) {
                     description = "A festival of gift-giving and role reversal, honoring Saturn.";
                 }
@@ -418,10 +419,10 @@ public class VillageEvent {
             case MEDIEVAL:
                 if (season == Culture.Season.SPRING) {
                     description = "A tournament of knights showcasing their skills in jousting and swordplay.";
-                    builder.withPhase(new EventPhase("Herald's Call", "Announcing the tournament", 6000, null, null, null))
-                           .withPhase(new EventPhase("Jousting", "Knights compete in jousting", 18000, null, null, null))
-                           .withPhase(new EventPhase("Melee", "Free-for-all combat tournament", 12000, null, null, null))
-                           .withPhase(new EventPhase("Awards", "Honoring the champions", 12000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Herald's Call", "Announcing the tournament", 6000, eventName))
+                           .withPhase(createFestivalPhase("Jousting", "Knights compete in jousting", 18000, eventName))
+                           .withPhase(createFestivalPhase("Melee", "Free-for-all combat tournament", 12000, eventName))
+                           .withPhase(createFestivalPhase("Awards", "Honoring the champions", 12000, eventName));
                 } else if (season == Culture.Season.AUTUMN) {
                     description = "Celebrating the harvest with feasting, dancing, and games.";
                 }
@@ -430,18 +431,18 @@ public class VillageEvent {
             case GREEK:
                 if (season == Culture.Season.SUMMER) {
                     description = "Athletic competitions honoring Zeus, featuring races, wrestling, and discus throwing.";
-                    builder.withPhase(new EventPhase("Opening Ceremony", "Lighting the sacred flame", 6000, null, null, null))
-                           .withPhase(new EventPhase("Athletic Competitions", "Various sporting events", 24000, null, null, null))
-                           .withPhase(new EventPhase("Awards", "Crowning the victors with olive wreaths", 18000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Opening Ceremony", "Lighting the sacred flame", 6000, eventName))
+                           .withPhase(createFestivalPhase("Athletic Competitions", "Various sporting events", 24000, eventName))
+                           .withPhase(createFestivalPhase("Awards", "Crowning the victors with olive wreaths", 18000, eventName));
                 }
                 break;
                 
             case JAPANESE:
                 if (season == Culture.Season.SPRING) {
                     description = "Viewing the beautiful cherry blossoms while enjoying poetry and sake.";
-                    builder.withPhase(new EventPhase("Viewing", "Cherry blossom appreciation", 24000, null, null, null))
-                           .withPhase(new EventPhase("Poetry", "Writing haiku under the trees", 12000, null, null, null))
-                           .withPhase(new EventPhase("Feast", "A traditional meal", 12000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Viewing", "Cherry blossom appreciation", 24000, eventName))
+                           .withPhase(createFestivalPhase("Poetry", "Writing haiku under the trees", 12000, eventName))
+                           .withPhase(createFestivalPhase("Feast", "A traditional meal", 12000, eventName));
                 }
                 break;
                 
@@ -450,9 +451,9 @@ public class VillageEvent {
                     description = "Ceremonies to call for rain in preparation for the planting season.";
                 } else if (season == Culture.Season.WINTER) {
                     description = "Celebrating the beginning of a new year in the calendar.";
-                    builder.withPhase(new EventPhase("Preparations", "Setting up altars and offerings", 12000, null, null, null))
-                           .withPhase(new EventPhase("Rituals", "Priests performing sacred ceremonies", 18000, null, null, null))
-                           .withPhase(new EventPhase("Celebration", "Community feasting and dancing", 18000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Preparations", "Setting up altars and offerings", 12000, eventName))
+                           .withPhase(createFestivalPhase("Rituals", "Priests performing sacred ceremonies", 18000, eventName))
+                           .withPhase(createFestivalPhase("Celebration", "Community feasting and dancing", 18000, eventName));
                 }
                 break;
                 
@@ -465,10 +466,10 @@ public class VillageEvent {
             case VICTORIAN:
                 if (season == Culture.Season.WINTER) {
                     description = "An elegant ball celebrating the holiday season with dancing and fine food.";
-                    builder.withPhase(new EventPhase("Arrivals", "Guests arriving in carriages", 6000, null, null, null))
-                           .withPhase(new EventPhase("Dining", "Formal dinner service", 12000, null, null, null))
-                           .withPhase(new EventPhase("Dancing", "Ballroom dancing until midnight", 18000, null, null, null))
-                           .withPhase(new EventPhase("Farewell", "Departure and gift exchange", 12000, null, null, null));
+                    builder.withPhase(createFestivalPhase("Arrivals", "Guests arriving in carriages", 6000, eventName))
+                           .withPhase(createFestivalPhase("Dining", "Formal dinner service", 12000, eventName))
+                           .withPhase(createFestivalPhase("Dancing", "Ballroom dancing until midnight", 18000, eventName))
+                           .withPhase(createFestivalPhase("Farewell", "Departure and gift exchange", 12000, eventName));
                 }
                 break;
                 
@@ -512,35 +513,35 @@ public class VillageEvent {
             case "fire":
                 name = "Village Fire";
                 description = "A fire has broken out in the village! Help put it out before buildings are destroyed.";
-                builder.withPhase(new EventPhase("Initial Spread", "The fire begins to spread", 3000, null, null, null))
-                       .withPhase(new EventPhase("Growing Blaze", "The fire intensifies", 6000, null, null, null))
-                       .withPhase(new EventPhase("Critical Point", "Structures are at risk of collapse", 3000, null, null, null));
+                builder.withPhase(createDisasterPhase("Initial Spread", "The fire begins to spread", 3000, name))
+                       .withPhase(createDisasterPhase("Growing Blaze", "The fire intensifies", 6000, name))
+                       .withPhase(createDisasterPhase("Critical Point", "Structures are at risk of collapse", 3000, name));
                 break;
                 
             case "raid":
                 name = "Hostile Raid";
                 description = "The village is under attack! Defend the villagers from hostile mobs.";
-                builder.withPhase(new EventPhase("Warning", "Scouts spot approaching enemies", 3000, null, null, null))
-                       .withPhase(new EventPhase("Attack", "Enemies raid the village", 6000, null, null, null))
-                       .withPhase(new EventPhase("Last Stand", "The final wave of attackers", 3000, null, null, null));
+                builder.withPhase(createDisasterPhase("Warning", "Scouts spot approaching enemies", 3000, name))
+                       .withPhase(createDisasterPhase("Attack", "Enemies raid the village", 6000, name))
+                       .withPhase(createDisasterPhase("Last Stand", "The final wave of attackers", 3000, name));
                 break;
                 
             case "disease":
                 name = "Village Illness";
                 description = "A mysterious illness is spreading among villagers. Help them find a cure!";
                 duration = 24000; // Full Minecraft day - diseases take longer to resolve
-                builder.withPhase(new EventPhase("Outbreak", "Initial cases appear", 6000, null, null, null))
-                       .withPhase(new EventPhase("Spreading", "The illness spreads to more villagers", 12000, null, null, null))
-                       .withPhase(new EventPhase("Treatment", "Administering the cure", 6000, null, null, null));
+                builder.withPhase(createDisasterPhase("Outbreak", "Initial cases appear", 6000, name))
+                       .withPhase(createDisasterPhase("Spreading", "The illness spreads to more villagers", 12000, name))
+                       .withPhase(createDisasterPhase("Treatment", "Administering the cure", 6000, name));
                 break;
                 
             case "drought":
                 name = "Severe Drought";
                 description = "Crops are failing due to lack of water. Help the village survive!";
                 duration = 36000; // 1.5 Minecraft days
-                builder.withPhase(new EventPhase("Early Signs", "Crops begin to wilt", 12000, null, null, null))
-                       .withPhase(new EventPhase("Crisis", "Food shortages begin", 18000, null, null, null))
-                       .withPhase(new EventPhase("Recovery", "Implementing irrigation solutions", 6000, null, null, null));
+                builder.withPhase(createDisasterPhase("Early Signs", "Crops begin to wilt", 12000, name))
+                       .withPhase(createDisasterPhase("Crisis", "Food shortages begin", 18000, name))
+                       .withPhase(createDisasterPhase("Recovery", "Implementing irrigation solutions", 6000, name));
                 break;
                 
             default:
@@ -599,19 +600,19 @@ public class VillageEvent {
                     description = "The village is selecting new leadership. Your participation matters!";
                 }
                 
-                builder.withPhase(new EventPhase("Nominations", "Candidates are being nominated", 6000, null, null, null))
-                       .withPhase(new EventPhase("Campaigning", "Candidates present their platforms", 12000, null, null, null))
-                       .withPhase(new EventPhase("Voting", "Citizens cast their votes", 6000, null, null, null))
-                       .withPhase(new EventPhase("Results", "Announcing the winners", 2000, null, null, null));
+                builder.withPhase(createPoliticalPhase("Nominations", "Candidates are being nominated", 6000, name))
+                       .withPhase(createPoliticalPhase("Campaigning", "Candidates present their platforms", 12000, name))
+                       .withPhase(createPoliticalPhase("Voting", "Citizens cast their votes", 6000, name))
+                       .withPhase(createPoliticalPhase("Results", "Announcing the winners", 2000, name));
                 break;
                 
             case "treaty":
                 name = "Diplomatic Treaty";
                 description = "Representatives from another village have arrived to negotiate a treaty.";
                 
-                builder.withPhase(new EventPhase("Arrival", "Diplomats arrive for negotiations", 6000, null, null, null))
-                       .withPhase(new EventPhase("Negotiations", "Terms are being discussed", 12000, null, null, null))
-                       .withPhase(new EventPhase("Signing", "The treaty is signed", 6000, null, null, null));
+                builder.withPhase(createPoliticalPhase("Arrival", "Diplomats arrive for negotiations", 6000, name))
+                       .withPhase(createPoliticalPhase("Negotiations", "Terms are being discussed", 12000, name))
+                       .withPhase(createPoliticalPhase("Signing", "The treaty is signed", 6000, name));
                 break;
                 
             case "coronation":
@@ -626,10 +627,10 @@ public class VillageEvent {
                     description = "A formal ceremony to recognize the new village leader.";
                 }
                 
-                builder.withPhase(new EventPhase("Preparations", "Setting up for the ceremony", 6000, null, null, null))
-                       .withPhase(new EventPhase("Procession", "The formal procession of dignitaries", 6000, null, null, null))
-                       .withPhase(new EventPhase("Ceremony", "The investiture ceremony", 6000, null, null, null))
-                       .withPhase(new EventPhase("Celebration", "Feasting and celebration", 12000, null, null, null));
+                builder.withPhase(createPoliticalPhase("Preparations", "Setting up for the ceremony", 6000, name))
+                       .withPhase(createPoliticalPhase("Procession", "The formal procession of dignitaries", 6000, name))
+                       .withPhase(createPoliticalPhase("Ceremony", "The investiture ceremony", 6000, name))
+                       .withPhase(createPoliticalPhase("Celebration", "Feasting and celebration", 12000, name));
                 break;
                 
             default:
@@ -650,6 +651,44 @@ public class VillageEvent {
         return builder.build();
     }
     
+    /**
+     * Helper method to create a festival event phase with proper behavior handlers
+     */
+    private static EventPhase createFestivalPhase(String name, String description, int duration, String eventName) {
+        // Create behavior handlers for this phase
+        Consumer<VillageEvent> startAction = VillagerEventBehavior.createFestivalBehavior(eventName, name);
+        Consumer<VillageEvent> tickAction = VillagerEventBehavior.createPhaseTicker("FESTIVAL");
+        
+        // Determine the next phase for completion messaging
+        Consumer<VillageEvent> completeAction = VillagerEventBehavior.createPhaseCompleter(name);
+        
+        return new EventPhase(name, description, duration, startAction, tickAction, completeAction);
+    }
+    
+    /**
+     * Helper method to create a disaster event phase with proper behavior handlers
+     */
+    private static EventPhase createDisasterPhase(String name, String description, int duration, String eventName) {
+        // Create behavior handlers for this phase
+        Consumer<VillageEvent> startAction = VillagerEventBehavior.createDisasterBehavior(eventName, name);
+        Consumer<VillageEvent> tickAction = VillagerEventBehavior.createPhaseTicker("DISASTER");
+        Consumer<VillageEvent> completeAction = VillagerEventBehavior.createPhaseCompleter(name);
+        
+        return new EventPhase(name, description, duration, startAction, tickAction, completeAction);
+    }
+    
+    /**
+     * Helper method to create a political event phase with proper behavior handlers
+     */
+    private static EventPhase createPoliticalPhase(String name, String description, int duration, String eventName) {
+        // Create behavior handlers for this phase
+        Consumer<VillageEvent> startAction = VillagerEventBehavior.createPoliticalBehavior(eventName, name);
+        Consumer<VillageEvent> tickAction = VillagerEventBehavior.createPhaseTicker("POLITICAL");
+        Consumer<VillageEvent> completeAction = VillagerEventBehavior.createPhaseCompleter(name);
+        
+        return new EventPhase(name, description, duration, startAction, tickAction, completeAction);
+    }
+    
     // Getters
     public String getId() { return id; }
     public String getName() { return name; }
@@ -661,6 +700,7 @@ public class VillageEvent {
     public BlockPos getEventCenter() { return eventCenter; }
     public boolean isComplete() { return isComplete; }
     public Culture getCulture() { return culture; }
+    public Set<PlayerEntity> getParticipatingPlayers() { return participatingPlayers; }
     
     /**
      * Get the current phase if one exists
