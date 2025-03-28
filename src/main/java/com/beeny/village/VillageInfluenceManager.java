@@ -1081,41 +1081,77 @@ public class VillageInfluenceManager {
                 BlockPos targetVillage = contribution.getVillageCenter();
                 
                 if (sourceVillage != null && !sourceVillage.equals(targetVillage)) {
-                    // Improve the relationship
-                    RelationshipStatus previousStatus = getVillageRelationship(sourceVillage, targetVillage).getStatus();
-                    RelationshipStatus newStatus = adjustVillageRelationship(
-                        sourceVillage, targetVillage, 15, "Diplomatic mission by " + player.getName().getString());
+                    // Get village data for both villages
+                    VillageDevelopmentData sourceVillageData = getVillageDevelopment(sourceVillage);
+                    VillageDevelopmentData targetVillageData = getVillageDevelopment(targetVillage);
                     
-                    player.sendMessage(Text.of("§6§lDiplomatic mission complete!§r"), false);
+                    if (sourceVillageData == null || targetVillageData == null) {
+                        return;
+                    }
+                    
+                    // Calculate relationship improvement based on difficulty and initial status
+                    VillageRelationship originalRelationship = getVillageRelationship(sourceVillage, targetVillage);
+                    RelationshipStatus previousStatus = originalRelationship.getStatus();
+                    
+                    // More difficult diplomatic missions give larger relationship bonuses
+                    int relationshipBonus = switch (previousStatus) {
+                        case HOSTILE -> 20;     // Major improvement from hostility
+                        case UNFRIENDLY -> 18;  // Significant improvement
+                        case NEUTRAL -> 15;     // Standard improvement
+                        case FRIENDLY -> 12;    // Minor improvement
+                        case ALLIED -> 8;       // Small reinforcement of alliance
+                    };
+                    
+                    // Apply the relationship improvement
+                    RelationshipStatus newStatus = adjustVillageRelationship(
+                        sourceVillage, targetVillage, relationshipBonus, 
+                        "Successful diplomatic mission by " + player.getName().getString());
+                    
+                    // Send success notifications
+                    player.sendMessage(Text.of("§6§l⚔ Diplomatic mission complete! ⚔§r"), false);
                     player.sendMessage(Text.of("§eRelationship improved from " + previousStatus.getColoredDisplayName() + 
                                            " to " + newStatus.getColoredDisplayName()), false);
                     
-                    // Track contribution points for the player
-                    int diplomacyPoints = 20 + contribution.getBonusPointsEarned();
+                    // Calculate reputation and contribution points based on mission difficulty
+                    int baseDiplomacyPoints = 20;
+                    int difficultyBonus = getDiplomacyDifficultyBonus(previousStatus);
+                    int diplomacyPoints = baseDiplomacyPoints + difficultyBonus + contribution.getBonusPointsEarned();
                     pointsAwarded = diplomacyPoints;
-                    VillageDevelopmentData sourceVillageData = getVillageDevelopment(sourceVillage);
-                    if (sourceVillageData != null) {
-                        sourceVillageData.addContributionPoints(player.getUuid(), diplomacyPoints);
-                        player.sendMessage(Text.of("§aYou earned " + diplomacyPoints + " contribution points!§r"), false);
-                    }
                     
-                    // Add reputation for being a successful diplomat
-                    PlayerEventParticipation.getInstance().addReputationPoints(
+                    // Award contribution points to the player's home village
+                    sourceVillageData.addContributionPoints(player.getUuid(), diplomacyPoints);
+                    player.sendMessage(Text.of("§aYou earned " + diplomacyPoints + " contribution points!§r"), false);
+                    
+                    // Add reputation based on mission difficulty
+                    int baseReputation = 15;
+                    int reputationBonus = getDiplomacyReputationBonus(previousStatus);
+                    PlayerEventParticipation pep = PlayerEventParticipation.getInstance();
+                    
+                    // Add reputation with player's own culture
+                    pep.addReputationPoints(
                         player, 
-                        getVillageDevelopment(sourceVillage).getCulture(), 
-                        15
+                        sourceVillageData.getCulture(), 
+                        baseReputation + reputationBonus
                     );
                     
-                    // Special effects for completion
-                    World world = player.getWorld();
-                    if (world instanceof ServerWorld serverWorld) {
-                        BlockPos pos = player.getBlockPos();
-                        serverWorld.spawnParticles(
-                            ParticleTypes.HAPPY_VILLAGER,
-                            pos.getX(), pos.getY() + 1, pos.getZ(),
-                            20, 0.5, 0.5, 0.5, 0.1
-                        );
-                    }
+                    // Also add some reputation with the target culture
+                    pep.addReputationPoints(
+                        player,
+                        targetVillageData.getCulture(),
+                        baseReputation / 2 + reputationBonus / 2
+                    );
+                    
+                    // Award special items for successful diplomacy
+                    grantDiplomaticRewards(player, previousStatus, sourceVillageData.getCulture(), targetVillageData.getCulture());
+                    
+                    // Apply economic benefits between villages
+                    applyInterVillageEconomicEffects(sourceVillage, targetVillage, newStatus);
+                    
+                    // Apply social effects (villager behaviors)
+                    applyInterVillageSocialEffects(player, sourceVillage, targetVillage, newStatus);
+                    
+                    // Special visual and sound effects
+                    applyDiplomacyCompletionEffects(player, targetVillage, previousStatus, newStatus);
                 }
             }
         }
@@ -1141,6 +1177,254 @@ public class VillageInfluenceManager {
             player.sendMessage(Text.of("§6§lVillage level: " + newLevel + "§r"), false);
             player.sendMessage(Text.of("§eNew upgrades available!§r"), false);
         }
+    }
+    
+    /**
+     * Gets the bonus points for diplomatic missions based on difficulty
+     */
+    private int getDiplomacyDifficultyBonus(RelationshipStatus previousStatus) {
+        return switch (previousStatus) {
+            case HOSTILE -> 30;      // Very difficult - highest bonus
+            case UNFRIENDLY -> 20;   // Challenging
+            case NEUTRAL -> 10;      // Standard difficulty
+            case FRIENDLY -> 5;      // Easier
+            case ALLIED -> 2;        // Very easy - minimal bonus
+        };
+    }
+    
+    /**
+     * Gets the reputation bonus for diplomatic missions based on difficulty
+     */
+    private int getDiplomacyReputationBonus(RelationshipStatus previousStatus) {
+        return switch (previousStatus) {
+            case HOSTILE -> 15;      // Major reputation gain for difficult diplomacy
+            case UNFRIENDLY -> 10;   // Significant gain
+            case NEUTRAL -> 5;       // Standard gain
+            case FRIENDLY -> 3;      // Smaller gain
+            case ALLIED -> 1;        // Minimal gain
+        };
+    }
+    
+    /**
+     * Grant special rewards for successful diplomatic missions
+     */
+    private void grantDiplomaticRewards(ServerPlayerEntity player, RelationshipStatus previousStatus, 
+                                       String sourceCulture, String targetCulture) {
+        // Different rewards based on mission difficulty
+        switch (previousStatus) {
+            case HOSTILE, UNFRIENDLY -> {
+                // Major achievement - grant special diplomatic artifact
+                String cultureName = targetCulture.substring(0, 1).toUpperCase() + targetCulture.substring(1);
+                player.sendMessage(Text.of("§d§lYou've received a " + cultureName + " diplomatic artifact!§r"), false);
+                
+                // Execute command to give artifact
+                String command = "culturalevent giveArtifact " + player.getName().getString() + " " + 
+                                 targetCulture + " uncommon";
+                player.getServer().getCommandManager().executeWithPrefix(
+                    player.getServer().getCommandSource(), command);
+            }
+            case NEUTRAL -> {
+                // Decent achievement - grant some valuable materials
+                player.sendMessage(Text.of("§a§lYou've received valuable materials as thanks!§r"), false);
+                
+                // Give emeralds and/or gold as thanks
+                String command = "give " + player.getName().getString() + " emerald 3";
+                player.getServer().getCommandManager().executeWithPrefix(
+                    player.getServer().getCommandSource(), command);
+            }
+            case FRIENDLY, ALLIED -> {
+                // Smaller achievement - grant minor benefits
+                player.sendMessage(Text.of("§a§lYou've received a token of appreciation!§r"), false);
+                
+                // Give a status effect and a small reward
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.HERO_OF_THE_VILLAGE, 24000, 0));
+                String command = "give " + player.getName().getString() + " emerald 1";
+                player.getServer().getCommandManager().executeWithPrefix(
+                    player.getServer().getCommandSource(), command);
+            }
+        }
+    }
+    
+    /**
+     * Apply economic effects between villages after a successful diplomatic mission
+     */
+    private void applyInterVillageEconomicEffects(BlockPos sourceVillage, BlockPos targetVillage, 
+                                                RelationshipStatus newStatus) {
+        VillageDevelopmentData sourceData = getVillageDevelopment(sourceVillage);
+        VillageDevelopmentData targetData = getVillageDevelopment(targetVillage);
+        
+        if (sourceData == null || targetData == null) {
+            return;
+        }
+        
+        // Apply different economic effects based on the new relationship status
+        switch (newStatus) {
+            case ALLIED -> {
+                // Significant economic boost to both villages
+                sourceData.addDevelopmentPoints(25);
+                targetData.addDevelopmentPoints(25);
+                
+                // Potentially unlock trade-related upgrades
+                if (!sourceData.getUnlockedFeatures().contains("trade_agreement") && 
+                    !sourceData.getPendingUpgrades().contains("trade_agreement")) {
+                    sourceData.pendingUpgrades.add("trade_agreement");
+                }
+                if (!targetData.getUnlockedFeatures().contains("trade_agreement") && 
+                    !targetData.getPendingUpgrades().contains("trade_agreement")) {
+                    targetData.pendingUpgrades.add("trade_agreement");
+                }
+            }
+            case FRIENDLY -> {
+                // Moderate economic boost
+                sourceData.addDevelopmentPoints(15);
+                targetData.addDevelopmentPoints(15);
+            }
+            case NEUTRAL -> {
+                // Small economic boost
+                sourceData.addDevelopmentPoints(5);
+                targetData.addDevelopmentPoints(5);
+            }
+            default -> {
+                // No economic effects for unfriendly/hostile relationships
+            }
+        }
+    }
+    
+    /**
+     * Apply social effects between villages after a successful diplomatic mission
+     */
+    private void applyInterVillageSocialEffects(ServerPlayerEntity player, BlockPos sourceVillage, 
+                                              BlockPos targetVillage, RelationshipStatus newStatus) {
+        VillagerManager vm = VillagerManager.getInstance();
+        ServerWorld world = player.getServerWorld();
+        
+        // Try to find villagers from both villages
+        List<VillagerEntity> sourceVillagers = findVillagers(world, sourceVillage, 3);
+        List<VillagerEntity> targetVillagers = findVillagers(world, targetVillage, 3);
+        
+        // Apply relationship effects to villagers
+        boolean positive = (newStatus == RelationshipStatus.ALLIED || newStatus == RelationshipStatus.FRIENDLY);
+        
+        for (VillagerEntity sourceVillager : sourceVillagers) {
+            VillagerAI sourceAI = vm.getVillagerAI(sourceVillager.getUuid());
+            if (sourceAI == null) continue;
+            
+            // Make villagers remember the diplomat player favorably
+            if (positive) {
+                sourceAI.addRelationship(player.getUuid(), VillagerAI.RelationshipType.FRIEND);
+            }
+            
+            // Establish relationships between villagers from different villages
+            for (VillagerEntity targetVillager : targetVillagers) {
+                VillagerAI targetAI = vm.getVillagerAI(targetVillager.getUuid());
+                if (targetAI == null) continue;
+                
+                if (positive) {
+                    sourceAI.addRelationship(targetVillager.getUuid(), VillagerAI.RelationshipType.FRIEND);
+                    targetAI.addRelationship(sourceVillager.getUuid(), VillagerAI.RelationshipType.FRIEND);
+                    
+                    // Also make target villagers remember the diplomat favorably
+                    targetAI.addRelationship(player.getUuid(), VillagerAI.RelationshipType.FRIEND);
+                } else {
+                    // For neutral relationships, just make them acquainted
+                    sourceAI.addRelationship(targetVillager.getUuid(), VillagerAI.RelationshipType.ACQUAINTANCE);
+                    targetAI.addRelationship(sourceVillager.getUuid(), VillagerAI.RelationshipType.ACQUAINTANCE);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Find a few villagers from a village for social effects
+     */
+    private List<VillagerEntity> findVillagers(ServerWorld world, BlockPos villageCenter, int count) {
+        List<VillagerEntity> result = new ArrayList<>();
+        List<VillagerEntity> villagers = world.getEntitiesByClass(
+            VillagerEntity.class,
+            new Box(villageCenter).expand(64),
+            villager -> true
+        );
+        
+        // Get up to 'count' random villagers
+        if (!villagers.isEmpty()) {
+            Random random = new Random();
+            for (int i = 0; i < Math.min(count, villagers.size()); i++) {
+                int index = random.nextInt(villagers.size());
+                result.add(villagers.get(index));
+                villagers.remove(index); // Don't pick the same villager twice
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Apply special effects for diplomatic mission completion
+     */
+    private void applyDiplomacyCompletionEffects(ServerPlayerEntity player, BlockPos targetVillage,
+                                               RelationshipStatus previousStatus, RelationshipStatus newStatus) {
+        World world = player.getWorld();
+        if (!(world instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        
+        // Player position effects
+        BlockPos playerPos = player.getBlockPos();
+        
+        // Create celebratory particle effects
+        serverWorld.spawnParticles(
+            ParticleTypes.HAPPY_VILLAGER,
+            playerPos.getX(), playerPos.getY() + 1, playerPos.getZ(),
+            30, 1.0, 1.0, 1.0, 0.1
+        );
+        
+        // Additional effect based on the new relationship status
+        if (newStatus == RelationshipStatus.ALLIED) {
+            // Beautiful firework-like effect for alliance
+            serverWorld.spawnParticles(
+                ParticleTypes.FIREWORK,
+                playerPos.getX(), playerPos.getY() + 3, playerPos.getZ(),
+                30, 2.0, 2.0, 2.0, 0.1
+            );
+        } else if (newStatus == RelationshipStatus.FRIENDLY) {
+            // Sparkle effect for friendly relations
+            serverWorld.spawnParticles(
+                ParticleTypes.END_ROD,
+                playerPos.getX(), playerPos.getY() + 2, playerPos.getZ(),
+                20, 1.5, 1.5, 1.5, 0.05
+            );
+        }
+        
+        // Also create effects at the target village if it's loaded
+        BlockPos tVillage = targetVillage;
+        if (serverWorld.isChunkLoaded(tVillage.getX() >> 4, tVillage.getZ() >> 4)) {
+            // Spawn celebration particles at the target village too
+            serverWorld.spawnParticles(
+                ParticleTypes.HAPPY_VILLAGER,
+                tVillage.getX(), tVillage.getY() + 2, tVillage.getZ(),
+                30, 1.5, 1.0, 1.5, 0.1
+            );
+            
+            // Play a sound at the target village
+            serverWorld.playSound(
+                null,
+                tVillage,
+                SoundEvents.ENTITY_VILLAGER_CELEBRATE,
+                SoundCategory.NEUTRAL,
+                1.0F,
+                1.0F
+            );
+        }
+        
+        // Play success sound for the player
+        serverWorld.playSound(
+            null, 
+            playerPos, 
+            SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
+            SoundCategory.PLAYERS,
+            1.0F,
+            1.0F
+        );
     }
     
     /**
