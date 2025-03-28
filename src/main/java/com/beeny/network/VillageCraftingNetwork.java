@@ -14,6 +14,8 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 // Remove the ClientPlayNetworking import since we'll handle client-side logic in a separate class
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.packet.CustomPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
@@ -26,14 +28,112 @@ import java.util.UUID;
 public class VillageCraftingNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillageCraftingNetwork");
     
-    // Packet identifiers
-    public static final Identifier CRAFT_PACKET = new Identifier("villagesreborn", "craft_recipe");
-    public static final Identifier REQUEST_RECIPES_PACKET = new Identifier("villagesreborn", "request_recipes");
-    public static final Identifier RECIPE_LIST_PACKET = new Identifier("villagesreborn", "recipe_list");
-    public static final Identifier CRAFT_STATUS_PACKET = new Identifier("villagesreborn", "craft_status");
-    public static final Identifier CANCEL_CRAFT_PACKET = new Identifier("villagesreborn", "cancel_craft");
-    public static final Identifier CRAFT_PROGRESS_PACKET = new Identifier("villagesreborn", "craft_progress");
-    public static final Identifier CRAFT_COMPLETE_PACKET = new Identifier("villagesreborn", "craft_complete");
+    // Packet identifiers - updated to use Identifier.of()
+    public static final Identifier CRAFT_PACKET = Identifier.of("villagesreborn", "craft_recipe");
+    public static final Identifier REQUEST_RECIPES_PACKET = Identifier.of("villagesreborn", "request_recipes");
+    public static final Identifier RECIPE_LIST_PACKET = Identifier.of("villagesreborn", "recipe_list");
+    public static final Identifier CRAFT_STATUS_PACKET = Identifier.of("villagesreborn", "craft_status");
+    public static final Identifier CANCEL_CRAFT_PACKET = Identifier.of("villagesreborn", "cancel_craft");
+    public static final Identifier CRAFT_PROGRESS_PACKET = Identifier.of("villagesreborn", "craft_progress");
+    public static final Identifier CRAFT_COMPLETE_PACKET = Identifier.of("villagesreborn", "craft_complete");
+
+    // Custom payload classes for 1.21.4
+    public static class CraftRecipePayload implements CustomPayload {
+        public static final Identifier ID = CRAFT_PACKET;
+        private final UUID villagerUuid;
+        private final String recipeId;
+        
+        public CraftRecipePayload(UUID villagerUuid, String recipeId) {
+            this.villagerUuid = villagerUuid;
+            this.recipeId = recipeId;
+        }
+        
+        public CraftRecipePayload(PacketByteBuf buf) {
+            this.villagerUuid = buf.readUuid();
+            this.recipeId = buf.readString();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeUuid(villagerUuid);
+            buf.writeString(recipeId);
+        }
+        
+        @Override
+        public Identifier id() {
+            return ID;
+        }
+        
+        public UUID getVillagerUuid() {
+            return villagerUuid;
+        }
+        
+        public String getRecipeId() {
+            return recipeId;
+        }
+    }
+    
+    public static class RequestRecipesPayload implements CustomPayload {
+        public static final Identifier ID = REQUEST_RECIPES_PACKET;
+        private final UUID villagerUuid;
+        
+        public RequestRecipesPayload(UUID villagerUuid) {
+            this.villagerUuid = villagerUuid;
+        }
+        
+        public RequestRecipesPayload(PacketByteBuf buf) {
+            this.villagerUuid = buf.readUuid();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeUuid(villagerUuid);
+        }
+        
+        @Override
+        public Identifier id() {
+            return ID;
+        }
+        
+        public UUID getVillagerUuid() {
+            return villagerUuid;
+        }
+    }
+    
+    public static class CancelCraftPayload implements CustomPayload {
+        public static final Identifier ID = CANCEL_CRAFT_PACKET;
+        private final UUID villagerUuid;
+        private final String recipeId;
+        
+        public CancelCraftPayload(UUID villagerUuid, String recipeId) {
+            this.villagerUuid = villagerUuid;
+            this.recipeId = recipeId;
+        }
+        
+        public CancelCraftPayload(PacketByteBuf buf) {
+            this.villagerUuid = buf.readUuid();
+            this.recipeId = buf.readString();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeUuid(villagerUuid);
+            buf.writeString(recipeId);
+        }
+        
+        @Override
+        public Identifier id() {
+            return ID;
+        }
+        
+        public UUID getVillagerUuid() {
+            return villagerUuid;
+        }
+        
+        public String getRecipeId() {
+            return recipeId;
+        }
+    }
 
     /**
      * Register all network handlers
@@ -41,33 +141,22 @@ public class VillageCraftingNetwork {
     public static void register() {
         LOGGER.info("Registering VillageCraftingNetwork packet handlers");
         
-        // Register server-side packet receiver for crafting requests
-        ServerPlayNetworking.registerGlobalReceiver(CRAFT_PACKET, (server, player, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            String recipeId = buf.readString();
-            
-            // Execute on the server thread
+        // Register server-side packet receivers using the new 1.21.4 API
+        ServerPlayNetworking.registerGlobalReceiver(CraftRecipePayload.ID, (server, player, handler, payload, responseSender) -> {
             server.execute(() -> {
-                handleCraftRequest(villagerUuid, recipeId, player);
+                handleCraftRequest(payload.getVillagerUuid(), payload.getRecipeId(), player);
             });
         });
         
-        // Register server-side packet receiver for recipe list requests
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PACKET, (server, player, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            
+        ServerPlayNetworking.registerGlobalReceiver(RequestRecipesPayload.ID, (server, player, handler, payload, responseSender) -> {
             server.execute(() -> {
-                handleRecipeListRequest(villagerUuid, player, responseSender);
+                handleRecipeListRequest(payload.getVillagerUuid(), player);
             });
         });
         
-        // Register server-side packet receiver for canceling crafting
-        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PACKET, (server, player, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            String recipeId = buf.readString();
-            
+        ServerPlayNetworking.registerGlobalReceiver(CancelCraftPayload.ID, (server, player, handler, payload, responseSender) -> {
             server.execute(() -> {
-                handleCancelCraftRequest(villagerUuid, recipeId, player);
+                handleCancelCraftRequest(payload.getVillagerUuid(), payload.getRecipeId(), player);
             });
         });
         
@@ -121,7 +210,7 @@ public class VillageCraftingNetwork {
     /**
      * Handle a recipe list request from a client
      */
-    private static void handleRecipeListRequest(UUID villagerUuid, ServerPlayerEntity player, PacketSender responseSender) {
+    private static void handleRecipeListRequest(UUID villagerUuid, ServerPlayerEntity player) {
         LOGGER.debug("Handling recipe list request for villager {} from player {}", villagerUuid, player.getName().getString());
         // Find the villager
         Box searchBox = Box.of(player.getPos(), 10, 10, 10);

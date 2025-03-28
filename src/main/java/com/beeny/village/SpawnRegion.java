@@ -70,12 +70,13 @@ public class SpawnRegion {
             // Only NETHER culture types should spawn in the Nether
             if (cultureType != Culture.CultureType.NETHER) return false;
             
-            // Specific Nether biome checks - check the biome parameter directly
-            return biome.matchesKey(BiomeKeys.CRIMSON_FOREST) || 
-                   biome.matchesKey(BiomeKeys.WARPED_FOREST) || 
-                   biome.matchesKey(BiomeKeys.SOUL_SAND_VALLEY) || 
-                   biome.matchesKey(BiomeKeys.NETHER_WASTES) || 
-                   biome.matchesKey(BiomeKeys.BASALT_DELTAS);
+            // Updated: In 1.21.4, use world registry to compare biome keys
+            var biomeKey = world.getBiomeKey(center);
+            return biomeKey.equals(BiomeKeys.CRIMSON_FOREST) || 
+                   biomeKey.equals(BiomeKeys.WARPED_FOREST) || 
+                   biomeKey.equals(BiomeKeys.SOUL_SAND_VALLEY) || 
+                   biomeKey.equals(BiomeKeys.NETHER_WASTES) || 
+                   biomeKey.equals(BiomeKeys.BASALT_DELTAS);
         }
         
         if (World.END.equals(dimension)) {
@@ -85,18 +86,24 @@ public class SpawnRegion {
             // End villages should only spawn in the outer islands, not the central island
             // Check if we're at least 1000 blocks from the center (0,0)
             int distanceFromCenter = (int) Math.sqrt(center.getSquaredDistance(0, center.getY(), 0));
+            
+            // Updated: In 1.21.4, use world registry to compare biome keys
+            var biomeKey = world.getBiomeKey(center);
             return distanceFromCenter > 1000 && 
-                   (biome.matchesKey(BiomeKeys.END_MIDLANDS) || 
-                    biome.matchesKey(BiomeKeys.END_HIGHLANDS) ||
-                    biome.matchesKey(BiomeKeys.END_BARRENS));
+                   (biomeKey.equals(BiomeKeys.END_MIDLANDS) || 
+                    biomeKey.equals(BiomeKeys.END_HIGHLANDS) ||
+                    biomeKey.equals(BiomeKeys.END_BARRENS));
         }
 
+        // Updated: In 1.21.4, use world registry to compare biome keys
+        var biomeKey = world.getBiomeKey(center);
+        
         // Overworld culture-specific biome checks
         return switch (cultureType) {
-            case EGYPTIAN -> biome.matchesKey(BiomeKeys.DESERT);
-            case ROMAN -> biome.matchesKey(BiomeKeys.PLAINS);
-            case VICTORIAN -> biome.matchesKey(BiomeKeys.FOREST);
-            case MODERN -> biome.matchesKey(BiomeKeys.WINDSWEPT_HILLS);
+            case EGYPTIAN -> biomeKey.equals(BiomeKeys.DESERT);
+            case ROMAN -> biomeKey.equals(BiomeKeys.PLAINS);
+            case VICTORIAN -> biomeKey.equals(BiomeKeys.FOREST);
+            case MODERN -> biomeKey.equals(BiomeKeys.WINDSWEPT_HILLS);
             // Default fallback to prevent unhandled culture types from spawning everywhere
             default -> false;
         };
@@ -142,16 +149,19 @@ public class SpawnRegion {
         // Check for netherrack platform and open space
         Block ground = world.getBlockState(pos.down()).getBlock();
         
+        // Updated: In 1.21.4, use world registry to compare biome keys
+        var biomeKey = world.getBiomeKey(pos);
+        
         // Get biome-specific requirements
-        if (world.getBiome(pos).matchesKey(BiomeKeys.CRIMSON_FOREST)) {
+        if (biomeKey.equals(BiomeKeys.CRIMSON_FOREST)) {
             // Crimson villages need more space for their unique structures
             return ground.getDefaultState().isOpaque() && 
                    hasEnoughSpace(world, pos, 8, 5);
-        } else if (world.getBiome(pos).matchesKey(BiomeKeys.WARPED_FOREST)) {
+        } else if (biomeKey.equals(BiomeKeys.WARPED_FOREST)) {
             // Warped villages have taller structures
             return ground.getDefaultState().isOpaque() && 
                    hasEnoughSpace(world, pos, 7, 6);
-        } else if (world.getBiome(pos).matchesKey(BiomeKeys.SOUL_SAND_VALLEY)) {
+        } else if (biomeKey.equals(BiomeKeys.SOUL_SAND_VALLEY)) {
             // Soul Sand villages are wider and shorter
             return ground.getDefaultState().isOpaque() && 
                    hasEnoughSpace(world, pos, 9, 3);

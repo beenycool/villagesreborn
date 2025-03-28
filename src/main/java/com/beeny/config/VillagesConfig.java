@@ -316,6 +316,15 @@ public class VillagesConfig {
         private boolean advancedConversationsEnabled = false;
         private String aiDetailLevel = "BALANCED";
         private int aiResponseDelay = 0;
+        private String provider = "deepseek"; // Add provider field with default value
+        
+        public String getProvider() {
+            return provider;
+        }
+        
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
         
         public String getApiKey() {
             return apiKey;

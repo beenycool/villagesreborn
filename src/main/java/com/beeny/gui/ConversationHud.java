@@ -25,8 +25,9 @@ public class ConversationHud {
     private static final long CONVERSATION_TIMEOUT = 30000; // 30 seconds of inactivity ends conversation
     private boolean isVisible = false;
     private HudPosition position = HudPosition.BOTTOM_RIGHT;
-    private final Identifier ICON_TEXTURE = new Identifier("villagesreborn", "textures/gui/conversation_icon.png");
-    private final Identifier SPEECH_BUBBLE_TEXTURE = new Identifier("villagesreborn", "textures/gui/speech_bubble.png");
+    // Use Identifier.of() instead of new Identifier() constructor
+    private final Identifier ICON_TEXTURE = Identifier.of("villagesreborn", "textures/gui/conversation_icon.png");
+    private final Identifier SPEECH_BUBBLE_TEXTURE = Identifier.of("villagesreborn", "textures/gui/speech_bubble.png");
     
     // Animation properties
     private float animationProgress = 0.0f;
@@ -299,8 +300,13 @@ public class ConversationHud {
         try {
             boolean hasIcon = MinecraftClient.getInstance().getResourceManager().getResource(ICON_TEXTURE).isPresent();
             if (hasIcon) {
-                context.drawTexture(ICON_TEXTURE, x + 5, y + 5, 0, 0, 16, 16, 16, 16);
-                textX = x + 26; // Move text to right of icon
+                // Updated texture drawing API for 1.21.4
+                context.drawTexture(ICON_TEXTURE, 
+                    x + 5, y + 5,  // Position
+                    0, 0,          // UV
+                    16, 16,        // Size
+                    16, 16);       // Texture size
+                textX = x + 26;    // Move text to right of icon
             }
         } catch (Exception e) {
             // Texture not found, continue without icon
@@ -318,9 +324,12 @@ public class ConversationHud {
                 boolean hasBubble = MinecraftClient.getInstance().getResourceManager().getResource(SPEECH_BUBBLE_TEXTURE).isPresent();
                 if (hasBubble) {
                     int bubbleSize = 10;
+                    // Updated texture drawing API for 1.21.4
                     context.drawTexture(SPEECH_BUBBLE_TEXTURE, 
                         textX + textWidth + 4, textY + 3, 
-                        0, 0, bubbleSize, bubbleSize, bubbleSize, bubbleSize);
+                        0, 0, 
+                        bubbleSize, bubbleSize, 
+                        bubbleSize, bubbleSize);
                 }
             } catch (Exception e) {
                 // Texture not found, continue without icon

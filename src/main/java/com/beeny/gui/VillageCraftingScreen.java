@@ -19,8 +19,9 @@ import java.util.List;
 import java.util.Arrays;
 
 public class VillageCraftingScreen extends Screen {
-    private static final Identifier BACKGROUND_TEXTURE = new Identifier("villagesreborn", "textures/gui/crafting_background.png");
-    private static final Identifier ICONS_TEXTURE = new Identifier("textures/gui/widgets.png");
+    // Use Identifier.of() for creating identifiers
+    private static final Identifier BACKGROUND_TEXTURE = Identifier.of("villagesreborn", "textures/gui/crafting_background.png");
+    private static final Identifier ICONS_TEXTURE = Identifier.of("minecraft", "textures/gui/widgets.png"); // Fixed missing namespace
     private static final int BACKGROUND_WIDTH = 256;
     private static final int BACKGROUND_HEIGHT = 196;
     private static final int RECIPE_BUTTON_HEIGHT = 24;
@@ -58,23 +59,21 @@ public class VillageCraftingScreen extends Screen {
         
         // Add scrolling buttons if needed
         if (recipes.size() > MAX_VISIBLE_RECIPES) {
-            // Up scroll button
-            ButtonWidget scrollUpButton = TexturedButtonWidget.builder(ICONS_TEXTURE, 12, 12)
+            // Up scroll button - fix TexturedButtonWidget usage for 1.21.4
+            ButtonWidget scrollUpButton = ButtonWidget.builder(
+                Text.literal("↑"), 
+                button -> scrollRecipes(-1))
                 .dimensions(guiLeft + 154, guiTop + 16, 12, 12)
-                .uv(0, 208)
-                .uvHovered(0, 220)
                 .tooltip(Tooltip.of(Text.literal("Scroll Up")))
-                .onClick(button -> scrollRecipes(-1))
                 .build();
             addDrawableChild(scrollUpButton);
             
             // Down scroll button
-            ButtonWidget scrollDownButton = TexturedButtonWidget.builder(ICONS_TEXTURE, 12, 12)
+            ButtonWidget scrollDownButton = ButtonWidget.builder(
+                Text.literal("↓"), 
+                button -> scrollRecipes(1))
                 .dimensions(guiLeft + 154, guiTop + 134, 12, 12)
-                .uv(12, 208)
-                .uvHovered(12, 220)
                 .tooltip(Tooltip.of(Text.literal("Scroll Down")))
-                .onClick(button -> scrollRecipes(1))
                 .build();
             addDrawableChild(scrollDownButton);
         }
@@ -189,8 +188,14 @@ public class VillageCraftingScreen extends Screen {
         int guiLeft = (width - BACKGROUND_WIDTH) / 2;
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
-        // Draw the background texture
-        context.drawTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, 0, 0, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+        // Draw the background texture with updated API for 1.21.4
+        context.drawTexture(
+            BACKGROUND_TEXTURE, 
+            guiLeft, guiTop,     // Position
+            0, 0,                // UV
+            BACKGROUND_WIDTH, BACKGROUND_HEIGHT, // Dimensions
+            BACKGROUND_WIDTH, BACKGROUND_HEIGHT  // Texture size
+        );
         
         // Draw culture-specific decorative elements
         drawCulturalTheme(context, guiLeft, guiTop);
@@ -314,7 +319,8 @@ public class VillageCraftingScreen extends Screen {
     
     private void drawItem(DrawContext context, ItemStack stack, int x, int y) {
         context.drawItem(stack, x, y);
-        context.drawItemInSlot(textRenderer, stack, x, y);
+        // Fixed drawItemInSlot method not found
+        context.drawItemTooltip(textRenderer, stack, x, y);
     }
     
     private void drawCulturalTheme(DrawContext context, int guiLeft, int guiTop) {
@@ -525,3 +531,5 @@ public class VillageCraftingScreen extends Screen {
         return false;
     }
 }
+```
+</copilot-edited-file>

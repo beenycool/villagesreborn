@@ -25,12 +25,13 @@ public class VillageCraftingClientNetwork {
      */
     public static void sendCraftingRequest(UUID villagerUuid, String recipeId) {
         LOGGER.debug("Sending crafting request for recipe {}", recipeId);
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeUuid(villagerUuid);
-        buf.writeString(recipeId);
         
-        // Send the packet to the server
-        ClientPlayNetworking.send(VillageCraftingNetwork.CRAFT_PACKET, buf);
+        // Create a payload instead of direct buffer for 1.21.4
+        VillageCraftingNetwork.CraftRecipePayload payload = 
+            new VillageCraftingNetwork.CraftRecipePayload(villagerUuid, recipeId);
+        
+        // Send the packet to the server using the new API
+        ClientPlayNetworking.send(payload);
     }
     
     /**
@@ -56,11 +57,13 @@ public class VillageCraftingClientNetwork {
      */
     public static void sendRecipeListRequest(UUID villagerUuid) {
         LOGGER.debug("Requesting recipe list from villager {}", villagerUuid);
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeUuid(villagerUuid);
         
-        // Send the packet to the server
-        ClientPlayNetworking.send(VillageCraftingNetwork.REQUEST_RECIPES_PACKET, buf);
+        // Create a payload instead of direct buffer for 1.21.4
+        VillageCraftingNetwork.RequestRecipesPayload payload = 
+            new VillageCraftingNetwork.RequestRecipesPayload(villagerUuid);
+        
+        // Send the packet to the server using the new API
+        ClientPlayNetworking.send(payload);
     }
     
     /**
@@ -80,12 +83,13 @@ public class VillageCraftingClientNetwork {
      */
     public static void sendCancelCraftingRequest(UUID villagerUuid, String recipeId) {
         LOGGER.debug("Sending cancel crafting request for recipe {}", recipeId);
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeUuid(villagerUuid);
-        buf.writeString(recipeId);
         
-        // Send the packet to the server
-        ClientPlayNetworking.send(VillageCraftingNetwork.CANCEL_CRAFT_PACKET, buf);
+        // Create a payload instead of direct buffer for 1.21.4
+        VillageCraftingNetwork.CancelCraftPayload payload = 
+            new VillageCraftingNetwork.CancelCraftPayload(villagerUuid, recipeId);
+        
+        // Send the packet to the server using the new API
+        ClientPlayNetworking.send(payload);
     }
     
     /**
