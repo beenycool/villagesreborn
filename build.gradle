@@ -19,6 +19,10 @@ sourceSets {
 
 repositories {
     mavenCentral()
+    // Add maven repo for Cloth Config
+    maven { url "https://maven.shedaniel.me/" }
+    // Add maven repo for ModMenu
+    maven { url "https://maven.terraformersmc.com/releases/" }
 }
 
 base {
@@ -47,6 +51,14 @@ dependencies {
 
     implementation 'com.squareup.okhttp3:okhttp:4.9.1'
     implementation 'com.google.code.gson:gson:2.8.9'
+    
+    // Cloth Config API
+    modApi("me.shedaniel.cloth:cloth-config-fabric:11.1.106") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+    
+    // ModMenu integration
+    modImplementation("com.terraformersmc:modmenu:7.1.0")
 }
 
 tasks.withType(JavaCompile).configureEach {
