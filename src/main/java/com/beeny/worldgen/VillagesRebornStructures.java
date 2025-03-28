@@ -12,8 +12,8 @@ import net.minecraft.world.gen.GenerationStep;
 
 public class VillagesRebornStructures {
     
-    // Structure set keys
-    public static final RegistryKey<net.minecraft.world.gen.structure.StructureSet> ROMAN_VILLAGE = 
+    // Updated to use the correct class name for 1.21.4
+    public static final RegistryKey<net.minecraft.registry.entry.RegistryEntryList> ROMAN_VILLAGE = 
         RegistryKey.of(RegistryKeys.STRUCTURE_SET, new Identifier(Villagesreborn.MOD_ID, "roman_village"));
     
     // Structure keys

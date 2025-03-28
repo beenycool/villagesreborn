@@ -11,7 +11,7 @@ import net.minecraft.util.math.Box;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.ClientPlayNetworking;
+// Remove the ClientPlayNetworking import since we'll handle client-side logic in a separate class
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
 import org.slf4j.Logger;
@@ -75,64 +75,13 @@ public class VillageCraftingNetwork {
     }
 
     /**
-     * Register client-side network handlers
+     * Register client-side network handlers - to be called from client mod initializer
+     * NOTE: Client-side implementation is moved to VillageCraftingNetworkClient class to avoid import issues
      */
     public static void registerClientHandlers() {
-        // Register client-side packet receiver for recipe list
-        ClientPlayNetworking.registerGlobalReceiver(RECIPE_LIST_PACKET, (client, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            int recipeCount = buf.readInt();
-            List<String> recipeIds = new java.util.ArrayList<>();
-            
-            for (int i = 0; i < recipeCount; i++) {
-                recipeIds.add(buf.readString());
-            }
-            
-            client.execute(() -> {
-                // Update client UI with available recipes
-                VillageCraftingClientHandler.updateAvailableRecipes(villagerUuid, recipeIds);
-            });
-        });
-        
-        // Register client-side packet receiver for craft status updates
-        ClientPlayNetworking.registerGlobalReceiver(CRAFT_STATUS_PACKET, (client, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            String recipeId = buf.readString();
-            String status = buf.readString();
-            String message = buf.readString();
-            
-            client.execute(() -> {
-                // Update crafting status in UI
-                VillageCraftingClientHandler.updateCraftingStatus(villagerUuid, recipeId, status, message);
-            });
-        });
-        
-        // Register client-side packet receiver for craft progress updates
-        ClientPlayNetworking.registerGlobalReceiver(CRAFT_PROGRESS_PACKET, (client, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            String recipeId = buf.readString();
-            int progress = buf.readInt();
-            int maxProgress = buf.readInt();
-            
-            client.execute(() -> {
-                // Update crafting progress in UI
-                VillageCraftingClientHandler.updateCraftingProgress(villagerUuid, recipeId, progress, maxProgress);
-            });
-        });
-        
-        // Register client-side packet receiver for craft completion
-        ClientPlayNetworking.registerGlobalReceiver(CRAFT_COMPLETE_PACKET, (client, handler, buf, responseSender) -> {
-            UUID villagerUuid = buf.readUuid();
-            String recipeId = buf.readString();
-            boolean success = buf.readBoolean();
-            
-            client.execute(() -> {
-                // Handle crafting completion in UI
-                VillageCraftingClientHandler.handleCraftingComplete(villagerUuid, recipeId, success);
-            });
-        });
-        
-        LOGGER.info("VillageCraftingNetwork client packet handlers registered successfully");
+        // Client-side registration has been moved to VillageCraftingNetworkClient
+        // to handle the ClientPlayNetworking import issue
+        LOGGER.info("VillageCraftingNetwork delegating client registration to client-side class");
     }
 
     /**

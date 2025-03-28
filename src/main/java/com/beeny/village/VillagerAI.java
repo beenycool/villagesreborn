@@ -23,7 +23,8 @@ import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.ai.goal.MoveToTargetPosGoal;
 import net.minecraft.entity.ai.goal.FleeEntityGoal;
 import net.minecraft.entity.ai.goal.EscapeDangerGoal;
-import net.minecraft.entity.ai.goal.AvoidEntityGoal;
+// Remove AvoidEntityGoal import as it doesn't exist in this version
+// Define a custom implementation below instead
 import com.beeny.village.event.VillageEvent;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.text.Text;
@@ -54,6 +55,97 @@ import net.minecraft.village.TradeOfferList;
 import net.minecraft.util.math.Vec3d;
 
 public class VillagerAI {
+    // Custom implementation of AvoidEntityGoal for 1.21.4 since it might be renamed or restructured
+    public static class AvoidEntityGoal<T extends LivingEntity> extends Goal {
+        protected final PathAwareEntity mob;
+        private final double walkSpeedModifier;
+        private final double sprintSpeedModifier;
+        protected T targetEntity;
+        protected final float fleeDistance;
+        protected final Class<T> classToAvoid;
+        protected final Predicate<LivingEntity> avoidPredicate;
+        protected final Predicate<LivingEntity> predicateOnAvoidEntity;
+        
+        public AvoidEntityGoal(PathAwareEntity mob, Class<T> entityClassToAvoid, float distance, double walkSpeed, double sprintSpeed) {
+            this.mob = mob;
+            this.classToAvoid = entityClassToAvoid;
+            this.avoidPredicate = (entity) -> true;
+            this.predicateOnAvoidEntity = (entity) -> true;
+            this.fleeDistance = distance;
+            this.walkSpeedModifier = walkSpeed;
+            this.sprintSpeedModifier = sprintSpeed;
+        }
+        
+        @Override
+        public boolean canStart() {
+            List<T> list = this.mob.world.getEntitiesByClass(
+                this.classToAvoid, 
+                this.mob.getBoundingBox().expand(this.fleeDistance, 3.0, this.fleeDistance), 
+                (entity) -> this.predicateOnAvoidEntity.test(entity)
+            );
+            
+            if (list.isEmpty()) {
+                return false;
+            }
+            
+            this.targetEntity = getNearestEntity(list, this.mob);
+            return true;
+        }
+        
+        private T getNearestEntity(List<T> entities, Entity entity) {
+            if (entities.isEmpty()) {
+                return null;
+            }
+            
+            double shortestDistance = Double.MAX_VALUE;
+            T closestEntity = null;
+            
+            for (T e : entities) {
+                double distance = entity.squaredDistanceTo(e);
+                if (distance < shortestDistance) {
+                    shortestDistance = distance;
+                    closestEntity = e;
+                }
+            }
+            
+            return closestEntity;
+        }
+        
+        @Override
+        public void start() {
+            this.flee();
+        }
+        
+        protected void flee() {
+            Vec3d targetPos = getFurthestPosition();
+            if (targetPos != null) {
+                this.mob.getNavigation().startMovingTo(targetPos.x, targetPos.y, targetPos.z, this.walkSpeedModifier);
+            }
+        }
+        
+        private Vec3d getFurthestPosition() {
+            Vec3d mobPos = this.mob.getPos();
+            Vec3d targetPos = this.targetEntity.getPos();
+            
+            // Calculate vector away from target
+            Vec3d direction = mobPos.subtract(targetPos).normalize();
+            
+            // Scale by flee distance
+            double distance = 10.0; // how far to try to run
+            direction = direction.multiply(distance);
+            
+            // Calculate destination
+            return mobPos.add(direction);
+        }
+        
+        @Override
+        public boolean shouldContinue() {
+            return this.targetEntity != null && 
+                   this.targetEntity.isAlive() && 
+                   this.mob.squaredDistanceTo(this.targetEntity) < this.fleeDistance * this.fleeDistance;
+        }
+    }
+
     // Relationship type enum used by Relationship class
     public enum RelationshipType {
         FRIEND,

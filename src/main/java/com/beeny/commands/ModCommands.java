@@ -8,7 +8,7 @@ import com.beeny.village.VillageInfluenceManager.VillageRelationship;
 import com.beeny.village.VillageInfluenceManager.RelationshipStatus;
 import com.beeny.ai.LLMService;
 import com.beeny.server.EventNotificationManager;
-import com.beeny.village.Villagesreborn;
+import com.beeny.Villagesreborn; // Fixed import path from com.beeny.village.Villagesreborn to com.beeny.Villagesreborn
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;

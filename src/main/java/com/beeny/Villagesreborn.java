@@ -196,13 +196,16 @@ public class Villagesreborn implements ModInitializer {
         );
         LOGGER.info("Structure modifications registration complete.");
     }
-    private void registerCultureStructures(String vanillaType, BiomeSelectors.BiomeSelector biomeSelector,
+    private void registerCultureStructures(String vanillaType, net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext selector,
                                          String cultureType, Map<Identifier, Integer> structures) {
         Identifier housesPoolId = new Identifier("minecraft", "village/" + vanillaType + "/houses");
         RegistryKey<StructurePool> housesPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, housesPoolId);
         Identifier centerPoolId = new Identifier("minecraft", "village/" + vanillaType + "/town_centers");
         RegistryKey<StructurePool> centerPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, centerPoolId);
-        VillagerManager.getInstance().registerBiomeCultureAssociation(biomeSelector, cultureType);
+        
+        // Update to use the correct BiomeSelectors method for 1.21.4
+        VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
+        
         net.fabricmc.fabric.api.structure.v1.FabricStructurePool.registerAddition(housesPoolId, builder -> {
             for (Map.Entry<Identifier, Integer> entry : structures.entrySet()) {
                 if (entry.getKey().getPath().contains("forum") ||
