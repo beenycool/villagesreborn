@@ -35,6 +35,15 @@ public class VillageEventScheduler {
     // Maps village BlockPos to their special conditions
     private final Map<BlockPos, Map<String, Object>> villageConditions = new ConcurrentHashMap<>();
     
+    // Maps village BlockPos to their demographic data
+    private final Map<BlockPos, VillageDemographics> villageDemographics = new ConcurrentHashMap<>();
+    
+    // Maps village BlockPos to their happiness level (0-100)
+    private final Map<BlockPos, Integer> villageHappiness = new ConcurrentHashMap<>();
+    
+    // Event complexity level increases as players engage with more events
+    private final Map<BlockPos, Integer> eventComplexityLevel = new ConcurrentHashMap<>();
+    
     // Minimum time between event checks (in milliseconds)
     private static final long MIN_CHECK_INTERVAL = 1000 * 60; // 1 minute
     
@@ -142,6 +151,61 @@ public class VillageEventScheduler {
     }
     
     /**
+     * Represents village demographic information
+     */
+    public static class VillageDemographics {
+        private final int totalPopulation;
+        private final int childPopulation;
+        private final int elderlyPopulation;
+        private final Map<String, Integer> professionCounts;
+        private final boolean hasLeader;
+        
+        public VillageDemographics(int totalPopulation, int childPopulation, int elderlyPopulation,
+                                  Map<String, Integer> professionCounts, boolean hasLeader) {
+            this.totalPopulation = totalPopulation;
+            this.childPopulation = childPopulation;
+            this.elderlyPopulation = elderlyPopulation;
+            this.professionCounts = new HashMap<>(professionCounts);
+            this.hasLeader = hasLeader;
+        }
+        
+        public int getTotalPopulation() {
+            return totalPopulation;
+        }
+        
+        public int getChildPopulation() {
+            return childPopulation;
+        }
+        
+        public int getElderlyPopulation() {
+            return elderlyPopulation;
+        }
+        
+        public Map<String, Integer> getProfessionCounts() {
+            return Collections.unmodifiableMap(professionCounts);
+        }
+        
+        public boolean hasLeader() {
+            return hasLeader;
+        }
+        
+        public int getPopulationByProfession(String profession) {
+            return professionCounts.getOrDefault(profession, 0);
+        }
+        
+        public boolean hasProfession(String profession) {
+            return professionCounts.containsKey(profession) && professionCounts.get(profession) > 0;
+        }
+        
+        public String getDominantProfession() {
+            return professionCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("none");
+        }
+    }
+    
+    /**
      * Seasons that can affect event occurrence and frequency
      */
     public enum Season {
@@ -210,6 +274,62 @@ public class VillageEventScheduler {
             120, 180
         ));
         eventTriggersByCondition.put("trade_boom", tradeTriggers);
+        
+        // Low happiness triggers
+        List<EventTrigger> lowHappinessTriggers = new ArrayList<>();
+        lowHappinessTriggers.add(new EventTrigger(
+            "low_happiness",
+            "celebration",
+            new String[] {
+                "Village Morale Boost Festival", 
+                "Community Spirit Day", 
+                "Harmony Restoration Ceremony"
+            },
+            150, 220
+        ));
+        eventTriggersByCondition.put("low_happiness", lowHappinessTriggers);
+        
+        // High child population triggers
+        List<EventTrigger> childPopulationTriggers = new ArrayList<>();
+        childPopulationTriggers.add(new EventTrigger(
+            "high_child_population",
+            "festival",
+            new String[] {
+                "Children's Day Celebration", 
+                "Youth Games Tournament", 
+                "Young Villagers Fair"
+            },
+            120, 150
+        ));
+        eventTriggersByCondition.put("high_child_population", childPopulationTriggers);
+        
+        // Scholarly population triggers
+        List<EventTrigger> scholarTriggers = new ArrayList<>();
+        scholarTriggers.add(new EventTrigger(
+            "scholarly_population",
+            "ceremony",
+            new String[] {
+                "Knowledge Symposium", 
+                "Scholarly Debate Contest", 
+                "Wisdom Exchange Conference"
+            },
+            90, 170
+        ));
+        eventTriggersByCondition.put("scholarly_population", scholarTriggers);
+        
+        // New leader triggers
+        List<EventTrigger> newLeaderTriggers = new ArrayList<>();
+        newLeaderTriggers.add(new EventTrigger(
+            "new_leader",
+            "ceremony",
+            new String[] {
+                "Leadership Inauguration", 
+                "Authority Transfer Ceremony", 
+                "Leader's Oath Ritual"
+            },
+            120, 250
+        ));
+        eventTriggersByCondition.put("new_leader", newLeaderTriggers);
     }
     
     /**
@@ -290,6 +410,42 @@ public class VillageEventScheduler {
                 "Imperial Relief Effort" 
             },
             20, 45, 90, null, true, "food_shortage"
+        ));
+        
+        // Events for villages with many priests/clerics
+        romanEvents.add(new EventTemplate(
+            "religious_festival",
+            new String[] {
+                "Temple Dedication Festival", 
+                "Divine Oracle Consultation",
+                "Vestal Virgins Ceremony",
+                "Jupiter's Blessing Ritual"
+            },
+            40, 60, 120, null, true, "high_priest_population"
+        ));
+        
+        // Events for villages with many farmers
+        romanEvents.add(new EventTemplate(
+            "agricultural_ceremony",
+            new String[] {
+                "Ceres Harvest Ritual", 
+                "Field Blessing Ceremony",
+                "Seed Planting Festival",
+                "First Fruits Offering"
+            },
+            50, 45, 90, null, true, "high_farmer_population"
+        ));
+        
+        // Events for villages with military focus
+        romanEvents.add(new EventTemplate(
+            "military_parade",
+            new String[] {
+                "Legion Triumph Procession", 
+                "Arms Display Ceremony",
+                "Military Training Exhibition",
+                "Victory Commemoration"
+            },
+            60, 75, 150, null, true, "high_smith_population"
         ));
         
         eventTemplatesByCulture.put("roman", romanEvents);
@@ -521,8 +677,71 @@ public class VillageEventScheduler {
         villageEventHistory.put(center, new ArrayList<>());
         villageConditions.put(center, new HashMap<>());
         
+        // Initialize other trackers
+        villageHappiness.put(center, 75); // Default happiness value
+        eventComplexityLevel.put(center, 1); // Start with simple events
+        
         // Schedule the first event
         scheduleNextEvent(center);
+    }
+    
+    /**
+     * Update village demographic information
+     */
+    public void updateVillageDemographics(BlockPos center, VillageDemographics demographics) {
+        villageDemographics.put(center, demographics);
+        
+        // Check for demographic-based conditions
+        Map<String, Object> conditions = villageConditions.computeIfAbsent(center, k -> new HashMap<>());
+        
+        // Check for demographic-based triggers
+        if (demographics.getChildPopulation() > demographics.getTotalPopulation() * 0.3) {
+            conditions.put("high_child_population", true);
+        } else {
+            conditions.remove("high_child_population");
+        }
+        
+        // Check profession-based conditions
+        Map<String, Integer> professions = demographics.getProfessionCounts();
+        for (Map.Entry<String, Integer> entry : professions.entrySet()) {
+            String profession = entry.getKey();
+            int count = entry.getValue();
+            
+            if (count >= 3 && count > demographics.getTotalPopulation() * 0.2) {
+                conditions.put("high_" + profession + "_population", true);
+            } else {
+                conditions.remove("high_" + profession + "_population");
+            }
+        }
+        
+        // Check for scholarly population (librarians, etc.)
+        if (demographics.hasProfession("librarian") || demographics.hasProfession("cleric")) {
+            conditions.put("scholarly_population", true);
+        } else {
+            conditions.remove("scholarly_population");
+        }
+    }
+    
+    /**
+     * Update village happiness level
+     */
+    public void updateVillageHappiness(BlockPos center, int happinessLevel) {
+        villageHappiness.put(center, happinessLevel);
+        
+        Map<String, Object> conditions = villageConditions.computeIfAbsent(center, k -> new HashMap<>());
+        
+        // Check for happiness-based conditions
+        if (happinessLevel < 40) {
+            conditions.put("low_happiness", true);
+        } else {
+            conditions.remove("low_happiness");
+        }
+        
+        if (happinessLevel > 80) {
+            conditions.put("high_happiness", true);
+        } else {
+            conditions.remove("high_happiness");
+        }
     }
     
     /**
@@ -545,6 +764,19 @@ public class VillageEventScheduler {
         Map<String, Object> conditions = villageConditions.getOrDefault(center, Collections.emptyMap());
         if (conditions.containsKey("festival_season")) {
             frequency = (int)(frequency * 0.7); // More frequent during festival seasons
+        }
+        
+        // Additional factors for event frequency
+        int happiness = villageHappiness.getOrDefault(center, 75);
+        
+        // Unhappy villages need more events to improve morale
+        if (happiness < 50) {
+            frequency = (int)(frequency * 0.8); // 20% more frequent
+        }
+        
+        // Very happy villages may have more celebrations
+        if (happiness > 85) {
+            frequency = (int)(frequency * 0.9); // 10% more frequent
         }
         
         // Add some randomness to the frequency (±20%)
@@ -668,6 +900,17 @@ public class VillageEventScheduler {
             conditions.remove(selectedCondition);
         }
         
+        // Add extras to the event based on village complexity
+        int complexity = eventComplexityLevel.getOrDefault(center, 1);
+        if (complexity > 1) {
+            event.setEventData("complexity", complexity);
+            
+            // For higher complexity events, add extra rewards or challenges
+            if (complexity >= 3) {
+                event.setEventData("bonus_rewards", true);
+            }
+        }
+        
         // Notify nearby players about the special event
         notifyNearbyPlayers(world, center, radius * 2, player -> {
             player.sendMessage(Text.of("§c§lSpecial Event: " + description + "§r"), false);
@@ -694,6 +937,10 @@ public class VillageEventScheduler {
             case "pollution" -> "urban pollution";
             case "food_shortage" -> "food shortages";
             case "festival_season" -> "the festival season";
+            case "low_happiness" -> "low village happiness";
+            case "high_child_population" -> "high child population";
+            case "scholarly_population" -> "scholarly population";
+            case "new_leader" -> "new village leader";
             default -> conditionId.replace('_', ' ');
         };
     }
@@ -758,6 +1005,26 @@ public class VillageEventScheduler {
         
         // Record this event type in history
         recordEventInHistory(center, selectedTemplate.type);
+        
+        // Add demographic influence to event selection
+        VillageDemographics demographics = villageDemographics.get(center);
+        if (demographics != null) {
+            // Add demographic data to the event for customization
+            event.setEventData("total_population", demographics.getTotalPopulation());
+            event.setEventData("child_population", demographics.getChildPopulation());
+            event.setEventData("elderly_population", demographics.getElderlyPopulation());
+            event.setEventData("dominant_profession", demographics.getDominantProfession());
+            
+            // Add specialized event features based on village composition
+            String dominantProfession = demographics.getDominantProfession();
+            if (!dominantProfession.equals("none")) {
+                event.setEventData("profession_focus", dominantProfession);
+            }
+        }
+        
+        // Add complexity level
+        int complexity = eventComplexityLevel.getOrDefault(center, 1);
+        event.setEventData("complexity", complexity);
         
         // Notify nearby players about the new event
         notifyNearbyPlayers(world, center, radius * 2, player -> {
@@ -939,6 +1206,46 @@ public class VillageEventScheduler {
     }
     
     /**
+     * Increase event complexity level for a village after successful events
+     */
+    public void increaseEventComplexity(BlockPos center) {
+        int currentLevel = eventComplexityLevel.getOrDefault(center, 1);
+        int maxLevel = 5; // Cap complexity at level 5
+        
+        if (currentLevel < maxLevel) {
+            eventComplexityLevel.put(center, currentLevel + 1);
+        }
+    }
+    
+    /**
+     * Reset event complexity to a lower level if players are struggling
+     */
+    public void resetEventComplexity(BlockPos center) {
+        eventComplexityLevel.put(center, 1);
+    }
+    
+    /**
+     * Get current event complexity level for a village
+     */
+    public int getEventComplexityLevel(BlockPos center) {
+        return eventComplexityLevel.getOrDefault(center, 1);
+    }
+    
+    /**
+     * Get current happiness level for a village
+     */
+    public int getVillageHappiness(BlockPos center) {
+        return villageHappiness.getOrDefault(center, 75);
+    }
+    
+    /**
+     * Get current demographics for a village
+     */
+    public VillageDemographics getVillageDemographics(BlockPos center) {
+        return villageDemographics.get(center);
+    }
+    
+    /**
      * Add a special condition to a village that may trigger special events
      */
     public void addVillageCondition(BlockPos center, String condition, Object value) {
@@ -1005,6 +1312,11 @@ public class VillageEventScheduler {
             // If no players participated, consider increasing the frequency
             int currentFrequency = eventFrequencies.getOrDefault(villageCenter, 180);
             eventFrequencies.put(villageCenter, Math.min(currentFrequency + 30, 240));
+        }
+        
+        // Increase event complexity if many players participated successfully
+        if (playerCount > 5) {
+            increaseEventComplexity(villageCenter);
         }
     }
 }
