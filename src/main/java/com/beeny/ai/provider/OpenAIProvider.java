@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.beeny.ai.LLMErrorHandler;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -30,6 +31,7 @@ public class OpenAIProvider implements AIProvider {
     private final Gson gson = new Gson();
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     public OpenAIProvider() {
         client = new OkHttpClient.Builder()
@@ -45,8 +47,11 @@ public class OpenAIProvider implements AIProvider {
         this.modelName = config.getOrDefault("modelName", "gpt-4-turbo-preview");
         
         if (apiKey == null || apiKey.isEmpty()) {
-            LOGGER.error("OpenAI provider initialization failed: missing API key");
-            return;
+            String errorMsg = "OpenAI provider initialization failed: missing API key";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide a valid OpenAI API key in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
         
         initialized = true;
@@ -55,10 +60,16 @@ public class OpenAIProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("OpenAI provider not initialized"));
+        if (!initialized) {
+            String error = "OpenAI provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
+        }
 
-        String cacheKey = generateCacheKey(prompt, context); int maxTokens = 1024;
-        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
+        String cacheKey = generateCacheKey(prompt, context);
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
+        }
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -67,11 +78,83 @@ public class OpenAIProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from OpenAI", e);
-                throw new RuntimeException("Failed to generate response", e);
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // For some error types, we can try to provide helpful guidance
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your OpenAI API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to OpenAI. Please check your internet connection.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("OpenAI API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    throw new RuntimeException("Failed to generate response from OpenAI: " + e.getMessage(), e);
+                }
             }
         }, executor);
     }
     
+    @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Make a minimal API call to check if API key is valid
+                JsonObject requestBody = new JsonObject();
+                requestBody.addProperty("model", modelName);
+                
+                JsonArray messagesArray = new JsonArray();
+                JsonObject userMessage = new JsonObject();
+                userMessage.addProperty("role", "user");
+                userMessage.addProperty("content", "Validate API key (respond with OK)");
+                messagesArray.add(userMessage);
+                
+                requestBody.add("messages", messagesArray);
+                requestBody.addProperty("max_tokens", 1);  // Minimal output to save tokens
+                
+                Request request = new Request.Builder()
+                    .url(API_URL)
+                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .build();
+                
+                try (Response response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        return true;
+                    } else {
+                        int statusCode = response.code();
+                        String body = response.body() != null ? response.body().string() : "";
+                        
+                        // Parse error message to provide better feedback
+                        if (statusCode == 401 || statusCode == 403) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                                "OpenAI rejected your API key. Please check it is correct.");
+                        } else if (statusCode == 429) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                                "OpenAI rate limit exceeded. Please try again later.");
+                        } else {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                                "OpenAI API error: " + statusCode + " - " + body);
+                        }
+                        return false;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.error("Error validating OpenAI access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to OpenAI: " + e.getMessage());
+                return false;
+            }
+        });
+    }
+
     private String callOpenAIApi(String prompt, Map<String, String> context) throws IOException {
         JsonArray messagesArray = new JsonArray();
         if (context != null && !context.isEmpty()) {
@@ -106,8 +189,20 @@ public class OpenAIProvider implements AIProvider {
             .build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                LOGGER.error("OpenAI API error: {} - {}", response.code(), response.message());
-                throw new IOException("OpenAI API error: " + response.code() + " - " + response.message());
+                int code = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
+                
+                // Generate more helpful error messages based on status code
+                if (code == 401 || code == 403) {
+                    throw new IOException("Authentication error: Invalid API key or insufficient permissions");
+                } else if (code == 429) {
+                    throw new IOException("Rate limit exceeded: OpenAI API quota has been reached");
+                } else if (code == 500 || code == 502 || code == 503) {
+                    throw new IOException("OpenAI service is currently unavailable: " + code);
+                } else {
+                    throw new IOException("OpenAI API error: " + code + " - " + response.message() + 
+                                         (responseBody.isEmpty() ? "" : " - " + responseBody));
+                }
             }
             String responseBody = response.body().string();
             JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
@@ -121,7 +216,7 @@ public class OpenAIProvider implements AIProvider {
             }
         } catch (IOException e) {
             LOGGER.error("OpenAI API communication error", e);
-            return mockResponse(prompt);
+            throw e;
         }
     }
 
@@ -144,7 +239,7 @@ public class OpenAIProvider implements AIProvider {
 
     @Override
     public boolean isAvailable() {
-        return initialized;
+        return initialized && apiKey != null && !apiKey.isEmpty();
     }
 
     @Override

@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import okhttp3.OkHttpClient;
+import com.beeny.ai.LLMErrorHandler;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.MediaType;
@@ -28,6 +30,7 @@ public class AnthropicProvider implements AIProvider {
     private final OkHttpClient client;
     private final Gson gson = new Gson();
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final String ANTHROPIC_API_VERSION = "2024-02-01";
 
@@ -42,16 +45,75 @@ public class AnthropicProvider implements AIProvider {
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
-        this.model = config.getOrDefault("model", "claude-sonnet-3.7");
+        this.model = config.getOrDefault("model", "claude-3-sonnet");
         
-        if (apiKey == null) {
-            LOGGER.error("Anthropic provider initialization failed: missing API key");
-            return;
+        if (apiKey == null || apiKey.isEmpty()) {
+            String errorMsg = "Anthropic provider initialization failed: missing API key";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide a valid Anthropic API key in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
         
         initialized = true;
         LOGGER.info("Anthropic provider initialized with model: {}", model);
     }
+
+    @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Minimal validation request
+                JsonObject requestBody = new JsonObject();
+                requestBody.addProperty("model", model);
+                JsonArray messages = new JsonArray();
+                JsonObject message = new JsonObject();
+                message.addProperty("role", "user");
+                message.addProperty("content", "Validation ping");
+                messages.add(message);
+                requestBody.add("messages", messages);
+                requestBody.addProperty("max_tokens", 1);
+
+                Request request = new Request.Builder()
+                    .url(API_URL)
+                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("x-api-key", apiKey)
+                    .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        return true;
+                    } else {
+                        int statusCode = response.code();
+                        String body = response.body() != null ? response.body().string() : "";
+                        
+                        if (statusCode == 401 || statusCode == 403) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
+                                "Anthropic rejected your API key. Please check it is correct.");
+                        } else if (statusCode == 429) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                                "Anthropic API rate limit exceeded. Please try again later.");
+                        } else {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                                "Anthropic API error: " + statusCode + " - " + body);
+                        }
+                        return false;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.error("Error validating Anthropic access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to Anthropic: " + e.getMessage());
+                return false;
+            }
+        });
+    }
+
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
@@ -140,6 +202,7 @@ public class AnthropicProvider implements AIProvider {
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
     }
+
 
     @Override
     public String getName() {

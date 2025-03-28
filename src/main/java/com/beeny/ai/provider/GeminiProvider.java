@@ -5,24 +5,40 @@ import com.google.gson.JsonArray;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.beeny.ai.LLMErrorHandler;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GeminiProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final String API_URL = "https://generativelanguage.googleapis.com/v1/models/";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final Map<String, String> cache = new ConcurrentHashMap<>();
     private OkHttpClient client;
     private String apiKey;
     private String model;
     private boolean initialized = false;
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     public GeminiProvider() {
-        client = new OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).build();
+        client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build();
+    }
+
+    private String generateCacheKey(String prompt, Map<String, String> context) {
+        StringBuilder key = new StringBuilder(prompt);
+        if (context != null) {
+            context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
+        }
+        return key.toString();
     }
 
     @Override
@@ -40,66 +56,138 @@ public class GeminiProvider implements AIProvider {
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         if (!initialized) {
-            CompletableFuture<String> future = new CompletableFuture<>();
-            future.completeExceptionally(new IllegalStateException("Gemini provider not initialized"));
-            return future;
+            String error = "Gemini provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
         }
+
+        String cacheKey = generateCacheKey(prompt, context);
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String url = API_URL + model + ":generateContent?key=" + apiKey;
-                JsonObject requestBody = new JsonObject();
-                JsonArray contents = new JsonArray();
-                if (context.containsKey("system_prompt")) {
-                    JsonObject systemMessage = new JsonObject();
-                    JsonObject systemRole = new JsonObject();
-                    systemRole.addProperty("role", "system");
-                    systemMessage.add("role", systemRole);
-                    systemMessage.addProperty("parts", context.get("system_prompt"));
-                    contents.add(systemMessage);
-                }
-                JsonObject userMessage = new JsonObject();
-                JsonObject parts = new JsonObject();
-                parts.addProperty("text", prompt);
-                JsonArray partsArray = new JsonArray();
-                partsArray.add(parts);
-                userMessage.addProperty("role", "user");
-                userMessage.add("parts", partsArray);
-                contents.add(userMessage);
-                requestBody.add("contents", contents);
-                JsonObject generationConfig = new JsonObject();
-                generationConfig.addProperty("temperature", 0.7);
-                int maxTokens = 0;
-                switch(model) {
-                    case "gemini-2.0-pro":
-                        maxTokens = 128000;
-                        break;
-                    case "gemini-2.0-flash":
-                        maxTokens = 128000;
-                        break;
-                    case "gemini-2.0-flash-lite":
-                    default:
-                        maxTokens = 32000;
-                }
-                generationConfig.addProperty("maxOutputTokens", maxTokens);
-                generationConfig.addProperty("candidateCount", 1);
-                generationConfig.add("stopSequences", new JsonArray());
-                requestBody.add("generationConfig", generationConfig);
-                RequestBody body = RequestBody.create(requestBody.toString(), JSON);
-                Request request = new Request.Builder().url(url).post(body).build();
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        throw new IOException("Unexpected response code: " + response);
-                    }
-                    String responseBody = response.body().string();
-                    JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.getAsJsonArray("candidates").get(0).getAsJsonObject().getAsJsonArray("content").get(0).getAsJsonObject().getAsJsonArray("parts").get(0).getAsJsonObject().get("text").getAsString();
-                    return generatedText;
-                }
+                String response = callGeminiApi(prompt, context);
+                cache.put(cacheKey, response);
+                return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Gemini", e);
-                throw new RuntimeException("Failed to generate response from Gemini", e);
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // For some error types, we can try to provide helpful guidance
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your Gemini API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to Gemini. Please check your internet connection.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("Gemini API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    throw new RuntimeException("Failed to generate response from Gemini: " + e.getMessage(), e);
+                }
             }
-        });
+        }, executor);
+    }
+    private String callGeminiApi(String prompt, Map<String, String> context) throws IOException {
+        String url = API_URL + model + ":generateContent?key=" + apiKey;
+        JsonObject requestBody = new JsonObject();
+        JsonArray contents = new JsonArray();
+        
+        // Add context as system message if available
+        if (context != null && !context.isEmpty()) {
+            StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+            context.forEach((key, value) -> {
+                if (value != null && !value.isEmpty()) {
+                    systemContent.append(" ").append(key).append(": ").append(value).append(".");
+                }
+            });
+            
+            JsonObject systemMessage = new JsonObject();
+            systemMessage.addProperty("role", "user");
+            JsonObject systemParts = new JsonObject();
+            systemParts.addProperty("text", systemContent.toString());
+            JsonArray systemPartsArray = new JsonArray();
+            systemPartsArray.add(systemParts);
+            systemMessage.add("parts", systemPartsArray);
+            contents.add(systemMessage);
+        }
+
+        // Add user prompt
+        JsonObject userMessage = new JsonObject();
+        JsonObject parts = new JsonObject();
+        parts.addProperty("text", prompt);
+        JsonArray partsArray = new JsonArray();
+        partsArray.add(parts);
+        userMessage.addProperty("role", "user");
+        userMessage.add("parts", partsArray);
+        contents.add(userMessage);
+        
+        requestBody.add("contents", contents);
+        
+        // Configure generation parameters
+        JsonObject generationConfig = new JsonObject();
+        generationConfig.addProperty("temperature", 0.7);
+        
+        int maxTokens;
+        switch(model) {
+            case "gemini-2.0-pro":
+                maxTokens = 128000;
+                break;
+            case "gemini-2.0-flash":
+                maxTokens = 128000;
+                break;
+            case "gemini-2.0-flash-lite":
+            default:
+                maxTokens = 32000;
+        }
+        
+        generationConfig.addProperty("maxOutputTokens", maxTokens);
+        generationConfig.addProperty("candidateCount", 1);
+        generationConfig.add("stopSequences", new JsonArray());
+        requestBody.add("generationConfig", generationConfig);
+        
+        // Make API request
+        RequestBody body = RequestBody.create(requestBody.toString(), JSON);
+        Request request = new Request.Builder()
+            .url(url)
+            .post(body)
+            .build();
+            
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                int code = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
+                
+                if (code == 401 || code == 403) {
+                    throw new IOException("Authentication error: Invalid API key or insufficient permissions");
+                } else if (code == 429) {
+                    throw new IOException("Rate limit exceeded: Gemini API quota has been reached");
+                } else if (code >= 500) {
+                    throw new IOException("Gemini service is currently unavailable: " + code);
+                } else {
+                    throw new IOException("Gemini API error: " + code + " - " + response.message());
+                }
+            }
+            
+            String responseBody = response.body().string();
+            JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+            if (jsonResponse.has("candidates") && jsonResponse.getAsJsonArray("candidates").size() > 0) {
+                return jsonResponse.getAsJsonArray("candidates").get(0)
+                    .getAsJsonObject().getAsJsonArray("content").get(0)
+                    .getAsJsonObject().getAsJsonArray("parts").get(0)
+                    .getAsJsonObject().get("text").getAsString().trim();
+            } else {
+                LOGGER.error("Unexpected Gemini API response structure: {}", responseBody);
+                throw new IOException("Unexpected Gemini API response structure");
+            }
+        } catch (IOException e) {
+            LOGGER.error("Gemini API communication error", e);
+            throw e;
+        }
+    }
     }
 
     @Override
@@ -109,11 +197,13 @@ public class GeminiProvider implements AIProvider {
 
     @Override
     public String getName() {
-        return "gemini";
+        return "Gemini";
     }
 
     @Override
     public void shutdown() {
-        // Nothing to do for OkHttp client
+        executor.shutdown();
+        cache.clear();
+        initialized = false;
     }
 }

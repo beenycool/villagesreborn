@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 public class LLMService {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -18,6 +19,7 @@ public class LLMService {
     private final Map<String, String> contextCache = new HashMap<>();
     private LLMConfig config;
     private SystemSpecs systemSpecs;
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     private LLMService() {
         this.systemSpecs = new SystemSpecs();
@@ -54,9 +56,15 @@ public class LLMService {
             providerConfig.put("endpoint", config.getEndpoint());
             providerConfig.put("modelName", config.getModelType());
         }
-        currentProvider.initialize(providerConfig);
-        LOGGER.info("LLMService initialized with provider: {} (Quick Start: {})",
-            currentProvider.getName(), config.isQuickStartMode());
+        try {
+            currentProvider.initialize(providerConfig);
+            LOGGER.info("LLMService initialized with provider: {} (Quick Start: {})",
+                currentProvider.getName(), config.isQuickStartMode());
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize LLM provider", e);
+            LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+            errorHandler.reportErrorToClient(errorType, "Failed to initialize LLM provider: " + e.getMessage());
+        }
     }
 
     public CompletableFuture<String> generateResponse(String prompt) {
@@ -64,87 +72,92 @@ public class LLMService {
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        systemSpecs.updatePerformanceMetrics();
-        String cacheKey = generateCacheKey(prompt, context); int complexityLevel = systemSpecs.getAIComplexity();
         if (currentProvider == null || !currentProvider.isAvailable()) {
-            return CompletableFuture.failedFuture(
-                new IllegalStateException("No available AI provider")
-            );
+            String errorMessage = "No LLM provider available. Please check your configuration and API keys.";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, errorMessage);
+            return CompletableFuture.failedFuture(new IllegalStateException(errorMessage));
         }
-        if (contextCache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(contextCache.get(cacheKey));
-        }
-        context.put("complexity_level", String.valueOf(complexityLevel));
-        if (complexityLevel == 0) {
-            String response = getDefaultResponse(prompt);
-            contextCache.put(cacheKey, response);
-            return CompletableFuture.completedFuture(response);
-        }
-        final String finalPrompt = complexityLevel == 1 ? simplifyPrompt(prompt) : prompt;
-        return currentProvider.generateResponse(finalPrompt, context)
-            .thenApply(response -> {
-                contextCache.put(cacheKey, response);
-                return response;
-            })
+
+        String finalPrompt = simplifyPrompt(prompt);
+        Map<String, String> fullContext = new HashMap<>(contextCache);
+        fullContext.putAll(context);
+
+        return currentProvider.generateResponse(finalPrompt, fullContext)
+            .orTimeout(30, TimeUnit.SECONDS)
             .exceptionally(e -> {
-                LOGGER.error("Error generating response", e);
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                LOGGER.error("Error generating response", cause);
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(cause);
+                errorHandler.reportErrorToClient(errorType, cause.getMessage());
+                
                 return getDefaultResponse(finalPrompt);
             });
     }
 
+    /**
+     * Test the LLM connection and report any issues
+     * @return A future that completes when testing is done
+     */
+    public CompletableFuture<Boolean> testConnection() {
+        if (currentProvider == null || !currentProvider.isAvailable()) {
+            String errorMessage = "No LLM provider available. Please check your configuration and API keys.";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, errorMessage);
+            return CompletableFuture.completedFuture(false);
+        }
+
+        return currentProvider.generateResponse("Test connection.", new HashMap<>())
+            .orTimeout(10, TimeUnit.SECONDS)
+            .thenApply(response -> true)
+            .exceptionally(e -> {
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                LOGGER.error("Connection test failed", cause);
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(cause);
+                errorHandler.reportErrorToClient(errorType, 
+                    "Connection test failed: " + cause.getMessage());
+                
+                return false;
+            });
+    }
+
     private String simplifyPrompt(String prompt) {
-        String simplified = prompt.replaceAll("\\{.*?\\}", "")
-                                .replaceAll("\\[.*?\\]", "")
-                                .trim();
-        return simplified + "\nPlease provide a simple response using basic actions and descriptions.";
+        if (prompt.length() > 500) {
+            LOGGER.debug("Truncating long prompt of length {}", prompt.length());
+            return prompt.substring(0, 500) + "...";
+        }
+        return prompt;
     }
 
     private String getDefaultResponse(String prompt) {
-        systemSpecs.updatePerformanceMetrics();
-        prompt = prompt.toLowerCase();
-        if (prompt.contains("farmer")) {
-            return "ACTION: work\nTARGET: nearest_farm\nDURATION: 6000\nDETAIL: tending crops and harvesting";
+        String lowerPrompt = prompt.toLowerCase();
+        if (lowerPrompt.contains("name")) {
+            return "Olivia the Village Helper";
+        } else if (lowerPrompt.contains("personality")) {
+            return "Friendly, helpful, and knowledgeable";
+        } else {
+            return "I'm sorry, I couldn't process that request. Please try again later.";
         }
-        if (prompt.contains("fisherman")) {
-            return "ACTION: work\nTARGET: nearest_water\nDURATION: 4800\nDETAIL: fishing at the pond";
-        }
-        if (prompt.contains("trader") || prompt.contains("merchant")) {
-            return "ACTION: trade\nTARGET: nearest_player\nDURATION: 3000\nDETAIL: offering special deals";
-        }
-        if (prompt.contains("night") || prompt.contains("sleeping")) {
-            return "ACTION: sleep\nTARGET: nearest_bed\nDURATION: 8000\nDETAIL: resting until morning";
-        }
-        if (prompt.contains("eating") || prompt.contains("hungry")) {
-            return "ACTION: eat\nTARGET: nearest_food\nDURATION: 1200\nDETAIL: having a meal";
-        }
-        if (prompt.contains("roman")) {
-            return "ACTION: gather\nTARGET: forum\nDURATION: 3600\nDETAIL: discussing politics at the forum";
-        }
-        if (prompt.contains("egyptian")) {
-            return "ACTION: pray\nTARGET: temple\nDURATION: 3600\nDETAIL: offering prayers to the gods";
-        }
-        if (prompt.contains("victorian")) {
-            return "ACTION: socialize\nTARGET: tea_room\nDURATION: 3000\nDETAIL: enjoying afternoon tea";
-        }
-        return "ACTION: walk\nTARGET: village_center\nDURATION: 2400\nDETAIL: exploring the village";
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {
         StringBuilder key = new StringBuilder(prompt);
-        context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
+        for (Map.Entry<String, String> entry : context.entrySet()) {
+            key.append("|").append(entry.getKey()).append("=").append(entry.getValue());
+        }
         return key.toString();
     }
 
     public void pruneCache() {
-        contextCache.clear();
+        // Cache pruning logic would go here
     }
 
     public void shutdown() {
-        LOGGER.info("Shutting down LLMService");
         if (currentProvider != null) {
             currentProvider.shutdown();
         }
-        contextCache.clear();
     }
 
     public void clearCache() {
@@ -152,7 +165,7 @@ public class LLMService {
     }
 
     public void addToContext(String key, String value) {
-        contextCache.put("context_" + key, value);
+        contextCache.put(key, value);
     }
 
     public Map<String, String> getContextCache() {
@@ -170,9 +183,20 @@ public class LLMService {
             providerConfig.put("apiKey", config.getApiKey());
             providerConfig.put("endpoint", config.getEndpoint());
             providerConfig.put("modelName", config.getModelType());
-            currentProvider.initialize(providerConfig);
-            LOGGER.info("Switched to provider: {}", currentProvider.getName());
-            return true;
+            
+            try {
+                currentProvider.initialize(providerConfig);
+                LOGGER.info("Switched to provider: {}", currentProvider.getName());
+                // Test connection after switching provider
+                testConnection();
+                return true;
+            } catch (Exception e) {
+                LOGGER.error("Failed to initialize provider: {}", providerName, e);
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, 
+                    "Failed to initialize provider " + providerName + ": " + e.getMessage());
+                return false;
+            }
         }
         return false;
     }

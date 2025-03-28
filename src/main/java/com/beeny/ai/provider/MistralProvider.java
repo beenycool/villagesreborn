@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.beeny.ai.LLMErrorHandler;
 
 import java.io.IOException;
 import java.util.Map;
@@ -20,6 +21,7 @@ public class MistralProvider implements AIProvider {
     private String apiKey;
     private String model;
     private boolean initialized = false;
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     public MistralProvider() {
         client = new OkHttpClient.Builder()
@@ -34,9 +36,12 @@ public class MistralProvider implements AIProvider {
         this.apiKey = config.get("apiKey");
         this.model = config.getOrDefault("modelName", "mistral-large");
         
-        if (apiKey == null) {
-            LOGGER.error("Mistral provider initialization failed: missing API key");
-            return;
+        if (apiKey == null || apiKey.isEmpty()) {
+            String errorMsg = "Mistral provider initialization failed: missing API key";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide a valid Mistral API key in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
         
         initialized = true;
@@ -100,7 +105,21 @@ public class MistralProvider implements AIProvider {
                 }
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Mistral", e);
-                throw new RuntimeException("Failed to generate response from Mistral", e);
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // Provide helpful guidance based on error type
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your Mistral API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to Mistral. Please check your internet connection.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("Mistral API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    throw new RuntimeException("Failed to generate response from Mistral: " + e.getMessage(), e);
+                }
             }
         });
     }
@@ -111,12 +130,68 @@ public class MistralProvider implements AIProvider {
     }
 
     @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Minimal validation request
+                JsonObject requestBody = new JsonObject();
+                requestBody.addProperty("model", model);
+                JsonArray messages = new JsonArray();
+                JsonObject message = new JsonObject();
+                message.addProperty("role", "user");
+                message.addProperty("content", "Validation ping");
+                messages.add(message);
+                requestBody.add("messages", messages);
+                requestBody.addProperty("max_tokens", 1);
+
+                Request request = new Request.Builder()
+                    .url(API_URL)
+                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        return true;
+                    } else {
+                        int statusCode = response.code();
+                        String body = response.body() != null ? response.body().string() : "";
+                        
+                        // Handle specific error codes
+                        if (statusCode == 401 || statusCode == 403) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
+                                "Mistral rejected your API key. Please check it is correct.");
+                        } else if (statusCode == 429) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                                "Mistral API rate limit exceeded. Please try again later.");
+                        } else {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                                "Mistral API error: " + statusCode + " - " + body);
+                        }
+                        return false;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.error("Error validating Mistral access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to Mistral: " + e.getMessage());
+                return false;
+            }
+        });
+    }
+
+    @Override
     public String getName() {
         return "mistral";
     }
 
     @Override
     public void shutdown() {
-        // Nothing to do for OkHttp client
+        client.dispatcher().executorService().shutdown();
+        client.connectionPool().evictAll();
     }
 }

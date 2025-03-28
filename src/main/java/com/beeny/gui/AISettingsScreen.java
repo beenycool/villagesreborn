@@ -3,16 +3,20 @@ package com.beeny.gui;
 
 import com.beeny.config.VillagesConfig;
 import com.beeny.ai.ModelType; // Assuming ModelType enum exists
+import com.beeny.ai.LLMService;
+import com.beeny.ai.LLMErrorHandler;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Screen for configuring AI settings in Villages Reborn mod.
@@ -32,6 +36,9 @@ public class AISettingsScreen extends Screen {
     private TextFieldWidget temperatureField;
     private CyclingButtonWidget<Boolean> localModelButton;
     private CyclingButtonWidget<Boolean> enableAdvancedConversationsButton;
+    private ButtonWidget testConnectionButton;
+    private Text connectionStatusText = Text.empty();
+    private boolean isTestingConnection = false;
 
     public AISettingsScreen(Screen parent) {
         super(Text.literal("AI Settings"));
@@ -133,6 +140,14 @@ public class AISettingsScreen extends Screen {
         this.addDrawableChild(enableAdvancedConversationsButton);
         y += spacing;
 
+        // Test Connection Button
+        testConnectionButton = ButtonWidget.builder(Text.literal("Test Connection"), button -> testConnection())
+            .dimensions(this.width / 2 - 100, y, 200, 20)
+            .tooltip(Tooltip.of(Text.literal("Test your current API settings")))
+            .build();
+        this.addDrawableChild(testConnectionButton);
+        y += spacing + 5; // Add extra spacing after test button
+
         // Save and Back buttons
         int bottomButtonY = this.height - 40;
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Save"), button -> saveAndClose())
@@ -141,6 +156,59 @@ public class AISettingsScreen extends Screen {
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Back"), button -> this.client.setScreen(parent))
             .dimensions(this.width / 2 + 2, bottomButtonY, 100, 20)
             .build());
+    }
+
+    private void testConnection() {
+        if (isTestingConnection) {
+            return; // Prevent multiple simultaneous tests
+        }
+
+        // Save current settings to temp
+        String provider = providerButton.getValue();
+        String apiKey = apiKeyField.getText();
+        String endpoint = endpointField.getText();
+        String model = modelButton.getValue();
+        
+        // Validate input
+        if (apiKey.isEmpty() && !provider.equals("local")) {
+            connectionStatusText = Text.literal("API Key is required").formatted(Formatting.RED);
+            return;
+        }
+
+        // Update UI to show testing state
+        connectionStatusText = Text.literal("Testing connection...").formatted(Formatting.YELLOW);
+        isTestingConnection = true;
+        testConnectionButton.active = false;
+
+        // Apply temporary settings for test
+        llmSettings.setProvider(provider);
+        llmSettings.setApiKey(apiKey);
+        llmSettings.setEndpoint(endpoint);
+        llmSettings.setModelType(model);
+        
+        // Need to save config to apply these settings
+        config.save();
+        
+        // Initialize LLM with new settings
+        LLMService llmService = LLMService.getInstance();
+        
+        // Test connection
+        CompletableFuture<Boolean> testFuture = llmService.testConnection();
+        
+        testFuture.thenAccept(success -> {
+            if (success) {
+                connectionStatusText = Text.literal("Connection successful!").formatted(Formatting.GREEN);
+            } else {
+                connectionStatusText = Text.literal("Connection failed. Check settings and try again.").formatted(Formatting.RED);
+            }
+            isTestingConnection = false;
+            testConnectionButton.active = true;
+        }).exceptionally(e -> {
+            connectionStatusText = Text.literal("Error: " + e.getMessage()).formatted(Formatting.RED);
+            isTestingConnection = false;
+            testConnectionButton.active = true;
+            return null;
+        });
     }
 
     private void saveAndClose() {
@@ -166,7 +234,10 @@ public class AISettingsScreen extends Screen {
         }
 
         config.save();
-        // If needed, we could re-initialize the LLM service here
+        
+        // Reinitialize LLM service with new settings
+        LLMService.getInstance().setProvider(llmSettings.getProvider());
+        
         this.client.setScreen(parent);
     }
 
@@ -184,6 +255,17 @@ public class AISettingsScreen extends Screen {
             35, 
             0xAAAAAA
         );
+        
+        // Draw connection status if not empty
+        if (!connectionStatusText.getString().isEmpty()) {
+            context.drawCenteredText(
+                this.textRenderer,
+                connectionStatusText,
+                this.width / 2,
+                this.height / 4 + 24 * 8 + 5, // Position below test button
+                0xFFFFFF
+            );
+        }
         
         super.render(context, mouseX, mouseY, delta);
     }
