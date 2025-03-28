@@ -189,18 +189,36 @@ public class VillagerManager {
     public void updateVillagerActivities(ServerWorld world) {
         long currentTime = world.getTimeOfDay();
         MoodManager moodManager = MoodManager.getInstance();
+        VillageRelationshipEffects relationshipEffects = VillageRelationshipEffects.getInstance();
+        
         if (currentTime - lastCacheUpdateTime >= CACHE_UPDATE_INTERVAL) {
             updateNearbyVillagersCache();
             lastCacheUpdateTime = currentTime;
         }
+        
         updateCulturalEvents(world);
+        
         if (currentTime % 24000 == 0) {
             updateVillageStats(world);
         }
+        
         villagerAIs.values().parallelStream().forEach(ai -> {
             ai.updateActivityBasedOnTime(world);
             moodManager.updateVillagerMood(ai, world);
+            
+            // Process relationship effects
+            VillagerEntity villager = ai.getVillager();
+            if (villager != null && villager.isAlive() && currentTime % 60 == 0) {
+                relationshipEffects.processAllyEffects(villager);
+                relationshipEffects.processHostileEffects(villager);
+            }
         });
+        
+        // Process village-to-village relationships occasionally
+        if (currentTime % 300 == 0) {
+            processVillageRelationships(world);
+        }
+        
         if (currentTime % 20 == 0) {
             for (VillagerAI ai : villagerAIs.values()) {
                 if (random.nextFloat() < 0.02f) {
@@ -265,7 +283,7 @@ public class VillagerManager {
         if (v2 == null || !v2.isAlive()) return;
         if (villager1.isBusy() || villager2.isBusy()) return;
         villager1.setBusy(true);
-        villager2.setBusy(true);
+        villager2.setBusy(true;
         try {
             positionVillagersForInteraction(v1, v2);
             String location = getLocationContext(v1.getBlockPos());
@@ -918,5 +936,27 @@ public class VillagerManager {
         
         LOGGER.debug("Broadcast villager AI update for {}: {}", 
                     villager.getName().getString(), activity);
+    }
+    
+    /**
+     * Process relationships between villages
+     * This helps apply village relationship effects to villagers from different villages
+     */
+    private void processVillageRelationships(ServerWorld world) {
+        VillageInfluenceManager vim = VillageInfluenceManager.getInstance();
+        VillageRelationshipEffects relationshipEffects = VillageRelationshipEffects.getInstance();
+        
+        // Get all village pairs
+        List<BlockPos> villageCenters = new ArrayList<>(spawnRegions.keySet());
+        
+        for (int i = 0; i < villageCenters.size(); i++) {
+            for (int j = i + 1; j < villageCenters.size(); j++) {
+                BlockPos village1 = villageCenters.get(i);
+                BlockPos village2 = villageCenters.get(j);
+                
+                // Process the relationship between these two villages
+                relationshipEffects.processVillageRelationships(village1, village2);
+            }
+        }
     }
 }

@@ -905,4 +905,12 @@ public class VillagerAI {
 
         return true;
     }
+    
+    /**
+     * Checks if the villager has PvP enabled
+     * @return true if the villager can engage in PvP
+     */
+    public boolean isPvPEnabled() {
+        return pvpEnabled;
+    }
 }
