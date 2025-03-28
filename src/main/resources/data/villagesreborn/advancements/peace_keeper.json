@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:master_diplomat",
+  "display": {
+    "icon": {
+      "item": "minecraft:diamond_sword"
+    },
+    "title": "Peace Keeper",
+    "description": "Establish an alliance between two previously hostile villages",
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "hostile_to_allied": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{HostileToAllied:1b}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 200,
+    "loot": [
+      "villagesreborn:alliance_reward"
+    ]
+  }
+}

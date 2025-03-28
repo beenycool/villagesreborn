@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:village_newbie",
+  "display": {
+    "icon": {
+      "item": "minecraft:oak_fence_gate"
+    },
+    "title": "Village Founder",
+    "description": "Become a founding member of a village",
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "founded_village": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{VillageFounder:1b}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 75,
+    "loot": [
+      "villagesreborn:founder_reward"
+    ]
+  }
+}

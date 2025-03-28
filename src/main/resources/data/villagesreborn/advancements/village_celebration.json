@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:best_buds",
+  "display": {
+    "icon": {
+      "item": "minecraft:cake"
+    },
+    "title": "Village Celebration",
+    "description": "Participate in 5 different village cultural events",
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "multiple_events": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{VillageEvents:[{totalEvents:5}]}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 175,
+    "loot": [
+      "villagesreborn:celebration_reward"
+    ]
+  }
+}

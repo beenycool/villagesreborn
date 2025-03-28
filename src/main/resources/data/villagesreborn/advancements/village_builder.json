@@ -1,0 +1,36 @@
+{
+  "parent": "villagesreborn:village_founder",
+  "display": {
+    "icon": {
+      "item": "minecraft:crafting_table"
+    },
+    "title": "Village Builder",
+    "description": "Contribute to building multiple structures in a village",
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "building_contribution": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "nbt": "{BuildingContributions:3}"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "rewards": {
+    "experience": 150,
+    "loot": [
+      "villagesreborn:builder_reward"
+    ]
+  }
+}
