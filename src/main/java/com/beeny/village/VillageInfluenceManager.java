@@ -26,11 +26,17 @@ public class VillageInfluenceManager {
     // Maps player UUIDs to their current village contribution activities
     private final Map<UUID, PlayerContribution> activeContributions = new ConcurrentHashMap<>();
     
+    // Maps player UUIDs to their contribution history
+    private final Map<UUID, List<ContributionRecord>> contributionHistory = new ConcurrentHashMap<>();
+    
     // Maps pairs of villages to their relationship status
     private final Map<VillagePair, VillageRelationship> villageRelationships = new ConcurrentHashMap<>();
     
     // Development thresholds for village evolution stages
     private static final int[] DEVELOPMENT_THRESHOLDS = {100, 250, 500, 1000, 2000};
+    
+    // Milestones for contribution progress (percentage)
+    private static final int[] CONTRIBUTION_MILESTONES = {25, 50, 75, 100};
     
     /**
      * Get singleton instance
@@ -153,6 +159,17 @@ public class VillageInfluenceManager {
     public record RelationshipEvent(int scoreChange, String description, long timestamp) {}
     
     /**
+     * A record of a completed contribution
+     */
+    public record ContributionRecord(String contributionType, String buildingType, 
+                                   BlockPos villageCenter, long completionTime, int pointsAwarded) {}
+    
+    /**
+     * Milestone reached in contribution progress
+     */
+    public record ContributionMilestone(int percentage, int bonusPoints) {}
+    
+    /**
      * Village development data class
      */
     public static class VillageDevelopmentData {
@@ -169,6 +186,8 @@ public class VillageInfluenceManager {
         private final List<BlockPos> allies = new ArrayList<>();
         // List of rival/enemy villages
         private final List<BlockPos> rivals = new ArrayList<>();
+        // Maps contributors to their total contribution points
+        private final Map<UUID, Integer> contributionPoints = new HashMap<>();
         
         public VillageDevelopmentData(BlockPos center, String culture) {
             this.center = center;
@@ -255,6 +274,18 @@ public class VillageInfluenceManager {
         
         public List<BlockPos> getRivals() {
             return Collections.unmodifiableList(rivals);
+        }
+        
+        public Map<UUID, Integer> getContributionPoints() {
+            return Collections.unmodifiableMap(contributionPoints);
+        }
+        
+        public int getPlayerContributionPoints(UUID playerUUID) {
+            return contributionPoints.getOrDefault(playerUUID, 0);
+        }
+        
+        public void addContributionPoints(UUID playerUUID, int points) {
+            contributionPoints.merge(playerUUID, points, Integer::sum);
         }
         
         public void updateAllyList(BlockPos otherVillage, boolean isAlly) {
@@ -405,6 +436,9 @@ public class VillageInfluenceManager {
         private int progress;
         private final int requiredProgress;
         private final String buildingType;
+        private final long startTime;
+        private final Set<Integer> reachedMilestones;
+        private int bonusPointsEarned;
         
         public PlayerContribution(UUID playerUUID, BlockPos villageCenter, String contributionType, 
                                  int requiredProgress, String buildingType) {
@@ -414,6 +448,9 @@ public class VillageInfluenceManager {
             this.progress = 0;
             this.requiredProgress = requiredProgress;
             this.buildingType = buildingType;
+            this.startTime = System.currentTimeMillis();
+            this.reachedMilestones = new HashSet<>();
+            this.bonusPointsEarned = 0;
         }
         
         public UUID getPlayerUUID() {
@@ -440,8 +477,48 @@ public class VillageInfluenceManager {
             return buildingType;
         }
         
+        public long getStartTime() {
+            return startTime;
+        }
+        
+        public int getBonusPointsEarned() {
+            return bonusPointsEarned;
+        }
+        
+        public float getProgressPercentage() {
+            return (float) progress / requiredProgress * 100f;
+        }
+        
+        public ContributionMilestone checkMilestone() {
+            int currentPercentage = (int) getProgressPercentage();
+            
+            for (int milestone : CONTRIBUTION_MILESTONES) {
+                if (currentPercentage >= milestone && !reachedMilestones.contains(milestone)) {
+                    reachedMilestones.add(milestone);
+                    int bonusPoints = calculateMilestoneBonus(milestone);
+                    bonusPointsEarned += bonusPoints;
+                    return new ContributionMilestone(milestone, bonusPoints);
+                }
+            }
+            
+            return null;
+        }
+        
+        private int calculateMilestoneBonus(int milestone) {
+            return switch (milestone) {
+                case 25 -> 2; // Small bonus at 25%
+                case 50 -> 3; // Medium bonus at 50%
+                case 75 -> 5; // Good bonus at 75%
+                case 100 -> 10; // Large bonus for completion
+                default -> 0;
+            };
+        }
+        
         public void addProgress(int amount) {
             this.progress += amount;
+            if (progress > requiredProgress) {
+                progress = requiredProgress;
+            }
         }
         
         public boolean isComplete() {
@@ -651,7 +728,8 @@ public class VillageInfluenceManager {
         Map<BlockPos, Integer> contributionCount = new HashMap<>();
         for (Map.Entry<BlockPos, VillageDevelopmentData> entry : villageDevelopment.entrySet()) {
             if (entry.getValue().getContributors().contains(playerUUID)) {
-                contributionCount.merge(entry.getKey(), 1, Integer::sum);
+                int points = entry.getValue().getPlayerContributionPoints(playerUUID);
+                contributionCount.put(entry.getKey(), points);
             }
         }
         
@@ -730,6 +808,9 @@ public class VillageInfluenceManager {
         
         activeContributions.put(playerUUID, contribution);
         
+        // Display the contribution UI
+        showContributionStartUI(player, contribution, village.getCulture());
+        
         // Notify the player
         player.sendMessage(Text.of("§6You've started work on a " + buildingType + " for the village.§r"), false);
         player.sendMessage(Text.of("§eProgress required: " + requiredProgress + "§r"), false);
@@ -784,11 +865,96 @@ public class VillageInfluenceManager {
         
         activeContributions.put(playerUUID, contribution);
         
+        // Display the contribution UI
+        showContributionStartUI(player, contribution, target.getCulture());
+        
         // Notify the player
         player.sendMessage(Text.of("§6You've started a diplomatic mission to the " + 
                                   target.getCulture() + " village.§r"), false);
         player.sendMessage(Text.of("§eCurrent relations: " + relationship.getStatus().getColoredDisplayName()), false);
         player.sendMessage(Text.of("§eProgress required: " + requiredProgress + "§r"), false);
+    }
+    
+    /**
+     * Show UI when starting a contribution
+     */
+    private void showContributionStartUI(ServerPlayerEntity player, PlayerContribution contribution, String culture) {
+        String type = contribution.getContributionType().equals("building") 
+            ? "Building: " + contribution.getBuildingType()
+            : "Diplomatic Mission";
+            
+        String title = "§6§l" + culture + " Village - New Contribution§r";
+        player.sendMessage(Text.of(title), false);
+        player.sendMessage(Text.of("§e" + type), false);
+        player.sendMessage(Text.of("§aProgress: §r[§7----------§r] §e0/" + contribution.getRequiredProgress() + "§r"), false);
+        
+        // Visual effect
+        if (player.getWorld() instanceof ServerWorld serverWorld) {
+            serverWorld.spawnParticles(
+                ParticleTypes.NOTE,
+                player.getX(), player.getY() + 2, player.getZ(),
+                5, 0.5, 0.5, 0.5, 0.1
+            );
+        }
+    }
+    
+    /**
+     * Show contribution progress UI
+     */
+    private void showProgressUI(ServerPlayerEntity player, PlayerContribution contribution, String culture) {
+        String type = contribution.getContributionType().equals("building") 
+            ? "Building: " + contribution.getBuildingType()
+            : "Diplomatic Mission";
+            
+        int progressPercent = (int) contribution.getProgressPercentage();
+        String progressBar = getProgressBar(progressPercent);
+        
+        player.sendMessage(Text.of("§6" + culture + " Village - Contribution Progress§r"), false);
+        player.sendMessage(Text.of("§e" + type), false);
+        player.sendMessage(Text.of("§aProgress: §r" + progressBar + " §e" + 
+            contribution.getProgress() + "/" + contribution.getRequiredProgress() + " (" + progressPercent + "%)§r"), false);
+    }
+    
+    /**
+     * Show milestone reached UI
+     */
+    private void showMilestoneUI(ServerPlayerEntity player, PlayerContribution contribution, 
+                               ContributionMilestone milestone, String culture) {
+        String type = contribution.getContributionType().equals("building") 
+            ? contribution.getBuildingType()
+            : "Diplomatic Mission";
+            
+        player.sendMessage(Text.of("§6§l" + culture + " Village - Milestone Reached!§r"), false);
+        player.sendMessage(Text.of("§eYour " + type + " contribution is " + milestone.percentage() + "% complete!"), false);
+        player.sendMessage(Text.of("§aBonus: +" + milestone.bonusPoints() + " contribution points§r"), false);
+        
+        // Visual effect
+        if (player.getWorld() instanceof ServerWorld serverWorld) {
+            serverWorld.spawnParticles(
+                ParticleTypes.TOTEM_OF_UNDYING,
+                player.getX(), player.getY() + 1, player.getZ(),
+                10, 0.5, 0.5, 0.5, 0.1
+            );
+        }
+    }
+    
+    /**
+     * Create a visual progress bar
+     */
+    private String getProgressBar(int percentage) {
+        int filledBars = percentage / 10;
+        StringBuilder bar = new StringBuilder("[");
+        
+        for (int i = 0; i < 10; i++) {
+            if (i < filledBars) {
+                bar.append("§a|");
+            } else {
+                bar.append("§7-");
+            }
+        }
+        
+        bar.append("§r]");
+        return bar.toString();
     }
     
     /**
@@ -817,16 +983,32 @@ public class VillageInfluenceManager {
             return;
         }
         
+        // Store the previous progress percentage for milestone checks
+        float previousPercentage = contribution.getProgressPercentage();
+        
+        // Add progress
         contribution.addProgress(amount);
+        
+        // Get village data for notifications
+        VillageDevelopmentData village = getVillageDevelopment(contribution.getVillageCenter());
+        if (village == null) {
+            return;
+        }
+        
+        // Check for milestone achievements
+        ContributionMilestone milestone = contribution.checkMilestone();
+        if (milestone != null) {
+            // Award bonus points at milestones
+            showMilestoneUI(player, contribution, milestone, village.getCulture());
+        }
         
         // Check if completed
         if (contribution.isComplete()) {
             completeContribution(player, contribution);
         } else {
-            // Notify of progress
-            if (contribution.getProgress() % 5 == 0 || contribution.getProgress() + amount >= contribution.getRequiredProgress()) { 
-                player.sendMessage(Text.of("§aContribution progress: " + contribution.getProgress() + 
-                    "/" + contribution.getRequiredProgress() + "§r"), false);
+            // Notify of progress at reasonable intervals
+            if (contribution.getProgress() % 10 == 0 || (int)previousPercentage / 10 != (int)contribution.getProgressPercentage() / 10) { 
+                showProgressUI(player, contribution, village.getCulture());
             }
         }
     }
@@ -841,29 +1023,39 @@ public class VillageInfluenceManager {
             return;
         }
         
+        // Record the contribution to player history
+        int pointsAwarded = 0;
+        
         switch (contribution.getContributionType()) {
             case "building" -> {
                 // Check if it's a special upgrade
                 if (village.pendingUpgrades.contains(contribution.getBuildingType())) {
                     // It's a village upgrade
                     village.completeUpgrade(contribution.getBuildingType());
-                    player.sendMessage(Text.of("§6Village upgrade completed: " + contribution.getBuildingType() + "!§r"), false);
+                    player.sendMessage(Text.of("§6§lVillage upgrade completed: " + contribution.getBuildingType() + "!§r"), false);
                     
                     // Add development points
                     int points = getDevelopmentPointsForUpgrade(contribution.getBuildingType());
                     village.addDevelopmentPoints(points);
+                    pointsAwarded = points;
                     player.sendMessage(Text.of("§aVillage development: +" + points + " points!§r"), false);
                 } else {
                     // It's a regular building
                     String buildingType = contribution.getBuildingType();
                     village.buildingCounts.put(buildingType, village.buildingCounts.getOrDefault(buildingType, 0) + 1);
-                    player.sendMessage(Text.of("§6Building completed: " + buildingType + "!§r"), false);
+                    player.sendMessage(Text.of("§6§lBuilding completed: " + buildingType + "!§r"), false);
                     
                     // Add development points
                     int points = getDevelopmentPointsForBuilding(buildingType);
                     village.addDevelopmentPoints(points);
+                    pointsAwarded = points;
                     player.sendMessage(Text.of("§aVillage development: +" + points + " points!§r"), false);
                 }
+                
+                // Track contribution points for the player
+                int totalPoints = pointsAwarded + contribution.getBonusPointsEarned();
+                village.addContributionPoints(player.getUuid(), totalPoints);
+                player.sendMessage(Text.of("§aYou earned " + totalPoints + " contribution points!§r"), false);
                 
                 // Add reputation for the player
                 PlayerEventParticipation.getInstance().addReputationPoints(
@@ -894,9 +1086,18 @@ public class VillageInfluenceManager {
                     RelationshipStatus newStatus = adjustVillageRelationship(
                         sourceVillage, targetVillage, 15, "Diplomatic mission by " + player.getName().getString());
                     
-                    player.sendMessage(Text.of("§6Diplomatic mission complete!§r"), false);
+                    player.sendMessage(Text.of("§6§lDiplomatic mission complete!§r"), false);
                     player.sendMessage(Text.of("§eRelationship improved from " + previousStatus.getColoredDisplayName() + 
                                            " to " + newStatus.getColoredDisplayName()), false);
+                    
+                    // Track contribution points for the player
+                    int diplomacyPoints = 20 + contribution.getBonusPointsEarned();
+                    pointsAwarded = diplomacyPoints;
+                    VillageDevelopmentData sourceVillageData = getVillageDevelopment(sourceVillage);
+                    if (sourceVillageData != null) {
+                        sourceVillageData.addContributionPoints(player.getUuid(), diplomacyPoints);
+                        player.sendMessage(Text.of("§aYou earned " + diplomacyPoints + " contribution points!§r"), false);
+                    }
                     
                     // Add reputation for being a successful diplomat
                     PlayerEventParticipation.getInstance().addReputationPoints(
@@ -919,6 +1120,18 @@ public class VillageInfluenceManager {
             }
         }
         
+        // Record to contribution history
+        addToContributionHistory(
+            player.getUuid(),
+            new ContributionRecord(
+                contribution.getContributionType(),
+                contribution.getBuildingType(),
+                contribution.getVillageCenter(),
+                System.currentTimeMillis(),
+                pointsAwarded + contribution.getBonusPointsEarned()
+            )
+        );
+        
         // Remove the active contribution
         activeContributions.remove(player.getUuid());
         
@@ -931,10 +1144,56 @@ public class VillageInfluenceManager {
     }
     
     /**
+     * Add a contribution record to player history
+     */
+    private void addToContributionHistory(UUID playerUUID, ContributionRecord record) {
+        List<ContributionRecord> playerHistory = contributionHistory.computeIfAbsent(playerUUID, k -> new ArrayList<>());
+        playerHistory.add(0, record); // Add to beginning for most recent first
+        
+        // Limit history size
+        if (playerHistory.size() > 50) {
+            playerHistory.remove(playerHistory.size() - 1);
+        }
+    }
+    
+    /**
+     * Get a player's contribution history
+     */
+    public List<ContributionRecord> getPlayerContributionHistory(UUID playerUUID) {
+        return contributionHistory.getOrDefault(playerUUID, Collections.emptyList());
+    }
+    
+    /**
      * Get a player's active contribution
      */
     public PlayerContribution getPlayerContribution(UUID playerUUID) {
         return activeContributions.get(playerUUID);
+    }
+    
+    /**
+     * Get contribution progress for UI display
+     */
+    public String getContributionProgressForDisplay(UUID playerUUID) {
+        PlayerContribution contribution = activeContributions.get(playerUUID);
+        if (contribution == null) {
+            return null;
+        }
+        
+        VillageDevelopmentData village = getVillageDevelopment(contribution.getVillageCenter());
+        if (village == null) {
+            return null;
+        }
+        
+        String type = contribution.getContributionType().equals("building") 
+            ? contribution.getBuildingType()
+            : "Diplomatic Mission";
+            
+        int progress = contribution.getProgress();
+        int required = contribution.getRequiredProgress();
+        int percentage = (int) contribution.getProgressPercentage();
+        
+        return String.format("%s Village - %s: %d/%d (%d%%)",
+            village.getCulture(), type, progress, required, percentage);
     }
     
     /**
