@@ -117,10 +117,16 @@ public class AnthropicProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        String cacheKey = generateCacheKey(prompt, context); int maxTokens = 1024;
-        if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("Anthropic provider not initialized"));
+        if (!initialized) {
+            String error = "Anthropic provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
+        }
 
-        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
+        String cacheKey = generateCacheKey(prompt, context);
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
+        }
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -129,9 +135,24 @@ public class AnthropicProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Anthropic", e);
-                String mockResp = mockResponse(prompt);
-                cache.put(cacheKey, mockResp);
-                return mockResp;
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // For some error types, we can try to provide helpful guidance
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your Anthropic API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to Anthropic. Please check your internet connection.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("Anthropic API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    // Fall back to mock response if available
+                    String mockResp = mockResponse(prompt);
+                    cache.put(cacheKey, mockResp);
+                    return mockResp;
+                }
             }
         }, executor);
     }
@@ -171,8 +192,20 @@ public class AnthropicProvider implements AIProvider {
         
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                LOGGER.error("Anthropic API error: {} - {}", response.code(), response.message());
-                throw new IOException("Anthropic API error: " + response.code() + " - " + response.message());
+                int code = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
+                
+                // Generate more helpful error messages based on status code
+                if (code == 401 || code == 403) {
+                    throw new IOException("Authentication error: Invalid Anthropic API key or insufficient permissions");
+                } else if (code == 429) {
+                    throw new IOException("Rate limit exceeded: Anthropic API quota has been reached");
+                } else if (code >= 500) {
+                    throw new IOException("Anthropic service is currently unavailable: " + code);
+                } else {
+                    throw new IOException("Anthropic API error: " + code + " - " + response.message() + 
+                                        (responseBody.isEmpty() ? "" : " - " + responseBody));
+                }
             }
             
             String responseBody = response.body().string();

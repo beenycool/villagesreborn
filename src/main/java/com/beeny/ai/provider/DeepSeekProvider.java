@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.beeny.ai.LLMErrorHandler;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -28,6 +29,7 @@ public class DeepSeekProvider implements AIProvider {
     private final Gson gson = new Gson();
     private static final String API_URL = "https://api.deepseek.com/v1/messages";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     public DeepSeekProvider() {
         client = new OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).build();
@@ -37,9 +39,12 @@ public class DeepSeekProvider implements AIProvider {
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
         this.model = config.getOrDefault("model", "deepseek-1.0");
-        if (apiKey == null) {
-            LOGGER.error("DeepSeek provider initialization failed: missing API key");
-            return;
+        if (apiKey == null || apiKey.isEmpty()) {
+            String errorMsg = "DeepSeek provider initialization failed: missing API key";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide a valid DeepSeek API key in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
         initialized = true;
         LOGGER.info("DeepSeek provider initialized with model: {}", model);
@@ -47,9 +52,17 @@ public class DeepSeekProvider implements AIProvider {
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        if (!initialized) return CompletableFuture.failedFuture(new IllegalStateException("DeepSeek provider not initialized"));
+        if (!initialized) {
+            String error = "DeepSeek provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
+        }
+        
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
+        }
+        
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String response = callDeepSeekApi(prompt, context);
@@ -57,9 +70,24 @@ public class DeepSeekProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from DeepSeek", e);
-                String mockResp = mockResponse(prompt);
-                cache.put(cacheKey, mockResp);
-                return mockResp;
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // For some error types, we can try to provide helpful guidance
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your DeepSeek API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to DeepSeek. Please check your internet connection.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("DeepSeek API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    // Fall back to mock response if available
+                    String mockResp = mockResponse(prompt);
+                    cache.put(cacheKey, mockResp);
+                    return mockResp;
+                }
             }
         }, executor);
     }
@@ -82,9 +110,22 @@ public class DeepSeekProvider implements AIProvider {
         Request request = new Request.Builder().url(API_URL).post(RequestBody.create(requestBody.toString(), JSON)).header("X-API-Key", apiKey).header("Content-Type", "application/json").build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                LOGGER.error("DeepSeek API error: {} - {}", response.code(), response.message());
-                throw new IOException("DeepSeek API error: " + response.code() + " - " + response.message());
+                int code = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
+                
+                // Generate more helpful error messages based on status code
+                if (code == 401 || code == 403) {
+                    throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
+                } else if (code == 429) {
+                    throw new IOException("Rate limit exceeded: DeepSeek API quota has been reached");
+                } else if (code >= 500) {
+                    throw new IOException("DeepSeek service is currently unavailable: " + code);
+                } else {
+                    throw new IOException("DeepSeek API error: " + code + " - " + response.message() + 
+                                         (responseBody.isEmpty() ? "" : " - " + responseBody));
+                }
             }
+            
             String responseBody = response.body().string();
             JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
             if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) {
@@ -109,6 +150,59 @@ public class DeepSeekProvider implements AIProvider {
         StringBuilder key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Minimal validation request
+                JsonObject requestBody = new JsonObject();
+                requestBody.addProperty("model", model);
+                JsonObject message = new JsonObject();
+                message.addProperty("role", "user");
+                message.addProperty("content", "Validation ping");
+                requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+                requestBody.addProperty("max_tokens", 1);
+
+                Request request = new Request.Builder()
+                    .url(API_URL)
+                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .header("X-API-Key", apiKey)
+                    .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        return true;
+                    } else {
+                        int statusCode = response.code();
+                        String body = response.body() != null ? response.body().string() : "";
+                        
+                        // Handle specific error codes
+                        if (statusCode == 401 || statusCode == 403) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
+                                "DeepSeek rejected your API key. Please check it is correct.");
+                        } else if (statusCode == 429) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                                "DeepSeek API rate limit exceeded. Please try again later.");
+                        } else {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                                "DeepSeek API error: " + statusCode + " - " + body);
+                        }
+                        return false;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.error("Error validating DeepSeek access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to DeepSeek: " + e.getMessage());
+                return false;
+            }
+        });
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.beeny.ai.provider;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.google.gson.Gson;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +25,7 @@ public class GeminiProvider implements AIProvider {
     private String model;
     private boolean initialized = false;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
+    private final Gson gson = new Gson();
 
     public GeminiProvider() {
         client = new OkHttpClient.Builder()
@@ -45,10 +47,15 @@ public class GeminiProvider implements AIProvider {
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
         this.model = config.getOrDefault("modelName", "gemini-2.0-flash-lite");
-        if (apiKey == null) {
-            LOGGER.error("Gemini provider initialization failed: missing API key");
-            return;
+        
+        if (apiKey == null || apiKey.isEmpty()) {
+            String errorMsg = "Gemini provider initialization failed: missing API key";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide a valid Gemini API key in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
+        
         initialized = true;
         LOGGER.info("Gemini provider initialized with model: {}", model);
     }
@@ -91,6 +98,7 @@ public class GeminiProvider implements AIProvider {
             }
         }, executor);
     }
+    
     private String callGeminiApi(String prompt, Map<String, String> context) throws IOException {
         String url = API_URL + model + ":generateContent?key=" + apiKey;
         JsonObject requestBody = new JsonObject();
@@ -188,6 +196,69 @@ public class GeminiProvider implements AIProvider {
             throw e;
         }
     }
+
+    @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Minimal validation request
+                String url = API_URL + model + ":generateContent?key=" + apiKey;
+                JsonObject requestBody = new JsonObject();
+                JsonArray contents = new JsonArray();
+                
+                JsonObject userMessage = new JsonObject();
+                JsonObject parts = new JsonObject();
+                parts.addProperty("text", "Validation ping");
+                JsonArray partsArray = new JsonArray();
+                partsArray.add(parts);
+                userMessage.addProperty("role", "user");
+                userMessage.add("parts", partsArray);
+                contents.add(userMessage);
+                
+                requestBody.add("contents", contents);
+                
+                JsonObject generationConfig = new JsonObject();
+                generationConfig.addProperty("maxOutputTokens", 1);
+                requestBody.add("generationConfig", generationConfig);
+                
+                RequestBody body = RequestBody.create(requestBody.toString(), JSON);
+                Request request = new Request.Builder()
+                    .url(url)
+                    .post(body)
+                    .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        return true;
+                    } else {
+                        int statusCode = response.code();
+                        String responseBody = response.body() != null ? response.body().string() : "";
+                        
+                        // Handle specific error codes
+                        if (statusCode == 401 || statusCode == 403) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
+                                "Gemini rejected your API key. Please check it is correct.");
+                        } else if (statusCode == 429) {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                                "Gemini API rate limit exceeded. Please try again later.");
+                        } else {
+                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                                "Gemini API error: " + statusCode + " - " + responseBody);
+                        }
+                        return false;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.error("Error validating Gemini access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to Gemini: " + e.getMessage());
+                return false;
+            }
+        });
     }
 
     @Override

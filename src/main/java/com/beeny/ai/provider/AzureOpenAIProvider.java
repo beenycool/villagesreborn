@@ -7,6 +7,8 @@ import com.azure.ai.openai.OpenAIClientBuilder;
 import com.azure.ai.openai.models.*;
 import com.azure.core.credential.AzureKeyCredential;
 import com.azure.core.util.Context;
+import com.beeny.ai.LLMErrorHandler;
+import com.azure.core.exception.HttpResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +27,7 @@ public class AzureOpenAIProvider implements AIProvider {
     private String modelName;
     private boolean initialized = false;
     private OpenAIClient client;
+    private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
     @Override
     public void initialize(Map<String, String> config) {
@@ -32,9 +35,12 @@ public class AzureOpenAIProvider implements AIProvider {
         this.endpoint = config.get("endpoint");
         this.modelName = config.get("modelName");
         
-        if (apiKey == null || endpoint == null) {
-            LOGGER.error("Azure OpenAI provider initialization failed: missing required configuration");
-            return;
+        if (apiKey == null || apiKey.isEmpty() || endpoint == null || endpoint.isEmpty()) {
+            String errorMsg = "Azure OpenAI provider initialization failed: missing required configuration";
+            LOGGER.error(errorMsg);
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+                "Please provide both a valid Azure OpenAI API key and endpoint in the configuration.");
+            throw new IllegalArgumentException(errorMsg);
         }
         
         try {
@@ -47,12 +53,26 @@ public class AzureOpenAIProvider implements AIProvider {
             LOGGER.info("Azure OpenAI provider initialized with model: {}", modelName);
         } catch (Exception e) {
             LOGGER.error("Failed to initialize Azure OpenAI client", e);
+            
+            LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+            errorHandler.reportErrorToClient(errorType, "Failed to initialize Azure OpenAI client: " + e.getMessage());
+            
+            throw new IllegalStateException("Failed to initialize Azure OpenAI client", e);
         }
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
+        if (!initialized) {
+            String error = "Azure OpenAI provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
+        }
+        
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
+        }
+        
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String response = callAzureOpenAI(prompt, context);
@@ -60,9 +80,24 @@ public class AzureOpenAIProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Azure OpenAI", e);
-                String mockResp = mockResponse(prompt);
-                cache.put(cacheKey, mockResp);
-                return mockResp;
+                
+                // Determine error type and report to user
+                LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
+                errorHandler.reportErrorToClient(errorType, e.getMessage());
+                
+                // For some error types, we can try to provide helpful guidance
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
+                    throw new RuntimeException("Your Azure OpenAI API key appears to be invalid. Please check your API key in the mod settings.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
+                    throw new RuntimeException("Could not connect to Azure OpenAI. Please check your internet connection and endpoint URL.", e);
+                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
+                    throw new RuntimeException("Azure OpenAI API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                } else {
+                    // Fall back to mock response if available
+                    String mockResp = mockResponse(prompt);
+                    cache.put(cacheKey, mockResp);
+                    return mockResp;
+                }
             }
         }, executor);
     }
@@ -88,12 +123,65 @@ public class AzureOpenAIProvider implements AIProvider {
                 return choice.getMessage().getContent();
             } else {
                 LOGGER.warn("Empty response received from Azure OpenAI");
-                return mockResponse(prompt);
+                throw new RuntimeException("Empty response received from Azure OpenAI");
+            }
+        } catch (HttpResponseException e) {
+            int statusCode = e.getResponse().getStatusCode();
+            
+            if (statusCode == 401 || statusCode == 403) {
+                throw new RuntimeException("Authentication error: Invalid Azure OpenAI API key or insufficient permissions", e);
+            } else if (statusCode == 429) {
+                throw new RuntimeException("Rate limit exceeded: Azure OpenAI API quota has been reached", e);
+            } else if (statusCode >= 500) {
+                throw new RuntimeException("Azure OpenAI service is currently unavailable: " + statusCode, e);
+            } else {
+                throw new RuntimeException("Azure OpenAI API error: " + statusCode + " - " + e.getMessage(), e);
             }
         } catch (Exception e) {
             LOGGER.error("Exception during Azure OpenAI API call", e);
             throw e;
         }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> validateAccess() {
+        if (!initialized || apiKey == null || apiKey.isEmpty() || endpoint == null || endpoint.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Minimal validation request
+                List<ChatMessage> chatMessages = new ArrayList<>();
+                chatMessages.add(new ChatMessage(ChatRole.USER, "Validation ping"));
+                ChatCompletionsOptions options = new ChatCompletionsOptions(chatMessages);
+                options.setMaxTokens(1);
+                options.setModel(modelName);
+                
+                client.getChatCompletions(modelName, options);
+                return true;
+            } catch (HttpResponseException e) {
+                int statusCode = e.getResponse().getStatusCode();
+                
+                // Handle specific error codes
+                if (statusCode == 401 || statusCode == 403) {
+                    errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
+                        "Azure OpenAI rejected your API key. Please check it is correct.");
+                } else if (statusCode == 429) {
+                    errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
+                        "Azure OpenAI API rate limit exceeded. Please try again later.");
+                } else {
+                    errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
+                        "Azure OpenAI API error: " + statusCode + " - " + e.getMessage());
+                }
+                return false;
+            } catch (Exception e) {
+                LOGGER.error("Error validating Azure OpenAI access", e);
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
+                    "Error connecting to Azure OpenAI: " + e.getMessage());
+                return false;
+            }
+        });
     }
 
     private String mockResponse(String prompt) {

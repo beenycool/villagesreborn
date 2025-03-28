@@ -2,6 +2,7 @@ package com.beeny.ai.provider;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.google.gson.Gson;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,7 @@ import com.beeny.ai.LLMErrorHandler;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 public class MistralProvider implements AIProvider {
@@ -22,6 +24,8 @@ public class MistralProvider implements AIProvider {
     private String model;
     private boolean initialized = false;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
+    private final Map<String, String> cache = new ConcurrentHashMap<>();
+    private final Gson gson = new Gson();
 
     public MistralProvider() {
         client = new OkHttpClient.Builder()
@@ -51,58 +55,21 @@ public class MistralProvider implements AIProvider {
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
         if (!initialized) {
-            CompletableFuture<String> future = new CompletableFuture<>();
-            future.completeExceptionally(new IllegalStateException("Mistral provider not initialized"));
-            return future;
+            String error = "Mistral provider not initialized";
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
+            return CompletableFuture.failedFuture(new IllegalStateException(error));
+        }
+
+        String cacheKey = generateCacheKey(prompt, context);
+        if (cache.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(cache.get(cacheKey));
         }
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                JsonObject requestBody = new JsonObject();
-                requestBody.addProperty("model", model);
-                
-                JsonArray messages = new JsonArray();
-                
-                if (context.containsKey("system_prompt")) {
-                    JsonObject systemMessage = new JsonObject();
-                    systemMessage.addProperty("role", "system");
-                    systemMessage.addProperty("content", context.get("system_prompt"));
-                    messages.add(systemMessage);
-                }
-                
-                JsonObject userMessage = new JsonObject();
-                userMessage.addProperty("role", "user");
-                userMessage.addProperty("content", prompt);
-                messages.add(userMessage);
-                
-                requestBody.add("messages", messages);
-                requestBody.addProperty("temperature", 0.7);
-                requestBody.addProperty("max_tokens", model.contains("large") ? 4096 : 2048);
-                requestBody.addProperty("top_p", 0.9);
-                requestBody.addProperty("response_format", "text");
-                
-                RequestBody body = RequestBody.create(requestBody.toString(), JSON);
-                Request request = new Request.Builder()
-                    .url(API_URL)
-                    .post(body)
-                    .addHeader("Authorization", "Bearer " + apiKey)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
-                try (Response response = client.newCall(request).execute()) {
-                    if (!response.isSuccessful()) {
-                        throw new IOException("Unexpected response code: " + response);
-                    }
-                    
-                    String responseBody = response.body().string();
-                    JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.getAsJsonArray("choices")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonObject("message")
-                        .get("content").getAsString();
-                    
-                    return generatedText;
-                }
+                String response = callMistralApi(prompt, context);
+                cache.put(cacheKey, response);
+                return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Mistral", e);
                 
@@ -122,6 +89,96 @@ public class MistralProvider implements AIProvider {
                 }
             }
         });
+    }
+
+    private String callMistralApi(String prompt, Map<String, String> context) throws IOException {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", model);
+        
+        JsonArray messages = new JsonArray();
+        
+        if (context != null && !context.isEmpty()) {
+            // Use system prompt if available, otherwise build from context
+            if (context.containsKey("system_prompt")) {
+                JsonObject systemMessage = new JsonObject();
+                systemMessage.addProperty("role", "system");
+                systemMessage.addProperty("content", context.get("system_prompt"));
+                messages.add(systemMessage);
+            } else {
+                // Build system message from context
+                StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+                context.forEach((key, value) -> {
+                    if (value != null && !value.isEmpty()) 
+                        systemContent.append(" ").append(key).append(": ").append(value).append(".");
+                });
+                
+                JsonObject systemMessage = new JsonObject();
+                systemMessage.addProperty("role", "system");
+                systemMessage.addProperty("content", systemContent.toString());
+                messages.add(systemMessage);
+            }
+        }
+        
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", prompt);
+        messages.add(userMessage);
+        
+        requestBody.add("messages", messages);
+        requestBody.addProperty("temperature", 0.7);
+        requestBody.addProperty("max_tokens", model.contains("large") ? 4096 : 2048);
+        requestBody.addProperty("top_p", 0.9);
+        requestBody.addProperty("response_format", "text");
+        
+        RequestBody body = RequestBody.create(requestBody.toString(), JSON);
+        Request request = new Request.Builder()
+            .url(API_URL)
+            .post(body)
+            .addHeader("Authorization", "Bearer " + apiKey)
+            .addHeader("Content-Type", "application/json")
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                int code = response.code();
+                String responseBody = response.body() != null ? response.body().string() : "";
+                
+                // Generate more helpful error messages based on status code
+                if (code == 401 || code == 403) {
+                    throw new IOException("Authentication error: Invalid Mistral API key or insufficient permissions");
+                } else if (code == 429) {
+                    throw new IOException("Rate limit exceeded: Mistral API quota has been reached");
+                } else if (code >= 500) {
+                    throw new IOException("Mistral service is currently unavailable: " + code);
+                } else {
+                    throw new IOException("Mistral API error: " + code + " - " + response.message() + 
+                                         (responseBody.isEmpty() ? "" : " - " + responseBody));
+                }
+            }
+            
+            String responseBody = response.body().string();
+            JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+            String generatedText = jsonResponse.getAsJsonArray("choices")
+                .get(0).getAsJsonObject()
+                .getAsJsonObject("message")
+                .get("content").getAsString();
+            
+            return generatedText;
+        } 
+    }
+
+    private String generateCacheKey(String prompt, Map<String, String> context) {
+        StringBuilder key = new StringBuilder(prompt);
+        if (context != null) {
+            context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
+        }
+        return key.toString();
+    }
+
+    private String mockResponse(String prompt) {
+        if (prompt.toLowerCase().contains("name")) return "Thomas the Diplomatic Scholar";
+        else if (prompt.toLowerCase().contains("personality")) return "Thoughtful, balanced, and insightful advisor";
+        else return "Let me assist you with your question.";
     }
 
     @Override
@@ -193,5 +250,6 @@ public class MistralProvider implements AIProvider {
     public void shutdown() {
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();
+        cache.clear();
     }
 }
