@@ -16,7 +16,7 @@ public class LLMService {
     private static final LLMService INSTANCE = new LLMService();
     private final Map<String, AIProvider> providers = new HashMap<>();
     private AIProvider currentProvider;
-    private final Map<String, String> contextCache = new HashMap<>();
+    private final Map<String, String> context = new HashMap<>();
     private LLMConfig config;
     private SystemSpecs systemSpecs;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
@@ -79,7 +79,7 @@ public class LLMService {
         }
 
         String finalPrompt = simplifyPrompt(prompt);
-        Map<String, String> fullContext = new HashMap<>(contextCache);
+        Map<String, String> fullContext = new HashMap<>(this.context);
         fullContext.putAll(context);
 
         return currentProvider.generateResponse(finalPrompt, fullContext)
@@ -88,7 +88,6 @@ public class LLMService {
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 LOGGER.error("Error generating response", cause);
                 
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(cause);
                 errorHandler.reportErrorToClient(errorType, cause.getMessage());
                 
@@ -96,10 +95,6 @@ public class LLMService {
             });
     }
 
-    /**
-     * Test the LLM connection and report any issues
-     * @return A future that completes when testing is done
-     */
     public CompletableFuture<Boolean> testConnection() {
         if (currentProvider == null || !currentProvider.isAvailable()) {
             String errorMessage = "No LLM provider available. Please check your configuration and API keys.";
@@ -114,7 +109,6 @@ public class LLMService {
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 LOGGER.error("Connection test failed", cause);
                 
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(cause);
                 errorHandler.reportErrorToClient(errorType, 
                     "Connection test failed: " + cause.getMessage());
@@ -151,7 +145,6 @@ public class LLMService {
     }
 
     public void pruneCache() {
-        // Cache pruning logic would go here
     }
 
     public void shutdown() {
@@ -161,15 +154,15 @@ public class LLMService {
     }
 
     public void clearCache() {
-        contextCache.clear();
+        context.clear();
     }
 
     public void addToContext(String key, String value) {
-        contextCache.put(key, value);
+        context.put(key, value);
     }
 
     public Map<String, String> getContextCache() {
-        return new HashMap<>(contextCache);
+        return new HashMap<>(context);
     }
 
     public boolean setProvider(String providerName) {
@@ -187,7 +180,6 @@ public class LLMService {
             try {
                 currentProvider.initialize(providerConfig);
                 LOGGER.info("Switched to provider: {}", currentProvider.getName());
-                // Test connection after switching provider
                 testConnection();
                 return true;
             } catch (Exception e) {

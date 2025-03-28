@@ -35,85 +35,54 @@ public class AnthropicProvider implements AIProvider {
     private static final String ANTHROPIC_API_VERSION = "2024-02-01";
 
     public AnthropicProvider() {
-        client = new OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .build();
+        client = new OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).build();
     }
 
     @Override
     public void initialize(Map<String, String> config) {
         this.apiKey = config.get("apiKey");
         this.model = config.getOrDefault("model", "claude-3-sonnet");
-        
         if (apiKey == null || apiKey.isEmpty()) {
             String errorMsg = "Anthropic provider initialization failed: missing API key";
             LOGGER.error(errorMsg);
-            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
-                "Please provide a valid Anthropic API key in the configuration.");
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "Please provide a valid Anthropic API key in the configuration.");
             throw new IllegalArgumentException(errorMsg);
         }
-        
         initialized = true;
         LOGGER.info("Anthropic provider initialized with model: {}", model);
     }
 
     @Override
     public CompletableFuture<Boolean> validateAccess() {
-        if (!initialized || apiKey == null || apiKey.isEmpty()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        
+        if (!initialized || apiKey == null || apiKey.isEmpty()) return CompletableFuture.completedFuture(false);
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Minimal validation request
-                JsonObject requestBody = new JsonObject();
-                requestBody.addProperty("model", model);
+                JsonObject reqBody = new JsonObject();
+                reqBody.addProperty("model", model);
                 JsonArray messages = new JsonArray();
                 JsonObject message = new JsonObject();
                 message.addProperty("role", "user");
                 message.addProperty("content", "Validation ping");
                 messages.add(message);
-                requestBody.add("messages", messages);
-                requestBody.addProperty("max_tokens", 1);
-
-                Request request = new Request.Builder()
-                    .url(API_URL)
-                    .post(RequestBody.create(requestBody.toString(), JSON))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("x-api-key", apiKey)
-                    .build();
-
+                reqBody.add("messages", messages);
+                reqBody.addProperty("max_tokens", 1);
+                Request request = new Request.Builder().url(API_URL).post(RequestBody.create(reqBody.toString(), JSON)).header("Authorization", "Bearer " + apiKey).header("x-api-key", apiKey).build();
                 try (Response response = client.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        return true;
-                    } else {
-                        int statusCode = response.code();
-                        String body = response.body() != null ? response.body().string() : "";
-                        
-                        if (statusCode == 401 || statusCode == 403) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
-                                "Anthropic rejected your API key. Please check it is correct.");
-                        } else if (statusCode == 429) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
-                                "Anthropic API rate limit exceeded. Please try again later.");
-                        } else {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
-                                "Anthropic API error: " + statusCode + " - " + body);
-                        }
-                        return false;
-                    }
+                    if (response.isSuccessful()) return true;
+                    int statusCode = response.code();
+                    String body = response.body() != null ? response.body().string() : "";
+                    if (statusCode == 401 || statusCode == 403) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "Anthropic rejected your API key. Please check it is correct.");
+                    else if (statusCode == 429) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "Anthropic API rate limit exceeded. Please try again later.");
+                    else errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "Anthropic API error: " + statusCode + " - " + body);
+                    return false;
                 }
             } catch (IOException e) {
                 LOGGER.error("Error validating Anthropic access", e);
-                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
-                    "Error connecting to Anthropic: " + e.getMessage());
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR, "Error connecting to Anthropic: " + e.getMessage());
                 return false;
             }
         });
     }
-
 
     @Override
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
@@ -122,12 +91,8 @@ public class AnthropicProvider implements AIProvider {
             errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, error);
             return CompletableFuture.failedFuture(new IllegalStateException(error));
         }
-
         String cacheKey = generateCacheKey(prompt, context);
-        if (cache.containsKey(cacheKey)) {
-            return CompletableFuture.completedFuture(cache.get(cacheKey));
-        }
-
+        if (cache.containsKey(cacheKey)) return CompletableFuture.completedFuture(cache.get(cacheKey));
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String response = callAnthropicApi(prompt, context);
@@ -135,86 +100,51 @@ public class AnthropicProvider implements AIProvider {
                 return response;
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Anthropic", e);
-                
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
                 errorHandler.reportErrorToClient(errorType, e.getMessage());
-                
-                // For some error types, we can try to provide helpful guidance
-                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
-                    throw new RuntimeException("Your Anthropic API key appears to be invalid. Please check your API key in the mod settings.", e);
-                } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
-                    throw new RuntimeException("Could not connect to Anthropic. Please check your internet connection.", e);
-                } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
-                    throw new RuntimeException("Anthropic API rate limit exceeded. Please try again later or switch to a different provider.", e);
-                } else {
-                    // Fall back to mock response if available
-                    String mockResp = mockResponse(prompt);
-                    cache.put(cacheKey, mockResp);
-                    return mockResp;
-                }
+                if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) throw new RuntimeException("Your Anthropic API key appears to be invalid. Please check your API key in the mod settings.", e);
+                else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) throw new RuntimeException("Could not connect to Anthropic. Please check your internet connection.", e);
+                else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) throw new RuntimeException("Anthropic API rate limit exceeded. Please try again later or switch to a different provider.", e);
+                String mockResp = mockResponse(prompt);
+                cache.put(cacheKey, mockResp);
+                return mockResp;
             }
         }, executor);
     }
 
     private String callAnthropicApi(String prompt, Map<String, String> context) throws IOException {
-        StringBuilder systemPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
-        if (context != null && !context.isEmpty()) {
-            context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) systemPrompt.append(" ").append(key).append(": ").append(value).append(".");
-            });
-        }
-
-        JsonObject requestBody = new JsonObject();
-        requestBody.addProperty("model", model);
+        StringBuilder sysPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+        if (context != null && !context.isEmpty()) context.forEach((key, value) -> {
+            if (value != null && !value.isEmpty()) sysPrompt.append(" ").append(key).append(": ").append(value).append(".");
+        });
+        JsonObject reqBody = new JsonObject();
+        reqBody.addProperty("model", model);
         int maxTokens = 1024;
         if (model.startsWith("claude-3-opus")) maxTokens = 4096;
         else if (model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5")) maxTokens = 4096;
         else if (model.startsWith("claude-3")) maxTokens = 2048;
-        requestBody.addProperty("max_tokens", maxTokens);
-        requestBody.addProperty("system", systemPrompt.toString());
-        requestBody.addProperty("temperature", 0.7);
-        
+        reqBody.addProperty("max_tokens", maxTokens);
+        reqBody.addProperty("system", sysPrompt.toString());
+        reqBody.addProperty("temperature", 0.7);
         JsonObject message = new JsonObject();
         message.addProperty("role", "user");
         message.addProperty("content", prompt);
-        requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
-
-        if (model.startsWith("claude-3")) requestBody.addProperty("response_format", "text");
-        
-        Request request = new Request.Builder()
-            .url(API_URL)
-            .post(RequestBody.create(requestBody.toString(), JSON))
-            .header("anthropic-api-key", apiKey)
-            .header("anthropic-version", ANTHROPIC_API_VERSION)
-            .header("Content-Type", "application/json")
-            .build();
-        
+        reqBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+        if (model.startsWith("claude-3")) reqBody.addProperty("response_format", "text");
+        Request request = new Request.Builder().url(API_URL).post(RequestBody.create(reqBody.toString(), JSON)).header("anthropic-api-key", apiKey).header("anthropic-version", ANTHROPIC_API_VERSION).header("Content-Type", "application/json").build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 int code = response.code();
                 String responseBody = response.body() != null ? response.body().string() : "";
-                
-                // Generate more helpful error messages based on status code
-                if (code == 401 || code == 403) {
-                    throw new IOException("Authentication error: Invalid Anthropic API key or insufficient permissions");
-                } else if (code == 429) {
-                    throw new IOException("Rate limit exceeded: Anthropic API quota has been reached");
-                } else if (code >= 500) {
-                    throw new IOException("Anthropic service is currently unavailable: " + code);
-                } else {
-                    throw new IOException("Anthropic API error: " + code + " - " + response.message() + 
-                                        (responseBody.isEmpty() ? "" : " - " + responseBody));
-                }
+                if (code == 401 || code == 403) throw new IOException("Authentication error: Invalid Anthropic API key or insufficient permissions");
+                else if (code == 429) throw new IOException("Rate limit exceeded: Anthropic API quota has been reached");
+                else if (code >= 500) throw new IOException("Anthropic service is currently unavailable: " + code);
+                else throw new IOException("Anthropic API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
             }
-            
             String responseBody = response.body().string();
             JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
-            
-            if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) {
-                return jsonResponse.getAsJsonArray("content").get(0)
-                    .getAsJsonObject().get("text").getAsString().trim();
-            } else {
+            if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) return jsonResponse.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString().trim();
+            else {
                 LOGGER.error("Unexpected Anthropic API response structure: {}", responseBody);
                 throw new IOException("Unexpected Anthropic API response structure");
             }
@@ -235,7 +165,6 @@ public class AnthropicProvider implements AIProvider {
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
     }
-
 
     @Override
     public String getName() {

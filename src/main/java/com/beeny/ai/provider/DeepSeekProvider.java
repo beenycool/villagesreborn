@@ -71,11 +71,9 @@ public class DeepSeekProvider implements AIProvider {
             } catch (Exception e) {
                 LOGGER.error("Error generating response from DeepSeek", e);
                 
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
                 errorHandler.reportErrorToClient(errorType, e.getMessage());
                 
-                // For some error types, we can try to provide helpful guidance
                 if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
                     throw new RuntimeException("Your DeepSeek API key appears to be invalid. Please check your API key in the mod settings.", e);
                 } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
@@ -83,7 +81,6 @@ public class DeepSeekProvider implements AIProvider {
                 } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
                     throw new RuntimeException("DeepSeek API rate limit exceeded. Please try again later or switch to a different provider.", e);
                 } else {
-                    // Fall back to mock response if available
                     String mockResp = mockResponse(prompt);
                     cache.put(cacheKey, mockResp);
                     return mockResp;
@@ -93,27 +90,26 @@ public class DeepSeekProvider implements AIProvider {
     }
 
     private String callDeepSeekApi(String prompt, Map<String, String> context) throws IOException {
-        StringBuilder systemPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+        StringBuilder sysPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
         if (context != null && !context.isEmpty()) {
             context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) systemPrompt.append(" ").append(key).append(": ").append(value).append(".");
+                if (value != null && !value.isEmpty()) sysPrompt.append(" ").append(key).append(": ").append(value).append(".");
             });
         }
-        JsonObject requestBody = new JsonObject();
-        requestBody.addProperty("model", model);
-        requestBody.addProperty("max_tokens", 300);
-        requestBody.addProperty("system", systemPrompt.toString());
+        JsonObject reqBody = new JsonObject();
+        reqBody.addProperty("model", model);
+        reqBody.addProperty("max_tokens", 300);
+        reqBody.addProperty("system", sysPrompt.toString());
         JsonObject message = new JsonObject();
         message.addProperty("role", "user");
         message.addProperty("content", prompt);
-        requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
-        Request request = new Request.Builder().url(API_URL).post(RequestBody.create(requestBody.toString(), JSON)).header("X-API-Key", apiKey).header("Content-Type", "application/json").build();
+        reqBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+        Request request = new Request.Builder().url(API_URL).post(RequestBody.create(reqBody.toString(), JSON)).header("X-API-Key", apiKey).header("Content-Type", "application/json").build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 int code = response.code();
                 String responseBody = response.body() != null ? response.body().string() : "";
                 
-                // Generate more helpful error messages based on status code
                 if (code == 401 || code == 403) {
                     throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
                 } else if (code == 429) {
@@ -160,18 +156,17 @@ public class DeepSeekProvider implements AIProvider {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Minimal validation request
-                JsonObject requestBody = new JsonObject();
-                requestBody.addProperty("model", model);
+                JsonObject reqBody = new JsonObject();
+                reqBody.addProperty("model", model);
                 JsonObject message = new JsonObject();
                 message.addProperty("role", "user");
                 message.addProperty("content", "Validation ping");
-                requestBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
-                requestBody.addProperty("max_tokens", 1);
+                reqBody.add("messages", gson.toJsonTree(new JsonObject[] { message }));
+                reqBody.addProperty("max_tokens", 1);
 
                 Request request = new Request.Builder()
                     .url(API_URL)
-                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .post(RequestBody.create(reqBody.toString(), JSON))
                     .header("X-API-Key", apiKey)
                     .build();
 
@@ -182,7 +177,6 @@ public class DeepSeekProvider implements AIProvider {
                         int statusCode = response.code();
                         String body = response.body() != null ? response.body().string() : "";
                         
-                        // Handle specific error codes
                         if (statusCode == 401 || statusCode == 403) {
                             errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
                                 "DeepSeek rejected your API key. Please check it is correct.");
