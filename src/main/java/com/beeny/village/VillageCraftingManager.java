@@ -8,11 +8,15 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.util.Formatting;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +27,9 @@ public class VillageCraftingManager {
     private final Map<String, List<CraftingRecipe>> culturalRecipes = new HashMap<>();
     private final VillagerManager villagerManager;
     private final Map<UUID, Map<String, Long>> craftingCooldowns = new HashMap<>();
+    private final Map<UUID, String> activeCraftingTasks = new HashMap<>();
     private static final long COOLDOWN_DURATION = 12000; // 10 minutes in game ticks
+    private static final Random random = new Random();
 
     private VillageCraftingManager() {
         this.villagerManager = VillagerManager.getInstance();
@@ -66,21 +72,52 @@ public class VillageCraftingManager {
     public CompletableFuture<String> assignTask(VillagerEntity villager, String recipeId, ServerPlayerEntity player) {
         LOGGER.info("Assigning crafting task to villager {} for recipe {}", villager.getUuid(), recipeId);
         
-        VillagerAI ai = villagerManager.getVillagerAI(villager.getUuid());
+        if (villager == null || player == null) {
+            LOGGER.error("Cannot assign task - villager or player is null");
+            return CompletableFuture.completedFuture("Error: Invalid villager or player");
+        }
+        
+        UUID villagerUuid = villager.getUuid();
+        
+        // Check if villager has AI associated
+        VillagerAI ai = villagerManager.getVillagerAI(villagerUuid);
+        if (ai == null) {
+            LOGGER.warn("Villager {} has no AI associated", villagerUuid);
+            return CompletableFuture.completedFuture("This villager cannot craft items.");
+        }
+        
+        // Check if villager is already busy with another crafting task
+        if (activeCraftingTasks.containsKey(villagerUuid)) {
+            String currentTask = activeCraftingTasks.get(villagerUuid);
+            LOGGER.info("Villager {} is already busy with task {}", villagerUuid, currentTask);
+            return CompletableFuture.completedFuture(villager.getName().getString() + " is already crafting " + currentTask);
+        }
+        
+        // Get villager's culture based on location
         VillagerManager vm = VillagerManager.getInstance();
         SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
         String culture = region != null ? region.getCultureAsString() : "default";
+        
+        // Find recipe in villager's culture
         CraftingRecipe recipe = findRecipe(culture, recipeId);
 
         if (recipe == null) {
             LOGGER.warn("Unknown recipe: {} for culture: {}", recipeId, culture);
-            return CompletableFuture.completedFuture("Unknown recipe");
+            return CompletableFuture.completedFuture("Unknown recipe for " + culture + " culture");
         }
         
         // Check if villager is on cooldown for this recipe
-        if (isOnCooldown(villager.getUuid(), recipeId, player.getWorld().getTime())) {
-            LOGGER.info("Villager {} is on cooldown for recipe {}", villager.getUuid(), recipeId);
+        if (isOnCooldown(villagerUuid, recipeId, player.getWorld().getTime())) {
+            LOGGER.info("Villager {} is on cooldown for recipe {}", villagerUuid, recipeId);
             return CompletableFuture.completedFuture(villager.getName().getString() + " needs to rest before crafting this again.");
+        }
+
+        // Check if villager has required profession skill
+        float craftingSkill = ai.getProfessionSkill("crafting");
+        float recipeComplexity = calculateRecipeComplexity(recipe);
+        if (craftingSkill < recipeComplexity * 0.5f) {
+            LOGGER.info("Villager {} lacks skill for recipe {}", villagerUuid, recipeId);
+            return CompletableFuture.completedFuture(villager.getName().getString() + " doesn't have enough skill to craft this item.");
         }
 
         // Check if player has required materials
@@ -101,10 +138,23 @@ public class VillageCraftingManager {
             }
         }
         
+        // All checks passed - mark villager as busy
+        activeCraftingTasks.put(villagerUuid, recipeId);
+        
         // Consume materials
         for (Map.Entry<Item, Integer> entry : recipe.getInputs().entrySet()) {
             consumePlayerItems(player, entry.getKey(), entry.getValue());
         }
+
+        // Play crafting sound
+        villager.getWorld().playSound(
+            null, 
+            villager.getBlockPos(), 
+            SoundEvents.ENTITY_VILLAGER_WORK_MASON, 
+            SoundCategory.NEUTRAL, 
+            1.0F, 
+            1.0F
+        );
 
         String prompt = String.format(
             "Villager %s (%s) is tasked with crafting %s in a %s village. Describe their reaction and work process in 15 words or less.",
@@ -116,27 +166,108 @@ public class VillageCraftingManager {
 
         return LLMService.getInstance().generateResponse(prompt)
             .thenApply(response -> {
-                // Apply skill gain
-                float skillGain = calculateSkillGain(recipe);
-                ai.updateActivity("crafting_" + recipeId);
-                ai.updateProfessionSkill("crafting");
-                
-                // Give the player the crafted item
-                ItemStack result = new ItemStack(recipe.getOutput());
-                player.getInventory().insertStack(result);
-                
-                // Set cooldown
-                setCooldown(villager.getUuid(), recipeId, player.getWorld().getTime());
-                
-                // Send messages
-                player.sendMessage(Text.literal("Received: " + result.getName().getString()).formatted(Formatting.GREEN), true);
-                player.sendMessage(Text.literal(response), false);
-                
-                LOGGER.info("Villager {} successfully crafted {} for player {}", 
-                    villager.getUuid(), recipeId, player.getName().getString());
-                
-                return response;
+                try {
+                    // Apply skill gain based on recipe complexity
+                    float skillGain = calculateSkillGain(recipe);
+                    ai.updateActivity("crafting_" + recipeId);
+                    ai.updateProfessionSkill("crafting", craftingSkill + skillGain);
+                    
+                    // Calculate quality based on villager's skill
+                    float quality = calculateItemQuality(craftingSkill, recipeComplexity);
+                    
+                    // Create the crafted item with quality if applicable
+                    ItemStack result = createQualityItem(recipe.getOutput(), quality, villager.getName().getString());
+                    
+                    // Give the player the crafted item
+                    boolean success = player.getInventory().insertStack(result);
+                    if (!success) {
+                        // Drop item if inventory is full
+                        player.dropItem(result, false);
+                    }
+                    
+                    // Set cooldown
+                    setCooldown(villagerUuid, recipeId, player.getWorld().getTime());
+                    
+                    // Send messages
+                    String qualityText = quality > 1.1f ? " (Exceptional Quality)" : 
+                                        quality > 1.0f ? " (Good Quality)" : "";
+                    player.sendMessage(Text.literal("Received: " + result.getName().getString() + qualityText)
+                        .formatted(Formatting.GREEN), true);
+                    player.sendMessage(Text.literal(response), false);
+                    
+                    LOGGER.info("Villager {} successfully crafted {} for player {}", 
+                        villagerUuid, recipeId, player.getName().getString());
+                    
+                    // Complete the task
+                    activeCraftingTasks.remove(villagerUuid);
+                    
+                    return response;
+                } catch (Exception e) {
+                    LOGGER.error("Error during crafting completion: {}", e.getMessage(), e);
+                    activeCraftingTasks.remove(villagerUuid);
+                    return "Error occurred during crafting";
+                }
+            })
+            .exceptionally(ex -> {
+                LOGGER.error("Error during crafting task: {}", ex.getMessage(), ex);
+                activeCraftingTasks.remove(villagerUuid);
+                return "Error occurred while crafting";
             });
+    }
+    
+    public void cancelTask(UUID villagerUuid, String recipeId, ServerPlayerEntity player) {
+        if (activeCraftingTasks.containsKey(villagerUuid) && 
+            activeCraftingTasks.get(villagerUuid).equals(recipeId)) {
+            
+            activeCraftingTasks.remove(villagerUuid);
+            player.sendMessage(Text.literal("Crafting canceled").formatted(Formatting.YELLOW), true);
+            LOGGER.info("Crafting task {} canceled for villager {}", recipeId, villagerUuid);
+        }
+    }
+    
+    private ItemStack createQualityItem(Item item, float quality, String craftedBy) {
+        ItemStack stack = new ItemStack(item);
+        
+        // Only add quality attributes if quality is above normal
+        if (quality > 1.0f) {
+            NbtCompound nbt = stack.getOrCreateNbt();
+            nbt.putFloat("CraftQuality", quality);
+            nbt.putString("CraftedBy", craftedBy);
+            
+            // Add visual effect to name for high quality items
+            if (quality >= 1.2f) {
+                stack.setCustomName(Text.literal("✦ " + item.getName().getString() + " ✦")
+                    .formatted(Formatting.AQUA));
+            }
+        }
+        
+        return stack;
+    }
+    
+    private float calculateItemQuality(float craftingSkill, float recipeComplexity) {
+        // Base quality is 1.0
+        float baseQuality = 1.0f;
+        
+        // Skill bonus (up to 0.2 bonus)
+        float skillBonus = Math.min(0.2f, craftingSkill / 10f);
+        
+        // Complexity bonus for matching skill to complex recipes (up to 0.1 bonus)
+        float complexityBonus = 0f;
+        if (craftingSkill >= recipeComplexity) {
+            complexityBonus = Math.min(0.1f, recipeComplexity / 20f);
+        }
+        
+        // Random factor (-0.05 to +0.05)
+        float randomFactor = (random.nextFloat() - 0.5f) * 0.1f;
+        
+        return baseQuality + skillBonus + complexityBonus + randomFactor;
+    }
+    
+    private float calculateRecipeComplexity(CraftingRecipe recipe) {
+        int ingredientCount = recipe.getInputs().size();
+        int totalItemCount = recipe.getInputs().values().stream().mapToInt(Integer::intValue).sum();
+        
+        return ingredientCount * 1.5f + totalItemCount * 0.5f;
     }
     
     private boolean isOnCooldown(UUID villagerUuid, String recipeId, long currentGameTime) {
