@@ -270,41 +270,69 @@ public abstract class VillagerInteractionMixin {
     }
   }
 
-  // isAtWorkstation and getWorkstationForProfession remain the same as the previous version
   private boolean isAtWorkstation(VillagerEntity villager) {
     VillagerProfession profession = villager.getVillagerData().getProfession();
     if (profession == VillagerProfession.NONE || profession == VillagerProfession.NITWIT) {
+      vr_LOGGER.debug("Villager {} has no profession or is a nitwit", villager.getUuid());
       return false;
     }
+
+    Block expectedWorkstation = getWorkstationForProfession(profession);
+    if (expectedWorkstation == null) {
+      vr_LOGGER.warn("No workstation mapping found for profession: {}", profession.toString());
+      return false;
+    }
+
+    // Primary check: JOB_SITE memory module
     Optional<BlockPos> poiPosOpt =
         villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+    
     if (poiPosOpt.isPresent()) {
       BlockPos poiPos = poiPosOpt.get();
-      if (villager.getBlockPos().isWithinDistance(poiPos, 4.0)) {
-        BlockState poiState = villager.getWorld().getBlockState(poiPos);
-        Block expectedWorkstation = getWorkstationForProfession(profession);
+      double distance = villager.getBlockPos().getSquaredDistance(poiPos);
+      BlockState poiState = villager.getWorld().getBlockState(poiPos);
+      
+      // Debug information about the POI
+      vr_LOGGER.debug("Villager {} has JOB_SITE at {} (distance: {}, block: {})", 
+          villager.getUuid(), poiPos, Math.sqrt(distance), poiState.getBlock().toString());
+      
+      // Check distance - villager needs to be close enough to the workstation
+      if (distance <= 16.0) { // 4 blocks squared
+        // Check if the block at the POI position matches the expected workstation block
         if (poiState.getBlock() == expectedWorkstation) {
-          // vr_LOGGER.debug("Villager {} confirmed at workstation POI: {}",
-          // villager.getUuid(), poiPos); // Can be noisy
+          vr_LOGGER.debug("Villager {} confirmed at workstation POI: {}", 
+              villager.getUuid(), poiPos);
           return true;
+        } else {
+          vr_LOGGER.debug("Villager {} JOB_SITE block mismatch: expected {}, found {}", 
+              villager.getUuid(), expectedWorkstation.toString(), poiState.getBlock().toString());
         }
+      } else {
+        vr_LOGGER.debug("Villager {} is too far from JOB_SITE ({}), distance: {}", 
+            villager.getUuid(), poiPos, Math.sqrt(distance));
       }
+    } else {
+      vr_LOGGER.debug("Villager {} has no JOB_SITE memory", villager.getUuid());
     }
-    // Fallback check (less reliable)
-    Block workstation = getWorkstationForProfession(profession);
-    if (workstation == null) return false;
+
+    // Only use fallback as a last resort - keeping it minimal for special cases
+    // like newly assigned workstations where the memory might not be updated yet
     BlockPos vilPos = villager.getBlockPos();
-    for (int y = -1; y <= 1; y++) {
-      for (int x = -2; x <= 2; x++) {
-        for (int z = -2; z <= 2; z++) {
+    for (int y = 0; y <= 1; y++) {  // Only check at feet and head level
+      for (int x = -1; x <= 1; x++) {
+        for (int z = -1; z <= 1; z++) {
           if (x == 0 && y == 0 && z == 0) continue;
           BlockPos checkPos = vilPos.add(x, y, z);
-          if (villager.getWorld().getBlockState(checkPos).getBlock() == workstation) {
+          if (villager.getWorld().getBlockState(checkPos).getBlock() == expectedWorkstation) {
+            vr_LOGGER.debug("Villager {} found at workstation via fallback check at {}", 
+                villager.getUuid(), checkPos);
             return true;
           }
         }
       }
     }
+    
+    vr_LOGGER.debug("Villager {} is not at their workstation", villager.getUuid());
     return false;
   }
 
@@ -322,6 +350,11 @@ public abstract class VillagerInteractionMixin {
     if (profession == VillagerProfession.LEATHERWORKER) return Blocks.CAULDRON;
     if (profession == VillagerProfession.MASON) return Blocks.STONECUTTER;
     if (profession == VillagerProfession.CARTOGRAPHER) return Blocks.CARTOGRAPHY_TABLE;
+    // In case Minecraft adds new professions in the future
+    if (profession == VillagerProfession.NITWIT) return null;
+    if (profession == VillagerProfession.NONE) return null;
+    
+    vr_LOGGER.warn("Unknown profession encountered: {}", profession.toString());
     return null;
   }
 }
