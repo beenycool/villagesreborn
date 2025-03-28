@@ -117,6 +117,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
+import com.beeny.network.VillagesNetwork;
+import com.beeny.server.EventNotificationManager;
 public class VillagerManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final VillagerManager INSTANCE = new VillagerManager();
@@ -910,18 +912,11 @@ public class VillagerManager {
      * Send event notification to players near an event
      */
     public void broadcastEventNotification(String title, String description, BlockPos center, int radius) {
-        if (server == null) return;
+        if (server == null || world == null) return;
         
-        // Fixed duration for event notifications - 200 ticks (10 seconds)
-        int durationTicks = 200;
-        
-        // Find all players within event radius
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            if (player.getWorld() == world && 
-                player.getBlockPos().getSquaredDistance(center) < radius * radius) {
-                VillagesNetwork.sendEventNotificationToClient(player, title, description, durationTicks);
-            }
-        }
+        // Use the server-side EventNotificationManager
+        EventNotificationManager.getInstance()
+            .broadcastNotificationInRadius((ServerWorld)world, center, radius, title, description, 200);
         
         LOGGER.debug("Broadcast event notification '{}' at {}", title, center);
     }

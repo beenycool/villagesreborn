@@ -1,10 +1,9 @@
 package com.beeny;
 
-import com.beeny.gui.EventNotificationManager;
+import com.beeny.gui.HudRenderer;
 import com.beeny.gui.VillageInfoHud;
 import com.beeny.network.VillagesClientNetwork;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,15 +17,8 @@ public class VillagesrebornClient implements ClientModInitializer {
     public void onInitializeClient() {
         LOGGER.info("Initializing Villages Reborn client");
         
-        // Create HUD components
-        VillageInfoHud villageInfoHud = VillageInfoHud.getInstance();
-        EventNotificationManager eventNotificationManager = EventNotificationManager.getInstance();
-        
-        // Register HUD rendering
-        HudRenderCallback.EVENT.register((context, tickDelta) -> {
-            villageInfoHud.render(context, context.getClient(), tickDelta);
-            eventNotificationManager.render(context, context.getClient(), tickDelta);
-        });
+        // Initialize HUD renderer (handles EventNotificationManager registration)
+        HudRenderer.init();
         
         // Register client-side networking
         registerNetworking();

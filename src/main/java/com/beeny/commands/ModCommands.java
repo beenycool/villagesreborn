@@ -6,9 +6,13 @@ import com.beeny.village.VillageInfluenceManager;
 import com.beeny.village.VillageInfluenceManager.VillageDevelopmentData;
 import com.beeny.village.VillageInfluenceManager.VillageRelationship;
 import com.beeny.village.VillageInfluenceManager.RelationshipStatus;
+import com.beeny.ai.LLMService;
+import com.beeny.server.EventNotificationManager;
+import com.beeny.village.Villagesreborn;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.command.argument.EntityArgumentType;
@@ -41,6 +45,30 @@ public class ModCommands {
         dispatcher.register(
             CommandManager.literal("vr")
                 .requires(source -> source.hasPermissionLevel(2))
+                .executes(context -> {
+                    context.getSource().sendMessage(Text.literal(
+                        """
+                        §eVillages Reborn Commands:§r
+                        /vr village info - Display info about the nearest village.
+                        /vr village development - Show development status of all villages.
+                        /vr village relationships - Show relationships of the nearest village.
+                        /vr village create <culture> <radius> - Create a village region (Admin).
+                        /vr village talk <villagerName> <situation> - Simulate villager talk (Admin).
+                        /vr village contribute <type> - Start contributing to a village building (Admin).
+                        /vr village progress <amount> - Add progress to your contribution (Admin).
+                        /vr village cancel - Cancel your active contribution (Admin).
+                        /vr village founder - Claim founder status for the nearest village (Admin).
+                        /vr village diplomacy <targetX> <targetY> <targetZ> - Start diplomatic mission (Admin).
+                        /vr village relationship <targetX> <targetY> <targetZ> <amount> <reason> - Adjust relationship (Admin).
+                        /vr notify <title> <message> - Send a notification to yourself (Admin).
+                        /vr notifyall <title> <message> - Send a notification to all players (Admin).
+                        /vr config reload - Reload configuration (Admin - Placeholder).
+                        /vr debug info - Show debug info (Admin).
+                        /vr checkai - Test AI service connection (Admin).
+                        """
+                    ));
+                    return 1;
+                })
                 .then(CommandManager.literal("village")
                     .then(CommandManager.literal("create")
                         .then(CommandManager.argument("culture", StringArgumentType.word())
@@ -403,6 +431,31 @@ public class ModCommands {
                         )
                     )
                 )
+                .then(CommandManager.literal("notify")
+                    .then(CommandManager.argument("title", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            return sendNotification(context, "Notification");
+                        })
+                        .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                            .executes(context -> {
+                                return sendNotification(context, 
+                                    StringArgumentType.getString(context, "title"),
+                                    StringArgumentType.getString(context, "message"));
+                            })
+                        )
+                    )
+                )
+                .then(CommandManager.literal("notifyall")
+                    .then(CommandManager.argument("title", StringArgumentType.string())
+                        .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                            .executes(context -> {
+                                return sendNotificationToAll(context, 
+                                    StringArgumentType.getString(context, "title"),
+                                    StringArgumentType.getString(context, "message"));
+                            })
+                        )
+                    )
+                )
                 .then(CommandManager.literal("config")
                     .then(CommandManager.literal("reload")
                         .executes(context -> {
@@ -431,6 +484,78 @@ public class ModCommands {
                         })
                     )
                 )
+                .then(CommandManager.literal("checkai")
+                    .executes(ModCommands::checkAIConnection)
+                )
         );
+    }
+
+    private static int sendNotification(CommandContext<ServerCommandSource> context, String title) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        if (player == null) {
+            context.getSource().sendError(Text.literal("This command can only be used by a player"));
+            return 0;
+        }
+        
+        EventNotificationManager.getInstance()
+            .sendNotification(player, title, "Test notification from command", 200);
+        
+        context.getSource().sendMessage(Text.literal("§aSent notification with title: §r" + title));
+        return 1;
+    }
+    
+    private static int sendNotification(CommandContext<ServerCommandSource> context, String title, String message) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        if (player == null) {
+            context.getSource().sendError(Text.literal("This command can only be used by a player"));
+            return 0;
+        }
+        
+        EventNotificationManager.getInstance()
+            .sendNotification(player, title, message, 200);
+        
+        context.getSource().sendMessage(Text.literal("§aSent notification with title: §r" + title));
+        return 1;
+    }
+    
+    private static int sendNotificationToAll(CommandContext<ServerCommandSource> context, String title, String message) {
+        ServerCommandSource source = context.getSource();
+        if (source.getServer() == null) {
+            source.sendError(Text.literal("Server not available"));
+            return 0;
+        }
+        
+        EventNotificationManager.getInstance()
+            .broadcastNotification(source.getWorld(), title, message, 200);
+        
+        source.sendMessage(Text.literal("§aSent notification to all players with title: §r" + title));
+        return 1;
+    }
+     
+    private static int checkAIConnection(CommandContext<ServerCommandSource> context) {
+        ServerCommandSource source = context.getSource();
+        source.sendMessage(Text.literal("§ePinging AI service...§r"));
+        LLMService llmService = LLMService.getInstance();
+        if (Villagesreborn.getLLMConfig() != null && !llmService.getCurrentProviderName().equals("None")) {
+            llmService.generateResponse("Say hello.")
+                .orTimeout(10, TimeUnit.SECONDS)
+                .handleAsync((response, error) -> {
+                    if (error != null) {
+                        source.sendError(Text.literal("§cAI Connection Test Failed: " + error.getMessage()));
+                        if (error.getCause() != null) {
+                            source.sendError(Text.literal("§cCause: " + error.getCause().getMessage()));
+                        }
+                        Villagesreborn.LOGGER.error("AI Check failed", error);
+                    } else {
+                        source.sendMessage(Text.literal("§aAI Connection Test Successful!§r"));
+                        source.sendMessage(Text.literal("Provider: " + llmService.getCurrentProviderName()));
+                        source.sendMessage(Text.literal("Response: " + response));
+                    }
+                    return null;
+                }, source.getServer()::execute);
+        } else {
+            source.sendError(Text.literal("§cLLM Service not initialized or no provider selected. Check config."));
+        }
+        return 1;
     }
 }
