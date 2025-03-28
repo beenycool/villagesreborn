@@ -6,6 +6,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.tooltip.Tooltip; // Import Tooltip
 import net.minecraft.text.Text;
 import com.beeny.config.VillagesConfig;
+import com.beeny.config.ClothConfigProvider;
 
 public class VillagesRebornSettingsScreen extends Screen {
     private final Screen parent;
@@ -22,6 +23,15 @@ public class VillagesRebornSettingsScreen extends Screen {
         int y = this.height / 4 + 24; // Start buttons lower
         int buttonWidth = 200;
         int spacing = 24;
+
+        // Advanced Configuration (Cloth Config)
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Advanced Configuration"),
+                button -> this.client.setScreen(new ClothConfigProvider().createConfigScreen(this)))
+            .tooltip(Tooltip.of(Text.literal("Configure all settings in detail using a comprehensive interface.")))
+            .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
+            .build());
+        y += spacing;
 
         // --- Simplified Main Settings ---
 
@@ -72,7 +82,6 @@ public class VillagesRebornSettingsScreen extends Screen {
             .dimensions(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20)
             .build());
         y += spacing;
-
 
         // Done button
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Done"),
