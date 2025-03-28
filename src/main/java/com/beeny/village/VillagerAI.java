@@ -94,6 +94,12 @@ public class VillagerAI {
     private long llmActivityExpiration = 0;
     private long lastActivityTransition = 0;
     
+    // Track active behavior execution
+    private String activeBehavior = null;
+    private long behaviorStartTime = 0;
+    private long behaviorDuration = 0;
+    private Map<String, Object> behaviorParams = new HashMap<>();
+    
     public VillagerAI(VillagerEntity villager, String personality) {
         this.villager = villager;
         this.personality = personality;
@@ -912,5 +918,514 @@ public class VillagerAI {
      */
     public boolean isPvPEnabled() {
         return pvpEnabled;
+    }
+    
+    /**
+     * Main tick method for behavior execution
+     * This should be called every server tick for each villager
+     * @param world The server world
+     */
+    public void tickBehavior(ServerWorld world) {
+        if (villager == null || !villager.isAlive()) {
+            return;
+        }
+        
+        // Check if we're executing a specific behavior
+        if (activeBehavior != null) {
+            // Check if behavior has timed out
+            if (world.getTime() - behaviorStartTime > behaviorDuration) {
+                completeBehavior();
+                return;
+            }
+            
+            // Execute the active behavior
+            executeBehavior(world);
+        } else {
+            // Update time-based activities if no specific behavior is active
+            if (world.getTime() % 100 == 0 && !busy) { // Only check every 5 seconds if not busy
+                updateActivityBasedOnTime(world);
+            }
+            
+            // Random chance to generate a new behavior if not busy
+            if (!busy && world.getTime() % 200 == 0 && Math.random() < 0.1) {
+                generateRandomBehavior(world);
+            }
+        }
+    }
+    
+    /**
+     * Execute the currently active behavior
+     * @param world The server world
+     */
+    private void executeBehavior(ServerWorld world) {
+        if (activeBehavior == null) return;
+        
+        switch (activeBehavior) {
+            case "working":
+                executeWorkBehavior(world);
+                break;
+            case "socializing":
+                executeSocializeBehavior(world);
+                break;
+            case "trading":
+                executeTradeBehavior(world);
+                break;
+            case "celebrating":
+                executeCelebrationBehavior(world);
+                break;
+            case "fleeing":
+                executeFleeingBehavior(world);
+                break;
+            case "sleeping":
+                executeSleepingBehavior(world);
+                break;
+            default:
+                // Default to idle behavior
+                executeIdleBehavior(world);
+                break;
+        }
+        
+        // Broadcast villager AI state to nearby clients for visuals
+        if (world.getTime() % 20 == 0) { // Once per second
+            com.beeny.network.VillagesNetwork.broadcastVillagerAIState(
+                villager, activeBehavior, villager.getBlockPos());
+        }
+    }
+    
+    /**
+     * Start a new behavior with parameters
+     * @param behaviorName The behavior to start
+     * @param durationTicks How long the behavior should last
+     * @param params Additional parameters for the behavior
+     */
+    public void startBehavior(String behaviorName, long durationTicks, Map<String, Object> params) {
+        this.activeBehavior = behaviorName;
+        this.behaviorStartTime = villager.getWorld().getTime();
+        this.behaviorDuration = durationTicks;
+        this.behaviorParams = params != null ? params : new HashMap<>();
+        
+        LOGGER.debug("Villager {} starting behavior: {} for {} ticks", 
+            villager.getName().getString(), behaviorName, durationTicks);
+            
+        // Update activity to match behavior
+        updateActivity(behaviorName);
+        
+        // Set busy state during behavior execution
+        setBusy(true);
+        
+        // Apply initial goals based on the behavior
+        applyInitialBehaviorGoals(behaviorName);
+    }
+    
+    /**
+     * Complete the current behavior and clean up
+     */
+    private void completeBehavior() {
+        LOGGER.debug("Villager {} completed behavior: {}", 
+            villager.getName().getString(), activeBehavior);
+            
+        // Reset state
+        this.activeBehavior = null;
+        this.behaviorParams.clear();
+        
+        // Clear goals
+        clearGoalsForNewBehavior("");
+        
+        // Update to a default activity
+        updateActivity("idle");
+        
+        // No longer busy
+        setBusy(false);
+    }
+    
+    /**
+     * Apply initial goals for a behavior
+     * @param behaviorName The behavior to set up
+     */
+    private void applyInitialBehaviorGoals(String behaviorName) {
+        // Clear previous goals
+        clearGoalsForNewBehavior(behaviorName);
+        
+        // Apply appropriate goals based on behavior
+        switch (behaviorName) {
+            case "working":
+                applyWorkGoals("job");
+                break;
+            case "socializing":
+                applySocializeGoals("villager");
+                break;
+            case "trading":
+                applyTradeGoals("player");
+                break;
+            case "celebrating":
+                applyWanderGoals("around");
+                break;
+            case "fleeing":
+                applyFleeGoals("danger");
+                break;
+            case "sleeping":
+                applyRestGoals("bed");
+                break;
+            default:
+                applyWanderGoals("around");
+                break;
+        }
+    }
+    
+    /**
+     * Generate a random behavior based on context
+     * @param world The server world
+     */
+    private void generateRandomBehavior(ServerWorld world) {
+        // Get time of day and cultural context
+        long timeOfDay = world.getTimeOfDay() % 24000;
+        VillagerManager vm = VillagerManager.getInstance();
+        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+        String culture = region != null ? region.getCultureAsString().toLowerCase() : "generic";
+        
+        // Generate a situation prompt for the LLM
+        String situation = String.format("It's %s and this villager is in a %s village near %s", 
+            getTimeDescription(timeOfDay), 
+            culture,
+            getNearbyDescription(world));
+        
+        // Generate behavior using LLM
+        generateBehavior(situation)
+            .thenAccept(behavior -> {
+                // The parseBehaviorAndUpdateGoals will handle setting up the behavior
+                LOGGER.debug("Generated random behavior for {}: {}", 
+                    villager.getName().getString(), behavior);
+            })
+            .exceptionally(e -> {
+                LOGGER.error("Error generating random behavior", e);
+                return null;
+            });
+    }
+    
+    /**
+     * Get a description of nearby entities and blocks
+     * @param world The server world
+     * @return A description of what's nearby
+     */
+    private String getNearbyDescription(ServerWorld world) {
+        BlockPos pos = villager.getBlockPos();
+        
+        // Check for nearby players
+        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
+            PlayerEntity.class, 
+            new Box(pos).expand(10), 
+            player -> true
+        );
+        
+        if (!nearbyPlayers.isEmpty()) {
+            return "some players";
+        }
+        
+        // Check for nearby villagers
+        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
+            VillagerEntity.class, 
+            new Box(pos).expand(8), 
+            v -> v != villager
+        );
+        
+        if (!nearbyVillagers.isEmpty()) {
+            return "other villagers";
+        }
+        
+        // Check profession-specific locations
+        VillagerProfession profession = villager.getVillagerData().getProfession();
+        
+        if (profession == VillagerProfession.FARMER) {
+            return "farmland";
+        } else if (profession == VillagerProfession.LIBRARIAN) {
+            return "bookshelves";
+        } else if (profession == VillagerProfession.BLACKSMITH) {
+            return "forge";
+        }
+        
+        return "their village";
+    }
+    
+    // Behavior execution methods for specific behaviors
+    
+    private void executeWorkBehavior(ServerWorld world) {
+        // Execute working behavior
+        VillagerProfession profession = villager.getVillagerData().getProfession();
+        
+        // Profession-specific work behaviors
+        if (profession == VillagerProfession.FARMER) {
+            // Occasionally show farming particles
+            if (world.getRandom().nextInt(20) == 0) {
+                world.spawnParticles(
+                    ParticleTypes.HAPPY_VILLAGER,
+                    villager.getX(), villager.getY() + 1, villager.getZ(),
+                    3, 0.5, 0.5, 0.5, 0.02
+                );
+            }
+        } else if (profession == VillagerProfession.LIBRARIAN) {
+            // Occasionally show reading particles
+            if (world.getRandom().nextInt(30) == 0) {
+                world.spawnParticles(
+                    ParticleTypes.ENCHANT,
+                    villager.getX(), villager.getY() + 1, villager.getZ(),
+                    2, 0.5, 0.5, 0.5, 0.01
+                );
+            }
+        } else if (profession == VillagerProfession.BLACKSMITH) {
+            // Occasionally show smithing particles
+            if (world.getRandom().nextInt(15) == 0) {
+                world.spawnParticles(
+                    ParticleTypes.FLAME,
+                    villager.getX(), villager.getY() + 1, villager.getZ(),
+                    2, 0.3, 0.3, 0.3, 0.01
+                );
+            }
+        }
+        
+        // Make sure we occasionally look around while working
+        if (world.getRandom().nextInt(50) == 0) {
+            // Look at random position
+            double lookX = villager.getX() + world.getRandom().nextDouble() * 10 - 5;
+            double lookY = villager.getY() + world.getRandom().nextDouble() * 2;
+            double lookZ = villager.getZ() + world.getRandom().nextDouble() * 10 - 5;
+            villager.getLookControl().lookAt(lookX, lookY, lookZ);
+        }
+    }
+    
+    private void executeSocializeBehavior(ServerWorld world) {
+        // Find nearby villagers to socialize with
+        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
+            VillagerEntity.class, 
+            new Box(villager.getBlockPos()).expand(5), 
+            v -> v != villager
+        );
+        
+        if (!nearbyVillagers.isEmpty()) {
+            // Look at the nearest villager
+            VillagerEntity nearest = nearbyVillagers.get(0);
+            villager.getLookControl().lookAt(nearest, 30f, 30f);
+            
+            // Occasional chat particle effects
+            if (world.getRandom().nextInt(30) == 0) {
+                VillagerFeedbackHelper.showSpeakingEffect(villager);
+            }
+        } else {
+            // If no villagers nearby, look for players
+            List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
+                PlayerEntity.class, 
+                new Box(villager.getBlockPos()).expand(8), 
+                player -> true
+            );
+            
+            if (!nearbyPlayers.isEmpty()) {
+                // Look at the nearest player
+                PlayerEntity nearest = nearbyPlayers.get(0);
+                villager.getLookControl().lookAt(nearest, 30f, 30f);
+            }
+        }
+    }
+    
+    private void executeTradeBehavior(ServerWorld world) {
+        // Trading behavior is mostly reactive to player interactions
+        // Here we'll just make the villager look more attentive
+        
+        // Look for nearby players
+        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
+            PlayerEntity.class, 
+            new Box(villager.getBlockPos()).expand(5), 
+            player -> true
+        );
+        
+        if (!nearbyPlayers.isEmpty()) {
+            // Look at the nearest player
+            PlayerEntity nearest = nearbyPlayers.get(0);
+            villager.getLookControl().lookAt(nearest, 30f, 30f);
+            
+            // Occasionally show interest particles
+            if (world.getRandom().nextInt(40) == 0) {
+                world.spawnParticles(
+                    ParticleTypes.HAPPY_VILLAGER,
+                    villager.getX(), villager.getY() + 1, villager.getZ(),
+                    1, 0.5, 0.5, 0.5, 0.01
+                );
+            }
+        }
+    }
+    
+    private void executeCelebrationBehavior(ServerWorld world) {
+        // Celebration effects - particles and animations
+        if (world.getRandom().nextInt(10) == 0) {
+            world.spawnParticles(
+                ParticleTypes.NOTE,
+                villager.getX(), villager.getY() + 1, villager.getZ(),
+                1, 0.5, 0.5, 0.5, 0
+            );
+        }
+        
+        // Occasionally jump with happiness
+        if (world.getRandom().nextInt(40) == 0 && villager.isOnGround()) {
+            villager.setVelocity(villager.getVelocity().add(0, 0.42, 0));
+            villager.velocityModified = true;
+        }
+        
+        // Look at other celebrating villagers or players
+        List<Entity> nearbyEntities = world.getOtherEntities(
+            villager, 
+            new Box(villager.getBlockPos()).expand(8), 
+            e -> e instanceof VillagerEntity || e instanceof PlayerEntity
+        );
+        
+        if (!nearbyEntities.isEmpty()) {
+            Entity target = nearbyEntities.get(world.getRandom().nextInt(nearbyEntities.size()));
+            villager.getLookControl().lookAt(target, 30f, 30f);
+        }
+    }
+    
+    private void executeFleeingBehavior(ServerWorld world) {
+        // Get the danger source from parameters if available
+        BlockPos dangerPos = null;
+        if (behaviorParams.containsKey("dangerPos")) {
+            dangerPos = (BlockPos) behaviorParams.get("dangerPos");
+        }
+        
+        // If we have a danger position, ensure we're moving away from it
+        if (dangerPos != null) {
+            // Calculate direction away from danger
+            double dx = villager.getX() - dangerPos.getX();
+            double dz = villager.getZ() - dangerPos.getZ();
+            
+            // Normalize and scale
+            double length = Math.sqrt(dx * dx + dz * dz);
+            if (length < 0.1) {
+                // If too close to danger, pick a random direction
+                dx = world.getRandom().nextDouble() * 2 - 1;
+                dz = world.getRandom().nextDouble() * 2 - 1;
+                length = Math.sqrt(dx * dx + dz * dz);
+            }
+            
+            dx = dx / length * 10; // Scale to 10 blocks away
+            dz = dz / length * 10;
+            
+            // Set flee destination
+            BlockPos fleePos = new BlockPos(
+                dangerPos.getX() + (int)dx,
+                dangerPos.getY(),
+                dangerPos.getZ() + (int)dz
+            );
+            
+            // Move to the flee position if we're not already moving
+            if (!villager.getNavigation().isFollowingPath()) {
+                moveToPosition(fleePos, 1.0, 1);
+            }
+        }
+        
+        // Occasional panic particles
+        if (world.getRandom().nextInt(15) == 0) {
+            world.spawnParticles(
+                ParticleTypes.SMOKE,
+                villager.getX(), villager.getY() + 1, villager.getZ(),
+                3, 0.3, 0.3, 0.3, 0.02
+            );
+        }
+    }
+    
+    private void executeSleepingBehavior(ServerWorld world) {
+        // Check time of day - should only sleep at night
+        long timeOfDay = world.getTimeOfDay() % 24000;
+        if (timeOfDay >= 1000 && timeOfDay <= 13000) {
+            // It's daytime, end sleep behavior
+            completeBehavior();
+            return;
+        }
+        
+        // Sleeping behaviors - reduced movement and occasional Z particles
+        if (world.getRandom().nextInt(50) == 0) {
+            world.spawnParticles(
+                ParticleTypes.CLOUD,
+                villager.getX(), villager.getY() + 0.8, villager.getZ(),
+                1, 0.1, 0.1, 0.1, 0.01
+            );
+        }
+        
+        // If we're not at a bed, try to find one occasionally
+        if (world.getRandom().nextInt(100) == 0) {
+            BlockPos bedPos = findNearestBed(world);
+            if (bedPos != null) {
+                moveToPosition(bedPos, 0.5, 1);
+            }
+        }
+    }
+    
+    private void executeIdleBehavior(ServerWorld world) {
+        // Basic idle behavior - occasional looking around
+        if (world.getRandom().nextInt(60) == 0) {
+            // Look at random position
+            double lookX = villager.getX() + world.getRandom().nextDouble() * 16 - 8;
+            double lookY = villager.getY() + world.getRandom().nextDouble() * 3 - 1;
+            double lookZ = villager.getZ() + world.getRandom().nextDouble() * 16 - 8;
+            villager.getLookControl().lookAt(lookX, lookY, lookZ);
+        }
+        
+        // Occasionally wander if stationary for too long
+        if (world.getRandom().nextInt(120) == 0 && !villager.getNavigation().isFollowingPath()) {
+            BlockPos randomPos = getRandomPositionAround(villager.getBlockPos(), 8);
+            moveToPosition(randomPos, 0.4, 3);
+        }
+    }
+    
+    /**
+     * Find the nearest bed block
+     * @param world The server world
+     * @return The position of the nearest bed, or null if none found
+     */
+    private BlockPos findNearestBed(ServerWorld world) {
+        BlockPos villagerPos = villager.getBlockPos();
+        BlockPos nearest = null;
+        double nearestDistSq = Double.MAX_VALUE;
+        
+        // Check for a remembered home bed first
+        Optional<BlockPos> homeMem = villager.getBrain().getOptionalMemory(
+            net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+        
+        if (homeMem.isPresent()) {
+            BlockPos homePos = homeMem.get();
+            if (world.getBlockState(homePos).getBlock() instanceof net.minecraft.block.BedBlock) {
+                return homePos;
+            }
+        }
+        
+        // Search in a radius
+        int radius = 15;
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    BlockPos checkPos = villagerPos.add(x, y, z);
+                    if (world.getBlockState(checkPos).getBlock() instanceof net.minecraft.block.BedBlock) {
+                        double distSq = checkPos.getSquaredDistance(villagerPos);
+                        if (distSq < nearestDistSq) {
+                            nearest = checkPos;
+                            nearestDistSq = distSq;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return nearest;
+    }
+    
+    /**
+     * Get a random position around a center point
+     * @param center The center position
+     * @param radius The radius to search within
+     * @return A random position
+     */
+    private BlockPos getRandomPositionAround(BlockPos center, int radius) {
+        Random random = new Random();
+        return center.add(
+            random.nextInt(radius * 2) - radius,
+             0,
+            random.nextInt(radius * 2) - radius
+        );
     }
 }
