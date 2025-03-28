@@ -1,5 +1,6 @@
 package com.beeny.gui;
 
+import com.beeny.network.VillagesClientNetwork;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -18,6 +19,25 @@ public class VillageInfoHud {
     private long displayEndTime = 0;
     private static final long DISPLAY_DURATION = 5000; // Show for 5 seconds after update
     private boolean forcedDisplay = false;
+    private long lastRequestTime = 0;
+    private static final long REQUEST_COOLDOWN = 5000; // 5 seconds between requests
+    
+    // Singleton instance
+    private static VillageInfoHud instance;
+    
+    /**
+     * Gets the singleton instance of the VillageInfoHud
+     */
+    public static VillageInfoHud getInstance() {
+        if (instance == null) {
+            instance = new VillageInfoHud();
+        }
+        return instance;
+    }
+    
+    private VillageInfoHud() {
+        // Private constructor for singleton
+    }
     
     /**
      * Updates the village information to be displayed.
@@ -47,6 +67,30 @@ public class VillageInfoHud {
         this.showHud = true;
         this.forcedDisplay = true;
         this.displayEndTime = System.currentTimeMillis() + durationMillis;
+    }
+    
+    /**
+     * Clears the current village info display
+     */
+    public void clear() {
+        this.cultureName = "";
+        this.prosperity = 0;
+        this.safety = 0;
+        this.population = 0;
+        this.showHud = false;
+    }
+    
+    /**
+     * Request updated village info from the server, if it's time to do so
+     */
+    public void requestUpdate() {
+        long currentTime = System.currentTimeMillis();
+        
+        // Avoid spamming the server with requests
+        if (currentTime - lastRequestTime > REQUEST_COOLDOWN) {
+            lastRequestTime = currentTime;
+            VillagesClientNetwork.requestVillageInfo();
+        }
     }
     
     /**

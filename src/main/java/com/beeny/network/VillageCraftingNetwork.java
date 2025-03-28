@@ -11,12 +11,18 @@ import net.minecraft.util.math.Box;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Handles network communication for the village crafting system.
+ * This includes crafting requests, recipe list requests, and crafting status updates.
+ */
 public class VillageCraftingNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillageCraftingNetwork");
     
@@ -26,7 +32,12 @@ public class VillageCraftingNetwork {
     public static final Identifier RECIPE_LIST_PACKET = new Identifier("villagesreborn", "recipe_list");
     public static final Identifier CRAFT_STATUS_PACKET = new Identifier("villagesreborn", "craft_status");
     public static final Identifier CANCEL_CRAFT_PACKET = new Identifier("villagesreborn", "cancel_craft");
+    public static final Identifier CRAFT_PROGRESS_PACKET = new Identifier("villagesreborn", "craft_progress");
+    public static final Identifier CRAFT_COMPLETE_PACKET = new Identifier("villagesreborn", "craft_complete");
 
+    /**
+     * Register all network handlers
+     */
     public static void register() {
         LOGGER.info("Registering VillageCraftingNetwork packet handlers");
         
@@ -60,14 +71,73 @@ public class VillageCraftingNetwork {
             });
         });
         
-        // Register connection events
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            // Initialize connection - no packet handling needed here
-        });
-        
         LOGGER.info("VillageCraftingNetwork packet handlers registered successfully");
     }
 
+    /**
+     * Register client-side network handlers
+     */
+    public static void registerClientHandlers() {
+        // Register client-side packet receiver for recipe list
+        ClientPlayNetworking.registerGlobalReceiver(RECIPE_LIST_PACKET, (client, handler, buf, responseSender) -> {
+            UUID villagerUuid = buf.readUuid();
+            int recipeCount = buf.readInt();
+            List<String> recipeIds = new java.util.ArrayList<>();
+            
+            for (int i = 0; i < recipeCount; i++) {
+                recipeIds.add(buf.readString());
+            }
+            
+            client.execute(() -> {
+                // Update client UI with available recipes
+                VillageCraftingClientHandler.updateAvailableRecipes(villagerUuid, recipeIds);
+            });
+        });
+        
+        // Register client-side packet receiver for craft status updates
+        ClientPlayNetworking.registerGlobalReceiver(CRAFT_STATUS_PACKET, (client, handler, buf, responseSender) -> {
+            UUID villagerUuid = buf.readUuid();
+            String recipeId = buf.readString();
+            String status = buf.readString();
+            String message = buf.readString();
+            
+            client.execute(() -> {
+                // Update crafting status in UI
+                VillageCraftingClientHandler.updateCraftingStatus(villagerUuid, recipeId, status, message);
+            });
+        });
+        
+        // Register client-side packet receiver for craft progress updates
+        ClientPlayNetworking.registerGlobalReceiver(CRAFT_PROGRESS_PACKET, (client, handler, buf, responseSender) -> {
+            UUID villagerUuid = buf.readUuid();
+            String recipeId = buf.readString();
+            int progress = buf.readInt();
+            int maxProgress = buf.readInt();
+            
+            client.execute(() -> {
+                // Update crafting progress in UI
+                VillageCraftingClientHandler.updateCraftingProgress(villagerUuid, recipeId, progress, maxProgress);
+            });
+        });
+        
+        // Register client-side packet receiver for craft completion
+        ClientPlayNetworking.registerGlobalReceiver(CRAFT_COMPLETE_PACKET, (client, handler, buf, responseSender) -> {
+            UUID villagerUuid = buf.readUuid();
+            String recipeId = buf.readString();
+            boolean success = buf.readBoolean();
+            
+            client.execute(() -> {
+                // Handle crafting completion in UI
+                VillageCraftingClientHandler.handleCraftingComplete(villagerUuid, recipeId, success);
+            });
+        });
+        
+        LOGGER.info("VillageCraftingNetwork client packet handlers registered successfully");
+    }
+
+    /**
+     * Direct method to handle a crafting request on the server side without going through networking
+     */
     public static void handleCraftingRequest(VillagerEntity villager, String recipeId, ServerPlayerEntity player) {
         // Direct server-side handling without networking
         if (isWithinReach(player, villager)) {
@@ -75,6 +145,9 @@ public class VillageCraftingNetwork {
         }
     }
 
+    /**
+     * Handle a crafting request from a client
+     */
     private static void handleCraftRequest(UUID villagerUuid, String recipeId, ServerPlayerEntity player) {
         LOGGER.debug("Handling craft request for recipe {} from player {}", recipeId, player.getName().getString());
         Box searchBox = Box.of(player.getPos(), 10, 10, 10);
@@ -96,6 +169,9 @@ public class VillageCraftingNetwork {
         }
     }
     
+    /**
+     * Handle a recipe list request from a client
+     */
     private static void handleRecipeListRequest(UUID villagerUuid, ServerPlayerEntity player, PacketSender responseSender) {
         LOGGER.debug("Handling recipe list request for villager {} from player {}", villagerUuid, player.getName().getString());
         // Find the villager
@@ -125,19 +201,25 @@ public class VillageCraftingNetwork {
                     buf.writeString(recipeId);
                 }
                 
-                responseSender.sendPacket(RECIPE_LIST_PACKET, buf);
+                ServerPlayNetworking.send(player, RECIPE_LIST_PACKET, buf);
             }
         }
     }
     
+    /**
+     * Handle a cancel craft request from a client
+     */
     private static void handleCancelCraftRequest(UUID villagerUuid, String recipeId, ServerPlayerEntity player) {
         LOGGER.debug("Handling cancel craft request for recipe {} from player {}", recipeId, player.getName().getString());
         // Implementation for canceling an in-progress crafting task
         VillageCraftingManager.getInstance().cancelTask(villagerUuid, recipeId, player);
     }
     
-    private static void sendCraftStatusToPlayer(ServerPlayerEntity player, UUID villagerUuid, 
-                                              String recipeId, String status, String message) {
+    /**
+     * Send a craft status update to a player
+     */
+    public static void sendCraftStatusToPlayer(ServerPlayerEntity player, UUID villagerUuid, 
+                                             String recipeId, String status, String message) {
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeUuid(villagerUuid);
         buf.writeString(recipeId);
@@ -146,8 +228,42 @@ public class VillageCraftingNetwork {
         ServerPlayNetworking.send(player, CRAFT_STATUS_PACKET, buf);
     }
 
+    /**
+     * Send a craft progress update to a player
+     */
+    public static void sendCraftProgressToPlayer(ServerPlayerEntity player, UUID villagerUuid,
+                                               String recipeId, int progress, int maxProgress) {
+        PacketByteBuf buf = PacketByteBufs.create();
+        buf.writeUuid(villagerUuid);
+        buf.writeString(recipeId);
+        buf.writeInt(progress);
+        buf.writeInt(maxProgress);
+        ServerPlayNetworking.send(player, CRAFT_PROGRESS_PACKET, buf);
+    }
+
+    /**
+     * Send a craft completion notification to a player
+     */
+    public static void sendCraftCompleteToPlayer(ServerPlayerEntity player, UUID villagerUuid,
+                                               String recipeId, boolean success, ItemStack result) {
+        PacketByteBuf buf = PacketByteBufs.create();
+        buf.writeUuid(villagerUuid);
+        buf.writeString(recipeId);
+        buf.writeBoolean(success);
+        
+        // Only write the result if crafting was successful
+        if (success) {
+            buf.writeItemStack(result);
+        }
+        
+        ServerPlayNetworking.send(player, CRAFT_COMPLETE_PACKET, buf);
+    }
+
+    /**
+     * Check if a player is within reach of a villager
+     */
     private static boolean isWithinReach(ServerPlayerEntity player, VillagerEntity villager) {
         double distanceSquared = player.squaredDistanceTo(villager);
-        return distanceSquared <= 64.0;
+        return distanceSquared <= 64.0; // 8 blocks squared
     }
 }

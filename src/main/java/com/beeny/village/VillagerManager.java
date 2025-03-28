@@ -490,14 +490,26 @@ public class VillagerManager {
                     for (VillagerAI ai : villagerAIs.values()) {
                         String activity = activities.get(world.getRandom().nextInt(activities.size()));
                         ai.updateActivity("event_" + activity);
+                        
+                        // Broadcast AI state update
+                        broadcastVillagerAIUpdate(ai.getVillager(), "event_" + activity);
                     }
-                    for (ServerPlayerEntity player : world.getPlayers()) {
-                        SpawnRegion region = getNearestSpawnRegion(player.getBlockPos());
-                        if (region != null && region.getCulture().toString().equals(culture)) {
-                            VillageHudAPI.getInstance().showEventNotification(
-                                eventName, description, 200);
+                    
+                    // Get region for notification range
+                    SpawnRegion eventRegion = null;
+                    for (SpawnRegion region : spawnRegions.values()) {
+                        if (region.getCulture().toString().equalsIgnoreCase(culture)) {
+                            eventRegion = region;
+                            break;
                         }
                     }
+                    
+                    int notificationRadius = eventRegion != null ? eventRegion.getRadius() * 2 : 128;
+                    BlockPos eventCenter = eventRegion != null ? eventRegion.getCenter() : world.getSpawnPos();
+                    
+                    // Broadcast event notification
+                    broadcastEventNotification(eventName, description, eventCenter, notificationRadius);
+                    
                     LOGGER.info("Generated cultural event: {} for {} village", event.name, culture);
                 });
         } finally {
@@ -679,8 +691,12 @@ public class VillagerManager {
     public void addVillageStats(BlockPos center, String culture) {
         villageStats.put(center, new VillageStats(center, culture));
     }
+    @Override
     public void updateVillageStats(BlockPos center, VillageStats stats) {
         villageStats.put(center, stats);
+        
+        // Broadcast the update to nearby clients
+        broadcastVillageInfoUpdate(center);
     }
     public static class CulturalEvent {
         public final String name;
@@ -851,5 +867,56 @@ public class VillagerManager {
             LOGGER.error("Error parsing response", e);
         }
         return result;
+    }
+    
+    /**
+     * Send village info updates to nearby players
+     * This is called whenever village stats change
+     */
+    public void broadcastVillageInfoUpdate(BlockPos center) {
+        VillageStats stats = villageStats.get(center);
+        if (stats == null || server == null) return;
+        
+        // Find all players within render distance of the village center
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            if (player.getWorld() == world && 
+                player.getBlockPos().getSquaredDistance(center) < 16384) { // 128 blocks squared
+                VillagesNetwork.sendVillageInfoToClient(player, stats);
+            }
+        }
+        
+        LOGGER.debug("Broadcast village info update for {} village at {}", stats.culture, center);
+    }
+    
+    /**
+     * Send event notification to players near an event
+     */
+    public void broadcastEventNotification(String title, String description, BlockPos center, int radius) {
+        if (server == null) return;
+        
+        // Fixed duration for event notifications - 200 ticks (10 seconds)
+        int durationTicks = 200;
+        
+        // Find all players within event radius
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            if (player.getWorld() == world && 
+                player.getBlockPos().getSquaredDistance(center) < radius * radius) {
+                VillagesNetwork.sendEventNotificationToClient(player, title, description, durationTicks);
+            }
+        }
+        
+        LOGGER.debug("Broadcast event notification '{}' at {}", title, center);
+    }
+    
+    /**
+     * Send villager AI state update to nearby players
+     */
+    public void broadcastVillagerAIUpdate(VillagerEntity villager, String activity) {
+        if (server == null || villager == null) return;
+        
+        VillagesNetwork.broadcastVillagerAIState(villager, activity, villager.getBlockPos());
+        
+        LOGGER.debug("Broadcast villager AI update for {}: {}", 
+                    villager.getName().getString(), activity);
     }
 }

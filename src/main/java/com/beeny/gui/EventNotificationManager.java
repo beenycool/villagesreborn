@@ -22,6 +22,35 @@ public class EventNotificationManager {
     private static final int NOTIFICATION_WIDTH = 220; // Wider notifications for better readability
     private static final int NOTIFICATION_HEIGHT = 60; // Taller notifications for more content
     
+    // Singleton instance
+    private static EventNotificationManager instance;
+    
+    /**
+     * Gets the singleton instance of the EventNotificationManager
+     */
+    public static EventNotificationManager getInstance() {
+        if (instance == null) {
+            instance = new EventNotificationManager();
+        }
+        return instance;
+    }
+    
+    private EventNotificationManager() {
+        // Private constructor for singleton
+    }
+    
+    /**
+     * Shows a new notification to be displayed.
+     * This is the main method called from network packets.
+     *
+     * @param title The title of the notification
+     * @param description The description text
+     * @param durationTicks How long to display the notification (in ticks)
+     */
+    public void showNotification(String title, String description, int durationTicks) {
+        addNotification(title, description, durationTicks);
+    }
+    
     /**
      * Adds a new notification to be displayed.
      *
@@ -58,7 +87,7 @@ public class EventNotificationManager {
      * @param client The Minecraft client
      * @param tickDelta The partial tick
      */
-    public void render(DrawContext context, MinecraftClient client, net.minecraft.client.render.RenderTickCounter tickDelta) {
+    public void render(DrawContext context, MinecraftClient client, float tickDelta) {
         if (activeNotifications.isEmpty()) {
             return;
         }
@@ -97,6 +126,13 @@ public class EventNotificationManager {
             
             yPosition -= (NOTIFICATION_HEIGHT + padding);
         }
+    }
+    
+    /**
+     * Clears all current notifications
+     */
+    public void clearAll() {
+        activeNotifications.clear();
     }
     
     /**
