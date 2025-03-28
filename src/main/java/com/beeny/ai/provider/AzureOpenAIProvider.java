@@ -81,11 +81,9 @@ public class AzureOpenAIProvider implements AIProvider {
             } catch (Exception e) {
                 LOGGER.error("Error generating response from Azure OpenAI", e);
                 
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
                 errorHandler.reportErrorToClient(errorType, e.getMessage());
                 
-                // For some error types, we can try to provide helpful guidance
                 if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
                     throw new RuntimeException("Your Azure OpenAI API key appears to be invalid. Please check your API key in the mod settings.", e);
                 } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
@@ -93,7 +91,6 @@ public class AzureOpenAIProvider implements AIProvider {
                 } else if (errorType == LLMErrorHandler.ErrorType.API_RATE_LIMIT) {
                     throw new RuntimeException("Azure OpenAI API rate limit exceeded. Please try again later or switch to a different provider.", e);
                 } else {
-                    // Fall back to mock response if available
                     String mockResp = mockResponse(prompt);
                     cache.put(cacheKey, mockResp);
                     return mockResp;
@@ -104,16 +101,16 @@ public class AzureOpenAIProvider implements AIProvider {
 
     private String callAzureOpenAI(String prompt, Map<String, String> context) {
         try {
-            List<ChatMessage> chatMessages = new ArrayList<>();
+            List<ChatMessage> messages = new ArrayList<>();
             if (context != null && !context.isEmpty()) {
                 StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
                 context.forEach((key, value) -> {
                     if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append(".");
                 });
-                chatMessages.add(new ChatMessage(ChatRole.SYSTEM, systemContent.toString()));
+                messages.add(new ChatMessage(ChatRole.SYSTEM, systemContent.toString()));
             }
-            chatMessages.add(new ChatMessage(ChatRole.USER, prompt));
-            ChatCompletionsOptions options = new ChatCompletionsOptions(chatMessages);
+            messages.add(new ChatMessage(ChatRole.USER, prompt));
+            ChatCompletionsOptions options = new ChatCompletionsOptions(messages);
             options.setMaxTokens(300);
             options.setTemperature(0.7);
             options.setModel(modelName);
@@ -151,10 +148,9 @@ public class AzureOpenAIProvider implements AIProvider {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Minimal validation request
-                List<ChatMessage> chatMessages = new ArrayList<>();
-                chatMessages.add(new ChatMessage(ChatRole.USER, "Validation ping"));
-                ChatCompletionsOptions options = new ChatCompletionsOptions(chatMessages);
+                List<ChatMessage> messages = new ArrayList<>();
+                messages.add(new ChatMessage(ChatRole.USER, "Validation ping"));
+                ChatCompletionsOptions options = new ChatCompletionsOptions(messages);
                 options.setMaxTokens(1);
                 options.setModel(modelName);
                 
@@ -163,7 +159,6 @@ public class AzureOpenAIProvider implements AIProvider {
             } catch (HttpResponseException e) {
                 int statusCode = e.getResponse().getStatusCode();
                 
-                // Handle specific error codes
                 if (statusCode == 401 || statusCode == 403) {
                     errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
                         "Azure OpenAI rejected your API key. Please check it is correct.");
