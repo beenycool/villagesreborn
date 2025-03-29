@@ -30,6 +30,7 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.command.CommandRegistryAccess;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.util.math.Box;
 
 public class VillagerManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
@@ -868,4 +869,25 @@ public class VillagerManager {
             }
         }
     }
+
+    /**
+     * Get the villagers in a spawn region
+     * @param region The spawn region
+     * @return A list of villagers in the region
+     */
+    public List<VillagerEntity> getVillagersInRegion(SpawnRegion region) {
+        if (region == null || server == null) {
+            return Collections.emptyList();
+        }
+        List<VillagerEntity> villagersInRegion = new ArrayList<>();
+        // Iterate through all server worlds to find villagers
+        for (ServerWorld world : server.getWorlds()) {
+             // Check if the world dimension matches the region, if necessary (using region.canSpawnInDimension)
+             // Efficiently get entities in the region's bounding box
+             Box regionBox = new Box(region.getCenter()).expand(region.getRadius());
+             List<VillagerEntity> worldVillagers = world.getEntitiesByClass(VillagerEntity.class, regionBox, v -> region.isWithinRegion(v.getBlockPos()));
+             villagersInRegion.addAll(worldVillagers);
+        }
+         return villagersInRegion;
+     }
 }

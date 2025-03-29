@@ -37,20 +37,6 @@ public class VillageCraftingScreenHandler extends ScreenHandler {
         this.culture = culture;
     }
     
-    /**
-     * Process the crafting request for the specified recipe.
-     * 
-     * @param recipeId The ID of the recipe to craft
-     * @return True if the crafting was successful, false otherwise
-     */
-    public boolean processCraftingRequest(String recipeId) {
-        if (player instanceof ServerPlayerEntity serverPlayer) {
-            // Use the existing crafting network logic to handle the request
-            VillageCraftingNetwork.handleCraftingRequest(villager, recipeId, serverPlayer);
-            return true;
-        }
-        return false;
-    }
     
     @Override
     public boolean canUse(PlayerEntity player) {

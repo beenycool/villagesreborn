@@ -87,6 +87,7 @@ public class Villagesreborn implements ModInitializer {
         ServerTickHandler.init();
 
         registerNetworking();
+        VillageCraftingNetwork.registerServerHandlers();
         CulturalEventSystem.getInstance();
         ModCommands.register();
         VillagerEvents.registerTheftDetection();

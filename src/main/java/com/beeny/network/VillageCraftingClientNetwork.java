@@ -8,7 +8,6 @@ import net.minecraft.network.PacketByteBuf;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
 import java.util.List;
@@ -59,11 +58,6 @@ public class VillageCraftingClientNetwork {
                 recipe.write(buf);
             }
         }
-
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return RECIPE_LIST_PAYLOAD_ID;
-        }
     }
 
     public static class CraftStatusPayload implements CustomPayload {
@@ -92,11 +86,6 @@ public class VillageCraftingClientNetwork {
             buf.writeString(recipeId);
             buf.writeBoolean(crafting);
             buf.writeString(message);
-        }
-
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return CRAFT_STATUS_PAYLOAD_ID;
         }
     }
 

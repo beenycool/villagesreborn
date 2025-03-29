@@ -95,11 +95,6 @@ public class VillagesNetwork {
             buf.writeInt(population);
         }
         
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return VILLAGE_INFO_PAYLOAD_ID;
-        }
-        
         public String getCulture() {
             return culture;
         }
@@ -133,11 +128,6 @@ public class VillagesNetwork {
             buf.writeBlockPos(playerPos);
         }
         
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
-        }
-        
         public BlockPos getPlayerPos() {
             return playerPos;
         }
@@ -165,11 +155,6 @@ public class VillagesNetwork {
             buf.writeString(title);
             buf.writeString(description);
             buf.writeInt(durationTicks);
-        }
-        
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return EVENT_NOTIFICATION_PAYLOAD_ID;
         }
         
         public String getTitle() {
@@ -209,11 +194,6 @@ public class VillagesNetwork {
             buf.writeString(message);
         }
         
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return EVENT_UPDATE_PAYLOAD_ID;
-        }
-        
         public String getEventId() {
             return eventId;
         }
@@ -243,11 +223,6 @@ public class VillagesNetwork {
             buf.writeString(eventId);
         }
         
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return JOIN_EVENT_PAYLOAD_ID;
-        }
-        
         public String getEventId() {
             return eventId;
         }
@@ -275,11 +250,6 @@ public class VillagesNetwork {
             buf.writeUuid(villagerUuid);
             buf.writeString(activity);
             buf.writeBlockPos(position);
-        }
-        
-        @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
-            return VILLAGER_AI_STATE_PAYLOAD_ID;
         }
         
         public UUID getVillagerUuid() {

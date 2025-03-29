@@ -343,4 +343,24 @@ public class VillageCraftingNetwork {
             return result;
         }
     }
+
+    public static void registerServerHandlers() {
+        ServerPlayNetworking.registerGlobalReceiver(CRAFT_RECIPE_PAYLOAD_ID,
+            (payload, context) -> {
+                ServerPlayerEntity player = context.player();
+                MinecraftServer server = player.getServer();
+                server.execute(() -> {
+                    // Find villager entity from payload.villagerUuid()
+                    VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.villagerUuid());
+                    if (villager != null) {
+                        VillageCraftingManager.getInstance().assignTask(villager, payload.recipeId(), player);
+                        // Handle potential future/result? Maybe assignTask returns void and uses callbacks/packets?
+                        // Based on current code, assignTask seems to handle sending results back.
+                    } else {
+                        LOGGER.warn("Crafting request received for unknown villager {}", payload.villagerUuid());
+                    }
+                });
+            });
+        // Register other server-side handlers (REQUEST_RECIPES, CANCEL_CRAFT) similarly
+    }
 }
