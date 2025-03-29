@@ -574,7 +574,6 @@ public class VillagerManager {
         villageStats.put(center, new VillageStats(center, culture));
     }
 
-    @Override
     public void updateVillageStats(BlockPos center, VillageStats stats) {
         villageStats.put(center, stats);
         broadcastVillageInfoUpdate(center);
@@ -890,4 +889,8 @@ public class VillagerManager {
         }
          return villagersInRegion;
      }
+    
+    public void registerBiomeCultureAssociation(java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType) {
+        biomeCultureAssociations.put(selector, cultureType);
+    }
 }

@@ -58,6 +58,11 @@ public class VillageCraftingClientNetwork {
                 recipe.write(buf);
             }
         }
+
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return RECIPE_LIST_PAYLOAD_ID;
+        }
     }
 
     public static class CraftStatusPayload implements CustomPayload {
@@ -87,21 +92,25 @@ public class VillageCraftingClientNetwork {
             buf.writeBoolean(crafting);
             buf.writeString(message);
         }
+
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return CRAFT_STATUS_PAYLOAD_ID;
+        }
     }
 
     /**
      * Register client-side packet handlers
      */
     private static void registerClientHandlers() {
-        // Register client-side packet receivers using the updated API for 1.21.4
+        // Updated registration using proper types
         ClientPlayNetworking.registerGlobalReceiver(
             RECIPE_LIST_PAYLOAD_ID,
-            (payload, context) -> {
-                MinecraftClient client = context.client();
+            (client, handler, buf, responseSender) -> {
+                RecipeListPayload payload = new RecipeListPayload(buf);
                 client.execute(() -> {
-                    RecipeListPayload recipeListPayload = (RecipeListPayload) payload;
                     VillageCraftingClientHandler.updateAvailableRecipes(
-                        recipeListPayload.recipes.get(0).getVillagerUuid(),
+                        payload.recipes.get(0).getVillagerUuid(),
                         null
                     );
                 });
@@ -110,15 +119,14 @@ public class VillageCraftingClientNetwork {
 
         ClientPlayNetworking.registerGlobalReceiver(
             CRAFT_STATUS_PAYLOAD_ID,
-            (payload, context) -> {
-                MinecraftClient client = context.client();
-                CraftStatusPayload craftStatusPayload = (CraftStatusPayload) payload;
+            (client, handler, buf, responseSender) -> {
+                CraftStatusPayload payload = new CraftStatusPayload(buf);
                 client.execute(() -> {
                     VillageCraftingClientHandler.updateCraftingStatus(
-                        craftStatusPayload.villagerUuid,
-                        craftStatusPayload.recipeId,
-                        craftStatusPayload.crafting,
-                        craftStatusPayload.message
+                        payload.villagerUuid,
+                        payload.recipeId,
+                        payload.crafting,
+                        payload.message
                     );
                 });
             }

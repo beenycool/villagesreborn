@@ -721,9 +721,13 @@ public class VillagerAI {
     private void moveToWorkstation() {
         // Try to get the workstation from the villager's brain
         villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE)
-            .ifPresent(pos -> {
-                moveToPosition(pos, 0.5D, 1);
-                LOGGER.debug("Moving villager {} to workstation at {}", villager.getName().getString(), pos);
+            .ifPresent(globalPos -> {
+                // Check if workstation is in the same dimension
+                if (globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
+                    BlockPos pos = globalPos.pos();
+                    moveToPosition(pos, 0.5D, 1);
+                    LOGGER.debug("Moving villager {} to workstation at {}", villager.getName().getString(), pos);
+                }
             });
     }
     
@@ -1499,13 +1503,17 @@ public class VillagerAI {
         double nearestDistSq = Double.MAX_VALUE;
         
         // Check for a remembered home bed first
-        Optional<BlockPos> homeMem = villager.getBrain().getOptionalMemory(
+        Optional<net.minecraft.util.math.GlobalPos> homeMem = villager.getBrain().getOptionalMemory(
             net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
         
         if (homeMem.isPresent()) {
-            BlockPos homePos = homeMem.get();
-            if (world.getBlockState(homePos).getBlock() instanceof net.minecraft.block.BedBlock) {
-                return homePos;
+            net.minecraft.util.math.GlobalPos homeGlobalPos = homeMem.get();
+            // Check if the home is in the same dimension
+            if (homeGlobalPos.dimension().equals(world.getRegistryKey())) {
+                BlockPos homePos = homeGlobalPos.pos();
+                if (world.getBlockState(homePos).getBlock() instanceof net.minecraft.block.BedBlock) {
+                    return homePos;
+                }
             }
         }
         

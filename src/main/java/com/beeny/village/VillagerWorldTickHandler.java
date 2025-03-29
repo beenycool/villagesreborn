@@ -62,7 +62,7 @@ public class VillagerWorldTickHandler implements ServerTickEvents.EndWorldTick {
         // Get all loaded villagers in the world
         List<VillagerEntity> loadedVillagers = world.getEntitiesByClass(
             VillagerEntity.class,
-            world.getWorldBorder().asBox(),
+            world.getWorldBorder().getBoundaries(),
             villager -> true
         );
         

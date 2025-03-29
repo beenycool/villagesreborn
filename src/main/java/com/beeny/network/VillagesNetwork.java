@@ -2,10 +2,10 @@ package com.beeny.network;
 
 import com.beeny.gui.EventNotificationManager;
 import com.beeny.gui.VillageInfoHud;
-import com.beeny.village.VillageEvent;
 import com.beeny.village.VillageInfluenceManager;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.event.PlayerEventParticipation;
+import com.beeny.village.event.VillageEvent;  // Updated import
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -110,6 +110,11 @@ public class VillagesNetwork {
         public int getPopulation() {
             return population;
         }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return VILLAGE_INFO_PAYLOAD_ID;
+        }
     }
     
     public static class RequestVillageInfoPayload implements CustomPayload {
@@ -130,6 +135,11 @@ public class VillagesNetwork {
         
         public BlockPos getPlayerPos() {
             return playerPos;
+        }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
         }
     }
     
@@ -168,6 +178,11 @@ public class VillagesNetwork {
         public int getDurationTicks() {
             return durationTicks;
         }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return EVENT_NOTIFICATION_PAYLOAD_ID;
+        }
     }
     
     public static class EventUpdatePayload implements CustomPayload {
@@ -205,6 +220,11 @@ public class VillagesNetwork {
         public String getMessage() {
             return message;
         }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return EVENT_UPDATE_PAYLOAD_ID;
+        }
     }
     
     public static class JoinEventPayload implements CustomPayload {
@@ -225,6 +245,11 @@ public class VillagesNetwork {
         
         public String getEventId() {
             return eventId;
+        }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return JOIN_EVENT_PAYLOAD_ID;
         }
     }
     
@@ -263,6 +288,11 @@ public class VillagesNetwork {
         public BlockPos getPosition() {
             return position;
         }
+        
+        @Override
+        public CustomPayload.Id<?> getId() {
+            return VILLAGER_AI_STATE_PAYLOAD_ID;
+        }
     }
 
     /**
@@ -278,16 +308,22 @@ public class VillagesNetwork {
      */
     public static void registerServerHandlers() {
         // Register handlers for the custom payload packets
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PAYLOAD_ID, 
-            (server, player, handler, buf, responseSender) -> {
-                RequestVillageInfoPayload payload = new RequestVillageInfoPayload(buf);
-                handleVillageInfoRequest(server, player, handler, payload, responseSender);
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PAYLOAD_ID,
+            (payload, context) -> {
+                ServerPlayerEntity player = context.player();
+                MinecraftServer server = player.getServer();
+                server.execute(() -> {
+                    handleVillageInfoRequest(server, player, player.networkHandler, payload, context.responseSender());
+                });
             });
         
-        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PAYLOAD_ID, 
-            (server, player, handler, buf, responseSender) -> {
-                JoinEventPayload payload = new JoinEventPayload(buf);
-                handleJoinEventRequest(server, player, handler, payload, responseSender);
+        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PAYLOAD_ID,
+            (payload, context) -> {
+                ServerPlayerEntity player = context.player();
+                MinecraftServer server = player.getServer();
+                server.execute(() -> {
+                    handleJoinEventRequest(server, player, player.networkHandler, payload, context.responseSender());
+                });
             });
             
         LOGGER.info("Server packet handlers registered successfully");
@@ -298,28 +334,36 @@ public class VillagesNetwork {
      */
     public static void registerClientHandlers() {
         // Register handlers for the custom payload packets
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PAYLOAD_ID, 
-            (client, handler, buf, responseSender) -> {
-                VillageInfoPayload payload = new VillageInfoPayload(buf);
-                handleVillageInfoUpdate(client, handler, payload, responseSender);
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PAYLOAD_ID,
+            (payload, context) -> {
+                MinecraftClient client = context.client();
+                client.execute(() -> {
+                    handleVillageInfoUpdate(client, context.networkHandler(), payload, context.responseSender());
+                });
             });
         
         ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_PAYLOAD_ID,
-            (client, handler, buf, responseSender) -> {
-                EventNotificationPayload payload = new EventNotificationPayload(buf);
-                handleEventNotification(client, handler, payload, responseSender);
+            (payload, context) -> {
+                MinecraftClient client = context.client();
+                client.execute(() -> {
+                    handleEventNotification(client, context.networkHandler(), payload, context.responseSender());
+                });
             });
         
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PAYLOAD_ID, 
-            (client, handler, buf, responseSender) -> {
-                EventUpdatePayload payload = new EventUpdatePayload(buf);
-                handleEventUpdate(client, handler, payload, responseSender);
+        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PAYLOAD_ID,
+            (payload, context) -> {
+                MinecraftClient client = context.client();
+                client.execute(() -> {
+                    handleEventUpdate(client, context.networkHandler(), payload, context.responseSender());
+                });
             });
         
         ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_PAYLOAD_ID,
-            (client, handler, buf, responseSender) -> {
-                VillagerAIStatePayload payload = new VillagerAIStatePayload(buf);
-                handleVillagerAIState(client, handler, payload, responseSender);
+            (payload, context) -> {
+                MinecraftClient client = context.client();
+                client.execute(() -> {
+                    handleVillagerAIState(client, context.networkHandler(), payload, context.responseSender());
+                });
             });
             
         LOGGER.info("Client packet handlers registered successfully");
@@ -355,17 +399,14 @@ public class VillagesNetwork {
     private static void handleJoinEventRequest(MinecraftServer server, ServerPlayerEntity player,
                                          ServerPlayNetworkHandler handler, JoinEventPayload payload,
                                          PacketSender responseSender) {
-        // Read event ID from the payload
         String eventId = payload.getEventId();
         
-        // Execute on server thread
         server.execute(() -> {
-            // Find the event and add the player as a participant
-            VillageEvent event = VillageEvent.getEvent(eventId);
+            // Updated to use correct VillageEvent class from event package
+            VillageEvent event = VillageEvent.findById(eventId);  // Assuming method name is findById
             if (event != null) {
                 PlayerEventParticipation.getInstance().joinEvent(player, event);
                 
-                // Send confirmation back to client
                 EventUpdatePayload updatePayload = new EventUpdatePayload(
                     eventId, true, "You've joined the " + event.getName() + " event!");
                 

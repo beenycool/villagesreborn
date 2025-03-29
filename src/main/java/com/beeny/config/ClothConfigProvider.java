@@ -546,7 +546,7 @@ public class ClothConfigProvider {
                 ui.getColorScheme())
                 .setDefaultValue("DEFAULT")
                 .setTooltip(Text.literal("UI color theme"))
-                .setSaveConsumer(ui::setColorScheme)
+                .setSaveConsumer(value -> ui.setColorScheme((String)value))
                 .build());
         
         // Conversation Label Format
@@ -566,7 +566,7 @@ public class ClothConfigProvider {
                 ui.getConversationHudPosition())
                 .setDefaultValue("BOTTOM_RIGHT")
                 .setTooltip(Text.literal("Position of conversation HUD on screen"))
-                .setSaveConsumer(ui::setConversationHudPosition)
+                .setSaveConsumer(value -> ui.setConversationHudPosition((String)value))
                 .build());
         
         // Show Culture

@@ -350,17 +350,43 @@ public class VillageCraftingNetwork {
                 ServerPlayerEntity player = context.player();
                 MinecraftServer server = player.getServer();
                 server.execute(() -> {
-                    // Find villager entity from payload.villagerUuid()
-                    VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.villagerUuid());
+                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
+                        .getEntity(payload.getVillagerUuid());
                     if (villager != null) {
-                        VillageCraftingManager.getInstance().assignTask(villager, payload.recipeId(), player);
-                        // Handle potential future/result? Maybe assignTask returns void and uses callbacks/packets?
-                        // Based on current code, assignTask seems to handle sending results back.
+                        VillageCraftingManager.getInstance()
+                            .assignTask(villager, payload.getRecipeId(), player);
                     } else {
-                        LOGGER.warn("Crafting request received for unknown villager {}", payload.villagerUuid());
+                        LOGGER.warn("Crafting request received for unknown villager {}", 
+                            payload.getVillagerUuid());
                     }
                 });
             });
-        // Register other server-side handlers (REQUEST_RECIPES, CANCEL_CRAFT) similarly
+
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PAYLOAD_ID,
+            (payload, context) -> {
+                ServerPlayerEntity player = context.player();
+                MinecraftServer server = player.getServer();
+                server.execute(() -> {
+                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
+                        .getEntity(payload.getVillagerUuid());
+                    if (villager != null) {
+                        handleRecipeRequest(villager, player, context.responseSender());
+                    }
+                });
+            });
+
+        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PAYLOAD_ID,
+            (payload, context) -> {
+                ServerPlayerEntity player = context.player();
+                MinecraftServer server = player.getServer();
+                server.execute(() -> {
+                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
+                        .getEntity(payload.getVillagerUuid());
+                    if (villager != null) {
+                        VillageCraftingManager.getInstance()
+                            .cancelTask(villager, payload.getRecipeId());
+                    }
+                });
+            });
     }
 }

@@ -170,28 +170,27 @@ public class VillagesClientNetwork {
      */
     public static void registerReceivers() {
         // Register receiver for villager culture data
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_PAYLOAD_ID, 
-            (client, handler, buf, responseSender) -> {
-                VillagerCulturePayload payload = new VillagerCulturePayload(buf);
-                // Process on the main client thread
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_PAYLOAD_ID,
+            (payload, context) -> {
+                MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleVillagerCulturePacket(payload.getVillagerUuid(), payload.getCulture());
                 });
             });
 
         // Register receiver for villager mood updates
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_PAYLOAD_ID, 
-            (client, handler, buf, responseSender) -> {
-                VillagerMoodPayload payload = new VillagerMoodPayload(buf);
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_PAYLOAD_ID,
+            (payload, context) -> {
+                MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleVillagerMoodPacket(payload.getVillagerUuid(), payload.getMood());
                 });
             });
 
-        // Register receiver for village information - reuse the payload from VillagesNetwork.java
-        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID, 
-            (client, handler, buf, responseSender) -> {
-                VillagesNetwork.VillageInfoPayload payload = new VillagesNetwork.VillageInfoPayload(buf);
+        // Register receiver for village information
+        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID,
+            (payload, context) -> {
+                MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleVillageInfoPacket(
                         payload.getCulture(),

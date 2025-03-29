@@ -174,7 +174,7 @@ public class Villagesreborn implements ModInitializer {
 
     private void registerNetworking() {
         LOGGER.info("Registering networking handlers");
-        VillageCraftingNetwork.register();
+        // VillageCraftingNetwork.register();
     }
 
     private void registerVillagerLoadCallback() {

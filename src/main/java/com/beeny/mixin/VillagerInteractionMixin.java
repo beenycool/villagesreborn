@@ -288,10 +288,14 @@ public abstract class VillagerInteractionMixin {
         villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
     
     if (jobSiteOpt.isPresent()) {
-      // Extract the BlockPos from GlobalPos
+      // Extract the BlockPos from GlobalPos and check dimension
       net.minecraft.util.math.GlobalPos globalPos = jobSiteOpt.get();
-      BlockPos poiPos = globalPos.pos();
+      if (!globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
+        vr_LOGGER.debug("Villager {} JOB_SITE is in different dimension", villager.getUuid());
+        return false;
+      }
       
+      BlockPos poiPos = globalPos.pos();
       double distance = villager.getBlockPos().getSquaredDistance(poiPos);
       BlockState poiState = villager.getWorld().getBlockState(poiPos);
       

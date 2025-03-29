@@ -32,7 +32,11 @@ public class CulturalCraftingStation {
         ROMAN_FORGE("Roman Forge", "roman", "Specialized forge for crafting enhanced weapons with Roman aesthetics"),
         EGYPTIAN_ALTAR("Egyptian Altar", "egyptian", "Mystical altar for creating items using desert resources"),
         VICTORIAN_WORKSHOP("Victorian Workshop", "victorian", "Advanced workshop for industrial gadgets and machinery parts"),
-        NYC_STUDIO("NYC Studio", "nyc", "Modern studio for unique NYC-themed creations");
+        NYC_STUDIO("NYC Studio", "nyc", "Modern studio for unique NYC-themed creations"),
+        GREEK_ACADEMY("Greek Academy", "greek", "Place of learning and crafting for Greek culture"), // Added
+        JAPANESE_FORGE("Japanese Forge", "japanese", "Forge for crafting traditional Japanese items"), // Added
+        MAYAN_ALTAR("Mayan Altar", "mayan", "Altar for Mayan rituals and crafting"), // Added
+        MEDIEVAL_SMITHY("Medieval Smithy", "medieval", "Smithy for medieval arms and armor"); // Added
         
         private final String name;
         private final String culture;

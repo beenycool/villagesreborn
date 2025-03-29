@@ -1,6 +1,7 @@
 package com.beeny.village.event;
 
 import com.beeny.Villagesreborn;
+import com.beeny.data.PlayerDataManager as PlayerDataManagerBeeny;
 import com.beeny.village.artifacts.CulturalArtifactSystem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
@@ -52,7 +53,7 @@ public class PlayerDataManager {
         villagesData.put("artifacts", artifactData);
         
         // Store in the player's persistent data
-        NbtCompound persistentData = player.getDataTracker().get(ServerPlayerEntityAccessor.getPersistentDataTracker());
+        NbtCompound persistentData = PlayerDataManagerBeeny.getOrCreatePersistentData(player);
         persistentData.put(Villagesreborn.MOD_ID, villagesData);
     }
 
@@ -68,7 +69,7 @@ public class PlayerDataManager {
         UUID playerUUID = player.getUuid();
 
         // Get the player's persistent data
-        NbtCompound persistentData = player.getDataTracker().get(ServerPlayerEntityAccessor.getPersistentDataTracker());
+        NbtCompound persistentData = PlayerDataManagerBeeny.getOrCreatePersistentData(player);
         
         // Return if no data exists for our mod
         if (!persistentData.contains(Villagesreborn.MOD_ID)) {
