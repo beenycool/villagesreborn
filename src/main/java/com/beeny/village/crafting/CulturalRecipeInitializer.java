@@ -1,47 +1,21 @@
 package com.beeny.village.crafting;
 
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import com.beeny.village.util.DataComponentHelper;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.RegistryWrapper.WrapperLookup;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
 import net.minecraft.text.Style;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.registry.Registry;
 import net.minecraft.util.Formatting;
+import net.minecraft.component.DataComponentTypes;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-/**
- * Cultural recipe initialization system for defining culturally-specific
- * crafting recipes with custom NBT data, enchantments, and special properties.
- */
 public class CulturalRecipeInitializer {
-    private static WrapperLookup wrapperLookup = null;
     
-    /**
-     * Initialize all cultural recipes
-     */
-    public static void init(WrapperLookup lookup) {
-        wrapperLookup = lookup;
+    public static void init() {
         registerRomanRecipes();
         registerEgyptianRecipes();
         registerVictorianRecipes();
@@ -52,46 +26,84 @@ public class CulturalRecipeInitializer {
         registerMedievalRecipes();
         registerSpecialRecipes();
     }
-    
-    /**
-     * Register Roman crafting recipes
-     */
+
+    private static void addCustomProperties(ItemStack stack, String name, Formatting color, List<String> loreLines) {
+        // Set custom name
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).formatted(color));
+        
+        // Set lore
+        if (!loreLines.isEmpty()) {
+            List<Text> lore = new ArrayList<>();
+            for (String line : loreLines) {
+                lore.add(Text.literal(line).formatted(Formatting.GRAY));
+            }
+            DataComponentHelper.setLore(stack, lore);
+        }
+    }
+
+    private static void addEnchantments(ItemStack stack, Map<String, Integer> enchantments) {
+        if (!enchantments.isEmpty()) {
+            Map<Enchantment, Integer> enchantMap = new HashMap<>();
+            enchantments.forEach((id, level) -> {
+                Optional<Enchantment> enchant = Registries.ENCHANTMENT.getOrEmpty(new net.minecraft.util.Identifier(id));
+                enchant.ifPresent(e -> enchantMap.put(e, level));
+            });
+            DataComponentHelper.setEnchantments(stack, enchantMap);
+        }
+    }
+
+    private static void addPotionEffect(ItemStack stack, String potionId, String name) {
+        // Set custom name
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).formatted(Formatting.AQUA));
+        
+        // Set potion effect
+        DataComponentHelper.setPotionEffect(stack, potionId);
+        
+        // Set lore based on potion type
+        List<Text> lore = new ArrayList<>();
+        if (potionId.contains("fire_resistance")) {
+            lore.add(Text.literal("Provides protection from the desert heat").formatted(Formatting.GRAY));
+        } else if (potionId.contains("strength")) {
+            lore.add(Text.literal("Enhances physical power").formatted(Formatting.GRAY));
+        }
+        DataComponentHelper.setLore(stack, lore);
+    }
+
+    private static void addFireworkEffect(ItemStack stack, String name, byte flight, int[] colors) {
+        // Set custom name
+        stack.setCustomName(Text.literal(name).formatted(Formatting.LIGHT_PURPLE));
+        
+        // Set firework effect
+        DataComponentHelper.setFireworkEffect(stack, flight, colors);
+        
+        // Set lore
+        List<Text> lore = Arrays.asList(
+            Text.literal("Celebratory fireworks for special occasions").formatted(Formatting.GRAY)
+        );
+        DataComponentHelper.setLore(stack, lore);
+    }
+
     private static void registerRomanRecipes() {
         // Roman Gladius
         ItemStack gladius = new ItemStack(Items.IRON_SWORD);
         
-        // Add custom name using Components
-        gladius.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Gladius").formatted(Formatting.RED));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:sharpness", 3);
+        enchantments.put("minecraft:unbreaking", 2);
         
-        // Add enchantments using custom NBT data component
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantmentList = new NbtList();
+        List<String> lore = Arrays.asList(
+            "The weapon of Roman legionnaires",
+            "Forged in the heart of Rome"
+        );
         
-        // Sharpness enchantment
-        NbtCompound sharpness = new NbtCompound();
-        sharpness.putString("id", "minecraft:sharpness");
-        sharpness.putShort("lvl", (short)3);
-        enchantmentList.add(sharpness);
+        addCustomProperties(gladius, "Roman Gladius", Formatting.RED, lore);
+        addEnchantments(gladius, enchantments);
         
-        // Unbreaking enchantment
-        NbtCompound unbreaking = new NbtCompound();
-        unbreaking.putString("id", "minecraft:unbreaking");
-        unbreaking.putShort("lvl", (short)2);
-        enchantmentList.add(unbreaking);
-        
-        enchantmentData.put("Enchantments", enchantmentList);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The weapon of Roman legionnaires").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Forged in the heart of Rome").formatted(Formatting.GRAY), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        gladius.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("damage_bonus", 2);
+        customData.put("attack_speed_bonus", 0.1f);
+        DataComponentHelper.setCustomData(gladius, customData);
 
-        // Register recipe
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 3),
             new ItemStack(Items.GOLD_INGOT, 1),
@@ -112,34 +124,18 @@ public class CulturalRecipeInitializer {
         // Roman Lorica Segmentata
         ItemStack lorica = new ItemStack(Items.IRON_CHESTPLATE);
         
-        // Add custom name using Components
-        lorica.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Lorica Segmentata").formatted(Formatting.RED));
+        enchantments = new HashMap<>();
+        enchantments.put("minecraft:protection", 3);
+        enchantments.put("minecraft:unbreaking", 2);
         
-        // Add enchantments using custom NBT data component
-        enchantmentData = new NbtCompound();
-        enchantmentList = new NbtList();
+        lore = Arrays.asList(
+            "Armor of the Imperial legions"
+        );
         
-        // Protection enchantment
-        NbtCompound protection = new NbtCompound();
-        protection.putString("id", "minecraft:protection");
-        protection.putShort("lvl", (short)3);
-        enchantmentList.add(protection);
+        addCustomProperties(lorica, "Roman Lorica Segmentata", Formatting.RED, lore);
+        addEnchantments(lorica, enchantments);
         
-        // Unbreaking enchantment
-        unbreaking = new NbtCompound();
-        unbreaking.putString("id", "minecraft:unbreaking");
-        unbreaking.putShort("lvl", (short)2);
-        enchantmentList.add(unbreaking);
-        
-        enchantmentData.put("Enchantments", enchantmentList);
-        
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Armor of the Imperial legions").formatted(Formatting.GRAY), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        lorica.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        DataComponentHelper.setCustomData(lorica, customData);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 7),
@@ -160,37 +156,20 @@ public class CulturalRecipeInitializer {
         // Roman Scutum Shield
         ItemStack scutum = new ItemStack(Items.SHIELD);
         
-        // Add custom name using Components
-        scutum.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Roman Scutum").formatted(Formatting.RED));
+        enchantments = new HashMap<>();
+        enchantments.put("minecraft:knockback", 1);
+        enchantments.put("minecraft:thorns", 1);
         
-        // Add enchantments using custom NBT data component
-        enchantmentData = new NbtCompound();
-        enchantmentList = new NbtList();
+        lore = Arrays.asList(
+            "The shield of Roman formation tactics"
+        );
         
-        // Protection enchantment
-        NbtCompound knockback = new NbtCompound();
-        knockback.putString("id", "minecraft:knockback");
-        knockback.putShort("lvl", (short)1);
-        enchantmentList.add(knockback);
+        addCustomProperties(scutum, "Roman Scutum", Formatting.RED, lore);
+        addEnchantments(scutum, enchantments);
         
-        // Thorns enchantment
-        NbtCompound thorns = new NbtCompound();
-        thorns.putString("id", "minecraft:thorns");
-        thorns.putShort("lvl", (short)1);
-        enchantmentList.add(thorns);
-        
-        enchantmentData.put("Enchantments", enchantmentList);
-        
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The shield of Roman formation tactics").formatted(Formatting.GRAY), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        // Add attributes
-        enchantmentData.putFloat("BlockStrength", 1.5f);
-        
-        scutum.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        customData = new HashMap<>();
+        customData.put("BlockStrength", 1.5f);
+        DataComponentHelper.setCustomData(scutum, customData);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 1),
@@ -210,9 +189,6 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Egyptian crafting recipes
-     */
     private static void registerEgyptianRecipes() {
         // Desert Protection Elixir
         ItemStack desertPotion = new ItemStack(Items.POTION);
@@ -238,36 +214,22 @@ public class CulturalRecipeInitializer {
         // Pharaoh's Staff
         ItemStack staff = new ItemStack(Items.BLAZE_ROD);
         
-        // Add custom name using Components
-        staff.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Pharaoh's Staff").formatted(Formatting.GOLD));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:fire_aspect", 2);
+        enchantments.put("minecraft:power", 3);
         
-        // Add enchantments using custom NBT data component
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantmentList = new NbtList();
+        List<String> lore = Arrays.asList(
+            "A symbol of royal authority",
+            "Blessed by Ra, the sun god"
+        );
         
-        // Fire Aspect enchantment
-        NbtCompound fireAspect = new NbtCompound();
-        fireAspect.putString("id", "minecraft:fire_aspect");
-        fireAspect.putShort("lvl", (short)2);
-        enchantmentList.add(fireAspect);
+        addCustomProperties(staff, "Pharaoh's Staff", Formatting.GOLD, lore);
+        addEnchantments(staff, enchantments);
         
-        // Power enchantment
-        NbtCompound power = new NbtCompound();
-        power.putString("id", "minecraft:power");
-        power.putShort("lvl", (short)3);
-        enchantmentList.add(power);
-        
-        enchantmentData.put("Enchantments", enchantmentList);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A symbol of royal authority").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Blessed by Ra, the sun god").formatted(Formatting.GOLD), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        staff.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("damage_bonus", 2);
+        customData.put("attack_speed_bonus", 0.1f);
+        DataComponentHelper.setCustomData(staff, customData);
 
         ingredients = Arrays.asList(
             new ItemStack(Items.STICK, 1),
@@ -289,25 +251,17 @@ public class CulturalRecipeInitializer {
         // Ankh of Resurrection
         ItemStack ankh = new ItemStack(Items.TOTEM_OF_UNDYING);
         
-        // Add custom name
-        ankh.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Ankh of Resurrection").formatted(Formatting.GOLD));
+        lore = Arrays.asList(
+            "Symbol of eternal life",
+            "Grants second chance to its bearer"
+        );
         
-        // Add custom NBT data
-        NbtCompound customData = new NbtCompound();
+        addCustomProperties(ankh, "Ankh of Resurrection", Formatting.GOLD, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Symbol of eternal life").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Grants second chance to its bearer").formatted(Formatting.AQUA), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Add custom properties
-        customData.putInt("ResurrectionPower", 2); // More powerful than standard totem
-        customData.putInt("HealthRestored", 15);
-        
-        ankh.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        customData = new HashMap<>();
+        customData.put("ResurrectionPower", 2);
+        customData.put("HealthRestored", 15);
+        DataComponentHelper.setCustomData(ankh, customData);
         
         ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 4),
@@ -327,30 +281,21 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Victorian crafting recipes
-     */
     private static void registerVictorianRecipes() {
         // Victorian Pocket Watch
         ItemStack pocketWatch = new ItemStack(Items.CLOCK);
         
-        // Add custom name using Components
-        pocketWatch.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Victorian Pocket Watch").formatted(Formatting.GOLD));
+        List<String> lore = Arrays.asList(
+            "A finely crafted timepiece",
+            "Keeps perfect time even in the most adverse conditions"
+        );
         
-        // Add lore using Components and custom NBT
-        NbtCompound customData = new NbtCompound();
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A finely crafted timepiece").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Keeps perfect time even in the most adverse conditions").formatted(Formatting.GRAY), wrapperLookup)));
-        customData.put("Lore", loreList);
+        addCustomProperties(pocketWatch, "Victorian Pocket Watch", Formatting.GOLD, lore);
         
-        // Add special properties
-        customData.putBoolean("IsPrecise", true);
-        customData.putBoolean("ShowsPhase", true);
-        
-        pocketWatch.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("IsPrecise", true);
+        customData.put("ShowsPhase", true);
+        DataComponentHelper.setCustomData(pocketWatch, customData);
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 3),
@@ -393,36 +338,21 @@ public class CulturalRecipeInitializer {
         // Victorian Explorer's Hat
         ItemStack explorerHat = new ItemStack(Items.LEATHER_HELMET);
         
-        // Add custom name
-        explorerHat.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Victorian Explorer's Hat").formatted(Formatting.DARK_GREEN));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:respiration", 2);
         
-        // Add enchantments and custom NBT
-        customData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        lore = Arrays.asList(
+            "Worn by explorers of the British Empire",
+            "Provides extra visibility in harsh conditions"
+        );
         
-        // Respiration enchantment
-        NbtCompound respiration = new NbtCompound();
-        respiration.putString("id", "minecraft:respiration");
-        respiration.putShort("lvl", (short)2);
-        enchantments.add(respiration);
+        addCustomProperties(explorerHat, "Victorian Explorer's Hat", Formatting.DARK_GREEN, lore);
+        addEnchantments(explorerHat, enchantments);
         
-        customData.put("Enchantments", enchantments);
-        
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Worn by explorers of the British Empire").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Provides extra visibility in harsh conditions").formatted(Formatting.DARK_GREEN), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Add color
-        customData.putInt("color", 5060991); // Brown color
-        
-        // Add special properties
-        customData.putFloat("ExplorationBonus", 0.15f);
-        
-        explorerHat.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        customData = new HashMap<>();
+        customData.put("color", 5060991);
+        customData.put("ExplorationBonus", 0.15f);
+        DataComponentHelper.setCustomData(explorerHat, customData);
         
         ingredients = Arrays.asList(
             new ItemStack(Items.LEATHER, 5),
@@ -442,37 +372,26 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register NYC crafting recipes
-     */
     private static void registerNYCRecipes() {
         // NYC-style Pizza
         ItemStack pizza = new ItemStack(Items.COOKED_BEEF);
         
-        // Add custom name using Components
-        pizza.set(DataComponentTypes.CUSTOM_NAME, Text.literal("NYC-Style Pizza").formatted(Formatting.RED));
+        List<String> lore = Arrays.asList(
+            "The best slice in town",
+            "Authentic NYC flavor"
+        );
         
-        // Add lore and food properties using custom data component
-        NbtCompound customData = new NbtCompound();
+        addCustomProperties(pizza, "NYC-Style Pizza", Formatting.RED, lore);
         
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The best slice in town").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Authentic NYC flavor").formatted(Formatting.GRAY), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Add food properties
-        customData.putInt("FoodLevel", 8);
-        customData.putFloat("Saturation", 0.8f);
-        
-        pizza.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("FoodLevel", 8);
+        customData.put("Saturation", 0.8f);
+        DataComponentHelper.setCustomData(pizza, customData);
 
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.BREAD, 1),
             new ItemStack(Items.COOKED_BEEF, 1),
-            new ItemStack(Items.RED_DYE, 1) // Tomato sauce
+            new ItemStack(Items.RED_DYE, 1)
         );
 
         CulturalCraftingStation.RecipeRegistry.registerRecipe(
@@ -489,29 +408,19 @@ public class CulturalRecipeInitializer {
         // NYC Coffee
         ItemStack coffee = new ItemStack(Items.SUSPICIOUS_STEW);
         
-        // Add custom name
-        coffee.set(DataComponentTypes.CUSTOM_NAME, Text.literal("NYC Coffee").formatted(Formatting.DARK_PURPLE));
+        lore = Arrays.asList(
+            "Strong New York coffee",
+            "Provides energy boost and speed"
+        );
         
-        // Add custom properties
-        customData = new NbtCompound();
+        addCustomProperties(coffee, "NYC Coffee", Formatting.DARK_PURPLE, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Strong New York coffee").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Provides energy boost and speed").formatted(Formatting.BLUE), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Add effects
-        customData.putString("Effect", "minecraft:speed");
-        customData.putInt("EffectDuration", 600); // 30 seconds
-        
-        // Add food properties
-        customData.putInt("FoodLevel", 3);
-        customData.putFloat("Saturation", 0.4f);
-        
-        coffee.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        customData = new HashMap<>();
+        customData.put("Effect", "minecraft:speed");
+        customData.put("EffectDuration", 600);
+        customData.put("FoodLevel", 3);
+        customData.put("Saturation", 0.4f);
+        DataComponentHelper.setCustomData(coffee, customData);
         
         ingredients = Arrays.asList(
             new ItemStack(Items.BOWL, 1),
@@ -533,24 +442,16 @@ public class CulturalRecipeInitializer {
         // NYC Taxi Whistle
         ItemStack taxiWhistle = new ItemStack(Items.GOAT_HORN);
         
-        // Add custom name
-        taxiWhistle.set(DataComponentTypes.CUSTOM_NAME, Text.literal("NYC Taxi Whistle").formatted(Formatting.YELLOW));
+        lore = Arrays.asList(
+            "Hail a cab from anywhere",
+            "The sound carries through the busy streets"
+        );
         
-        // Add custom properties
-        customData = new NbtCompound();
+        addCustomProperties(taxiWhistle, "NYC Taxi Whistle", Formatting.YELLOW, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Hail a cab from anywhere").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The sound carries through the busy streets").formatted(Formatting.GRAY), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Special horn properties
-        customData.putString("instrument", "taxi_call");
-        
-        taxiWhistle.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        customData = new HashMap<>();
+        customData.put("instrument", "taxi_call");
+        DataComponentHelper.setCustomData(taxiWhistle, customData);
         
         ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 1),
@@ -569,43 +470,26 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Greek crafting recipes
-     */
     private static void registerGreekRecipes() {
         // Hoplite Spear
         ItemStack spear = new ItemStack(Items.TRIDENT);
         
-        // Add custom name
-        spear.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Hoplite Spear").formatted(Formatting.AQUA));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:impaling", 3);
+        enchantments.put("minecraft:loyalty", 2);
         
-        // Add enchantments
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        List<String> lore = Arrays.asList(
+            "Weapon of the Greek phalanx",
+            "Forged in the traditions of Sparta"
+        );
         
-        // Impaling
-        NbtCompound impaling = new NbtCompound();
-        impaling.putString("id", "minecraft:impaling");
-        impaling.putShort("lvl", (short)3);
-        enchantments.add(impaling);
+        addCustomProperties(spear, "Hoplite Spear", Formatting.AQUA, lore);
+        addEnchantments(spear, enchantments);
         
-        // Loyalty
-        NbtCompound loyalty = new NbtCompound();
-        loyalty.putString("id", "minecraft:loyalty");
-        loyalty.putShort("lvl", (short)2);
-        enchantments.add(loyalty);
-        
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Weapon of the Greek phalanx").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Forged in the traditions of Sparta").formatted(Formatting.RED), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        spear.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("damage_bonus", 2);
+        customData.put("attack_speed_bonus", 0.1f);
+        DataComponentHelper.setCustomData(spear, customData);
         
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 3),
@@ -627,40 +511,22 @@ public class CulturalRecipeInitializer {
         // Olympic Laurel Crown
         ItemStack laurelCrown = new ItemStack(Items.GOLDEN_HELMET);
         
-        // Add custom name
-        laurelCrown.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Olympic Laurel Crown").formatted(Formatting.GREEN, Formatting.BOLD));
+        enchantments = new HashMap<>();
+        enchantments.put("minecraft:protection", 1);
+        enchantments.put("minecraft:feather_falling", 3);
         
-        // Add enchantments and NBT
-        NbtCompound customData = new NbtCompound();
-        enchantments = new NbtList();
+        lore = Arrays.asList(
+            "Symbol of victory at the Olympic games",
+            "Grants the speed and agility of a champion"
+        );
         
-        // Protection enchantment
-        NbtCompound protection = new NbtCompound();
-        protection.putString("id", "minecraft:protection");
-        protection.putShort("lvl", (short)1);
-        enchantments.add(protection);
+        addCustomProperties(laurelCrown, "Olympic Laurel Crown", Formatting.GREEN, lore);
+        addEnchantments(laurelCrown, enchantments);
         
-        // Feather falling (speed)
-        NbtCompound featherFalling = new NbtCompound();
-        featherFalling.putString("id", "minecraft:feather_falling");
-        featherFalling.putShort("lvl", (short)3);
-        enchantments.add(featherFalling);
-        
-        customData.put("Enchantments", enchantments);
-        
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Symbol of victory at the Olympic games").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Grants the speed and agility of a champion").formatted(Formatting.GREEN), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        // Special properties
-        customData.putFloat("SpeedBonus", 0.2f);
-        customData.putFloat("JumpBonus", 0.1f);
-        
-        laurelCrown.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        customData = new HashMap<>();
+        customData.put("SpeedBonus", 0.2f);
+        customData.put("JumpBonus", 0.1f);
+        DataComponentHelper.setCustomData(laurelCrown, customData);
         
         ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_NUGGET, 5),
@@ -680,52 +546,26 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Japanese crafting recipes
-     */
     private static void registerJapaneseRecipes() {
         // Samurai Katana
         ItemStack katana = new ItemStack(Items.NETHERITE_SWORD);
         
-        // Add custom name
-        katana.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Samurai Katana").formatted(Formatting.DARK_RED));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:sharpness", 5);
+        enchantments.put("minecraft:sweeping", 3);
+        enchantments.put("minecraft:mending", 1);
         
-        // Add enchantments
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        List<String> lore = Arrays.asList(
+            "Folded 1000 times",
+            "The soul of a samurai dwells within"
+        );
         
-        // Sharpness
-        NbtCompound sharpness = new NbtCompound();
-        sharpness.putString("id", "minecraft:sharpness");
-        sharpness.putShort("lvl", (short)5);
-        enchantments.add(sharpness);
+        addCustomProperties(katana, "Samurai Katana", Formatting.DARK_RED, lore);
+        addEnchantments(katana, enchantments);
         
-        // Sweeping Edge
-        NbtCompound sweeping = new NbtCompound();
-        sweeping.putString("id", "minecraft:sweeping");
-        sweeping.putShort("lvl", (short)3);
-        enchantments.add(sweeping);
-        
-        // Mending
-        NbtCompound mending = new NbtCompound();
-        mending.putString("id", "minecraft:mending");
-        mending.putShort("lvl", (short)1);
-        enchantments.add(mending);
-        
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Folded 1000 times").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The soul of a samurai dwells within").formatted(Formatting.DARK_PURPLE), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        // Special properties
-        enchantmentData.putFloat("AttackSpeedBonus", 0.3f);
-        
-        katana.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("AttackSpeedBonus", 0.3f);
+        DataComponentHelper.setCustomData(katana, customData);
         
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.NETHERITE_INGOT, 1),
@@ -748,27 +588,19 @@ public class CulturalRecipeInitializer {
         // Paper Lantern
         ItemStack lantern = new ItemStack(Items.LANTERN);
         
-        // Add custom name
-        lantern.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Japanese Paper Lantern").formatted(Formatting.LIGHT_PURPLE));
+        lore = Arrays.asList(
+            "A delicate light source",
+            "Provides a calming atmosphere"
+        );
         
-        // Add custom properties
-        NbtCompound customData = new NbtCompound();
+        addCustomProperties(lantern, "Japanese Paper Lantern", Formatting.LIGHT_PURPLE, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A delicate light source").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Provides a calming atmosphere").formatted(Formatting.LIGHT_PURPLE), wrapperLookup)));
-        customData.put("Lore", loreList);
+        customData = new HashMap<>();
+        customData.put("LightLevel", 14);
+        customData.put("PeacefulAura", true);
+        DataComponentHelper.setCustomData(lantern, customData);
         
-        // Special properties
-        customData.putInt("LightLevel", 14);
-        customData.putBoolean("PeacefulAura", true);
-        
-        lantern.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-        
-        ingredients = Arrays.asList(
+        List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.PAPER, 6),
             new ItemStack(Items.BAMBOO, 4),
             new ItemStack(Items.TORCH, 1)
@@ -786,47 +618,26 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Mayan crafting recipes
-     */
     private static void registerMayanRecipes() {
         // Obsidian Sacrificial Blade
         ItemStack obsidianBlade = new ItemStack(Items.GOLDEN_SWORD);
         
-        // Add custom name
-        obsidianBlade.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Obsidian Ceremonial Blade").formatted(Formatting.DARK_PURPLE));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:smite", 5);
+        enchantments.put("minecraft:looting", 3);
         
-        // Add enchantments
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        List<String> lore = Arrays.asList(
+            "Used in sacred Mayan rituals",
+            "A blade that thirsts for offerings"
+        );
         
-        // Smite
-        NbtCompound smite = new NbtCompound();
-        smite.putString("id", "minecraft:smite");
-        smite.putShort("lvl", (short)5);
-        enchantments.add(smite);
+        addCustomProperties(obsidianBlade, "Obsidian Ceremonial Blade", Formatting.DARK_PURPLE, lore);
+        addEnchantments(obsidianBlade, enchantments);
         
-        // Looting
-        NbtCompound looting = new NbtCompound();
-        looting.putString("id", "minecraft:looting");
-        looting.putShort("lvl", (short)3);
-        enchantments.add(looting);
-        
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Used in sacred Mayan rituals").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A blade that thirsts for offerings").formatted(Formatting.DARK_RED), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        // Special properties
-        enchantmentData.putBoolean("BleedingEffect", true);
-        enchantmentData.putFloat("RitualBonus", 0.5f);
-        
-        obsidianBlade.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("BleedingEffect", true);
+        customData.put("RitualBonus", 0.5f);
+        DataComponentHelper.setCustomData(obsidianBlade, customData);
         
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.OBSIDIAN, 5),
@@ -848,29 +659,20 @@ public class CulturalRecipeInitializer {
         // Crystal Skull
         ItemStack crystalSkull = new ItemStack(Items.DIAMOND);
         
-        // Add custom name
-        crystalSkull.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Mayan Crystal Skull").formatted(Formatting.AQUA, Formatting.BOLD));
+        lore = Arrays.asList(
+            "Ancient knowledge from beyond the stars",
+            "Holds the wisdom of forgotten civilizations",
+            "A powerful artifact of divination"
+        );
         
-        // Add custom properties
-        NbtCompound customData = new NbtCompound();
+        addCustomProperties(crystalSkull, "Mayan Crystal Skull", Formatting.AQUA, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Ancient knowledge from beyond the stars").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Holds the wisdom of forgotten civilizations").formatted(Formatting.DARK_AQUA), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A powerful artifact of divination").formatted(Formatting.LIGHT_PURPLE), wrapperLookup)));
-        customData.put("Lore", loreList);
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("ExperienceBonus", 0.25f);
+        customData.put("VisionPower", true);
+        DataComponentHelper.setCustomData(crystalSkull, customData);
         
-        // Special properties
-        customData.putFloat("ExperienceBonus", 0.25f);
-        customData.putBoolean("VisionPower", true);
-        
-        crystalSkull.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-        
-        ingredients = Arrays.asList(
+        List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.DIAMOND, 1),
             new ItemStack(Items.QUARTZ, 3),
             new ItemStack(Items.AMETHYST_SHARD, 4),
@@ -889,46 +691,25 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register Medieval crafting recipes
-     */
     private static void registerMedievalRecipes() {
         // Knight's Longsword
         ItemStack longsword = new ItemStack(Items.IRON_SWORD);
         
-        // Add custom name
-        longsword.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Knight's Longsword").formatted(Formatting.GRAY, Formatting.BOLD));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:sharpness", 3);
+        enchantments.put("minecraft:knockback", 2);
         
-        // Add enchantments
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        List<String> lore = Arrays.asList(
+            "Sword of a noble knight",
+            "Blessed with honor and valor"
+        );
         
-        // Sharpness
-        NbtCompound sharpness = new NbtCompound();
-        sharpness.putString("id", "minecraft:sharpness");
-        sharpness.putShort("lvl", (short)3);
-        enchantments.add(sharpness);
+        addCustomProperties(longsword, "Knight's Longsword", Formatting.GRAY, lore);
+        addEnchantments(longsword, enchantments);
         
-        // Knockback
-        NbtCompound knockback = new NbtCompound();
-        knockback.putString("id", "minecraft:knockback");
-        knockback.putShort("lvl", (short)2);
-        enchantments.add(knockback);
-        
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Sword of a noble knight").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Blessed with honor and valor").formatted(Formatting.BLUE), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        // Special properties
-        enchantmentData.putFloat("ReachBonus", 1.0f);
-        
-        longsword.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("ReachBonus", 1.0f);
+        DataComponentHelper.setCustomData(longsword, customData);
         
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.IRON_INGOT, 3),
@@ -951,30 +732,21 @@ public class CulturalRecipeInitializer {
         // Holy Grail
         ItemStack holyGrail = new ItemStack(Items.GOLDEN_APPLE);
         
-        // Add custom name
-        holyGrail.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Holy Grail").formatted(Formatting.YELLOW, Formatting.BOLD));
+        lore = Arrays.asList(
+            "A legendary artifact of immense power",
+            "Grants healing to the worthy",
+            "The ultimate quest of knights"
+        );
         
-        // Add custom properties
-        NbtCompound customData = new NbtCompound();
+        addCustomProperties(holyGrail, "Holy Grail", Formatting.YELLOW, lore);
         
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("A legendary artifact of immense power").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Grants healing to the worthy").formatted(Formatting.GREEN), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("The ultimate quest of knights").formatted(Formatting.GOLD), wrapperLookup)));
-        customData.put("Lore", loreList);
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("HealthBonus", 4);
+        customData.put("HealingPower", 10);
+        customData.put("RegenerationEffect", true);
+        DataComponentHelper.setCustomData(holyGrail, customData);
         
-        // Special properties
-        customData.putInt("HealthBonus", 4);
-        customData.putInt("HealingPower", 10);
-        customData.putBoolean("RegenerationEffect", true);
-        
-        holyGrail.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-        
-        ingredients = Arrays.asList(
+        List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_BLOCK, 1),
             new ItemStack(Items.DIAMOND, 2),
             new ItemStack(Items.GOLDEN_APPLE, 1),
@@ -995,38 +767,24 @@ public class CulturalRecipeInitializer {
         // Authentic Chainmail
         ItemStack chainmail = new ItemStack(Items.CHAINMAIL_CHESTPLATE);
         
-        // Add custom name
-        chainmail.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Authentic Chainmail").formatted(Formatting.GRAY));
+        enchantments = new HashMap<>();
+        enchantments.put("minecraft:protection", 3);
+        enchantments.put("minecraft:unbreaking", 2);
         
-        // Add enchantments
-        enchantmentData = new NbtCompound();
-        enchantments = new NbtList();
+        lore = Arrays.asList(
+            "Handcrafted links of iron",
+            "Light and flexible, yet strong"
+        );
         
-        // Protection
-        NbtCompound protection = new NbtCompound();
-        protection.putString("id", "minecraft:protection");
-        protection.putShort("lvl", (short)3);
-        enchantments.add(protection);
+        addCustomProperties(chainmail, "Authentic Chainmail", Formatting.GRAY, lore);
+        addEnchantments(chainmail, enchantments);
         
-        // Unbreaking
-        NbtCompound unbreaking = new NbtCompound();
-        unbreaking.putString("id", "minecraft:unbreaking");
-        unbreaking.putShort("lvl", (short)2);
-        enchantments.add(unbreaking);
+        customData = new HashMap<>();
+        customData.put("damage_bonus", 2);
+        customData.put("attack_speed_bonus", 0.1f);
+        DataComponentHelper.setCustomData(chainmail, customData);
         
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Handcrafted links of iron").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Light and flexible, yet strong").formatted(Formatting.GRAY), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        chainmail.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
-        
-        ingredients = Arrays.asList(
+        List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.IRON_NUGGET, 20),
             new ItemStack(Items.STRING, 5)
         );
@@ -1043,49 +801,28 @@ public class CulturalRecipeInitializer {
         );
     }
     
-    /**
-     * Register special hybrid cultural recipes
-     */
     private static void registerSpecialRecipes() {
         // Greco-Roman Helmet (Hybrid artifact)
         ItemStack corinthianHelmet = new ItemStack(Items.GOLDEN_HELMET);
         
-        // Add custom name
-        corinthianHelmet.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Corinthian Helmet").formatted(Formatting.GOLD, Formatting.BOLD));
+        Map<String, Integer> enchantments = new HashMap<>();
+        enchantments.put("minecraft:protection", 4);
+        enchantments.put("minecraft:respiration", 2);
         
-        // Add enchantments
-        NbtCompound enchantmentData = new NbtCompound();
-        NbtList enchantments = new NbtList();
+        List<String> lore = Arrays.asList(
+            "Blends Greek design with Roman craftsmanship",
+            "Symbol of classical military might"
+        );
         
-        // Protection
-        NbtCompound protection = new NbtCompound();
-        protection.putString("id", "minecraft:protection");
-        protection.putShort("lvl", (short)4);
-        enchantments.add(protection);
+        addCustomProperties(corinthianHelmet, "Corinthian Helmet", Formatting.GOLD, lore);
+        addEnchantments(corinthianHelmet, enchantments);
         
-        // Respiration
-        NbtCompound respiration = new NbtCompound();
-        respiration.putString("id", "minecraft:respiration");
-        respiration.putShort("lvl", (short)2);
-        enchantments.add(respiration);
-        
-        enchantmentData.put("Enchantments", enchantments);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Blends Greek design with Roman craftsmanship").formatted(Formatting.GRAY), wrapperLookup)));
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Symbol of classical military might").formatted(Formatting.GOLD), wrapperLookup)));
-        enchantmentData.put("Lore", loreList);
-        
-        // Cultural fusion properties
-        enchantmentData.putBoolean("CulturalHybrid", true);
-        enchantmentData.putString("PrimaryCulture", "greek");
-        enchantmentData.putString("SecondaryCulture", "roman");
-        enchantmentData.putFloat("StrengthBonus", 0.15f);
-        
-        corinthianHelmet.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(enchantmentData));
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("CulturalHybrid", true);
+        customData.put("PrimaryCulture", "greek");
+        customData.put("SecondaryCulture", "roman");
+        customData.put("StrengthBonus", 0.15f);
+        DataComponentHelper.setCustomData(corinthianHelmet, customData);
         
         List<ItemStack> ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_INGOT, 5),
@@ -1103,96 +840,5 @@ public class CulturalRecipeInitializer {
                 240
             )
         );
-    }
-    
-    /**
-     * Helper method to add potion effect
-     */
-    private static void addPotionEffect(ItemStack stack, String potionId, String name) {
-        // Add custom name using Components
-        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).formatted(Formatting.AQUA));
-        
-        // Add potion type using custom data component
-        NbtCompound customData = new NbtCompound();
-        customData.putString("Potion", potionId);
-        
-        // Add lore based on potion type
-        NbtList loreList = new NbtList();
-        if (potionId.contains("fire_resistance")) {
-            loreList.add(NbtString.of(Text.Serialization.toJsonString(
-                Text.literal("Provides protection from the desert heat").formatted(Formatting.GRAY), wrapperLookup)));
-        } else if (potionId.contains("strength")) {
-            loreList.add(NbtString.of(Text.Serialization.toJsonString(
-                Text.literal("Enhances physical power").formatted(Formatting.GRAY), wrapperLookup)));
-        }
-        customData.put("Lore", loreList);
-        
-        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-    }
-    
-    /**
-     * Helper method to add firework effect
-     */
-    private static void addFireworkEffect(ItemStack stack, String name, byte flight, int[] colors) {
-        // Add custom name using Components
-        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).formatted(Formatting.LIGHT_PURPLE));
-        
-        // Add firework data using custom data component
-        NbtCompound customData = new NbtCompound();
-        NbtCompound fireworks = new NbtCompound();
-        fireworks.putByte("Flight", flight);
-        
-        NbtList explosions = new NbtList();
-        NbtCompound explosion = new NbtCompound();
-        explosion.putByte("Type", (byte)1);
-        explosion.putIntArray("Colors", colors);
-        explosions.add(explosion);
-        
-        fireworks.put("Explosions", explosions);
-        customData.put("Fireworks", fireworks);
-        
-        // Add lore
-        NbtList loreList = new NbtList();
-        loreList.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Celebratory fireworks for special occasions").formatted(Formatting.GRAY), wrapperLookup)));
-        customData.put("Lore", loreList);
-        
-        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-    }
-    
-    /**
-     * Helper method to add enchanted book with custom enchantments
-     */
-    private static ItemStack createEnchantedBook(String name, Map<String, Integer> enchantments, List<String> lore) {
-        ItemStack book = new ItemStack(Items.ENCHANTED_BOOK);
-        
-        // Add custom name
-        book.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
-        
-        // Add enchantments
-        NbtCompound customData = new NbtCompound();
-        NbtList enchantmentList = new NbtList();
-        
-        for (Map.Entry<String, Integer> enchant : enchantments.entrySet()) {
-            NbtCompound enchantNbt = new NbtCompound();
-            enchantNbt.putString("id", enchant.getKey());
-            enchantNbt.putShort("lvl", enchant.getValue().shortValue());
-            enchantmentList.add(enchantNbt);
-        }
-        
-        customData.put("StoredEnchantments", enchantmentList);
-        
-        // Add lore
-        if (lore != null && !lore.isEmpty()) {
-            NbtList loreList = new NbtList();
-            for (String loreLine : lore) {
-                loreList.add(NbtString.of(Text.Serialization.toJsonString(
-                    Text.literal(loreLine).formatted(Formatting.GRAY), wrapperLookup)));
-            }
-            customData.put("Lore", loreList);
-        }
-        
-        book.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-        return book;
     }
 }

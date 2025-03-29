@@ -1,6 +1,7 @@
 package com.beeny.village.artifacts;
 
 import com.beeny.village.event.PlayerEventParticipation;
+import com.beeny.village.util.DataComponentHelper;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -50,6 +51,7 @@ public class CulturalArtifactSystem {
     
     public void setWrapperLookup(WrapperLookup lookup) {
         this.wrapperLookup = lookup;
+        DataComponentHelper.setWrapperLookup(lookup);
     }
     
     /**
@@ -248,112 +250,52 @@ public class CulturalArtifactSystem {
      * Generate a random artifact for a player during an event
      */
     public ItemStack generateEventArtifact(ServerPlayerEntity player, String culture, String eventType) {
-        // Check if culture has artifacts
-        List<ArtifactDefinition> availableArtifacts = artifactDefinitions.get(culture.toLowerCase());
-        if (availableArtifacts == null || availableArtifacts.isEmpty()) {
-            return new ItemStack(Items.AIR);
+        List<ArtifactDefinition> artifacts = artifactDefinitions.get(culture);
+        if (artifacts == null || artifacts.isEmpty()) {
+            return ItemStack.EMPTY;
         }
-        
-        // Determine rarity based on event type and player reputation
-        float rarityBoost = 0;
-        if (eventType.toLowerCase().contains("ritual") || eventType.toLowerCase().contains("ceremony")) {
-            rarityBoost += 0.1f; // Rituals have higher chance of good artifacts
-        }
-        
-        int reputation = PlayerEventParticipation.getInstance().getReputation(player, culture);
-        rarityBoost += Math.min(0.2f, reputation / 100.0f); // Up to +20% for high reputation
-        
-        // Select rarity with potential boost
-        Rarity targetRarity = Rarity.COMMON;
-        float roll = random.nextFloat();
-        
-        // Apply rarity boost by adjusting the roll value down (making better artifacts more likely)
-        roll = Math.max(0, roll - rarityBoost);
-        
-        // Determine rarity based on adjusted roll
-        float cumulativeChance = 0;
-        for (Rarity rarity : Rarity.values()) {
-            cumulativeChance += rarity.getChance();
-            if (roll <= cumulativeChance) {
-                targetRarity = rarity;
-                break;
-            }
-        }
-        
-        // Filter artifacts by target rarity
-        List<ArtifactDefinition> rarityArtifacts = new ArrayList<>();
-        for (ArtifactDefinition artifact : availableArtifacts) {
-            if (artifact.getRarity() == targetRarity) {
-                rarityArtifacts.add(artifact);
-            }
-        }
-        
-        // If no artifacts match the rarity, just use all artifacts
-        if (rarityArtifacts.isEmpty()) {
-            rarityArtifacts = availableArtifacts;
-        }
-        
-        // Pick a random artifact
-        ArtifactDefinition selectedArtifact = rarityArtifacts.get(random.nextInt(rarityArtifacts.size()));
-        
-        // Create the artifact item with the selected base item
+
+        ArtifactDefinition selectedArtifact = artifacts.get(random.nextInt(artifacts.size()));
         ItemStack result = new ItemStack(selectedArtifact.getBaseItem());
-        
+
         // Set custom name with appropriate color
-        result.set(DataComponentTypes.CUSTOM_NAME, Text.literal(selectedArtifact.getName())
-            .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())));
-        
-        // Create custom data for lore and artifact properties
-        NbtCompound customData = new NbtCompound();
-        
+        result.set(DataComponentTypes.CUSTOM_NAME, 
+            Text.literal(selectedArtifact.getName())
+                .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())));
+
         // Create lore list
-        NbtList lore = new NbtList();
+        List<Text> lore = new ArrayList<>();
         
         // Culture info
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Culture: " + capitalize(culture))
-                .setStyle(Style.EMPTY.withColor(Formatting.GRAY)), 
-            wrapperLookup)));
+        lore.add(Text.literal("Culture: " + capitalize(culture))
+            .setStyle(Style.EMPTY.withColor(Formatting.BLUE)));
         
-        // Description
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal(selectedArtifact.getDescription())
-                .setStyle(Style.EMPTY.withColor(Formatting.DARK_GRAY)), 
-            wrapperLookup)));
+        // Event info
+        lore.add(Text.literal("Discovered during: " + capitalize(eventType))
+            .setStyle(Style.EMPTY.withColor(Formatting.GREEN)));
         
-        // Rarity
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Rarity: " + selectedArtifact.getRarity().name())
-                .setStyle(Style.EMPTY.withColor(selectedArtifact.getRarity().getColor())), 
-            wrapperLookup)));
+        // Development value
+        lore.add(Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus())
+            .setStyle(Style.EMPTY.withColor(Formatting.GREEN)));
         
-        // Values
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Village Development Value: +" + selectedArtifact.getVillageBonus())
-                .setStyle(Style.EMPTY.withColor(Formatting.GREEN)), 
-            wrapperLookup)));
-            
-        lore.add(NbtString.of(Text.Serialization.toJsonString(
-            Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue())
-                .setStyle(Style.EMPTY.withColor(Formatting.AQUA)), 
-            wrapperLookup)));
-        
-        // Add lore to custom data
-        customData.put("Lore", lore);
-        
-        // Add hidden artifact data
-        NbtCompound artifactData = new NbtCompound();
-        artifactData.putString("id", selectedArtifact.getId());
-        artifactData.putString("culture", selectedArtifact.getCulture());
-        artifactData.putString("rarity", selectedArtifact.getRarity().name());
-        customData.put("CulturalArtifact", artifactData);
+        // Reputation value
+        lore.add(Text.literal("Reputation Value: +" + selectedArtifact.getReputationValue())
+            .setStyle(Style.EMPTY.withColor(Formatting.AQUA)));
 
-        // Apply the custom data to the item stack
-        result.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+        DataComponentHelper.setLore(result, lore);
+
+        // Add hidden artifact data
+        Map<String, Object> customData = new HashMap<>();
+        customData.put("id", selectedArtifact.getId());
+        customData.put("culture", culture);
+        customData.put("discoveryTime", System.currentTimeMillis());
+        customData.put("discoveredBy", player.getUuid().toString());
+        customData.put("eventType", eventType);
+        customData.put("villageBonus", selectedArtifact.getVillageBonus());
+        customData.put("reputationValue", selectedArtifact.getReputationValue());
         
-        // Register this artifact with the player
-        registerArtifact(player.getUuid(), selectedArtifact.getId());
-        
+        DataComponentHelper.setCustomData(result, customData);
+
         return result;
     }
     
@@ -521,24 +463,25 @@ public class CulturalArtifactSystem {
                 String culture = entry.getKey();
                 List<ArtifactInstance> artifacts = entry.getValue();
                 
-                NbtList artifactsList = new NbtList();
+                NbtCompound cultureData = new NbtCompound();
                 for (ArtifactInstance artifact : artifacts) {
-                    NbtCompound artifactNbt = new NbtCompound();
-                    artifactNbt.putString("id", artifact.getArtifactId());
-                    artifactNbt.putLong("discoveryTime", artifact.getDiscoveryTime());
-                    artifactNbt.putBoolean("displayed", artifact.isDisplayed());
+                    NbtCompound artifactData = new NbtCompound();
+                    artifactData.putString("id", artifact.getArtifactId());
+                    artifactData.putBoolean("displayed", artifact.isDisplayed());
                     
                     if (artifact.getDisplayLocation() != null) {
                         BlockPos pos = artifact.getDisplayLocation();
-                        artifactNbt.putInt("displayX", pos.getX());
-                        artifactNbt.putInt("displayY", pos.getY());
-                        artifactNbt.putInt("displayZ", pos.getZ());
+                        NbtCompound posData = new NbtCompound();
+                        posData.putInt("x", pos.getX());
+                        posData.putInt("y", pos.getY());
+                        posData.putInt("z", pos.getZ());
+                        artifactData.put("displayPos", posData);
                     }
                     
-                    artifactsList.add(artifactNbt);
+                    cultureData.put(artifact.getArtifactId(), artifactData);
                 }
                 
-                nbt.put("artifacts_" + culture, artifactsList);
+                nbt.put("artifacts_" + culture, cultureData);
             }
         }
         
@@ -548,31 +491,31 @@ public class CulturalArtifactSystem {
     /**
      * Load player artifact data from NBT
      */
-    public void loadPlayerArtifacts(UUID playerUUID, NbtCompound nbt) {
+    public void loadPlayerArtifacts(UUID playerUUID, NbtCompound data) {
         Map<String, List<ArtifactInstance>> collections = new HashMap<>();
         
-        for (String key : nbt.getKeys()) {
+        for (String key : data.getKeys()) {
             if (key.startsWith("artifacts_")) {
-                String culture = key.substring(10); // Remove "artifacts_" prefix
-                NbtList artifactsList = nbt.getList(key, 10); // 10 = NbtCompound type ID
+                String culture = key.substring(10);
+                NbtCompound cultureData = data.getCompound(key);
                 
                 List<ArtifactInstance> artifacts = new ArrayList<>();
-                for (int i = 0; i < artifactsList.size(); i++) {
-                    NbtCompound artifactNbt = artifactsList.getCompound(i);
-                    
-                    String id = artifactNbt.getString("id");
-                    ArtifactInstance artifact = new ArtifactInstance(id, playerUUID);
+                for (String artifactId : cultureData.getKeys()) {
+                    NbtCompound artifactData = cultureData.getCompound(artifactId);
+                    ArtifactInstance artifact = new ArtifactInstance(artifactId, playerUUID);
                     
                     // Load display status
-                    boolean displayed = artifactNbt.getBoolean("displayed");
+                    boolean displayed = artifactData.getBoolean("displayed");
                     artifact.setDisplayed(displayed);
                     
                     // Load display location if available
-                    if (displayed && artifactNbt.contains("displayX")) {
-                        int x = artifactNbt.getInt("displayX");
-                        int y = artifactNbt.getInt("displayY");
-                        int z = artifactNbt.getInt("displayZ");
-                        artifact.setDisplayLocation(new BlockPos(x, y, z));
+                    if (displayed && artifactData.contains("displayPos")) {
+                        NbtCompound posData = artifactData.getCompound("displayPos");
+                        artifact.setDisplayLocation(new BlockPos(
+                            posData.getInt("x"),
+                            posData.getInt("y"),
+                            posData.getInt("z")
+                        ));
                     }
                     
                     artifacts.add(artifact);
