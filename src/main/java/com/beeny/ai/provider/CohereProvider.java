@@ -17,8 +17,7 @@ public class CohereProvider implements AIProvider {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
     private OkHttpClient client;
-    private String apiKey;
-    private String model;
+    private String apiKey, model;
     private boolean initialized = false;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
