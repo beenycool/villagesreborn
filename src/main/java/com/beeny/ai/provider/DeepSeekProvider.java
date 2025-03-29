@@ -22,8 +22,7 @@ public class DeepSeekProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> cache = new ConcurrentHashMap<>();
-    private String apiKey;
-    private String model;
+    private String apiKey, model;
     private boolean initialized = false;
     private final OkHttpClient client;
     private final Gson gson = new Gson();
@@ -91,11 +90,9 @@ public class DeepSeekProvider implements AIProvider {
 
     private String callDeepSeekApi(String prompt, Map<String, String> context) throws IOException {
         StringBuilder sysPrompt = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
-        if (context != null && !context.isEmpty()) {
-            context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) sysPrompt.append(" ").append(key).append(": ").append(value).append(".");
-            });
-        }
+        if (context != null && !context.isEmpty()) context.forEach((key, value) -> {
+            if (value != null && !value.isEmpty()) sysPrompt.append(" ").append(key).append(": ").append(value).append(".");
+        });
         JsonObject reqBody = new JsonObject();
         reqBody.addProperty("model", model);
         reqBody.addProperty("max_tokens", 300);
@@ -110,23 +107,16 @@ public class DeepSeekProvider implements AIProvider {
                 int code = response.code();
                 String responseBody = response.body() != null ? response.body().string() : "";
                 
-                if (code == 401 || code == 403) {
-                    throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
-                } else if (code == 429) {
-                    throw new IOException("Rate limit exceeded: DeepSeek API quota has been reached");
-                } else if (code >= 500) {
-                    throw new IOException("DeepSeek service is currently unavailable: " + code);
-                } else {
-                    throw new IOException("DeepSeek API error: " + code + " - " + response.message() + 
-                                         (responseBody.isEmpty() ? "" : " - " + responseBody));
-                }
+                if (code == 401 || 403) throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
+                else if (code == 429) throw new IOException("Rate limit exceeded: DeepSeek API quota has been reached");
+                else if (code >= 500) throw new IOException("DeepSeek service is currently unavailable: " + code);
+                else throw new IOException("DeepSeek API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
             }
             
             String responseBody = response.body().string();
             JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
-            if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) {
-                return jsonResponse.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString().trim();
-            } else {
+            if (jsonResponse.has("content") && jsonResponse.getAsJsonArray("content").size() > 0) return jsonResponse.getAsJsonArray("content").get(0).getAsJsonObject().get("text").getAsString().trim();
+            else {
                 LOGGER.error("Unexpected DeepSeek API response structure: {}", responseBody);
                 throw new IOException("Unexpected DeepSeek API response structure");
             }
@@ -150,10 +140,7 @@ public class DeepSeekProvider implements AIProvider {
 
     @Override
     public CompletableFuture<Boolean> validateAccess() {
-        if (!initialized || apiKey == null || apiKey.isEmpty()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        
+        if (!initialized || apiKey == null || apiKey.isEmpty()) return CompletableFuture.completedFuture(false);
         return CompletableFuture.supplyAsync(() -> {
             try {
                 JsonObject reqBody = new JsonObject();
@@ -171,29 +158,17 @@ public class DeepSeekProvider implements AIProvider {
                     .build();
 
                 try (Response response = client.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        return true;
-                    } else {
-                        int statusCode = response.code();
-                        String body = response.body() != null ? response.body().string() : "";
-                        
-                        if (statusCode == 401 || statusCode == 403) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
-                                "DeepSeek rejected your API key. Please check it is correct.");
-                        } else if (statusCode == 429) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
-                                "DeepSeek API rate limit exceeded. Please try again later.");
-                        } else {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
-                                "DeepSeek API error: " + statusCode + " - " + body);
-                        }
-                        return false;
-                    }
+                    if (response.isSuccessful()) return true;
+                    int statusCode = response.code();
+                    String body = response.body() != null ? response.body().string() : "";
+                    if (statusCode == 401 || 403) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "DeepSeek rejected your API key. Please check it is correct.");
+                    else if (statusCode == 429) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "DeepSeek API rate limit exceeded. Please try again later.");
+                    else errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "DeepSeek API error: " + statusCode + " - " + body);
+                    return false;
                 }
             } catch (IOException e) {
                 LOGGER.error("Error validating DeepSeek access", e);
-                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR,
-                    "Error connecting to DeepSeek: " + e.getMessage());
+                errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR, "Error connecting to DeepSeek: " + e.getMessage());
                 return false;
             }
         });

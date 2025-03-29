@@ -119,10 +119,7 @@ public class AnthropicProvider implements AIProvider {
         });
         JsonObject reqBody = new JsonObject();
         reqBody.addProperty("model", model);
-        int maxTokens = 1024;
-        if (model.startsWith("claude-3-opus")) maxTokens = 4096;
-        else if (model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5")) maxTokens = 4096;
-        else if (model.startsWith("claude-3")) maxTokens = 2048;
+        int maxTokens = model.startsWith("claude-3-opus") ? 4096 : model.startsWith("claude-sonnet-3.7") || model.startsWith("claude-sonnet-3.5") ? 4096 : model.startsWith("claude-3") ? 2048 : 1024;
         reqBody.addProperty("max_tokens", maxTokens);
         reqBody.addProperty("system", sysPrompt.toString());
         reqBody.addProperty("temperature", 0.7);

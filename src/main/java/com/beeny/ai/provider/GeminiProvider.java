@@ -21,8 +21,7 @@ public class GeminiProvider implements AIProvider {
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> cache = new ConcurrentHashMap<>();
     private OkHttpClient client;
-    private String apiKey;
-    private String model;
+    private String apiKey, model;
     private boolean initialized = false;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
     private final Gson gson = new Gson();
@@ -139,18 +138,11 @@ public class GeminiProvider implements AIProvider {
         JsonObject generationConfig = new JsonObject();
         generationConfig.addProperty("temperature", 0.7);
         
-        int maxTokens;
-        switch(model) {
-            case "gemini-2.0-pro":
-                maxTokens = 128000;
-                break;
-            case "gemini-2.0-flash":
-                maxTokens = 128000;
-                break;
-            case "gemini-2.0-flash-lite":
-            default:
-                maxTokens = 32000;
-        }
+        int maxTokens = switch (model) {
+            case "gemini-2.0-pro", "gemini-2.0-flash" -> 128000;
+            case "gemini-2.0-flash-lite" -> 32000;
+            default -> 32000;
+        };
         
         generationConfig.addProperty("maxOutputTokens", maxTokens);
         generationConfig.addProperty("candidateCount", 1);

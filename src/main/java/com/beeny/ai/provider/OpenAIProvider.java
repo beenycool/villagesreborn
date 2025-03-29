@@ -24,8 +24,7 @@ public class OpenAIProvider implements AIProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Map<String, String> cache = new ConcurrentHashMap<>();
-    private String apiKey;
-    private String modelName;
+    private String apiKey, modelName;
     private boolean initialized = false;
     private final OkHttpClient client;
     private final Gson gson = new Gson();
@@ -79,11 +78,9 @@ public class OpenAIProvider implements AIProvider {
             } catch (Exception e) {
                 LOGGER.error("Error generating response from OpenAI", e);
                 
-                // Determine error type and report to user
                 LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
                 errorHandler.reportErrorToClient(errorType, e.getMessage());
                 
-                // For some error types, we can try to provide helpful guidance
                 if (errorType == LLMErrorHandler.ErrorType.INVALID_API_KEY) {
                     throw new RuntimeException("Your OpenAI API key appears to be invalid. Please check your API key in the mod settings.", e);
                 } else if (errorType == LLMErrorHandler.ErrorType.CONNECTION_ERROR) {
@@ -105,7 +102,6 @@ public class OpenAIProvider implements AIProvider {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // Make a minimal API call to check if API key is valid
                 JsonObject requestBody = new JsonObject();
                 requestBody.addProperty("model", modelName);
                 
@@ -116,7 +112,7 @@ public class OpenAIProvider implements AIProvider {
                 messagesArray.add(userMessage);
                 
                 requestBody.add("messages", messagesArray);
-                requestBody.addProperty("max_tokens", 1);  // Minimal output to save tokens
+                requestBody.addProperty("max_tokens", 1);
                 
                 Request request = new Request.Builder()
                     .url(API_URL)
@@ -132,7 +128,6 @@ public class OpenAIProvider implements AIProvider {
                         int statusCode = response.code();
                         String body = response.body() != null ? response.body().string() : "";
                         
-                        // Parse error message to provide better feedback
                         if (statusCode == 401 || statusCode == 403) {
                             errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
                                 "OpenAI rejected your API key. Please check it is correct.");
@@ -192,7 +187,6 @@ public class OpenAIProvider implements AIProvider {
                 int code = response.code();
                 String responseBody = response.body() != null ? response.body().string() : "";
                 
-                // Generate more helpful error messages based on status code
                 if (code == 401 || code == 403) {
                     throw new IOException("Authentication error: Invalid API key or insufficient permissions");
                 } else if (code == 429) {
