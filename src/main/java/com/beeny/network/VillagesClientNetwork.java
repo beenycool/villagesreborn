@@ -31,6 +31,19 @@ public class VillagesClientNetwork {
     public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of("villagesreborn", "request_village_info");
     public static final Identifier JOIN_EVENT_ID = Identifier.of("villagesreborn", "join_event");
 
+    // Custom payload IDs for 1.21.4
+    public static final CustomPayload.Id<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = 
+        CustomPayload.id("villagesreborn:villager_culture");
+    
+    public static final CustomPayload.Id<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = 
+        CustomPayload.id("villagesreborn:villager_mood");
+    
+    public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
+        CustomPayload.id("villagesreborn:request_village_info");
+    
+    public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
+        CustomPayload.id("villagesreborn:join_event");
+
     // Custom payload classes for 1.21.4
     public static class VillagerCulturePayload implements CustomPayload {
         private final UUID villagerUuid;
@@ -53,8 +66,8 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public Identifier id() {
-            return VILLAGER_CULTURE_ID;
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return VILLAGER_CULTURE_PAYLOAD_ID;
         }
         
         public UUID getVillagerUuid() {
@@ -87,8 +100,8 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public Identifier id() {
-            return VILLAGER_MOOD_ID;
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return VILLAGER_MOOD_PAYLOAD_ID;
         }
         
         public UUID getVillagerUuid() {
@@ -117,8 +130,8 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public Identifier id() {
-            return REQUEST_VILLAGE_INFO_ID;
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
         }
         
         public BlockPos getPosition() {
@@ -143,8 +156,8 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public Identifier id() {
-            return JOIN_EVENT_ID;
+        public CustomPayload.Id<? extends CustomPayload> getId() {
+            return JOIN_EVENT_PAYLOAD_ID;
         }
         
         public String getEventId() {
@@ -157,31 +170,37 @@ public class VillagesClientNetwork {
      */
     public static void registerReceivers() {
         // Register receiver for villager culture data
-        ClientPlayNetworking.registerGlobalReceiver(VillagerCulturePayload.class, (payload, client, handler, responseSender) -> {
-            // Process on the main client thread
-            client.execute(() -> {
-                handleVillagerCulturePacket(payload.getVillagerUuid(), payload.getCulture());
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_PAYLOAD_ID, 
+            (client, handler, buf, responseSender) -> {
+                VillagerCulturePayload payload = new VillagerCulturePayload(buf);
+                // Process on the main client thread
+                client.execute(() -> {
+                    handleVillagerCulturePacket(payload.getVillagerUuid(), payload.getCulture());
+                });
             });
-        });
 
         // Register receiver for villager mood updates
-        ClientPlayNetworking.registerGlobalReceiver(VillagerMoodPayload.class, (payload, client, handler, responseSender) -> {
-            client.execute(() -> {
-                handleVillagerMoodPacket(payload.getVillagerUuid(), payload.getMood());
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_PAYLOAD_ID, 
+            (client, handler, buf, responseSender) -> {
+                VillagerMoodPayload payload = new VillagerMoodPayload(buf);
+                client.execute(() -> {
+                    handleVillagerMoodPacket(payload.getVillagerUuid(), payload.getMood());
+                });
             });
-        });
 
         // Register receiver for village information - reuse the payload from VillagesNetwork.java
-        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VillageInfoPayload.class, (payload, client, handler, responseSender) -> {
-            client.execute(() -> {
-                handleVillageInfoPacket(
-                    payload.getCulture(),
-                    payload.getProsperity(),
-                    payload.getSafety(),
-                    payload.getPopulation()
-                );
+        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID, 
+            (client, handler, buf, responseSender) -> {
+                VillagesNetwork.VillageInfoPayload payload = new VillagesNetwork.VillageInfoPayload(buf);
+                client.execute(() -> {
+                    handleVillageInfoPacket(
+                        payload.getCulture(),
+                        payload.getProsperity(),
+                        payload.getSafety(),
+                        payload.getPopulation()
+                    );
+                });
             });
-        });
         
         LOGGER.info("Client-side village network receivers registered");
     }
@@ -236,7 +255,10 @@ public class VillagesClientNetwork {
      */
     private static void handleVillageInfoPacket(String cultureName, int prosperity, int safety, int population) {
         // Update the village info HUD
-        VillageInfoHud.getInstance().updateVillageInfo(cultureName, prosperity, safety, population);
+        VillageInfoHud hud = VillageInfoHud.getInstance();
+        if (hud != null) {
+            hud.setCultureInfo(cultureName, prosperity, safety, population);
+        }
     }
 
     /**
