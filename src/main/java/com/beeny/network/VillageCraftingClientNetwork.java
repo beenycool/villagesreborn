@@ -5,10 +5,11 @@ import com.beeny.network.VillageCraftingClientHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.RegistryByteBuf;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.network.packet.c2s.play.CustomPayloadC2SPacket;
+import net.minecraft.network.packet.CustomPayload;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +38,7 @@ public class VillageCraftingClientNetwork {
     private static void registerClientHandlers() {
         // Register client-side packet receivers using the updated API for 1.21.4
         ClientPlayNetworking.registerGlobalReceiver(
-            VillageCraftingNetwork.RECIPE_LIST_PACKET_ID,
+            VillageCraftingNetwork.RecipeListPayload.ID,
             (client, handler, payload, responseSender) -> {
                 if (payload instanceof VillageCraftingNetwork.RecipeListPayload recipeListPayload) {
                     client.execute(() -> {
@@ -51,7 +52,7 @@ public class VillageCraftingClientNetwork {
         );
         
         ClientPlayNetworking.registerGlobalReceiver(
-            VillageCraftingNetwork.CRAFT_STATUS_PACKET_ID,
+            VillageCraftingNetwork.CraftStatusPayload.ID,
             (client, handler, payload, responseSender) -> {
                 if (payload instanceof VillageCraftingNetwork.CraftStatusPayload statusPayload) {
                     client.execute(() -> {
@@ -67,7 +68,7 @@ public class VillageCraftingClientNetwork {
         );
         
         ClientPlayNetworking.registerGlobalReceiver(
-            VillageCraftingNetwork.CRAFT_PROGRESS_PACKET_ID,
+            VillageCraftingNetwork.CraftProgressPayload.ID,
             (client, handler, payload, responseSender) -> {
                 if (payload instanceof VillageCraftingNetwork.CraftProgressPayload progressPayload) {
                     client.execute(() -> {
@@ -83,7 +84,7 @@ public class VillageCraftingClientNetwork {
         );
         
         ClientPlayNetworking.registerGlobalReceiver(
-            VillageCraftingNetwork.CRAFT_COMPLETE_PACKET_ID,
+            VillageCraftingNetwork.CraftCompletePayload.ID,
             (client, handler, payload, responseSender) -> {
                 if (payload instanceof VillageCraftingNetwork.CraftCompletePayload completePayload) {
                     client.execute(() -> {
@@ -105,7 +106,7 @@ public class VillageCraftingClientNetwork {
         LOGGER.debug("Sending recipe list request for villager {}", villagerUuid);
         VillageCraftingNetwork.RequestRecipesPayload payload = 
             new VillageCraftingNetwork.RequestRecipesPayload(villagerUuid);
-        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
+        ClientPlayNetworking.send(payload);
     }
 
     /**
@@ -115,7 +116,7 @@ public class VillageCraftingClientNetwork {
         LOGGER.debug("Sending crafting request for villager {} recipe {}", villagerUuid, recipeId);
         VillageCraftingNetwork.CraftRecipePayload payload = 
             new VillageCraftingNetwork.CraftRecipePayload(villagerUuid, recipeId);
-        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
+        ClientPlayNetworking.send(payload);
     }
 
     /**
@@ -125,6 +126,6 @@ public class VillageCraftingClientNetwork {
         LOGGER.debug("Sending cancel craft request for villager {} recipe {}", villagerUuid, recipeId);
         VillageCraftingNetwork.CancelCraftPayload payload = 
             new VillageCraftingNetwork.CancelCraftPayload(villagerUuid, recipeId);
-        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
+        ClientPlayNetworking.send(payload);
     }
 }

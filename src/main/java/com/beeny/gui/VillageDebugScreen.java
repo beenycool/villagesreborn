@@ -1,6 +1,7 @@
 package com.beeny.gui;
 
 import com.beeny.Villagesreborn;
+import com.beeny.village.Culture.CulturalTrait;
 import com.beeny.config.VillagesConfig;
 import com.beeny.village.Culture;
 import com.beeny.village.Villager;
@@ -139,7 +140,7 @@ public class VillageDebugScreen extends Screen {
             // Cultural traits
             debugInfo.add("§aTraits: §f" + villageCulture.getTraits().size() + " cultural traits");
             int traitCounter = 0;
-            for (String trait : villageCulture.getTraits()) {
+            for (CulturalTrait trait : villageCulture.getTraits()) {
                 if (traitCounter++ < 5) { // Limit to 5 traits to avoid clutter
                     debugInfo.add("  §7- §f" + trait);
                 } else {

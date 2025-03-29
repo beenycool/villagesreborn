@@ -5,6 +5,8 @@ import com.beeny.village.SpawnRegion;
 import com.beeny.village.VillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Box;
@@ -13,17 +15,14 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.registry.RegistryKey;
-import net.minecraft.network.packet.payload.CustomPayload;
+import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.registry.Registries;
-import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.UUID;
-import net.minecraft.network.PacketByteBufs;
 
 /**
  * Handles network communication for the village crafting system.
@@ -44,30 +43,34 @@ public class VillageCraftingNetwork {
 
     // Custom payload classes for 1.21.4
     public static class CraftRecipePayload implements CustomPayload {
+        public static final CustomPayload.Id<CraftRecipePayload> ID = new CustomPayload.Id<>(CRAFT_PACKET_ID);
+
         private final UUID villagerUuid;
         private final String recipeId;
-        
+
         public CraftRecipePayload(UUID villagerUuid, String recipeId) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
         }
-        
-        public CraftRecipePayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public CraftRecipePayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return CRAFT_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -76,58 +79,66 @@ public class VillageCraftingNetwork {
             return recipeId;
         }
     }
-    
+
     public static class RequestRecipesPayload implements CustomPayload {
+        public static final CustomPayload.Id<RequestRecipesPayload> ID = new CustomPayload.Id<>(REQUEST_RECIPES_PACKET_ID);
+
         private final UUID villagerUuid;
-        
+
         public RequestRecipesPayload(UUID villagerUuid) {
             this.villagerUuid = villagerUuid;
         }
-        
-        public RequestRecipesPayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public RequestRecipesPayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return REQUEST_RECIPES_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
     }
-    
+
     public static class CancelCraftPayload implements CustomPayload {
+        public static final CustomPayload.Id<CancelCraftPayload> ID = new CustomPayload.Id<>(CANCEL_CRAFT_PACKET_ID);
+
         private final UUID villagerUuid;
         private final String recipeId;
-        
+
         public CancelCraftPayload(UUID villagerUuid, String recipeId) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
         }
-        
-        public CancelCraftPayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public CancelCraftPayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return CANCEL_CRAFT_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -136,17 +147,20 @@ public class VillageCraftingNetwork {
             return recipeId;
         }
     }
-    
+
     public static class RecipeListPayload implements CustomPayload {
+        public static final CustomPayload.Id<RecipeListPayload> ID = new CustomPayload.Id<>(RECIPE_LIST_PACKET_ID);
+
         private final UUID villagerUuid;
         private final List<String> recipeIds;
-        
+
         public RecipeListPayload(UUID villagerUuid, List<String> recipeIds) {
             this.villagerUuid = villagerUuid;
             this.recipeIds = recipeIds;
         }
-        
-        public RecipeListPayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public RecipeListPayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             int size = buf.readInt();
             this.recipeIds = new java.util.ArrayList<>(size);
@@ -154,21 +168,22 @@ public class VillageCraftingNetwork {
                 this.recipeIds.add(buf.readString());
             }
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeInt(recipeIds.size());
             for (String recipeId : recipeIds) {
                 buf.writeString(recipeId);
             }
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return RECIPE_LIST_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -177,40 +192,44 @@ public class VillageCraftingNetwork {
             return recipeIds;
         }
     }
-    
+
     public static class CraftStatusPayload implements CustomPayload {
+        public static final CustomPayload.Id<CraftStatusPayload> ID = new CustomPayload.Id<>(CRAFT_STATUS_PACKET_ID);
+
         private final UUID villagerUuid;
         private final String recipeId;
         private final String status;
         private final String message;
-        
+
         public CraftStatusPayload(UUID villagerUuid, String recipeId, String status, String message) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
             this.status = status;
             this.message = message;
         }
-        
-        public CraftStatusPayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public CraftStatusPayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
             this.status = buf.readString();
             this.message = buf.readString();
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
             buf.writeString(status);
             buf.writeString(message);
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return CRAFT_STATUS_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -227,40 +246,44 @@ public class VillageCraftingNetwork {
             return message;
         }
     }
-    
+
     public static class CraftProgressPayload implements CustomPayload {
+        public static final CustomPayload.Id<CraftProgressPayload> ID = new CustomPayload.Id<>(CRAFT_PROGRESS_PACKET_ID);
+
         private final UUID villagerUuid;
         private final String recipeId;
         private final int progress;
         private final int maxProgress;
-        
+
         public CraftProgressPayload(UUID villagerUuid, String recipeId, int progress, int maxProgress) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
             this.progress = progress;
             this.maxProgress = maxProgress;
         }
-        
-        public CraftProgressPayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf
+        public CraftProgressPayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
             this.progress = buf.readInt();
             this.maxProgress = buf.readInt();
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
             buf.writeInt(progress);
             buf.writeInt(maxProgress);
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return CRAFT_PROGRESS_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -277,43 +300,47 @@ public class VillageCraftingNetwork {
             return maxProgress;
         }
     }
-    
+
     public static class CraftCompletePayload implements CustomPayload {
+        public static final CustomPayload.Id<CraftCompletePayload> ID = new CustomPayload.Id<>(CRAFT_COMPLETE_PACKET_ID);
+
         private final UUID villagerUuid;
         private final String recipeId;
         private final boolean success;
         private final ItemStack result;
-        
+
         public CraftCompletePayload(UUID villagerUuid, String recipeId, boolean success, ItemStack result) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
             this.success = success;
             this.result = result != null ? result : ItemStack.EMPTY;
         }
-        
-        public CraftCompletePayload(PacketByteBuf buf) {
+
+        // Updated constructor for RegistryByteBuf and ItemStack codec
+        public CraftCompletePayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
             this.success = buf.readBoolean();
-            this.result = success ? buf.readItemStack() : ItemStack.EMPTY;
+            this.result = success ? ItemStack.PACKET_CODEC.decode(buf) : ItemStack.EMPTY;
         }
-        
-        @Override
-        public void write(PacketByteBuf buf) {
+
+        // Updated write method for RegistryByteBuf and ItemStack codec
+        public void write(RegistryByteBuf buf) { // Removed @Override
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
             buf.writeBoolean(success);
-            
+
             if (success) {
-                buf.writeItemStack(result);
+                ItemStack.PACKET_CODEC.encode(buf, result);
             }
         }
-        
+
+        // Implement required getId method
         @Override
-        public Identifier id() {
-            return CRAFT_COMPLETE_PACKET_ID;
+        public Id<? extends CustomPayload> getId() {
+            return ID;
         }
-        
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -438,12 +465,12 @@ public class VillageCraftingNetwork {
                     
                     // Send the recipe list back to the client
                     RecipeListPayload payload = new RecipeListPayload(villagerUuid, recipeIds);
-                    ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
+                    ServerPlayNetworking.send(player, PacketByteBufs.create().writeCustomPayload(payload));
                 } catch (Exception e) {
                     LOGGER.error("Error getting available recipes", e);
                     // Send an empty list if there's an error
                     RecipeListPayload payload = new RecipeListPayload(villagerUuid, java.util.Collections.emptyList());
-                    ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
+                    ServerPlayNetworking.send(player, PacketByteBufs.create().writeCustomPayload(payload));
                 }
             }
         }
@@ -464,7 +491,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftStatusToPlayer(ServerPlayerEntity player, UUID villagerUuid, 
                                              String recipeId, String status, String message) {
         CraftStatusPayload payload = new CraftStatusPayload(villagerUuid, recipeId, status, message);
-        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
+        ServerPlayNetworking.send(player, PacketByteBufs.create().writeCustomPayload(payload));
     }
 
     /**
@@ -473,7 +500,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftProgressToPlayer(ServerPlayerEntity player, UUID villagerUuid,
                                                String recipeId, int progress, int maxProgress) {
         CraftProgressPayload payload = new CraftProgressPayload(villagerUuid, recipeId, progress, maxProgress);
-        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
+        ServerPlayNetworking.send(player, PacketByteBufs.create().writeCustomPayload(payload));
     }
 
     /**
@@ -482,7 +509,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftCompleteToPlayer(ServerPlayerEntity player, UUID villagerUuid,
                                                String recipeId, boolean success, ItemStack result) {
         CraftCompletePayload payload = new CraftCompletePayload(villagerUuid, recipeId, success, result);
-        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
+        ServerPlayNetworking.send(player, PacketByteBufs.create().writeCustomPayload(payload));
     }
 
     /**

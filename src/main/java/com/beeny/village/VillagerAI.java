@@ -767,6 +767,26 @@ public class VillagerAI {
         SimpleMoveToGoal moveGoal = new SimpleMoveToGoal((PathAwareEntity)villager, speed, pos);
         addGoal(moveGoal, priority, "move_to_pos");
     }
+    
+    /**
+     * Helper method to move to a GlobalPos (which contains dimension and position)
+     * @param globalPos The GlobalPos to move to
+     * @param speed The movement speed
+     * @param priority The priority for the goal
+     */
+    private void moveToPosition(net.minecraft.util.math.GlobalPos globalPos, double speed, int priority) {
+        // Extract the BlockPos from the GlobalPos
+        BlockPos pos = globalPos.pos();
+        
+        // Only move if we're in the right dimension
+        if (!globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
+            LOGGER.warn("Attempted to move villager to a position in a different dimension");
+            return;
+        }
+        
+        // Use the existing BlockPos method
+        moveToPosition(pos, speed, priority);
+    }
 
     /**
      * Adds a goal to the villager with the given priority and identifier
