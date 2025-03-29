@@ -3,6 +3,7 @@ package com.beeny.gui;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter
 
 /**
  * Registers and manages all HUD elements for the Villages Reborn mod.
@@ -19,9 +20,9 @@ public class HudRenderer {
         initialized = true;
         
         // Register the EventNotificationManager renderer
-        HudRenderCallback.EVENT.register((DrawContext context, float tickDelta) -> {
+        HudRenderCallback.EVENT.register((context, tickCounter) -> {
             MinecraftClient client = MinecraftClient.getInstance();
-            EventNotificationManager.getInstance().render(context, client, tickDelta);
+            EventNotificationManager.getInstance().render(context, client, tickCounter.getTickDelta(false));
         });
     }
 }

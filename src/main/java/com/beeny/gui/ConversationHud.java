@@ -301,11 +301,9 @@ public class ConversationHud {
             boolean hasIcon = MinecraftClient.getInstance().getResourceManager().getResource(ICON_TEXTURE).isPresent();
             if (hasIcon) {
                 // Updated texture drawing API for 1.21.4
-                context.drawTexture(ICON_TEXTURE, 
+                context.drawGuiTexture(ICON_TEXTURE, 
                     x + 5, y + 5,  // Position
-                    0, 0,          // UV
-                    16, 16,        // Size
-                    16, 16);       // Texture size
+                    16, 16);       // Size
                 textX = x + 26;    // Move text to right of icon
             }
         } catch (Exception e) {
@@ -325,10 +323,8 @@ public class ConversationHud {
                 if (hasBubble) {
                     int bubbleSize = 10;
                     // Updated texture drawing API for 1.21.4
-                    context.drawTexture(SPEECH_BUBBLE_TEXTURE, 
+                    context.drawGuiTexture(SPEECH_BUBBLE_TEXTURE, 
                         textX + textWidth + 4, textY + 3, 
-                        0, 0, 
-                        bubbleSize, bubbleSize, 
                         bubbleSize, bubbleSize);
                 }
             } catch (Exception e) {

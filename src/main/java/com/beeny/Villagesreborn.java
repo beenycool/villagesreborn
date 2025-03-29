@@ -46,14 +46,14 @@ public class Villagesreborn implements ModInitializer {
     private final Map<BlockPos, Integer> villageRadiusMap = new ConcurrentHashMap<>();
     private final Map<BlockPos, Integer> villageEventsMap = new ConcurrentHashMap<>();
     private static MinecraftServer serverInstance;
-    private static final Identifier ROMAN_HOUSE = new Identifier(MOD_ID, "roman/house");
-    private static final Identifier ROMAN_FORUM = new Identifier(MOD_ID, "roman/forum");
-    private static final Identifier EGYPTIAN_HOUSE = new Identifier(MOD_ID, "egyptian/house");
-    private static final Identifier EGYPTIAN_TEMPLE = new Identifier(MOD_ID, "egyptian/temple");
-    private static final Identifier VICTORIAN_HOUSE = new Identifier(MOD_ID, "victorian/house");
-    private static final Identifier VICTORIAN_SQUARE = new Identifier(MOD_ID, "victorian/square");
-    private static final Identifier NYC_APARTMENT = new Identifier(MOD_ID, "nyc/apartment");
-    private static final Identifier NYC_SKYSCRAPER = new Identifier(MOD_ID, "nyc/skyscraper");
+    private static final Identifier ROMAN_HOUSE = Identifier.of(MOD_ID, "roman/house");
+    private static final Identifier ROMAN_FORUM = Identifier.of(MOD_ID, "roman/forum");
+    private static final Identifier EGYPTIAN_HOUSE = Identifier.of(MOD_ID, "egyptian/house");
+    private static final Identifier EGYPTIAN_TEMPLE = Identifier.of(MOD_ID, "egyptian/temple");
+    private static final Identifier VICTORIAN_HOUSE = Identifier.of(MOD_ID, "victorian/house");
+    private static final Identifier VICTORIAN_SQUARE = Identifier.of(MOD_ID, "victorian/square");
+    private static final Identifier NYC_APARTMENT = Identifier.of(MOD_ID, "nyc/apartment");
+    private static final Identifier NYC_SKYSCRAPER = Identifier.of(MOD_ID, "nyc/skyscraper");
 
     private final List<Float> tickTimes = new ArrayList<>();
     private int pendingNetworkRequests = 0;

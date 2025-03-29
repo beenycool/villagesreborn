@@ -78,7 +78,7 @@ public class VillagerAI {
         
         @Override
         public boolean canStart() {
-            List<T> list = this.mob.world.getEntitiesByClass(
+            List<T> list = this.mob.getWorld().getEntitiesByClass(
                 this.classToAvoid, 
                 this.mob.getBoundingBox().expand(this.fleeDistance, 3.0, this.fleeDistance), 
                 (entity) -> this.predicateOnAvoidEntity.test(entity)
