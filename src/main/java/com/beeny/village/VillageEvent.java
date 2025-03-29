@@ -703,6 +703,34 @@ public class VillageEvent {
     public Set<PlayerEntity> getParticipatingPlayers() { return participatingPlayers; }
     
     /**
+     * Get the time until this event starts, formatted as a string
+     */
+    public String getTimeUntilStart() {
+        // Convert remaining ticks to a readable format (20 ticks = 1 second)
+        int seconds = remainingTime / 20;
+        int minutes = seconds / 60;
+        int hours = minutes / 60;
+        
+        if (hours > 0) {
+            return hours + "h " + (minutes % 60) + "m";
+        } else if (minutes > 0) {
+            return minutes + "m " + (seconds % 60) + "s";
+        } else {
+            return seconds + "s";
+        }
+    }
+    
+    /**
+     * Get an event by ID (static lookup method)
+     */
+    public static VillageEvent getEvent(String eventId) {
+        // This would typically involve looking up the event in a registry
+        // For now, a placeholder implementation that would need to be connected to 
+        // whatever registry system is managing events
+        return null;
+    }
+    
+    /**
      * Get the current phase if one exists
      */
     public EventPhase getCurrentPhase() {

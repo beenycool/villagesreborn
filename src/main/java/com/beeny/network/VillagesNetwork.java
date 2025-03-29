@@ -14,6 +14,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -27,21 +30,251 @@ import java.util.UUID;
 /**
  * Main network handler for Villages Reborn mod.
  * Handles communication between client and server for village-related data.
+ * Updated for Minecraft 1.21.4 networking API
  */
 public class VillagesNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillagesNetwork");
 
-    // Village Info Packets
-    public static final Identifier VILLAGE_INFO_PACKET = new Identifier("villagesreborn", "village_info");
-    public static final Identifier REQUEST_VILLAGE_INFO_PACKET = new Identifier("villagesreborn", "request_village_info");
+    // Village Info Packets - using Identifier.of() instead of new Identifier()
+    public static final Identifier VILLAGE_INFO_ID = Identifier.of("villagesreborn", "village_info");
+    public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of("villagesreborn", "request_village_info");
     
     // Event Notification Packets
-    public static final Identifier EVENT_NOTIFICATION_PACKET = new Identifier("villagesreborn", "event_notification");
-    public static final Identifier EVENT_UPDATE_PACKET = new Identifier("villagesreborn", "event_update");
-    public static final Identifier JOIN_EVENT_PACKET = new Identifier("villagesreborn", "join_event");
+    public static final Identifier EVENT_NOTIFICATION_ID = Identifier.of("villagesreborn", "event_notification");
+    public static final Identifier EVENT_UPDATE_ID = Identifier.of("villagesreborn", "event_update");
+    public static final Identifier JOIN_EVENT_ID = Identifier.of("villagesreborn", "join_event");
     
     // AI State Sync Packets
-    public static final Identifier VILLAGER_AI_STATE_PACKET = new Identifier("villagesreborn", "villager_ai_state");
+    public static final Identifier VILLAGER_AI_STATE_ID = Identifier.of("villagesreborn", "villager_ai_state");
+
+    // Custom payload classes for 1.21.4
+    public static class VillageInfoPayload implements CustomPayload {
+        private final String culture;
+        private final int prosperity;
+        private final int safety;
+        private final int population;
+        
+        public VillageInfoPayload(String culture, int prosperity, int safety, int population) {
+            this.culture = culture;
+            this.prosperity = prosperity;
+            this.safety = safety;
+            this.population = population;
+        }
+        
+        public VillageInfoPayload(PacketByteBuf buf) {
+            this.culture = buf.readString();
+            this.prosperity = buf.readInt();
+            this.safety = buf.readInt();
+            this.population = buf.readInt();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeString(culture);
+            buf.writeInt(prosperity);
+            buf.writeInt(safety);
+            buf.writeInt(population);
+        }
+        
+        @Override
+        public Identifier id() {
+            return VILLAGE_INFO_ID;
+        }
+        
+        public String getCulture() {
+            return culture;
+        }
+        
+        public int getProsperity() {
+            return prosperity;
+        }
+        
+        public int getSafety() {
+            return safety;
+        }
+        
+        public int getPopulation() {
+            return population;
+        }
+    }
+    
+    public static class RequestVillageInfoPayload implements CustomPayload {
+        private final BlockPos playerPos;
+        
+        public RequestVillageInfoPayload(BlockPos playerPos) {
+            this.playerPos = playerPos;
+        }
+        
+        public RequestVillageInfoPayload(PacketByteBuf buf) {
+            this.playerPos = buf.readBlockPos();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeBlockPos(playerPos);
+        }
+        
+        @Override
+        public Identifier id() {
+            return REQUEST_VILLAGE_INFO_ID;
+        }
+        
+        public BlockPos getPlayerPos() {
+            return playerPos;
+        }
+    }
+    
+    public static class EventNotificationPayload implements CustomPayload {
+        private final String title;
+        private final String description;
+        private final int durationTicks;
+        
+        public EventNotificationPayload(String title, String description, int durationTicks) {
+            this.title = title;
+            this.description = description;
+            this.durationTicks = durationTicks;
+        }
+        
+        public EventNotificationPayload(PacketByteBuf buf) {
+            this.title = buf.readString();
+            this.description = buf.readString();
+            this.durationTicks = buf.readInt();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeString(title);
+            buf.writeString(description);
+            buf.writeInt(durationTicks);
+        }
+        
+        @Override
+        public Identifier id() {
+            return EVENT_NOTIFICATION_ID;
+        }
+        
+        public String getTitle() {
+            return title;
+        }
+        
+        public String getDescription() {
+            return description;
+        }
+        
+        public int getDurationTicks() {
+            return durationTicks;
+        }
+    }
+    
+    public static class EventUpdatePayload implements CustomPayload {
+        private final String eventId;
+        private final boolean success;
+        private final String message;
+        
+        public EventUpdatePayload(String eventId, boolean success, String message) {
+            this.eventId = eventId;
+            this.success = success;
+            this.message = message;
+        }
+        
+        public EventUpdatePayload(PacketByteBuf buf) {
+            this.eventId = buf.readString();
+            this.success = buf.readBoolean();
+            this.message = buf.readString();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeString(eventId);
+            buf.writeBoolean(success);
+            buf.writeString(message);
+        }
+        
+        @Override
+        public Identifier id() {
+            return EVENT_UPDATE_ID;
+        }
+        
+        public String getEventId() {
+            return eventId;
+        }
+        
+        public boolean isSuccess() {
+            return success;
+        }
+        
+        public String getMessage() {
+            return message;
+        }
+    }
+    
+    public static class JoinEventPayload implements CustomPayload {
+        private final String eventId;
+        
+        public JoinEventPayload(String eventId) {
+            this.eventId = eventId;
+        }
+        
+        public JoinEventPayload(PacketByteBuf buf) {
+            this.eventId = buf.readString();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeString(eventId);
+        }
+        
+        @Override
+        public Identifier id() {
+            return JOIN_EVENT_ID;
+        }
+        
+        public String getEventId() {
+            return eventId;
+        }
+    }
+    
+    public static class VillagerAIStatePayload implements CustomPayload {
+        private final UUID villagerUuid;
+        private final String activity;
+        private final BlockPos position;
+        
+        public VillagerAIStatePayload(UUID villagerUuid, String activity, BlockPos position) {
+            this.villagerUuid = villagerUuid;
+            this.activity = activity;
+            this.position = position;
+        }
+        
+        public VillagerAIStatePayload(PacketByteBuf buf) {
+            this.villagerUuid = buf.readUuid();
+            this.activity = buf.readString();
+            this.position = buf.readBlockPos();
+        }
+        
+        @Override
+        public void write(PacketByteBuf buf) {
+            buf.writeUuid(villagerUuid);
+            buf.writeString(activity);
+            buf.writeBlockPos(position);
+        }
+        
+        @Override
+        public Identifier id() {
+            return VILLAGER_AI_STATE_ID;
+        }
+        
+        public UUID getVillagerUuid() {
+            return villagerUuid;
+        }
+        
+        public String getActivity() {
+            return activity;
+        }
+        
+        public BlockPos getPosition() {
+            return position;
+        }
+    }
 
     /**
      * Register all network handlers for both client and server
@@ -55,13 +288,9 @@ public class VillagesNetwork {
      * Register server-side packet handlers
      */
     public static void registerServerHandlers() {
-        // Register handler for village info requests
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PACKET, 
-            VillagesNetwork::handleVillageInfoRequest);
-        
-        // Register handler for event join requests
-        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PACKET,
-            VillagesNetwork::handleJoinEventRequest);
+        // Register handlers for the custom payload packets
+        ServerPlayNetworking.registerGlobalReceiver(RequestVillageInfoPayload.class, VillagesNetwork::handleVillageInfoRequest);
+        ServerPlayNetworking.registerGlobalReceiver(JoinEventPayload.class, VillagesNetwork::handleJoinEventRequest);
             
         LOGGER.info("Server packet handlers registered successfully");
     }
@@ -70,21 +299,11 @@ public class VillagesNetwork {
      * Register client-side packet handlers
      */
     public static void registerClientHandlers() {
-        // Register handler for village info updates
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PACKET,
-            VillagesNetwork::handleVillageInfoUpdate);
-            
-        // Register handler for event notifications
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_PACKET,
-            VillagesNetwork::handleEventNotification);
-            
-        // Register handler for event updates
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PACKET,
-            VillagesNetwork::handleEventUpdate);
-            
-        // Register handler for villager AI state updates
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_PACKET,
-            VillagesNetwork::handleVillagerAIState);
+        // Register handlers for the custom payload packets
+        ClientPlayNetworking.registerGlobalReceiver(VillageInfoPayload.class, VillagesNetwork::handleVillageInfoUpdate);
+        ClientPlayNetworking.registerGlobalReceiver(EventNotificationPayload.class, VillagesNetwork::handleEventNotification);
+        ClientPlayNetworking.registerGlobalReceiver(EventUpdatePayload.class, VillagesNetwork::handleEventUpdate);
+        ClientPlayNetworking.registerGlobalReceiver(VillagerAIStatePayload.class, VillagesNetwork::handleVillagerAIState);
             
         LOGGER.info("Client packet handlers registered successfully");
     }
@@ -94,11 +313,11 @@ public class VillagesNetwork {
     /**
      * Handle request for village info from client
      */
-    private static void handleVillageInfoRequest(MinecraftServer server, ServerPlayerEntity player,
-                                              ServerPlayNetworkHandler handler, PacketByteBuf buf,
-                                              PacketSender responseSender) {
-        // Read player position from the packet
-        BlockPos playerPos = buf.readBlockPos();
+    private static void handleVillageInfoRequest(RequestVillageInfoPayload payload, MinecraftServer server, 
+                                           ServerPlayerEntity player, ServerPlayNetworkHandler handler, 
+                                           PacketSender responseSender) {
+        // Get player position from the payload
+        BlockPos playerPos = payload.getPlayerPos();
         
         // Execute on server thread
         server.execute(() -> {
@@ -116,11 +335,11 @@ public class VillagesNetwork {
     /**
      * Handle request to join an event from client
      */
-    private static void handleJoinEventRequest(MinecraftServer server, ServerPlayerEntity player,
-                                            ServerPlayNetworkHandler handler, PacketByteBuf buf,
-                                            PacketSender responseSender) {
-        // Read event ID from the packet
-        String eventId = buf.readString();
+    private static void handleJoinEventRequest(JoinEventPayload payload, MinecraftServer server,
+                                         ServerPlayerEntity player, ServerPlayNetworkHandler handler,
+                                         PacketSender responseSender) {
+        // Read event ID from the payload
+        String eventId = payload.getEventId();
         
         // Execute on server thread
         server.execute(() -> {
@@ -130,12 +349,10 @@ public class VillagesNetwork {
                 PlayerEventParticipation.getInstance().joinEvent(player, event);
                 
                 // Send confirmation back to client
-                PacketByteBuf responseBuf = PacketByteBufs.create();
-                responseBuf.writeString(eventId);
-                responseBuf.writeBoolean(true); // Success
-                responseBuf.writeString("You've joined the " + event.getName() + " event!");
+                EventUpdatePayload updatePayload = new EventUpdatePayload(
+                    eventId, true, "You've joined the " + event.getName() + " event!");
                 
-                ServerPlayNetworking.send(player, EVENT_UPDATE_PACKET, responseBuf);
+                ServerPlayNetworking.send(player, updatePayload);
             }
         });
     }
@@ -145,19 +362,19 @@ public class VillagesNetwork {
     /**
      * Handle village info update packet from server
      */
-    private static void handleVillageInfoUpdate(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                             PacketByteBuf buf, PacketSender responseSender) {
-        // Read village info from packet
-        String cultureName = buf.readString();
-        int prosperity = buf.readInt();
-        int safety = buf.readInt();
-        int population = buf.readInt();
+    private static void handleVillageInfoUpdate(VillageInfoPayload payload, MinecraftClient client,
+                                          ClientPlayNetworkHandler handler, PacketSender responseSender) {
+        // Get village info from payload
+        String cultureName = payload.getCulture();
+        int prosperity = payload.getProsperity();
+        int safety = payload.getSafety();
+        int population = payload.getPopulation();
         
         // Update the HUD on the main thread
         client.execute(() -> {
-            VillageInfoHud hud = client.getInstance().getVillageInfoHud();
+            VillageInfoHud hud = VillageInfoHud.getInstance();
             if (hud != null) {
-                hud.update(cultureName, prosperity, safety, population);
+                hud.updateVillageInfo(cultureName, prosperity, safety, population);
             }
         });
     }
@@ -165,12 +382,12 @@ public class VillagesNetwork {
     /**
      * Handle event notification packet from server
      */
-    private static void handleEventNotification(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                             PacketByteBuf buf, PacketSender responseSender) {
-        // Read event notification from packet
-        String title = buf.readString();
-        String description = buf.readString();
-        int durationTicks = buf.readInt();
+    private static void handleEventNotification(EventNotificationPayload payload, MinecraftClient client,
+                                          ClientPlayNetworkHandler handler, PacketSender responseSender) {
+        // Read event notification from payload
+        String title = payload.getTitle();
+        String description = payload.getDescription();
+        int durationTicks = payload.getDurationTicks();
         
         // Show notification on the main thread
         client.execute(() -> {
@@ -182,12 +399,12 @@ public class VillagesNetwork {
     /**
      * Handle event update packet from server
      */
-    private static void handleEventUpdate(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                       PacketByteBuf buf, PacketSender responseSender) {
-        // Read event update from packet
-        String eventId = buf.readString();
-        boolean success = buf.readBoolean();
-        String message = buf.readString();
+    private static void handleEventUpdate(EventUpdatePayload payload, MinecraftClient client,
+                                    ClientPlayNetworkHandler handler, PacketSender responseSender) {
+        // Read event update from payload
+        String eventId = payload.getEventId();
+        boolean success = payload.isSuccess();
+        String message = payload.getMessage();
         
         // Handle update on the main thread
         client.execute(() -> {
@@ -201,12 +418,12 @@ public class VillagesNetwork {
     /**
      * Handle villager AI state update packet from server
      */
-    private static void handleVillagerAIState(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                           PacketByteBuf buf, PacketSender responseSender) {
-        // Read villager AI state from packet
-        UUID villagerUuid = buf.readUuid();
-        String activity = buf.readString();
-        BlockPos position = buf.readBlockPos();
+    private static void handleVillagerAIState(VillagerAIStatePayload payload, MinecraftClient client,
+                                        ClientPlayNetworkHandler handler, PacketSender responseSender) {
+        // Read villager AI state from payload
+        UUID villagerUuid = payload.getVillagerUuid();
+        String activity = payload.getActivity();
+        BlockPos position = payload.getPosition();
         
         // Update villager rendering state on the main thread
         client.execute(() -> {
@@ -222,17 +439,19 @@ public class VillagesNetwork {
      * Send village info to a specific client
      */
     public static void sendVillageInfoToClient(ServerPlayerEntity player, VillagerManager.VillageStats stats) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(stats.culture);
-        buf.writeInt(stats.prosperity);
-        buf.writeInt(stats.safety);
-        
         // Get villager count for the village
-        int population = VillagerManager.getInstance().getVillagerCount(
-            VillagerManager.getInstance().getNearestSpawnRegion(stats.center));
-        buf.writeInt(population);
+        int population = 0;
+        try {
+            population = VillagerManager.getInstance().getVillagerCount(
+                VillagerManager.getInstance().getNearestSpawnRegion(stats.center));
+        } catch (Exception e) {
+            LOGGER.error("Error getting villager count", e);
+        }
         
-        ServerPlayNetworking.send(player, VILLAGE_INFO_PACKET, buf);
+        VillageInfoPayload payload = new VillageInfoPayload(
+            stats.culture, stats.prosperity, stats.safety, population);
+        
+        ServerPlayNetworking.send(player, payload);
     }
 
     /**
@@ -240,28 +459,22 @@ public class VillagesNetwork {
      */
     public static void sendEventNotificationToClient(ServerPlayerEntity player, String title, 
                                                   String description, int durationTicks) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(title);
-        buf.writeString(description);
-        buf.writeInt(durationTicks);
-        
-        ServerPlayNetworking.send(player, EVENT_NOTIFICATION_PACKET, buf);
+        EventNotificationPayload payload = new EventNotificationPayload(title, description, durationTicks);
+        ServerPlayNetworking.send(player, payload);
     }
 
     /**
      * Send villager AI state update to all nearby clients
      */
     public static void broadcastVillagerAIState(VillagerEntity villager, String activity, BlockPos position) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeUuid(villager.getUuid());
-        buf.writeString(activity);
-        buf.writeBlockPos(position);
+        VillagerAIStatePayload payload = new VillagerAIStatePayload(
+            villager.getUuid(), activity, position);
         
         // Get all players within render distance of the villager
         for (ServerPlayerEntity player : villager.getServer().getPlayerManager().getPlayerList()) {
             if (player.getWorld() == villager.getWorld() && 
                 player.squaredDistanceTo(villager) < 16384) { // 128 blocks squared
-                ServerPlayNetworking.send(player, VILLAGER_AI_STATE_PACKET, buf);
+                ServerPlayNetworking.send(player, payload);
             }
         }
     }
@@ -272,19 +485,15 @@ public class VillagesNetwork {
      * Send a request for village info to the server
      */
     public static void requestVillageInfo(BlockPos playerPos) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeBlockPos(playerPos);
-        
-        ClientPlayNetworking.send(REQUEST_VILLAGE_INFO_PACKET, buf);
+        RequestVillageInfoPayload payload = new RequestVillageInfoPayload(playerPos);
+        ClientPlayNetworking.send(payload);
     }
 
     /**
      * Send a request to join an event to the server
      */
     public static void requestJoinEvent(String eventId) {
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeString(eventId);
-        
-        ClientPlayNetworking.send(JOIN_EVENT_PACKET, buf);
+        JoinEventPayload payload = new JoinEventPayload(eventId);
+        ClientPlayNetworking.send(payload);
     }
 }

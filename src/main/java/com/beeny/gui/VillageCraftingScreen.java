@@ -17,6 +17,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import java.util.List;
 import java.util.Arrays;
+import net.minecraft.client.render.RenderLayer;
 
 public class VillageCraftingScreen extends Screen {
     // Use Identifier.of() for creating identifiers
@@ -189,15 +190,7 @@ public class VillageCraftingScreen extends Screen {
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
         // Draw the background texture with updated API for 1.21.4
-        context.drawTexture(
-            BACKGROUND_TEXTURE, 
-            guiLeft, 
-            guiTop,
-            0,
-            0,
-            BACKGROUND_WIDTH,
-            BACKGROUND_HEIGHT
-        );
+        context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
         
         // Draw culture-specific decorative elements
         drawCulturalTheme(context, guiLeft, guiTop);
@@ -254,7 +247,7 @@ public class VillageCraftingScreen extends Screen {
             
             // Draw result item
             if (recipe.getOutput() != null) {
-                ItemStack output = recipe.getOutput();
+                ItemStack output = new ItemStack(recipe.getOutput());
                 drawItem(context, output, guiLeft + 190, guiTop + 45);
                 
                 // Draw item count if more than 1
@@ -533,5 +526,3 @@ public class VillageCraftingScreen extends Screen {
         return false;
     }
 }
-/* 
-</copilot-edited-file>

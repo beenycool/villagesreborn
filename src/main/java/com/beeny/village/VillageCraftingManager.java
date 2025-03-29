@@ -356,4 +356,48 @@ public class VillageCraftingManager {
         // Base skill gain + bonuses for complexity
         return 0.1f * ingredientCount + 0.05f * totalItemCount;
     }
+    
+    /**
+     * Get available recipes for a villager based on their culture and profession
+     * 
+     * @param villager The villager entity
+     * @param player The player who is interacting with the villager
+     * @param culture The culture of the villager
+     * @return A list of recipe IDs available to this villager
+     */
+    public List<String> getAvailableRecipes(VillagerEntity villager, ServerPlayerEntity player, String culture) {
+        LOGGER.debug("Getting available recipes for villager {} in culture {}", villager.getUuid(), culture);
+        
+        // Get the villager's AI
+        VillagerAI ai = villagerManager.getVillagerAI(villager.getUuid());
+        if (ai == null) {
+            LOGGER.warn("No AI found for villager {}", villager.getUuid());
+            return List.of();
+        }
+        
+        // Get recipes for this culture
+        List<CraftingRecipe> recipes = getRecipesForCulture(culture);
+        if (recipes.isEmpty()) {
+            LOGGER.warn("No recipes found for culture {}", culture);
+            return List.of();
+        }
+        
+        // Get the villager's crafting skill
+        float craftingSkill = 0.0f;
+        try {
+            craftingSkill = ai.getProfessionSkill("crafting");
+        } catch (Exception e) {
+            LOGGER.error("Error getting crafting skill for villager {}: {}", villager.getUuid(), e.getMessage());
+        }
+        
+        // Filter recipes based on skill and return IDs
+        return recipes.stream()
+            .filter(recipe -> {
+                float complexity = calculateRecipeComplexity(recipe);
+                // Villager can craft if they have at least half the required skill
+                return craftingSkill >= complexity * 0.5f;
+            })
+            .map(CraftingRecipe::getId)
+            .toList();
+    }
 }

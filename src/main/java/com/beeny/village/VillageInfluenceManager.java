@@ -1,6 +1,8 @@
 package com.beeny.village;
 
 import com.beeny.village.event.PlayerEventParticipation;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -10,6 +12,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.particle.ParticleTypes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1327,8 +1331,8 @@ public class VillageInfluenceManager {
                     targetAI.addRelationship(player.getUuid(), VillagerAI.RelationshipType.FRIEND);
                 } else {
                     // For neutral relationships, just make them acquainted
-                    sourceAI.addRelationship(targetVillager.getUuid(), VillagerAI.RelationshipType.ACQUAINTANCE);
-                    targetAI.addRelationship(sourceVillager.getUuid(), VillagerAI.RelationshipType.ACQUAINTANCE);
+                    sourceAI.addRelationship(targetVillager.getUuid(), VillagerAI.RelationshipType.NEUTRAL);
+                    targetAI.addRelationship(sourceVillager.getUuid(), VillagerAI.RelationshipType.NEUTRAL);
                 }
             }
         }

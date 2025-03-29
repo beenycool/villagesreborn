@@ -192,6 +192,9 @@ public class VillagerAI {
     private long behaviorDuration = 0;
     private Map<String, Object> behaviorParams = new HashMap<>();
     
+    // Store profession skills
+    private Map<String, Float> professionSkills = new HashMap<>();
+    
     public VillagerAI(VillagerEntity villager, String personality) {
         this.villager = villager;
         this.personality = personality;
@@ -1519,5 +1522,30 @@ public class VillagerAI {
              0,
             random.nextInt(radius * 2) - radius
         );
+    }
+    
+    /**
+     * Get a villager's skill level in a specific profession
+     * 
+     * @param skill The skill name to get (e.g., "crafting", "farming", "trading")
+     * @return The skill level (0.0f to 10.0f)
+     */
+    public float getProfessionSkill(String skill) {
+        // Return the skill value if it exists, or 0 if it doesn't
+        return professionSkills.getOrDefault(skill, 0.0f);
+    }
+    
+    /**
+     * Update a villager's skill level in a specific profession
+     * 
+     * @param skill The skill name to update
+     * @param newValue The new skill value
+     */
+    public void updateProfessionSkill(String skill, float newValue) {
+        // Keep skill values between 0 and 10
+        float clampedValue = Math.max(0.0f, Math.min(10.0f, newValue));
+        professionSkills.put(skill, clampedValue);
+        LOGGER.debug("Updated {} skill for villager {} to {}", 
+            skill, villager.getName().getString(), clampedValue);
     }
 }
