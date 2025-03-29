@@ -107,7 +107,7 @@ public class DeepSeekProvider implements AIProvider {
                 int code = response.code();
                 String responseBody = response.body() != null ? response.body().string() : "";
                 
-                if (code == 401 || 403) throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
+                if (code == 401 || code == 403) throw new IOException("Authentication error: Invalid DeepSeek API key or insufficient permissions");
                 else if (code == 429) throw new IOException("Rate limit exceeded: DeepSeek API quota has been reached");
                 else if (code >= 500) throw new IOException("DeepSeek service is currently unavailable: " + code);
                 else throw new IOException("DeepSeek API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
@@ -161,7 +161,7 @@ public class DeepSeekProvider implements AIProvider {
                     if (response.isSuccessful()) return true;
                     int statusCode = response.code();
                     String body = response.body() != null ? response.body().string() : "";
-                    if (statusCode == 401 || 403) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "DeepSeek rejected your API key. Please check it is correct.");
+                    if (statusCode == 401 || 403) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "DeepSeek rejected your API key. Please check it is correct.");is correct.");
                     else if (statusCode == 429) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "DeepSeek API rate limit exceeded. Please try again later.");
                     else errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "DeepSeek API error: " + statusCode + " - " + body);
                     return false;

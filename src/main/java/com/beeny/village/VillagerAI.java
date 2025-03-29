@@ -1254,7 +1254,7 @@ public class VillagerAI {
             return "farmland";
         } else if (profession == VillagerProfession.LIBRARIAN) {
             return "bookshelves";
-        } else if (profession == VillagerProfession.BLACKSMITH) {
+        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
             return "forge";
         }
         
@@ -1286,7 +1286,7 @@ public class VillagerAI {
                     2, 0.5, 0.5, 0.5, 0.01
                 );
             }
-        } else if (profession == VillagerProfession.BLACKSMITH) {
+        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
             // Occasionally show smithing particles
             if (world.getRandom().nextInt(15) == 0) {
                 world.spawnParticles(

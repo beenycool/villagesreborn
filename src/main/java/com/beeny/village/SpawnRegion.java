@@ -71,7 +71,9 @@ public class SpawnRegion {
             if (cultureType != Culture.CultureType.NETHER) return false;
             
             // Updated: In 1.21.4, use world registry to compare biome keys
-            var biomeKey = world.getBiomeKey(center);
+            var biomeKeyOpt = world.getBiome(center).getKey(); // NEW - returns Optional<RegistryKey<Biome>>
+            if (biomeKeyOpt.isEmpty()) return false; // Or handle missing key case appropriately
+            var biomeKey = biomeKeyOpt.get();
             return biomeKey.equals(BiomeKeys.CRIMSON_FOREST) || 
                    biomeKey.equals(BiomeKeys.WARPED_FOREST) || 
                    biomeKey.equals(BiomeKeys.SOUL_SAND_VALLEY) || 
@@ -88,7 +90,9 @@ public class SpawnRegion {
             int distanceFromCenter = (int) Math.sqrt(center.getSquaredDistance(0, center.getY(), 0));
             
             // Updated: In 1.21.4, use world registry to compare biome keys
-            var biomeKey = world.getBiomeKey(center);
+            var biomeKeyOpt = world.getBiome(center).getKey(); // NEW - returns Optional<RegistryKey<Biome>>
+            if (biomeKeyOpt.isEmpty()) return false; // Or handle missing key case appropriately
+            var biomeKey = biomeKeyOpt.get();
             return distanceFromCenter > 1000 && 
                    (biomeKey.equals(BiomeKeys.END_MIDLANDS) || 
                     biomeKey.equals(BiomeKeys.END_HIGHLANDS) ||
@@ -96,7 +100,9 @@ public class SpawnRegion {
         }
 
         // Updated: In 1.21.4, use world registry to compare biome keys
-        var biomeKey = world.getBiomeKey(center);
+        var biomeKeyOpt = world.getBiome(center).getKey(); // NEW - returns Optional<RegistryKey<Biome>>
+        if (biomeKeyOpt.isEmpty()) return false; // Or handle missing key case appropriately
+        var biomeKey = biomeKeyOpt.get();
         
         // Overworld culture-specific biome checks
         return switch (cultureType) {
@@ -150,7 +156,9 @@ public class SpawnRegion {
         Block ground = world.getBlockState(pos.down()).getBlock();
         
         // Updated: In 1.21.4, use world registry to compare biome keys
-        var biomeKey = world.getBiomeKey(pos);
+        var biomeKeyOpt = world.getBiome(pos).getKey(); // NEW - returns Optional<RegistryKey<Biome>>
+        if (biomeKeyOpt.isEmpty()) return false; // Or handle missing key case appropriately
+        var biomeKey = biomeKeyOpt.get();
         
         // Get biome-specific requirements
         if (biomeKey.equals(BiomeKeys.CRIMSON_FOREST)) {
