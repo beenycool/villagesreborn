@@ -161,17 +161,21 @@ public class DeepSeekProvider implements AIProvider {
                     if (response.isSuccessful()) return true;
                     int statusCode = response.code();
                     String body = response.body() != null ? response.body().string() : "";
-                    if (statusCode == 401 || 403) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "DeepSeek rejected your API key. Please check it is correct.");is correct.");
-                    else if (statusCode == 429) errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "DeepSeek API rate limit exceeded. Please try again later.");
-                    else errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "DeepSeek API error: " + statusCode + " - " + body);
+                    if (statusCode == 401 || statusCode == 403) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "DeepSeek rejected your API key. Please check it is correct.");
+                    } else if (statusCode == 429) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "DeepSeek API rate limit exceeded. Please try again later.");
+                    } else {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "DeepSeek API error: " + statusCode + " - " + body);
+                    }
                     return false;
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 LOGGER.error("Error validating DeepSeek access", e);
                 errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.CONNECTION_ERROR, "Error connecting to DeepSeek: " + e.getMessage());
                 return false;
             }
-        });
+        }, executor);
     }
 
     @Override

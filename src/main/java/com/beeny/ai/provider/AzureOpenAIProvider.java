@@ -123,7 +123,7 @@ public class AzureOpenAIProvider implements AIProvider {
         } catch (HttpResponseException e) {
             int statusCode = e.getResponse().getStatusCode();
             
-            if (statusCode == 401 || statusCode == 403) {Code == 403) {
+            if (statusCode == 401 || statusCode == 403) {
                 throw new RuntimeException("Authentication error: Invalid Azure OpenAI API key or insufficient permissions", e);
             } else if (statusCode == 429) {
                 throw new RuntimeException("Rate limit exceeded: Azure OpenAI API quota has been reached", e);
