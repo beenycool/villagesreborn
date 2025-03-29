@@ -1,110 +1,130 @@
 package com.beeny.network;
 
 import com.beeny.village.VillageCraftingManager;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.network.PacketByteBuf;
+import com.beeny.network.VillageCraftingClientHandler;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.network.PacketByteBuf;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.network.packet.c2s.play.CustomPayloadC2SPacket;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 /**
- * Handles client-side networking for the village crafting system
+ * Client-side implementation of the VillageCrafting network system
  */
 public class VillageCraftingClientNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillageCraftingClientNetwork");
-    
+
     /**
-     * Sends a crafting request to the server for the specified villager and recipe
-     *
-     * @param villagerUuid The UUID of the villager to craft with
-     * @param recipeId The ID of the recipe to craft
+     * Register client-side packet handlers
      */
-    public static void sendCraftingRequest(UUID villagerUuid, String recipeId) {
-        LOGGER.debug("Sending crafting request for recipe {}", recipeId);
-        
-        // Create a payload instead of direct buffer for 1.21.4
-        VillageCraftingNetwork.CraftRecipePayload payload = 
-            new VillageCraftingNetwork.CraftRecipePayload(villagerUuid, recipeId);
-        
-        // Send the packet to the server using the new API
-        ClientPlayNetworking.send(payload);
+    public static void register() {
+        LOGGER.info("Registering VillageCraftingClientNetwork handlers");
+        registerClientHandlers();
+        LOGGER.info("VillageCraftingClientNetwork handlers registered successfully");
     }
-    
+
     /**
-     * Sends a crafting request to the server for the specified villager and recipe
-     *
-     * @param villager The villager to craft with
-     * @param recipeId The ID of the recipe to craft
+     * Register client-side packet handlers
      */
-    public static void sendCraftingRequest(VillagerEntity villager, String recipeId) {
-        sendCraftingRequest(villager.getUuid(), recipeId);
+    private static void registerClientHandlers() {
+        // Register client-side packet receivers using the updated API for 1.21.4
+        ClientPlayNetworking.registerGlobalReceiver(
+            VillageCraftingNetwork.RECIPE_LIST_PACKET_ID,
+            (client, handler, payload, responseSender) -> {
+                if (payload instanceof VillageCraftingNetwork.RecipeListPayload recipeListPayload) {
+                    client.execute(() -> {
+                        VillageCraftingClientHandler.updateAvailableRecipes(
+                            recipeListPayload.getVillagerUuid(), 
+                            recipeListPayload.getRecipeIds()
+                        );
+                    });
+                }
+            }
+        );
         
-        // Log the request to help with debugging
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            client.player.sendMessage(net.minecraft.text.Text.literal("§7Requesting crafting: " + recipeId + "..."), true);
-        }
+        ClientPlayNetworking.registerGlobalReceiver(
+            VillageCraftingNetwork.CRAFT_STATUS_PACKET_ID,
+            (client, handler, payload, responseSender) -> {
+                if (payload instanceof VillageCraftingNetwork.CraftStatusPayload statusPayload) {
+                    client.execute(() -> {
+                        VillageCraftingClientHandler.updateCraftingStatus(
+                            statusPayload.getVillagerUuid(),
+                            statusPayload.getRecipeId(),
+                            statusPayload.getStatus(),
+                            statusPayload.getMessage()
+                        );
+                    });
+                }
+            }
+        );
+        
+        ClientPlayNetworking.registerGlobalReceiver(
+            VillageCraftingNetwork.CRAFT_PROGRESS_PACKET_ID,
+            (client, handler, payload, responseSender) -> {
+                if (payload instanceof VillageCraftingNetwork.CraftProgressPayload progressPayload) {
+                    client.execute(() -> {
+                        VillageCraftingClientHandler.updateCraftingProgress(
+                            progressPayload.getVillagerUuid(),
+                            progressPayload.getRecipeId(),
+                            progressPayload.getProgress(),
+                            progressPayload.getMaxProgress()
+                        );
+                    });
+                }
+            }
+        );
+        
+        ClientPlayNetworking.registerGlobalReceiver(
+            VillageCraftingNetwork.CRAFT_COMPLETE_PACKET_ID,
+            (client, handler, payload, responseSender) -> {
+                if (payload instanceof VillageCraftingNetwork.CraftCompletePayload completePayload) {
+                    client.execute(() -> {
+                        VillageCraftingClientHandler.handleCraftingComplete(
+                            completePayload.getVillagerUuid(),
+                            completePayload.getRecipeId(),
+                            completePayload.isSuccess()
+                        );
+                    });
+                }
+            }
+        );
     }
-    
+
     /**
-     * Sends a request to the server for the list of recipes available from a villager
-     * 
-     * @param villagerUuid The UUID of the villager to get recipes from
+     * Send a request to the server to get available recipes for a villager
      */
     public static void sendRecipeListRequest(UUID villagerUuid) {
-        LOGGER.debug("Requesting recipe list from villager {}", villagerUuid);
-        
-        // Create a payload instead of direct buffer for 1.21.4
+        LOGGER.debug("Sending recipe list request for villager {}", villagerUuid);
         VillageCraftingNetwork.RequestRecipesPayload payload = 
             new VillageCraftingNetwork.RequestRecipesPayload(villagerUuid);
-        
-        // Send the packet to the server using the new API
-        ClientPlayNetworking.send(payload);
+        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
     }
-    
+
     /**
-     * Sends a request to the server for the list of recipes available from a villager
-     * 
-     * @param villager The villager to get recipes from
+     * Send a request to the server to craft a recipe
      */
-    public static void sendRecipeListRequest(VillagerEntity villager) {
-        sendRecipeListRequest(villager.getUuid());
+    public static void sendCraftingRequest(UUID villagerUuid, String recipeId) {
+        LOGGER.debug("Sending crafting request for villager {} recipe {}", villagerUuid, recipeId);
+        VillageCraftingNetwork.CraftRecipePayload payload = 
+            new VillageCraftingNetwork.CraftRecipePayload(villagerUuid, recipeId);
+        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
     }
-    
+
     /**
-     * Sends a request to the server to cancel an in-progress crafting task
-     * 
-     * @param villagerUuid The UUID of the villager
-     * @param recipeId The ID of the recipe to cancel
+     * Send a request to the server to cancel crafting
      */
     public static void sendCancelCraftingRequest(UUID villagerUuid, String recipeId) {
-        LOGGER.debug("Sending cancel crafting request for recipe {}", recipeId);
-        
-        // Create a payload instead of direct buffer for 1.21.4
+        LOGGER.debug("Sending cancel craft request for villager {} recipe {}", villagerUuid, recipeId);
         VillageCraftingNetwork.CancelCraftPayload payload = 
             new VillageCraftingNetwork.CancelCraftPayload(villagerUuid, recipeId);
-        
-        // Send the packet to the server using the new API
-        ClientPlayNetworking.send(payload);
-    }
-    
-    /**
-     * Sends a request to the server to cancel an in-progress crafting task
-     * 
-     * @param villager The villager
-     * @param recipeId The ID of the recipe to cancel
-     */
-    public static void sendCancelCraftingRequest(VillagerEntity villager, String recipeId) {
-        sendCancelCraftingRequest(villager.getUuid(), recipeId);
-        
-        // Log the request to help with debugging
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player != null) {
-            client.player.sendMessage(net.minecraft.text.Text.literal("§7Canceling crafting: " + recipeId + "..."), true);
-        }
+        ClientPlayNetworking.send(new CustomPayloadC2SPacket(payload));
     }
 }

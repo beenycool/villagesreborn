@@ -51,6 +51,9 @@ public class VillagerManager {
     private ServerWorld world;
     private Culture.CultureType currentCulture;
     private MinecraftServer server;
+    
+    // Add a static reference to the server for safe access
+    private static MinecraftServer staticServerInstance;
 
     private VillagerManager() {
         this.villagerAIs = new ConcurrentHashMap<>();
@@ -72,8 +75,20 @@ public class VillagerManager {
         return server;
     }
 
+    /**
+     * Get the server instance safely from a static context
+     * @return The current MinecraftServer instance
+     */
+    public static MinecraftServer getServerInstance() {
+        if (staticServerInstance == null) {
+            staticServerInstance = INSTANCE.server;
+        }
+        return staticServerInstance;
+    }
+
     public void setServer(MinecraftServer server) {
         this.server = server;
+        staticServerInstance = server; // Also update static reference
     }
 
     public void registerSpawnRegion(BlockPos center, int radius, String cultureName) {

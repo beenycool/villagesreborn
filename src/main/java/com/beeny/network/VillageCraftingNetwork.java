@@ -14,10 +14,16 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.network.packet.payload.CustomPayload;
+import net.minecraft.registry.Registries;
+import net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.UUID;
+import net.minecraft.network.PacketByteBufs;
 
 /**
  * Handles network communication for the village crafting system.
@@ -339,19 +345,22 @@ public class VillageCraftingNetwork {
      */
     public static void registerServerHandlers() {
         // Register server-side packet receivers using the new 1.21.4 API
-        ServerPlayNetworking.registerGlobalReceiver(CraftRecipePayload.class, (payload, server, player, handler, responseSender) -> {
+        ServerPlayNetworking.registerGlobalReceiver(CRAFT_PACKET_ID, (server, player, handler, buf, responseSender) -> {
+            CraftRecipePayload payload = new CraftRecipePayload(buf);
             server.execute(() -> {
                 handleCraftRequest(payload.getVillagerUuid(), payload.getRecipeId(), player);
             });
         });
         
-        ServerPlayNetworking.registerGlobalReceiver(RequestRecipesPayload.class, (payload, server, player, handler, responseSender) -> {
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PACKET_ID, (server, player, handler, buf, responseSender) -> {
+            RequestRecipesPayload payload = new RequestRecipesPayload(buf);
             server.execute(() -> {
                 handleRecipeListRequest(payload.getVillagerUuid(), player);
             });
         });
         
-        ServerPlayNetworking.registerGlobalReceiver(CancelCraftPayload.class, (payload, server, player, handler, responseSender) -> {
+        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PACKET_ID, (server, player, handler, buf, responseSender) -> {
+            CancelCraftPayload payload = new CancelCraftPayload(buf);
             server.execute(() -> {
                 handleCancelCraftRequest(payload.getVillagerUuid(), payload.getRecipeId(), player);
             });
@@ -427,14 +436,14 @@ public class VillageCraftingNetwork {
                     List<String> recipeIds = VillageCraftingManager.getInstance().getAvailableRecipes(
                         villager, player, culture);
                     
-                    // Send the recipe list back to the client using the new CustomPayload approach
+                    // Send the recipe list back to the client
                     RecipeListPayload payload = new RecipeListPayload(villagerUuid, recipeIds);
-                    ServerPlayNetworking.send(player, payload);
+                    ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
                 } catch (Exception e) {
                     LOGGER.error("Error getting available recipes", e);
                     // Send an empty list if there's an error
                     RecipeListPayload payload = new RecipeListPayload(villagerUuid, java.util.Collections.emptyList());
-                    ServerPlayNetworking.send(player, payload);
+                    ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
                 }
             }
         }
@@ -455,7 +464,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftStatusToPlayer(ServerPlayerEntity player, UUID villagerUuid, 
                                              String recipeId, String status, String message) {
         CraftStatusPayload payload = new CraftStatusPayload(villagerUuid, recipeId, status, message);
-        ServerPlayNetworking.send(player, payload);
+        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
     }
 
     /**
@@ -464,7 +473,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftProgressToPlayer(ServerPlayerEntity player, UUID villagerUuid,
                                                String recipeId, int progress, int maxProgress) {
         CraftProgressPayload payload = new CraftProgressPayload(villagerUuid, recipeId, progress, maxProgress);
-        ServerPlayNetworking.send(player, payload);
+        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
     }
 
     /**
@@ -473,7 +482,7 @@ public class VillageCraftingNetwork {
     public static void sendCraftCompleteToPlayer(ServerPlayerEntity player, UUID villagerUuid,
                                                String recipeId, boolean success, ItemStack result) {
         CraftCompletePayload payload = new CraftCompletePayload(villagerUuid, recipeId, success, result);
-        ServerPlayNetworking.send(player, payload);
+        ServerPlayNetworking.send(player, new CustomPayloadS2CPacket(payload));
     }
 
     /**

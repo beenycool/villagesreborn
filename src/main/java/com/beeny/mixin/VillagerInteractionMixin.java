@@ -283,12 +283,15 @@ public abstract class VillagerInteractionMixin {
       return false;
     }
 
-    // Primary check: JOB_SITE memory module
-    Optional<BlockPos> poiPosOpt =
+    // Primary check: JOB_SITE memory module - need to extract BlockPos from GlobalPos
+    Optional<net.minecraft.util.math.GlobalPos> jobSiteOpt =
         villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
     
-    if (poiPosOpt.isPresent()) {
-      BlockPos poiPos = poiPosOpt.get();
+    if (jobSiteOpt.isPresent()) {
+      // Extract the BlockPos from GlobalPos
+      net.minecraft.util.math.GlobalPos globalPos = jobSiteOpt.get();
+      BlockPos poiPos = globalPos.pos();
+      
       double distance = villager.getBlockPos().getSquaredDistance(poiPos);
       BlockState poiState = villager.getWorld().getBlockState(poiPos);
       

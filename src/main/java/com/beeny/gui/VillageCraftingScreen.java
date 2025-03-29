@@ -16,13 +16,14 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Arrays;
 import net.minecraft.client.render.RenderLayer;
 
 public class VillageCraftingScreen extends Screen {
-    // Use Identifier.of() for creating identifiers
-    private static final Identifier BACKGROUND_TEXTURE = Identifier.of("villagesreborn", "textures/gui/crafting_background.png");
-    private static final Identifier ICONS_TEXTURE = Identifier.of("minecraft", "textures/gui/widgets.png"); // Fixed missing namespace
+    // Update to use regular constructor rather than Identifier.of
+    private static final Identifier BACKGROUND_TEXTURE = new Identifier("villagesreborn", "textures/gui/crafting_background.png");
+    private static final Identifier ICONS_TEXTURE = new Identifier("minecraft", "textures/gui/widgets.png");
     private static final int BACKGROUND_WIDTH = 256;
     private static final int BACKGROUND_HEIGHT = 196;
     private static final int RECIPE_BUTTON_HEIGHT = 24;
@@ -190,7 +191,7 @@ public class VillageCraftingScreen extends Screen {
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
         // Draw the background texture with updated API for 1.21.4
-        context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+        context.drawGuiTexture(RenderLayer.getGuiTexture(), BACKGROUND_TEXTURE, guiLeft, guiTop, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
         
         // Draw culture-specific decorative elements
         drawCulturalTheme(context, guiLeft, guiTop);
@@ -314,7 +315,7 @@ public class VillageCraftingScreen extends Screen {
     
     private void drawItem(DrawContext context, ItemStack stack, int x, int y) {
         context.drawItem(stack, x, y);
-        // Fixed drawItemInSlot method not found
+        // Fixed tooltip rendering
         context.drawItemTooltip(textRenderer, stack, x, y);
     }
     
@@ -324,11 +325,35 @@ public class VillageCraftingScreen extends Screen {
         int borderColor = getCultureBorderColor();
         
         // Draw a decorative border
-        context.drawBorder(
+        context.fill(
             guiLeft + 2, 
             guiTop + 2, 
-            BACKGROUND_WIDTH - 4, 
-            BACKGROUND_HEIGHT - 4, 
+            guiLeft + BACKGROUND_WIDTH - 2, 
+            guiTop + 4, 
+            borderColor
+        );
+        
+        context.fill(
+            guiLeft + 2, 
+            guiTop + BACKGROUND_HEIGHT - 4, 
+            guiLeft + BACKGROUND_WIDTH - 2, 
+            guiTop + BACKGROUND_HEIGHT - 2, 
+            borderColor
+        );
+        
+        context.fill(
+            guiLeft + 2, 
+            guiTop + 2, 
+            guiLeft + 4, 
+            guiTop + BACKGROUND_HEIGHT - 2, 
+            borderColor
+        );
+        
+        context.fill(
+            guiLeft + BACKGROUND_WIDTH - 4, 
+            guiTop + 2, 
+            guiLeft + BACKGROUND_WIDTH - 2, 
+            guiTop + BACKGROUND_HEIGHT - 2, 
             borderColor
         );
         
@@ -456,8 +481,23 @@ public class VillageCraftingScreen extends Screen {
     }
     
     public void updateRecipeList(List<String> recipeIds) {
-        // This method would be called from the client handler when recipe list is updated
-        // Implement recipe updating logic here if needed
+        // Convert string recipe IDs to CraftingRecipe objects
+        List<VillageCraftingManager.CraftingRecipe> newRecipes = new ArrayList<>();
+        for (String id : recipeIds) {
+            VillageCraftingManager.CraftingRecipe recipe = VillageCraftingManager.getInstance().getRecipeById(id);
+            if (recipe != null) {
+                newRecipes.add(recipe);
+            }
+        }
+        
+        // Update the recipes list (this assumes recipes is mutable)
+        recipes.clear();
+        recipes.addAll(newRecipes);
+        
+        // Reset selection and update UI
+        selectedRecipe = -1;
+        updateRecipeButtons();
+        updateCraftButton();
     }
     
     public void updateCraftingStatus(String recipeId, String status, String message) {
