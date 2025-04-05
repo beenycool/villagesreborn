@@ -1,5 +1,7 @@
 package com.beeny;
 
+import com.beeny.village.VillagerWorldTickHandler;
+import com.beeny.village.ServerTickHandler;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -268,7 +270,8 @@ public class Villagesreborn implements ModInitializer {
         LOGGER.info("Structure modifications registration complete.");
     }
 
-    private void registerCultureStructures(String vanillaType, net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext selector,
+    private void registerCultureStructures(String vanillaType, 
+                                         java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector,
                                          String cultureType, Map<Identifier, Integer> structures) {
         Identifier housesPoolId = new Identifier("minecraft", "village/" + vanillaType + "/houses");
         RegistryKey<StructurePool> housesPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, housesPoolId);

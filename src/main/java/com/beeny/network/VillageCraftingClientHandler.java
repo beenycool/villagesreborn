@@ -1,5 +1,7 @@
 package com.beeny.network;
 
+import com.beeny.gui.VillageCraftingScreen;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.text.Text;

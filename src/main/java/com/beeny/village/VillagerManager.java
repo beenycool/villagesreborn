@@ -52,6 +52,7 @@ public class VillagerManager {
     private ServerWorld world;
     private Culture.CultureType currentCulture;
     private MinecraftServer server;
+    private final Map<java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext>, String> biomeCultureAssociations = new HashMap<>();
     
     // Add a static reference to the server for safe access
     private static MinecraftServer staticServerInstance;
@@ -709,6 +710,10 @@ public class VillagerManager {
             v1.updateActivity("socializing");
             v2.updateActivity("socializing");
         }
+    }
+
+    public Map<String, String> parseInteractionResponse(String response) {
+        return parseResponse(response); // Reuse the existing private parseResponse method
     }
 
     private Map<String, String> parseResponse(String response) {

@@ -22,6 +22,7 @@ public class VillageCraftingManager {
     private static VillageCraftingManager instance;
     private final Map<String, List<CraftingRecipe>> culturalRecipes = new HashMap<>();
     private final LLMService llmService;
+    private List<CraftingRecipe> recipes = new ArrayList<>();
     
     private VillageCraftingManager() {
         this.llmService = LLMService.getInstance();
@@ -124,6 +125,16 @@ public class VillageCraftingManager {
         return culturalRecipes.getOrDefault(culture, Collections.emptyList());
     }
     
+    public CraftingRecipe getRecipeById(String id) {
+        // Iterate through the recipes list to find a matching recipe.
+        for (CraftingRecipe recipe : recipes) {
+            if (recipe.getId().equals(id)) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+    
     public static class CraftingRecipe {
         private final String id;
         private final Item result;
@@ -167,6 +178,14 @@ public class VillageCraftingManager {
                 player.getInventory().remove(stack -> stack.isOf(entry.getKey()), 
                     entry.getValue(), player.getInventory());
             }
+        }
+
+        public net.minecraft.item.Item getOutput() {
+            return result;
+        }
+
+        public java.util.Map<net.minecraft.item.Item, Integer> getInputs() {
+            return ingredients;
         }
     }
 }

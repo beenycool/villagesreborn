@@ -3,11 +3,16 @@ package com.beeny.ai;
 import com.beeny.ai.provider.*;
 import com.beeny.setup.LLMConfig;
 import com.beeny.setup.SystemSpecs;
+import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -145,6 +150,37 @@ public class LLMService {
     }
 
     public void pruneCache() {
+    }
+
+    public CompletableFuture<List<String>> getRecipeSuggestions(
+            ServerPlayerEntity player, VillagerEntity villager, String culture) {
+        if (currentProvider == null || !currentProvider.isAvailable()) {
+            LOGGER.warn("No AI provider available for recipe suggestions");
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+
+        String prompt = String.format(
+            "Generate 3-5 crafting recipe suggestions for a %s culture villager interacting with player %s. " +
+            "The villager's profession is %s. Recipes should use common Minecraft items but reflect cultural themes. " +
+            "Return each recipe on a new line in the format: 'RecipeName: Item1 xCount, Item2 xCount'",
+            culture,
+            player.getName().getString(),
+            villager.getVillagerData().getProfession().toString()
+        );
+
+        return currentProvider.generateResponse(prompt, new HashMap<>())
+            .thenApply(response -> {
+                List<String> suggestions = new ArrayList<>();
+                if (response != null && !response.isEmpty()) {
+                    suggestions.addAll(Arrays.asList(response.split("\n")));
+                    LOGGER.info("Generated {} recipe suggestions for culture {}", suggestions.size(), culture);
+                }
+                return suggestions;
+            })
+            .exceptionally(ex -> {
+                LOGGER.error("Failed to generate recipe suggestions", ex);
+                return new ArrayList<>();
+            });
     }
 
     public void shutdown() {
