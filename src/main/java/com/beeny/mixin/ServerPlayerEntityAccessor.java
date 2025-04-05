@@ -1,19 +1,19 @@
-package com.beeny.mixin;
+package com.beeny.accessors;
 
-import net.minecraft.entity.data.TrackedData;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.network.ServerPlayerEntity;
 
 /**
- * Interface for accessing protected members of ServerPlayerEntity
+ * Interface for accessing persistent data added by mixin.
  */
 public interface ServerPlayerEntityAccessor {
     /**
-     * Gets the TrackedData for persistent data
-     * This is a static method to avoid having to cast to the accessor
-     * This accessor is used to save and load player's mod-specific data
+     * Gets the custom persistent NBT data compound for VillagesReborn.
+     * Ensures the compound is created if it doesn't exist.
+     * @return The mod-specific NBT data compound.
      */
-    static TrackedData<NbtCompound> getPersistentDataTracker() {
-        return ServerPlayerEntity.PERSISTENT_DATA;
-    }
+    NbtCompound villagesreborn_getPersistentData();
+
+    // Optional: A setter might be useful if you need to replace the entire compound,
+    // but usually modifying the returned compound is sufficient.
+    // void villagesreborn_setPersistentData(NbtCompound data);
 }

@@ -12,6 +12,8 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.text.Text;
+import net.minecraft.network.codec.PacketCodec;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,12 +34,12 @@ public class VillagesClientNetwork {
     public static final Identifier JOIN_EVENT_ID = Identifier.of("villagesreborn", "join_event");
 
     // Custom payload IDs for 1.21.4
-    public static final CustomPayload.Id<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:villager_culture");
-    
-    public static final CustomPayload.Id<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:villager_mood");
-    
+    public static final CustomPayload.Type<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = CustomPayload.createType("villagesreborn:villager_culture");
+    public static final PacketCodec<PacketByteBuf, VillagerCulturePayload> VILLAGER_CULTURE_CODEC = PacketCodec.of(VillagerCulturePayload::write, VillagerCulturePayload::new);
+
+    public static final CustomPayload.Type<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = CustomPayload.createType("villagesreborn:villager_mood");
+    public static final PacketCodec<PacketByteBuf, VillagerMoodPayload> VILLAGER_MOOD_CODEC = PacketCodec.of(VillagerMoodPayload::write, VillagerMoodPayload::new);
+
     public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
         CustomPayload.id("villagesreborn:request_village_info");
     
@@ -66,7 +68,7 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGER_CULTURE_PAYLOAD_ID;
         }
         
@@ -100,7 +102,7 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGER_MOOD_PAYLOAD_ID;
         }
         
@@ -130,7 +132,7 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getId() {
             return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
         }
         
@@ -156,7 +158,7 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getId() {
             return JOIN_EVENT_PAYLOAD_ID;
         }
         
@@ -169,7 +171,6 @@ public class VillagesClientNetwork {
      * Register all client-side packet receivers
      */
     public static void registerReceivers() {
-        // Register receiver for villager culture data
         ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_PAYLOAD_ID,
             (payload, context) -> {
                 MinecraftClient client = context.client();
@@ -178,7 +179,6 @@ public class VillagesClientNetwork {
                 });
             });
 
-        // Register receiver for villager mood updates
         ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_PAYLOAD_ID,
             (payload, context) -> {
                 MinecraftClient client = context.client();
@@ -187,8 +187,7 @@ public class VillagesClientNetwork {
                 });
             });
 
-        // Register receiver for village information
-        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID,
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_ID,
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
@@ -253,10 +252,9 @@ public class VillagesClientNetwork {
      * Process a village info packet from the server
      */
     private static void handleVillageInfoPacket(String cultureName, int prosperity, int safety, int population) {
-        // Update the village info HUD
         VillageInfoHud hud = VillageInfoHud.getInstance();
         if (hud != null) {
-            hud.setCultureInfo(cultureName, prosperity, safety, population);
+            hud.update(cultureName, prosperity, safety, population);
         }
     }
 
@@ -306,5 +304,11 @@ public class VillagesClientNetwork {
         // Register handlers for our custom packet channels
         registerReceivers();
         LOGGER.info("Client-side village network handlers registered");
+    }
+
+    // Register codecs in Villagesreborn#onInitialize
+    static {
+        PayloadTypeRegistry.playS2C().register(VILLAGER_CULTURE_PAYLOAD_ID, VILLAGER_CULTURE_CODEC);
+        PayloadTypeRegistry.playS2C().register(VILLAGER_MOOD_PAYLOAD_ID, VILLAGER_MOOD_CODEC);
     }
 }

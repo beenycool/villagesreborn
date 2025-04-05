@@ -1,13 +1,17 @@
 package com.beeny.network;
 
 import com.beeny.village.VillageCraftingManager;
+import com.beeny.village.VillageCraftingManager.CraftingRecipe;
 import com.beeny.network.VillageCraftingClientHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.codec.PacketCodec;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.util.Identifier;
 
 import java.util.List;
@@ -33,8 +37,11 @@ public class VillageCraftingClientNetwork {
         LOGGER.info("VillageCraftingClientNetwork handlers registered successfully");
     }
 
-    public static final CustomPayload.Id<RecipeListPayload> RECIPE_LIST_PAYLOAD_ID = CustomPayload.id(Identifier.of(MOD_ID, "recipe_list"));
-    public static final CustomPayload.Id<CraftStatusPayload> CRAFT_STATUS_PAYLOAD_ID = CustomPayload.id(Identifier.of(MOD_ID, "craft_status"));
+    public static final CustomPayload.Type<RecipeListPayload> RECIPE_LIST_PAYLOAD_ID = CustomPayload.createType("villagesreborn:recipe_list");
+    public static final PacketCodec<PacketByteBuf, RecipeListPayload> RECIPE_LIST_CODEC = PacketCodec.of(RecipeListPayload::write, RecipeListPayload::new);
+
+    public static final CustomPayload.Type<CraftStatusPayload> CRAFT_STATUS_PAYLOAD_ID = CustomPayload.createType("villagesreborn:craft_status");
+    public static final PacketCodec<PacketByteBuf, CraftStatusPayload> CRAFT_STATUS_CODEC = PacketCodec.of(CraftStatusPayload::write, CraftStatusPayload::new);
 
     public static class RecipeListPayload implements CustomPayload {
         private final List<CraftingRecipe> recipes;
@@ -60,7 +67,7 @@ public class VillageCraftingClientNetwork {
         }
 
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return RECIPE_LIST_PAYLOAD_ID;
         }
     }
@@ -68,20 +75,20 @@ public class VillageCraftingClientNetwork {
     public static class CraftStatusPayload implements CustomPayload {
         private final UUID villagerUuid;
         private final String recipeId;
-        private final boolean crafting;
+        private final String status; // Changed from boolean crafting
         private final String message;
 
-        public CraftStatusPayload(UUID villagerUuid, String recipeId, boolean crafting, String message) {
+        public CraftStatusPayload(UUID villagerUuid, String recipeId, String status, String message) {
             this.villagerUuid = villagerUuid;
             this.recipeId = recipeId;
-            this.crafting = crafting;
+            this.status = status;
             this.message = message;
         }
 
         public CraftStatusPayload(PacketByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
-            this.crafting = buf.readBoolean();
+            this.status = buf.readString(); // Changed from readBoolean
             this.message = buf.readString();
         }
 
@@ -89,12 +96,12 @@ public class VillageCraftingClientNetwork {
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
-            buf.writeBoolean(crafting);
+            buf.writeString(status); // Changed from writeBoolean
             buf.writeString(message);
         }
 
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_STATUS_PAYLOAD_ID;
         }
     }
@@ -106,12 +113,12 @@ public class VillageCraftingClientNetwork {
         // Updated registration using proper types
         ClientPlayNetworking.registerGlobalReceiver(
             RECIPE_LIST_PAYLOAD_ID,
-            (client, handler, buf, responseSender) -> {
-                RecipeListPayload payload = new RecipeListPayload(buf);
+            (payload, context) -> {
+                MinecraftClient client = context.client();
                 client.execute(() -> {
                     VillageCraftingClientHandler.updateAvailableRecipes(
-                        payload.recipes.get(0).getVillagerUuid(),
-                        null
+                        payload.getVillagerUuid(),
+                        payload.getRecipeIds()
                     );
                 });
             }
@@ -119,14 +126,14 @@ public class VillageCraftingClientNetwork {
 
         ClientPlayNetworking.registerGlobalReceiver(
             CRAFT_STATUS_PAYLOAD_ID,
-            (client, handler, buf, responseSender) -> {
-                CraftStatusPayload payload = new CraftStatusPayload(buf);
+            (payload, context) -> {
+                MinecraftClient client = context.client();
                 client.execute(() -> {
                     VillageCraftingClientHandler.updateCraftingStatus(
-                        payload.villagerUuid,
-                        payload.recipeId,
-                        payload.crafting,
-                        payload.message
+                        payload.getVillagerUuid(),
+                        payload.getRecipeId(),
+                        payload.getStatus(),
+                        payload.getMessage()
                     );
                 });
             }

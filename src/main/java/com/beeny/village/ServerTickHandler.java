@@ -28,7 +28,7 @@ public class ServerTickHandler implements ServerTickEvents.EndTick {
      */
     public static void init() {
         LOGGER.info("Initializing ServerTickHandler");
-        ServerTickEvents.END_TICK.register(INSTANCE);
+        ServerTickEvents.END_SERVER_TICK.register(INSTANCE);
     }
     
     /**

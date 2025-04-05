@@ -33,6 +33,10 @@ public class DataComponentHelper {
     }
     
     public static void setCustomData(ItemStack stack, Map<String, Object> data) {
+        if (wrapperLookup == null) {
+            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            return;
+        }
         NbtCompound nbt = new NbtCompound();
         for (Map.Entry<String, Object> entry : data.entrySet()) {
             if (entry.getValue() instanceof String) {
@@ -51,47 +55,44 @@ public class DataComponentHelper {
     }
     
     public static void setLore(ItemStack stack, List<Text> lore) {
-        stack.set(DataComponentTypes.LORE, lore);
+        if (wrapperLookup == null) {
+            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            return;
+        }
+        stack.set(DataComponentTypes.LORE, new LoreComponent(lore));
     }
-    
+
     public static void setEnchantments(ItemStack stack, Map<Enchantment, Integer> enchantments) {
         if (wrapperLookup == null) {
-            // Fallback if wrapper lookup is not available
-            ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder();
-            enchantments.forEach((enchant, level) -> {
-                RegistryKey<Enchantment> registryKey = RegistryKey.of(
-                    RegistryKeys.ENCHANTMENT, 
-                    Registries.ENCHANTMENT.getId(enchant)
-                );
-                // This is a best-effort approach without wrapperLookup
-                builder.add(registryKey, level);
-            });
-            stack.set(DataComponentTypes.ENCHANTMENTS, builder.build());
-        } else {
-            // Proper approach with wrapperLookup
-            ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder();
-            enchantments.forEach((enchant, level) -> {
-                RegistryKey<Enchantment> registryKey = RegistryKey.of(
-                    RegistryKeys.ENCHANTMENT, 
-                    Registries.ENCHANTMENT.getId(enchant)
-                );
-                Optional<RegistryEntry.Reference<Enchantment>> enchantRef = 
-                    wrapperLookup.getWrapperOrThrow(RegistryKeys.ENCHANTMENT).getOptional(registryKey);
-                
-                enchantRef.ifPresent(ref -> builder.add(ref, level));
-            });
-            stack.set(DataComponentTypes.ENCHANTMENTS, builder.build());
+            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            return;
         }
+        ItemEnchantmentsComponent.Builder builder = ItemEnchantmentsComponent.builder();
+        enchantments.forEach((enchant, level) -> {
+            RegistryKey<Enchantment> registryKey = RegistryKey.of(
+                RegistryKeys.ENCHANTMENT, 
+                Registries.ENCHANTMENT.getId(enchant)
+            );
+            Optional<RegistryEntry.Reference<Enchantment>> enchantRef = 
+                wrapperLookup.getWrapperOrThrow(RegistryKeys.ENCHANTMENT).getOptional(registryKey);
+            
+            enchantRef.ifPresent(ref -> builder.add(ref, level));
+        });
+        stack.set(DataComponentTypes.ENCHANTMENTS, builder.build());
     }
-    
+
     public static void setFireworkEffect(ItemStack stack, byte flight, int[] colors) {
+        if (wrapperLookup == null) {
+            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            return;
+        }
         FireworksComponent.Builder builder = new FireworksComponent.Builder()
             .flight(flight);
         
-        List<FireworksComponent.ExplosionComponent> explosions = new ArrayList<>();
-        FireworksComponent.ExplosionComponent.Builder explosionBuilder = 
-            new FireworksComponent.ExplosionComponent.Builder()
-                .type(FireworkRocketItem.Type.LARGE_BALL);
+        List<FireworksComponent.Explosion> explosions = new ArrayList<>();
+        FireworksComponent.Explosion.Builder explosionBuilder = 
+            new FireworksComponent.Explosion.Builder()
+                .type(FireworksComponent.Explosion.Type.LARGE_BALL);
         
         for (int color : colors) {
             explosionBuilder.addColor(color);
@@ -102,31 +103,26 @@ public class DataComponentHelper {
         
         stack.set(DataComponentTypes.FIREWORKS, builder.build());
     }
-    
+
     public static void setPotionEffect(ItemStack stack, String potionId) {
         if (wrapperLookup == null) {
-            // Fallback if wrapper lookup is not available - less reliable
-            Identifier potionIdentifier = new Identifier(potionId);
-            NbtCompound nbt = new NbtCompound();
-            nbt.putString("Potion", potionId);
-            stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
-        } else {
-            // Proper approach with wrapperLookup
-            Identifier potionIdentifier = new Identifier(potionId);
-            RegistryKey<Potion> potionKey = RegistryKey.of(RegistryKeys.POTION, potionIdentifier);
-            
-            Optional<RegistryEntry.Reference<Potion>> potionRef = 
-                wrapperLookup.getWrapperOrThrow(RegistryKeys.POTION).getOptional(potionKey);
-            
-            potionRef.ifPresent(ref -> {
-                PotionContentsComponent potionContents = new PotionContentsComponent(ref);
-                stack.set(DataComponentTypes.POTION_CONTENTS, potionContents);
-            });
+            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            return;
         }
+        Identifier potionIdentifier = Identifier.of(potionId);
+        RegistryKey<Potion> potionKey = RegistryKey.of(RegistryKeys.POTION, potionIdentifier);
+        
+        Optional<RegistryEntry.Reference<Potion>> potionRef = 
+            wrapperLookup.getWrapperOrThrow(RegistryKeys.POTION).getOptional(potionKey);
+        
+        potionRef.ifPresent(ref -> {
+            PotionContentsComponent potionContents = new PotionContentsComponent(ref);
+            stack.set(DataComponentTypes.POTION_CONTENTS, potionContents);
+        });
     }
-    
+
     public static NbtCompound getCustomData(ItemStack stack) {
         Optional<NbtComponent> customData = stack.get(DataComponentTypes.CUSTOM_DATA);
-        return customData.map(NbtComponent::nbt).orElse(new NbtCompound());
+        return customData.map(NbtComponent::copyNbt).orElse(new NbtCompound());
     }
 }

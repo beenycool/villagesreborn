@@ -419,7 +419,14 @@ public class VillagerEventBehavior {
                 
                 // Seek shelter at home locations if possible
                 villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME)
-                    .ifPresent(pos -> moveVillagerToPosition(ai, pos));
+                    .ifPresent(globalPos -> {
+                        // Check if the home is in the same dimension before moving
+                        // Replace globalPos.getDimension() with globalPos.dimension()
+                        // Replace globalPos.getPos() with globalPos.pos()
+                        if (globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
+                            moveVillagerToPosition(ai, globalPos.pos());
+                        }
+                    });
             }
         }
     }

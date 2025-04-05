@@ -190,7 +190,7 @@ public class VillageCraftingScreen extends Screen {
         int guiLeft = (width - BACKGROUND_WIDTH) / 2;
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
-        // Draw the background texture with updated API for 1.21.4
+        // Updated BACKGROUND_TEXTURE rendering
         context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
         
         // Draw culture-specific decorative elements

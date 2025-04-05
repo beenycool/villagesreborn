@@ -15,6 +15,8 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.codec.PacketCodec;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
@@ -48,23 +50,23 @@ public class VillagesNetwork {
     public static final Identifier VILLAGER_AI_STATE_ID = Identifier.of("villagesreborn", "villager_ai_state");
 
     // Custom payload ID objects for 1.21.4
-    public static final CustomPayload.Id<VillageInfoPayload> VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:village_info");
+    public static final CustomPayload.Type<VillageInfoPayload> VILLAGE_INFO_PAYLOAD_ID = CustomPayload.createType("villagesreborn:village_info");
+    public static final PacketCodec<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_CODEC = PacketCodec.of(VillageInfoPayload::write, VillageInfoPayload::new);
+
+    public static final CustomPayload.Type<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = CustomPayload.createType("villagesreborn:request_village_info");
+    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC = PacketCodec.of(RequestVillageInfoPayload::write, RequestVillageInfoPayload::new);
     
-    public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:request_village_info");
+    public static final CustomPayload.Type<EventNotificationPayload> EVENT_NOTIFICATION_PAYLOAD_ID = 
+        CustomPayload.createType("villagesreborn:event_notification");
     
-    public static final CustomPayload.Id<EventNotificationPayload> EVENT_NOTIFICATION_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:event_notification");
+    public static final CustomPayload.Type<EventUpdatePayload> EVENT_UPDATE_PAYLOAD_ID = 
+        CustomPayload.createType("villagesreborn:event_update");
     
-    public static final CustomPayload.Id<EventUpdatePayload> EVENT_UPDATE_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:event_update");
+    public static final CustomPayload.Type<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
+        CustomPayload.createType("villagesreborn:join_event");
     
-    public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:join_event");
-    
-    public static final CustomPayload.Id<VillagerAIStatePayload> VILLAGER_AI_STATE_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:villager_ai_state");
+    public static final CustomPayload.Type<VillagerAIStatePayload> VILLAGER_AI_STATE_PAYLOAD_ID = 
+        CustomPayload.createType("villagesreborn:villager_ai_state");
 
     // Custom payload classes for 1.21.4
     public static class VillageInfoPayload implements CustomPayload {
@@ -112,7 +114,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGE_INFO_PAYLOAD_ID;
         }
     }
@@ -138,7 +140,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
         }
     }
@@ -180,7 +182,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return EVENT_NOTIFICATION_PAYLOAD_ID;
         }
     }
@@ -222,7 +224,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return EVENT_UPDATE_PAYLOAD_ID;
         }
     }
@@ -248,7 +250,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return JOIN_EVENT_PAYLOAD_ID;
         }
     }
@@ -290,7 +292,7 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGER_AI_STATE_PAYLOAD_ID;
         }
     }
@@ -313,7 +315,7 @@ public class VillagesNetwork {
                 ServerPlayerEntity player = context.player();
                 MinecraftServer server = player.getServer();
                 server.execute(() -> {
-                    handleVillageInfoRequest(server, player, player.networkHandler, payload, context.responseSender());
+                    handleVillageInfoRequest(server, player, payload, context.responseSender());
                 });
             });
         
@@ -322,7 +324,7 @@ public class VillagesNetwork {
                 ServerPlayerEntity player = context.player();
                 MinecraftServer server = player.getServer();
                 server.execute(() -> {
-                    handleJoinEventRequest(server, player, player.networkHandler, payload, context.responseSender());
+                    handleJoinEventRequest(server, player, payload, context.responseSender());
                 });
             });
             
@@ -338,7 +340,7 @@ public class VillagesNetwork {
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
-                    handleVillageInfoUpdate(client, context.networkHandler(), payload, context.responseSender());
+                    handleVillageInfoUpdate(client, payload);
                 });
             });
         
@@ -375,7 +377,7 @@ public class VillagesNetwork {
      * Handle request for village info from client
      */
     private static void handleVillageInfoRequest(MinecraftServer server, ServerPlayerEntity player, 
-                                           ServerPlayNetworkHandler handler, RequestVillageInfoPayload payload, 
+                                           RequestVillageInfoPayload payload, 
                                            PacketSender responseSender) {
         // Get player position from the payload
         BlockPos playerPos = payload.getPlayerPos();
@@ -397,13 +399,12 @@ public class VillagesNetwork {
      * Handle request to join an event from client
      */
     private static void handleJoinEventRequest(MinecraftServer server, ServerPlayerEntity player,
-                                         ServerPlayNetworkHandler handler, JoinEventPayload payload,
+                                         JoinEventPayload payload,
                                          PacketSender responseSender) {
         String eventId = payload.getEventId();
         
         server.execute(() -> {
-            // Updated to use correct VillageEvent class from event package
-            VillageEvent event = VillageEvent.findById(eventId);  // Assuming method name is findById
+            VillageEvent event = VillageEvent.getEvent(eventId); // Updated method
             if (event != null) {
                 PlayerEventParticipation.getInstance().joinEvent(player, event);
                 
@@ -420,8 +421,7 @@ public class VillagesNetwork {
     /**
      * Handle village info update packet from server
      */
-    private static void handleVillageInfoUpdate(MinecraftClient client, ClientPlayNetworkHandler handler, 
-                                          VillageInfoPayload payload, PacketSender responseSender) {
+    private static void handleVillageInfoUpdate(MinecraftClient client, VillageInfoPayload payload) {
         // Get village info from payload
         String cultureName = payload.getCulture();
         int prosperity = payload.getProsperity();
@@ -432,7 +432,7 @@ public class VillagesNetwork {
         client.execute(() -> {
             VillageInfoHud hud = VillageInfoHud.getInstance();
             if (hud != null) {
-                hud.setCultureInfo(cultureName, prosperity, safety, population);
+                hud.update(cultureName, prosperity, safety, population); // Updated method
             }
         });
     }

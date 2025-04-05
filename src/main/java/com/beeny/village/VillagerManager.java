@@ -278,7 +278,7 @@ public class VillagerManager {
         }
     }
 
-    private void updateCulturalEvents(ServerWorld world) {
+    public void updateCulturalEvents(ServerWorld world) {
         long timeOfDay = world.getTimeOfDay();
         culturalEventLock.writeLock().lock();
         try {
@@ -299,7 +299,7 @@ public class VillagerManager {
         }
     }
 
-    private void updateVillageStats(ServerWorld world) {
+    public void updateVillageStats(ServerWorld world) {
         villageLock.readLock().lock();
         try {
             for (Map.Entry<BlockPos, VillageStats> entry : villageStats.entrySet()) {

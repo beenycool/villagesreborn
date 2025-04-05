@@ -1,8 +1,6 @@
 package com.beeny.village.event;
 
 import com.beeny.Villagesreborn;
-// Fix: Use a standard import
-import com.beeny.data.PlayerDataManager; // Import the class from the data package
 import com.beeny.village.artifacts.CulturalArtifactSystem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
@@ -55,7 +53,6 @@ public class PlayerDataManager { // Keep the class name as is within this packag
         villagesData.put("artifacts", artifactData);
 
         // Store in the player's persistent data using the correct PlayerDataManager from the 'data' package
-        // Fix: Use the fully qualified name or the imported class name directly
         NbtCompound persistentData = com.beeny.data.PlayerDataManager.getOrCreatePersistentData(player);
         persistentData.put(Villagesreborn.MOD_ID, villagesData);
         // No need to call savePersistentData explicitly if getOrCreatePersistentData modifies the original NBT
@@ -73,7 +70,6 @@ public class PlayerDataManager { // Keep the class name as is within this packag
         UUID playerUUID = player.getUuid();
 
         // Get the player's persistent data using the correct PlayerDataManager from the 'data' package
-        // Fix: Use the fully qualified name or the imported class name directly
         NbtCompound persistentData = com.beeny.data.PlayerDataManager.getOrCreatePersistentData(player);
 
         // Return if no data exists for our mod

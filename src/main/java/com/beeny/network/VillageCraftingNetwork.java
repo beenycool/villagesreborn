@@ -14,10 +14,15 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import net.minecraft.network.codec.PacketCodec;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 /**
  * Handles network communication for the village crafting system.
@@ -37,11 +42,11 @@ public class VillageCraftingNetwork {
     public static final Identifier CRAFT_COMPLETE_PACKET_ID = Identifier.of("villagesreborn", "craft_complete");
 
     // Custom payload IDs for 1.21.4
-    public static final CustomPayload.Id<CraftRecipePayload> CRAFT_RECIPE_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:craft_recipe");
-    
-    public static final CustomPayload.Id<RequestRecipesPayload> REQUEST_RECIPES_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:request_recipes");
+    public static final CustomPayload.Type<CraftRecipePayload> CRAFT_RECIPE_PAYLOAD_ID = CustomPayload.createType("villagesreborn:craft_recipe");
+    public static final PacketCodec<PacketByteBuf, CraftRecipePayload> CRAFT_RECIPE_CODEC = PacketCodec.of(CraftRecipePayload::write, CraftRecipePayload::new);
+
+    public static final CustomPayload.Type<RequestRecipesPayload> REQUEST_RECIPES_PAYLOAD_ID = CustomPayload.createType("villagesreborn:request_recipes");
+    public static final PacketCodec<PacketByteBuf, RequestRecipesPayload> REQUEST_RECIPES_CODEC = PacketCodec.of(RequestRecipesPayload::write, RequestRecipesPayload::new);
     
     public static final CustomPayload.Id<CancelCraftPayload> CANCEL_CRAFT_PAYLOAD_ID = 
         CustomPayload.id("villagesreborn:cancel_craft");
@@ -80,7 +85,7 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_RECIPE_PAYLOAD_ID;
         }
 
@@ -110,7 +115,7 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return REQUEST_RECIPES_PAYLOAD_ID;
         }
 
@@ -165,7 +170,7 @@ public class VillageCraftingNetwork {
         public RecipeListPayload(PacketByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             int size = buf.readInt();
-            this.recipeIds = new java.util.ArrayList<>(size);
+            this.recipeIds = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
                 this.recipeIds.add(buf.readString());
             }
@@ -181,14 +186,14 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Id<?> getId() {
             return RECIPE_LIST_PAYLOAD_ID;
         }
 
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
-        
+
         public List<String> getRecipeIds() {
             return recipeIds;
         }
@@ -223,22 +228,22 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Id<?> getId() {
             return CRAFT_STATUS_PAYLOAD_ID;
         }
 
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
-        
+
         public String getRecipeId() {
             return recipeId;
         }
-        
+
         public String getStatus() {
             return status;
         }
-        
+
         public String getMessage() {
             return message;
         }
@@ -362,31 +367,46 @@ public class VillageCraftingNetwork {
                 });
             });
 
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PAYLOAD_ID,
-            (payload, context) -> {
-                ServerPlayerEntity player = context.player();
-                MinecraftServer server = player.getServer();
-                server.execute(() -> {
-                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
-                        .getEntity(payload.getVillagerUuid());
-                    if (villager != null) {
-                        handleRecipeRequest(villager, player, context.responseSender());
-                    }
-                });
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PAYLOAD_ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            MinecraftServer server = player.getServer();
+            server.execute(() -> {
+                VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
+                if (villager != null) {
+                    handleRecipeRequest(villager, player, context.responseSender());
+                }
             });
+        });
 
-        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PAYLOAD_ID,
-            (payload, context) -> {
-                ServerPlayerEntity player = context.player();
-                MinecraftServer server = player.getServer();
-                server.execute(() -> {
-                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
-                        .getEntity(payload.getVillagerUuid());
-                    if (villager != null) {
-                        VillageCraftingManager.getInstance()
-                            .cancelTask(villager, payload.getRecipeId());
-                    }
-                });
+        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PAYLOAD_ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            MinecraftServer server = player.getServer();
+            server.execute(() -> {
+                VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
+                if (villager != null) {
+                    VillageCraftingManager.getInstance().cancelTask(villager, payload.getRecipeId());
+                }
             });
+        });
+    }
+
+    private static void handleRecipeRequest(VillagerEntity villager, ServerPlayerEntity player, PacketSender responseSender) {
+        VillagerManager vm = VillagerManager.getInstance();
+        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+        String culture = region != null ? region.getCultureAsString() : "default";
+
+        List<String> recipeIds = VillageCraftingManager.getInstance()
+            .getRecipesForCulture(culture).stream()
+            .map(VillageCraftingManager.CraftingRecipe::getId)
+            .collect(Collectors.toList());
+
+        RecipeListPayload payload = new RecipeListPayload(villager.getUuid(), recipeIds);
+        ServerPlayNetworking.send(player, payload);
+    }
+    
+    // Register codecs in Villagesreborn#onInitialize
+    static {
+        PayloadTypeRegistry.playC2S().register(CRAFT_RECIPE_PAYLOAD_ID, CRAFT_RECIPE_CODEC);
+        PayloadTypeRegistry.playC2S().register(REQUEST_RECIPES_PAYLOAD_ID, REQUEST_RECIPES_CODEC);
     }
 }

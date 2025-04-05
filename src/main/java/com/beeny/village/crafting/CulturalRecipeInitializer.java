@@ -45,7 +45,7 @@ public class CulturalRecipeInitializer {
         if (!enchantments.isEmpty()) {
             Map<Enchantment, Integer> enchantMap = new HashMap<>();
             enchantments.forEach((id, level) -> {
-                Optional<Enchantment> enchant = Registries.ENCHANTMENT.getOrEmpty(new net.minecraft.util.Identifier(id));
+                Optional<Enchantment> enchant = Registries.ENCHANTMENT.getOrEmpty(net.minecraft.util.Identifier.of(id));
                 enchant.ifPresent(e -> enchantMap.put(e, level));
             });
             DataComponentHelper.setEnchantments(stack, enchantMap);
@@ -71,7 +71,7 @@ public class CulturalRecipeInitializer {
 
     private static void addFireworkEffect(ItemStack stack, String name, byte flight, int[] colors) {
         // Set custom name
-        stack.setCustomName(Text.literal(name).formatted(Formatting.LIGHT_PURPLE));
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).formatted(Formatting.LIGHT_PURPLE));
         
         // Set firework effect
         DataComponentHelper.setFireworkEffect(stack, flight, colors);
@@ -667,7 +667,7 @@ public class CulturalRecipeInitializer {
         
         addCustomProperties(crystalSkull, "Mayan Crystal Skull", Formatting.AQUA, lore);
         
-        Map<String, Object> customData = new HashMap<>();
+        customData = new HashMap<>();
         customData.put("ExperienceBonus", 0.25f);
         customData.put("VisionPower", true);
         DataComponentHelper.setCustomData(crystalSkull, customData);

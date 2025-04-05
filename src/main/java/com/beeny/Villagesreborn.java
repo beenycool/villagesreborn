@@ -18,7 +18,6 @@ import com.beeny.village.VillageCraftingManager;
 import com.beeny.village.Culture;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.SpawnRegion;
-import com.beeny.village.VillageEvent;
 import com.beeny.village.event.CulturalEventSystem;
 import com.beeny.village.event.PlayerDataManager;
 import com.beeny.setup.SystemSpecs;
@@ -36,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import net.minecraft.structure.pool.StructurePool;
 
 public class Villagesreborn implements ModInitializer {
     public static final String MOD_ID = "villagesreborn";
@@ -273,39 +273,17 @@ public class Villagesreborn implements ModInitializer {
     private void registerCultureStructures(String vanillaType, 
                                          java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector,
                                          String cultureType, Map<Identifier, Integer> structures) {
-        Identifier housesPoolId = new Identifier("minecraft", "village/" + vanillaType + "/houses");
+        Identifier housesPoolId = Identifier.of("minecraft", "village/" + vanillaType + "/houses");
         RegistryKey<StructurePool> housesPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, housesPoolId);
-        Identifier centerPoolId = new Identifier("minecraft", "village/" + vanillaType + "/town_centers");
+        Identifier centerPoolId = Identifier.of("minecraft", "village/" + vanillaType + "/town_centers");
         RegistryKey<StructurePool> centerPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, centerPoolId);
 
         // Update to use the correct BiomeSelectors method for 1.21.4
         VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
 
-        net.fabricmc.fabric.api.structure.v1.FabricStructurePool.registerAddition(housesPoolId, builder -> {
-            for (Map.Entry<Identifier, Integer> entry : structures.entrySet()) {
-                if (entry.getKey().getPath().contains("forum") ||
-                    entry.getKey().getPath().contains("temple") ||
-                    entry.getKey().getPath().contains("square") ||
-                    entry.getKey().getPath().contains("skyscraper")) {
-                    continue;
-                }
-                LOGGER.info("Adding {} to {} village houses pool with weight {}",
-                            entry.getKey(), vanillaType, entry.getValue());
-                builder.element(entry.getKey().toString(), entry.getValue());
-            }
-        });
-        net.fabricmc.fabric.api.structure.v1.FabricStructurePool.registerAddition(centerPoolId, builder -> {
-            for (Map.Entry<Identifier, Integer> entry : structures.entrySet()) {
-                if (entry.getKey().getPath().contains("forum") ||
-                    entry.getKey().getPath().contains("temple") ||
-                    entry.getKey().getPath().contains("square") ||
-                    entry.getKey().getPath().contains("skyscraper")) {
-                    LOGGER.info("Adding {} to {} village center pool with weight {}",
-                                entry.getKey(), vanillaType, entry.getValue());
-                    builder.element(entry.getKey().toString(), entry.getValue());
-                }
-            }
-        });
+        // Removed FabricStructurePool.registerAddition calls as the API is no longer available in Fabric 1.21.4.
+        // Structure additions should now be implemented via data packs or custom structure sets.
+
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             LOGGER.info("Registered structure generation callback for {} culture in {} villages",
                        cultureType, vanillaType);
@@ -354,7 +332,7 @@ public class Villagesreborn implements ModInitializer {
     }
 
     public int getActiveEventCount(BlockPos pos) {
-        return VillageEvent.findEventsNear(pos, getVillageRadius(pos)).size();
+        return com.beeny.village.event.VillageEvent.findEventsNear(pos, getVillageRadius(pos)).size();
     }
 
     public Collection<Culture> getAllVillages() {
