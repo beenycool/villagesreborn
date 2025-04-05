@@ -190,8 +190,8 @@ public class VillageCraftingScreen extends Screen {
         int guiLeft = (width - BACKGROUND_WIDTH) / 2;
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
-        // Updated BACKGROUND_TEXTURE rendering
-        context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+        // Updated BACKGROUND_TEXTURE rendering for Minecraft 1.21.4
+        context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, 0, 0, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
         
         // Draw culture-specific decorative elements
         drawCulturalTheme(context, guiLeft, guiTop);

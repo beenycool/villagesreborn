@@ -36,37 +36,42 @@ import java.util.UUID;
  */
 public class VillagesNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillagesNetwork");
+    private static final String MOD_ID = "villagesreborn";
 
     // Village Info Packets - using Identifier.of() instead of new Identifier()
-    public static final Identifier VILLAGE_INFO_ID = Identifier.of("villagesreborn", "village_info");
-    public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of("villagesreborn", "request_village_info");
+    public static final Identifier VILLAGE_INFO_ID = Identifier.of(MOD_ID, "village_info");
+    public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of(MOD_ID, "request_village_info");
     
     // Event Notification Packets
-    public static final Identifier EVENT_NOTIFICATION_ID = Identifier.of("villagesreborn", "event_notification");
-    public static final Identifier EVENT_UPDATE_ID = Identifier.of("villagesreborn", "event_update");
-    public static final Identifier JOIN_EVENT_ID = Identifier.of("villagesreborn", "join_event");
+    public static final Identifier EVENT_NOTIFICATION_ID = Identifier.of(MOD_ID, "event_notification");
+    public static final Identifier EVENT_UPDATE_ID = Identifier.of(MOD_ID, "event_update");
+    public static final Identifier JOIN_EVENT_ID = Identifier.of(MOD_ID, "join_event");
     
     // AI State Sync Packets
-    public static final Identifier VILLAGER_AI_STATE_ID = Identifier.of("villagesreborn", "villager_ai_state");
+    public static final Identifier VILLAGER_AI_STATE_ID = Identifier.of(MOD_ID, "villager_ai_state");
 
-    // Custom payload ID objects for 1.21.4
-    public static final CustomPayload.Type<VillageInfoPayload> VILLAGE_INFO_PAYLOAD_ID = CustomPayload.createType("villagesreborn:village_info");
-    public static final PacketCodec<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_CODEC = PacketCodec.of(VillageInfoPayload::write, VillageInfoPayload::new);
+    // Custom payload ID objects for 1.21.4 - corrected to use the Type constructor with two type parameters
+    public static final CustomPayload.Type<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "village_info"));
+    public static final PacketCodec<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_CODEC = 
+        PacketCodec.of(VillageInfoPayload::write, VillageInfoPayload::new);
 
-    public static final CustomPayload.Type<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = CustomPayload.createType("villagesreborn:request_village_info");
-    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC = PacketCodec.of(RequestVillageInfoPayload::write, RequestVillageInfoPayload::new);
+    public static final CustomPayload.Type<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "request_village_info"));
+    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC = 
+        PacketCodec.of(RequestVillageInfoPayload::write, RequestVillageInfoPayload::new);
     
-    public static final CustomPayload.Type<EventNotificationPayload> EVENT_NOTIFICATION_PAYLOAD_ID = 
-        CustomPayload.createType("villagesreborn:event_notification");
+    public static final CustomPayload.Type<PacketByteBuf, EventNotificationPayload> EVENT_NOTIFICATION_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "event_notification"));
     
-    public static final CustomPayload.Type<EventUpdatePayload> EVENT_UPDATE_PAYLOAD_ID = 
-        CustomPayload.createType("villagesreborn:event_update");
+    public static final CustomPayload.Type<PacketByteBuf, EventUpdatePayload> EVENT_UPDATE_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "event_update"));
     
-    public static final CustomPayload.Type<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
-        CustomPayload.createType("villagesreborn:join_event");
+    public static final CustomPayload.Type<PacketByteBuf, JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "join_event"));
     
-    public static final CustomPayload.Type<VillagerAIStatePayload> VILLAGER_AI_STATE_PAYLOAD_ID = 
-        CustomPayload.createType("villagesreborn:villager_ai_state");
+    public static final CustomPayload.Type<PacketByteBuf, VillagerAIStatePayload> VILLAGER_AI_STATE_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "villager_ai_state"));
 
     // Custom payload classes for 1.21.4
     public static class VillageInfoPayload implements CustomPayload {
@@ -117,6 +122,11 @@ public class VillagesNetwork {
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGE_INFO_PAYLOAD_ID;
         }
+
+        @Override
+        public CustomPayload.Id<VillageInfoPayload> getId() {
+            return VILLAGE_INFO_PAYLOAD_ID.getId();
+        }
     }
     
     public static class RequestVillageInfoPayload implements CustomPayload {
@@ -142,6 +152,11 @@ public class VillagesNetwork {
         @Override
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
+        }
+
+        @Override
+        public CustomPayload.Id<RequestVillageInfoPayload> getId() {
+            return REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId();
         }
     }
     
@@ -185,6 +200,11 @@ public class VillagesNetwork {
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return EVENT_NOTIFICATION_PAYLOAD_ID;
         }
+
+        @Override
+        public CustomPayload.Id<EventNotificationPayload> getId() {
+            return EVENT_NOTIFICATION_PAYLOAD_ID.getId();
+        }
     }
     
     public static class EventUpdatePayload implements CustomPayload {
@@ -227,6 +247,11 @@ public class VillagesNetwork {
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return EVENT_UPDATE_PAYLOAD_ID;
         }
+
+        @Override
+        public CustomPayload.Id<EventUpdatePayload> getId() {
+            return EVENT_UPDATE_PAYLOAD_ID.getId();
+        }
     }
     
     public static class JoinEventPayload implements CustomPayload {
@@ -252,6 +277,11 @@ public class VillagesNetwork {
         @Override
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return JOIN_EVENT_PAYLOAD_ID;
+        }
+
+        @Override
+        public CustomPayload.Id<JoinEventPayload> getId() {
+            return JOIN_EVENT_PAYLOAD_ID.getId();
         }
     }
     
@@ -295,6 +325,11 @@ public class VillagesNetwork {
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return VILLAGER_AI_STATE_PAYLOAD_ID;
         }
+
+        @Override
+        public CustomPayload.Id<VillagerAIStatePayload> getId() {
+            return VILLAGER_AI_STATE_PAYLOAD_ID.getId();
+        }
     }
 
     /**
@@ -310,7 +345,7 @@ public class VillagesNetwork {
      */
     public static void registerServerHandlers() {
         // Register handlers for the custom payload packets
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PAYLOAD_ID,
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 ServerPlayerEntity player = context.player();
                 MinecraftServer server = player.getServer();
@@ -319,7 +354,7 @@ public class VillagesNetwork {
                 });
             });
         
-        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PAYLOAD_ID,
+        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 ServerPlayerEntity player = context.player();
                 MinecraftServer server = player.getServer();
@@ -335,32 +370,32 @@ public class VillagesNetwork {
      * Register client-side packet handlers
      */
     public static void registerClientHandlers() {
-        // Register handlers for the custom payload packets
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PAYLOAD_ID,
+        // Updated to use static CustomPayload.Id<T> field
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleVillageInfoUpdate(client, payload);
                 });
             });
-        
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_PAYLOAD_ID,
+
+        ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleEventNotification(client, context.networkHandler(), payload, context.responseSender());
                 });
             });
-        
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PAYLOAD_ID,
+
+        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
                     handleEventUpdate(client, context.networkHandler(), payload, context.responseSender());
                 });
             });
-        
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_PAYLOAD_ID,
+
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_PAYLOAD_ID.getId(),
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {

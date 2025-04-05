@@ -35,15 +35,10 @@ public abstract class ServerPlayerEntityMixin implements ServerPlayerEntityAcces
     }
 
     @Override
-    public NbtCompound getPersistentData() {
+    public NbtCompound villagesreborn_getPersistentData() {
         if (villagesreborn_persistentData == null) {
             villagesreborn_persistentData = new NbtCompound();
         }
         return villagesreborn_persistentData;
-    }
-
-    @Override
-    public void setPersistentData(NbtCompound persistentData) {
-        this.villagesreborn_persistentData = persistentData;
     }
 }

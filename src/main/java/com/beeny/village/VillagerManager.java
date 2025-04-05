@@ -898,4 +898,39 @@ public class VillagerManager {
     public void registerBiomeCultureAssociation(java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType) {
         biomeCultureAssociations.put(selector, cultureType);
     }
+
+    /**
+     * Initialize culture-specific structures for a village type
+     * This replaces the deprecated FabricStructurePool.registerAddition in 1.21.4
+     * 
+     * @param server The Minecraft server
+     * @param cultureType The culture type (e.g., "roman", "egyptian")
+     * @param vanillaType The vanilla village type (e.g., "plains", "desert")
+     * @param structures Map of structure Identifiers to their weights
+     */
+    public void initializeCultureStructures(MinecraftServer server, String cultureType, 
+                                          String vanillaType, Map<net.minecraft.util.Identifier, Integer> structures) {
+        // Get the registry manager from the server
+        net.minecraft.registry.RegistryWrapper.WrapperLookup registryManager = server.getRegistryManager();
+        
+        // In 1.21.4, the correct way to add structures is through data packs
+        // We'll log what structures would have been added so the user knows
+        // what to include in their data pack
+        
+        LOGGER.info("Structures for {} culture in {} villages:", cultureType, vanillaType);
+        for (Map.Entry<net.minecraft.util.Identifier, Integer> entry : structures.entrySet()) {
+            LOGGER.info(" - {} (weight: {})", entry.getKey(), entry.getValue());
+            
+            // Store the structure reference for later use in the mod
+            SpawnRegion region = spawnRegions.values().stream()
+                .filter(r -> r.getCulture().toString().equalsIgnoreCase(cultureType))
+                .findFirst().orElse(null);
+                
+            if (region != null) {
+                region.addCulturalStructure(entry.getKey());
+            }
+        }
+        
+        LOGGER.info("To add these structures, include them in a data pack with appropriate structure pool templates");
+    }
 }

@@ -273,20 +273,20 @@ public class Villagesreborn implements ModInitializer {
     private void registerCultureStructures(String vanillaType, 
                                          java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector,
                                          String cultureType, Map<Identifier, Integer> structures) {
-        Identifier housesPoolId = Identifier.of("minecraft", "village/" + vanillaType + "/houses");
-        RegistryKey<StructurePool> housesPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, housesPoolId);
-        Identifier centerPoolId = Identifier.of("minecraft", "village/" + vanillaType + "/town_centers");
-        RegistryKey<StructurePool> centerPoolKey = RegistryKey.of(RegistryKeys.TEMPLATE_POOL, centerPoolId);
-
-        // Update to use the correct BiomeSelectors method for 1.21.4
+        // Register the culture-biome association for villager behavior
         VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
-
-        // Removed FabricStructurePool.registerAddition calls as the API is no longer available in Fabric 1.21.4.
-        // Structure additions should now be implemented via data packs or custom structure sets.
-
+        
+        LOGGER.info("Registered {} culture for {} biomes", cultureType, vanillaType);
+        
+        // In 1.21.4, structure additions should be handled through data packs
+        // or through the Structure API directly rather than FabricStructurePool
+        
+        // Add structures to the custom registry when the server starts
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            LOGGER.info("Registered structure generation callback for {} culture in {} villages",
+            LOGGER.info("Initializing structure generation for {} culture in {} villages",
                        cultureType, vanillaType);
+            // Register culture-specific spawning logic
+            VillagerManager.getInstance().initializeCultureStructures(server, cultureType, vanillaType, structures);
         });
     }
 

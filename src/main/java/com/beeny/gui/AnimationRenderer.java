@@ -32,16 +32,13 @@ public class AnimationRenderer {
         int y = height / 2 - TEXTURE_SIZE / 2;
 
         context.drawTexture(
-            GUI_LAYER,
             frames[frameIndex],  // Current animation frame
             x,                  // x position
             y,                  // y position
-            0.0f,              // u (texture x offset)
-            0.0f,              // v (texture y offset)
+            0,                  // u (texture x offset)
+            0,                  // v (texture y offset)
             TEXTURE_SIZE,       // width
-            TEXTURE_SIZE,       // height
-            TEXTURE_SIZE,       // texture width
-            TEXTURE_SIZE        // texture height
+            TEXTURE_SIZE        // height
         );
     }
 

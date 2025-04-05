@@ -31,37 +31,42 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
  */
 public class VillageCraftingNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillageCraftingNetwork");
+    private static final String MOD_ID = "villagesreborn";
     
     // Packet identifiers - updated to use Identifier.of()
-    public static final Identifier CRAFT_PACKET_ID = Identifier.of("villagesreborn", "craft_recipe");
-    public static final Identifier REQUEST_RECIPES_PACKET_ID = Identifier.of("villagesreborn", "request_recipes");
-    public static final Identifier RECIPE_LIST_PACKET_ID = Identifier.of("villagesreborn", "recipe_list");
-    public static final Identifier CRAFT_STATUS_PACKET_ID = Identifier.of("villagesreborn", "craft_status");
-    public static final Identifier CANCEL_CRAFT_PACKET_ID = Identifier.of("villagesreborn", "cancel_craft");
-    public static final Identifier CRAFT_PROGRESS_PACKET_ID = Identifier.of("villagesreborn", "craft_progress");
-    public static final Identifier CRAFT_COMPLETE_PACKET_ID = Identifier.of("villagesreborn", "craft_complete");
+    public static final Identifier CRAFT_PACKET_ID = Identifier.of(MOD_ID, "craft_recipe");
+    public static final Identifier REQUEST_RECIPES_PACKET_ID = Identifier.of(MOD_ID, "request_recipes");
+    public static final Identifier RECIPE_LIST_PACKET_ID = Identifier.of(MOD_ID, "recipe_list");
+    public static final Identifier CRAFT_STATUS_PACKET_ID = Identifier.of(MOD_ID, "craft_status");
+    public static final Identifier CANCEL_CRAFT_PACKET_ID = Identifier.of(MOD_ID, "cancel_craft");
+    public static final Identifier CRAFT_PROGRESS_PACKET_ID = Identifier.of(MOD_ID, "craft_progress");
+    public static final Identifier CRAFT_COMPLETE_PACKET_ID = Identifier.of(MOD_ID, "craft_complete");
 
-    // Custom payload IDs for 1.21.4
-    public static final CustomPayload.Type<CraftRecipePayload> CRAFT_RECIPE_PAYLOAD_ID = CustomPayload.createType("villagesreborn:craft_recipe");
-    public static final PacketCodec<PacketByteBuf, CraftRecipePayload> CRAFT_RECIPE_CODEC = PacketCodec.of(CraftRecipePayload::write, CraftRecipePayload::new);
+    // Custom payload IDs for 1.21.4 - corrected to use the Type constructor with two type parameters
+    public static final CustomPayload.Id<CraftRecipePayload> CRAFT_RECIPE_PAYLOAD_ID = 
+        CustomPayload.createId(Identifier.of(MOD_ID, "craft_recipe"));
+    public static final PacketCodec<PacketByteBuf, CraftRecipePayload> CRAFT_RECIPE_CODEC = 
+        PacketCodec.of(CraftRecipePayload::write, CraftRecipePayload::new);
 
-    public static final CustomPayload.Type<RequestRecipesPayload> REQUEST_RECIPES_PAYLOAD_ID = CustomPayload.createType("villagesreborn:request_recipes");
-    public static final PacketCodec<PacketByteBuf, RequestRecipesPayload> REQUEST_RECIPES_CODEC = PacketCodec.of(RequestRecipesPayload::write, RequestRecipesPayload::new);
+    public static final CustomPayload.Id<RequestRecipesPayload> REQUEST_RECIPES_PAYLOAD_ID = 
+        CustomPayload.createId(Identifier.of(MOD_ID, "request_recipes"));
+    public static final PacketCodec<PacketByteBuf, RequestRecipesPayload> REQUEST_RECIPES_CODEC = 
+        PacketCodec.of(RequestRecipesPayload::write, RequestRecipesPayload::new);
     
     public static final CustomPayload.Id<CancelCraftPayload> CANCEL_CRAFT_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:cancel_craft");
+        CustomPayload.createId(Identifier.of(MOD_ID, "cancel_craft"));
     
     public static final CustomPayload.Id<RecipeListPayload> RECIPE_LIST_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:recipe_list");
+        CustomPayload.createId(Identifier.of(MOD_ID, "recipe_list"));
     
     public static final CustomPayload.Id<CraftStatusPayload> CRAFT_STATUS_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:craft_status");
+        CustomPayload.createId(Identifier.of(MOD_ID, "craft_status"));
     
     public static final CustomPayload.Id<CraftProgressPayload> CRAFT_PROGRESS_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:craft_progress");
+        CustomPayload.createId(Identifier.of(MOD_ID, "craft_progress"));
     
     public static final CustomPayload.Id<CraftCompletePayload> CRAFT_COMPLETE_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:craft_complete");
+        CustomPayload.createId(Identifier.of(MOD_ID, "craft_complete"));
 
     // Custom payload classes for 1.21.4
     public static class CraftRecipePayload implements CustomPayload {
@@ -87,6 +92,11 @@ public class VillageCraftingNetwork {
         @Override
         public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_RECIPE_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return CRAFT_RECIPE_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {
@@ -119,6 +129,11 @@ public class VillageCraftingNetwork {
             return REQUEST_RECIPES_PAYLOAD_ID;
         }
 
+        @Override
+        public Identifier getId() {
+            return REQUEST_RECIPES_PAYLOAD_ID.getId();
+        }
+
         public UUID getVillagerUuid() {
             return villagerUuid;
         }
@@ -145,8 +160,13 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CANCEL_CRAFT_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return CANCEL_CRAFT_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {
@@ -186,8 +206,13 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return RECIPE_LIST_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return RECIPE_LIST_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {
@@ -228,8 +253,13 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<?> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_STATUS_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return CRAFT_STATUS_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {
@@ -278,8 +308,13 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_PROGRESS_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return CRAFT_PROGRESS_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {
@@ -316,7 +351,7 @@ public class VillageCraftingNetwork {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
             this.success = buf.readBoolean();
-            this.result = buf.readItemStack();
+            this.result = ItemStack.PACKET_CODEC.decode(buf).getOrThrow(false, LOGGER::error);
         }
 
         @Override
@@ -324,12 +359,17 @@ public class VillageCraftingNetwork {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
             buf.writeBoolean(success);
-            buf.writeItemStack(result);
+            ItemStack.PACKET_CODEC.encode(buf, result);
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return CRAFT_COMPLETE_PAYLOAD_ID;
+        }
+
+        @Override
+        public Identifier getId() {
+            return CRAFT_COMPLETE_PAYLOAD_ID.getId();
         }
 
         public UUID getVillagerUuid() {

@@ -25,26 +25,31 @@ import java.util.UUID;
  */
 public class VillagesClientNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillagesClientNetwork");
+    private static final String MOD_ID = "villagesreborn";
 
     // Channel identifiers for different packet types - using Identifier.of() for 1.21.4
-    public static final Identifier VILLAGER_CULTURE_ID = Identifier.of("villagesreborn", "villager_culture");
-    public static final Identifier VILLAGER_MOOD_ID = Identifier.of("villagesreborn", "villager_mood");
-    public static final Identifier VILLAGE_INFO_ID = Identifier.of("villagesreborn", "village_info");
-    public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of("villagesreborn", "request_village_info");
-    public static final Identifier JOIN_EVENT_ID = Identifier.of("villagesreborn", "join_event");
+    public static final Identifier VILLAGER_CULTURE_ID = Identifier.of(MOD_ID, "villager_culture");
+    public static final Identifier VILLAGER_MOOD_ID = Identifier.of(MOD_ID, "villager_mood");
+    public static final Identifier VILLAGE_INFO_ID = Identifier.of(MOD_ID, "village_info");
+    public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of(MOD_ID, "request_village_info");
+    public static final Identifier JOIN_EVENT_ID = Identifier.of(MOD_ID, "join_event");
 
-    // Custom payload IDs for 1.21.4
-    public static final CustomPayload.Type<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = CustomPayload.createType("villagesreborn:villager_culture");
-    public static final PacketCodec<PacketByteBuf, VillagerCulturePayload> VILLAGER_CULTURE_CODEC = PacketCodec.of(VillagerCulturePayload::write, VillagerCulturePayload::new);
+    // Custom payload IDs for 1.21.4 - corrected to use the Type constructor with two type parameters
+    public static final CustomPayload.Id<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "villager_culture"));
+    public static final PacketCodec<PacketByteBuf, VillagerCulturePayload> VILLAGER_CULTURE_CODEC = 
+        PacketCodec.of(VillagerCulturePayload::write, VillagerCulturePayload::new);
 
-    public static final CustomPayload.Type<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = CustomPayload.createType("villagesreborn:villager_mood");
-    public static final PacketCodec<PacketByteBuf, VillagerMoodPayload> VILLAGER_MOOD_CODEC = PacketCodec.of(VillagerMoodPayload::write, VillagerMoodPayload::new);
+    public static final CustomPayload.Id<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = 
+        CustomPayload.createType(Identifier.of(MOD_ID, "villager_mood"));
+    public static final PacketCodec<PacketByteBuf, VillagerMoodPayload> VILLAGER_MOOD_CODEC = 
+        PacketCodec.of(VillagerMoodPayload::write, VillagerMoodPayload::new);
 
     public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:request_village_info");
+        CustomPayload.createType(Identifier.of(MOD_ID, "request_village_info"));
     
     public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
-        CustomPayload.id("villagesreborn:join_event");
+        CustomPayload.createType(Identifier.of(MOD_ID, "join_event"));
 
     // Custom payload classes for 1.21.4
     public static class VillagerCulturePayload implements CustomPayload {
@@ -78,6 +83,11 @@ public class VillagesClientNetwork {
         
         public String getCulture() {
             return culture;
+        }
+
+        @Override
+        public Identifier getId() {
+            return VILLAGER_CULTURE_PAYLOAD_ID.getId();
         }
     }
     
@@ -113,6 +123,11 @@ public class VillagesClientNetwork {
         public String getMood() {
             return mood;
         }
+
+        @Override
+        public Identifier getId() {
+            return VILLAGER_MOOD_PAYLOAD_ID.getId();
+        }
     }
     
     public static class RequestVillageInfoPayload implements CustomPayload {
@@ -132,12 +147,17 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
         }
         
         public BlockPos getPosition() {
             return position;
+        }
+
+        @Override
+        public Identifier getId() {
+            return REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId();
         }
     }
     
@@ -158,12 +178,17 @@ public class VillagesClientNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getId() {
+        public CustomPayload.Type<? extends CustomPayload> getType() {
             return JOIN_EVENT_PAYLOAD_ID;
         }
         
         public String getEventId() {
             return eventId;
+        }
+
+        @Override
+        public Identifier getId() {
+            return JOIN_EVENT_PAYLOAD_ID.getId();
         }
     }
 
@@ -171,7 +196,8 @@ public class VillagesClientNetwork {
      * Register all client-side packet receivers
      */
     public static void registerReceivers() {
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_PAYLOAD_ID,
+        ClientPlayNetworking.registerGlobalReceiver(
+            VILLAGER_CULTURE_PAYLOAD_ID, // Using Id instead of Type
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
@@ -179,7 +205,8 @@ public class VillagesClientNetwork {
                 });
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_PAYLOAD_ID,
+        ClientPlayNetworking.registerGlobalReceiver(
+            VILLAGER_MOOD_PAYLOAD_ID, // Using Id instead of Type
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
@@ -187,7 +214,8 @@ public class VillagesClientNetwork {
                 });
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_ID,
+        ClientPlayNetworking.registerGlobalReceiver(
+            VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID, // Using Id instead of Type
             (payload, context) -> {
                 MinecraftClient client = context.client();
                 client.execute(() -> {
