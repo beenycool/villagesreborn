@@ -29,6 +29,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.village.VillagerProfession;
+import net.minecraft.registry.Registries; // Added import for Registries
 import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -271,15 +272,20 @@ public abstract class VillagerInteractionMixin {
   }
 
   private boolean isAtWorkstation(VillagerEntity villager) {
-    VillagerProfession profession = villager.getVillagerData().getProfession();
-    if (profession == VillagerProfession.NONE || profession == VillagerProfession.NITWIT) {
+    VillagerProfession profession = villager.getVillagerData().getProfession(); // Re-applying based on user info
+    // Compare VillagerProfession objects (assuming getProfession returns VillagerProfession)
+    // Compare the profession's key to the constant key
+    // Compare the profession's key to the constant key
+    // Compare the profession's registry key to the constant key
+    // Compare the profession's registry key to the constant key
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.NONE || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.NITWIT) {
       vr_LOGGER.debug("Villager {} has no profession or is a nitwit", villager.getUuid());
       return false;
     }
 
     Block expectedWorkstation = getWorkstationForProfession(profession);
     if (expectedWorkstation == null) {
-      vr_LOGGER.warn("No workstation mapping found for profession: {}", profession.toString());
+      vr_LOGGER.warn("No workstation mapping found for profession: {}", profession.toString()); // Keep original logging
       return false;
     }
 
@@ -343,23 +349,28 @@ public abstract class VillagerInteractionMixin {
     return false;
   }
 
-  private static Block getWorkstationForProfession(VillagerProfession profession) {
-    if (profession == VillagerProfession.FARMER) return Blocks.COMPOSTER;
-    if (profession == VillagerProfession.LIBRARIAN) return Blocks.LECTERN;
-    if (profession == VillagerProfession.ARMORER) return Blocks.BLAST_FURNACE;
-    if (profession == VillagerProfession.WEAPONSMITH) return Blocks.GRINDSTONE;
-    if (profession == VillagerProfession.TOOLSMITH) return Blocks.SMITHING_TABLE;
-    if (profession == VillagerProfession.CLERIC) return Blocks.BREWING_STAND;
-    if (profession == VillagerProfession.FISHERMAN) return Blocks.BARREL;
-    if (profession == VillagerProfession.FLETCHER) return Blocks.FLETCHING_TABLE;
-    if (profession == VillagerProfession.SHEPHERD) return Blocks.LOOM;
-    if (profession == VillagerProfession.BUTCHER) return Blocks.SMOKER;
-    if (profession == VillagerProfession.LEATHERWORKER) return Blocks.CAULDRON;
-    if (profession == VillagerProfession.MASON) return Blocks.STONECUTTER;
-    if (profession == VillagerProfession.CARTOGRAPHER) return Blocks.CARTOGRAPHY_TABLE;
+  private static Block getWorkstationForProfession(VillagerProfession profession) { // Parameter type already correct
+    // Comparisons are already correct assuming VillagerProfession type
+    // Compare the profession's key to the constant key
+    // Compare the profession's key to the constant key
+    // Compare the profession's registry key to the constant key
+    // Compare the profession's registry key to the constant key
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FARMER) return Blocks.COMPOSTER;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LIBRARIAN) return Blocks.LECTERN;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.ARMORER) return Blocks.BLAST_FURNACE;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.WEAPONSMITH) return Blocks.GRINDSTONE;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.TOOLSMITH) return Blocks.SMITHING_TABLE;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.CLERIC) return Blocks.BREWING_STAND;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FISHERMAN) return Blocks.BARREL;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FLETCHER) return Blocks.FLETCHING_TABLE;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.SHEPHERD) return Blocks.LOOM;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.BUTCHER) return Blocks.SMOKER;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LEATHERWORKER) return Blocks.CAULDRON;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.MASON) return Blocks.STONECUTTER;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.CARTOGRAPHER) return Blocks.CARTOGRAPHY_TABLE;
     // In case Minecraft adds new professions in the future
-    if (profession == VillagerProfession.NITWIT) return null;
-    if (profession == VillagerProfession.NONE) return null;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.NITWIT) return null;
+    if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.NONE) return null;
     
     vr_LOGGER.warn("Unknown profession encountered: {}", profession.toString());
     return null;

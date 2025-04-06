@@ -449,11 +449,11 @@ public class VillagerManager {
             VillagerAI ai = new VillagerAI(villager, personality);
             villagerAIs.put(villager.getUuid(), ai);
             VillagerMemory memory = new VillagerMemory();
-            VillagerDialogue dialogue = new VillagerDialogue(villager, memory, region.getCulture().toString(), villager.getVillagerData().getProfession().toString());
+            VillagerDialogue dialogue = new VillagerDialogue(villager, memory, region.getCulture().toString(), villager.getVillagerData().getProfession().toString()); // Re-applying based on user info
             villagerDialogues.put(villager.getUuid(), dialogue);
-            String situation = String.format("Starting life as a %s in a %s village", villager.getVillagerData().getProfession(), region.getCulture().toString());
+            String situation = String.format("Starting life as a %s in a %s village", villager.getVillagerData().getProfession().toString(), region.getCulture().toString()); // Re-applying based on user info
             ai.generateBehavior(situation);
-        }), nameGenerator.generateName(region.getCulture().toString(), villager.getVillagerData().getProfession().toString()).thenAccept(name -> {
+        }), nameGenerator.generateName(region.getCulture().toString(), villager.getVillagerData().getProfession().toString()).thenAccept(name -> { // Re-applying based on user info
             villager.setCustomName(Text.of(name));
             villager.setCustomNameVisible(true);
             LOGGER.info("Initialized new villager: {} in {} village", name, region.getCulture().toString());

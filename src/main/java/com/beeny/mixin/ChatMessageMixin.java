@@ -85,7 +85,7 @@ public class ChatMessageMixin {
             villagerAI.generateDialogue(playerText, null)
                 .thenAccept(response -> {
                     if (player.isAlive() && villager.isAlive()) {
-                        String profession = villager.getVillagerData().getProfession().toString();
+                        String profession = villager.getVillagerData().getProfession().toString(); // Re-applying based on user info
                         String formattedResponse = VillagerFeedbackHelper.formatSpeech(profession, response);
                         
                         player.sendMessage(
@@ -103,7 +103,7 @@ public class ChatMessageMixin {
             villagerAI.generateDialogue("Player mentioned my name", null)
                 .thenAccept(greeting -> {
                     if (player.isAlive() && villager.isAlive()) {
-                        String profession = villager.getVillagerData().getProfession().toString();
+                        String profession = villager.getVillagerData().getProfession().toString(); // Re-applying based on user info
                         String formattedGreeting = VillagerFeedbackHelper.formatSpeech(profession, greeting);
                         
                         player.sendMessage(

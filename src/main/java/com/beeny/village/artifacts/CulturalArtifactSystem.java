@@ -497,24 +497,24 @@ public class CulturalArtifactSystem {
         for (String key : data.getKeys()) {
             if (key.startsWith("artifacts_")) {
                 String culture = key.substring(10);
-                NbtCompound cultureData = data.getCompound(key);
+                NbtCompound cultureData = data.getCompound(key).orElse(new NbtCompound());
                 
                 List<ArtifactInstance> artifacts = new ArrayList<>();
                 for (String artifactId : cultureData.getKeys()) {
-                    NbtCompound artifactData = cultureData.getCompound(artifactId);
+                    NbtCompound artifactData = cultureData.getCompound(artifactId).orElse(new NbtCompound());
                     ArtifactInstance artifact = new ArtifactInstance(artifactId, playerUUID);
                     
                     // Load display status
-                    boolean displayed = artifactData.getBoolean("displayed");
+                    boolean displayed = artifactData.getBoolean("displayed").orElse(false);
                     artifact.setDisplayed(displayed);
                     
                     // Load display location if available
                     if (displayed && artifactData.contains("displayPos")) {
-                        NbtCompound posData = artifactData.getCompound("displayPos");
+                        NbtCompound posData = artifactData.getCompound("displayPos").orElse(new NbtCompound());
                         artifact.setDisplayLocation(new BlockPos(
-                            posData.getInt("x"),
-                            posData.getInt("y"),
-                            posData.getInt("z")
+                            posData.getInt("x").orElse(0),
+                            posData.getInt("y").orElse(0),
+                            posData.getInt("z").orElse(0)
                         ));
                     }
                     

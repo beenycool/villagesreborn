@@ -50,6 +50,8 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 import net.minecraft.village.VillagerProfession;
+import net.minecraft.registry.Registries; // Import Registries
+// Remove RegistryKey import if not needed
 import net.minecraft.village.TradeOffer;
 import net.minecraft.village.TradeOfferList;
 import net.minecraft.util.math.Vec3d;
@@ -1252,13 +1254,19 @@ public class VillagerAI {
         }
         
         // Check profession-specific locations
-        VillagerProfession profession = villager.getVillagerData().getProfession();
+        // Revert to original getProfession call
+        VillagerProfession profession = villager.getVillagerData().getProfession(); // Re-applying based on user info
         
-        if (profession == VillagerProfession.FARMER) {
+        // Compare VillagerProfession objects (assuming getProfession returns VillagerProfession)
+        // Compare the profession's key to the constant key
+        // Compare the profession's key to the constant key
+        // Compare the profession's registry key to the constant key
+        // Compare the profession's registry key to the constant key
+        if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FARMER) {
             return "farmland";
-        } else if (profession == VillagerProfession.LIBRARIAN) {
+        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LIBRARIAN) {
             return "bookshelves";
-        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
+        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.ARMORER || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.WEAPONSMITH || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.TOOLSMITH) {
             return "forge";
         }
         
@@ -1269,10 +1277,16 @@ public class VillagerAI {
     
     private void executeWorkBehavior(ServerWorld world) {
         // Execute working behavior
-        VillagerProfession profession = villager.getVillagerData().getProfession();
+        // Revert to original getProfession call
+        VillagerProfession profession = villager.getVillagerData().getProfession(); // Re-applying based on user info
         
         // Profession-specific work behaviors
-        if (profession == VillagerProfession.FARMER) {
+        // Compare VillagerProfession objects
+        // Compare the profession's key to the constant key
+        // Compare the profession's key to the constant key
+        // Compare the profession's registry key to the constant key
+        // Compare the profession's registry key to the constant key
+        if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FARMER) {
             // Occasionally show farming particles
             if (world.getRandom().nextInt(20) == 0) {
                 world.spawnParticles(
@@ -1281,7 +1295,7 @@ public class VillagerAI {
                     3, 0.5, 0.5, 0.5, 0.02
                 );
             }
-        } else if (profession == VillagerProfession.LIBRARIAN) {
+        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LIBRARIAN) {
             // Occasionally show reading particles
             if (world.getRandom().nextInt(30) == 0) {
                 world.spawnParticles(
@@ -1290,7 +1304,7 @@ public class VillagerAI {
                     2, 0.5, 0.5, 0.5, 0.01
                 );
             }
-        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
+        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.ARMORER || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.WEAPONSMITH || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.TOOLSMITH) {
             // Occasionally show smithing particles
             if (world.getRandom().nextInt(15) == 0) {
                 world.spawnParticles(

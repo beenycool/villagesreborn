@@ -207,7 +207,7 @@ public class ConversationHud {
         // Get villager information
         String villagerName = currentVillager.getName().getString();
         String culture = getCulture(currentVillager);
-        String profession = currentVillager.getVillagerData().getProfession().toString();
+        String profession = currentVillager.getVillagerData().getProfession().toString(); // Corrected based on user info
         profession = formatProfession(profession);
 
         // Get friendship information

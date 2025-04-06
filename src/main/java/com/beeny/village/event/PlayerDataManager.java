@@ -79,17 +79,20 @@ public class PlayerDataManager { // Keep the class name as is within this packag
         }
 
         // Get our mod's data
-        NbtCompound villagesData = persistentData.getCompound(Villagesreborn.MOD_ID);
+        // .get() is safe here because line 76 checks contains()
+        NbtCompound villagesData = persistentData.getCompound(Villagesreborn.MOD_ID).get();
 
         // Load event participation data
         if (villagesData.contains("eventParticipation")) {
-            NbtCompound eventData = villagesData.getCompound("eventParticipation");
+            // .get() is safe here because line 85 checks contains()
+            NbtCompound eventData = villagesData.getCompound("eventParticipation").get();
             PlayerEventParticipation.getInstance().loadPlayerData(playerUUID, eventData);
         }
 
         // Load artifact data
         if (villagesData.contains("artifacts")) {
-            NbtCompound artifactData = villagesData.getCompound("artifacts");
+            // .get() is safe here because line 91 checks contains()
+            NbtCompound artifactData = villagesData.getCompound("artifacts").get();
             CulturalArtifactSystem.getInstance().loadPlayerArtifacts(playerUUID, artifactData);
         }
     }

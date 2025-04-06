@@ -53,12 +53,14 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.9'
     
     // Cloth Config API
-    modApi("me.shedaniel.cloth:cloth-config-fabric:11.1.106") {
+    // Find the latest Cloth Config version compatible with 1.21.5
+    modApi("me.shedaniel.cloth:cloth-config-fabric:13.0.121") {
         exclude(group: "net.fabricmc.fabric-api")
     }
     
     // ModMenu integration
-    modImplementation("com.terraformersmc:modmenu:12.1.1")
+    // Updated ModMenu version based on available releases
+    modImplementation("com.terraformersmc:modmenu:13.0.3")
 }
 
 tasks.withType(JavaCompile).configureEach {

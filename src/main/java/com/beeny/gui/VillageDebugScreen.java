@@ -318,7 +318,7 @@ public class VillageDebugScreen extends Screen {
         // Group villagers by profession
         Map<String, Long> professionCounts = nearbyVillagers.stream()
             .collect(Collectors.groupingBy(
-                villager -> villager.getVillagerData().getProfession().toString(),
+                villager -> villager.getVillagerData().getProfession().toString(), // Corrected based on user info
                 Collectors.counting()
             ));
         

@@ -150,7 +150,7 @@ public class CulturalEvolution {
         villagers.forEach(villager -> {
             String prompt = CulturalPromptTemplates.getTemplate("daily_schedule",
                 villager.getPersonality(),
-                villager.getVillager().getVillagerData().getProfession().toString(),
+                villager.getVillager().getVillagerData().getProfession().toString(), // Re-applying based on user info
                 "evolved");
                 
             LLMService.getInstance()

@@ -402,11 +402,11 @@ public class PlayerEventParticipation {
     public void loadPlayerData(UUID playerUUID, NbtCompound nbt) {
         // Load reputations
         if (nbt.contains("reputations")) {
-            NbtCompound repNbt = nbt.getCompound("reputations");
+            NbtCompound repNbt = nbt.getCompound("reputations").orElse(new NbtCompound());
             Map<String, Integer> reputations = new HashMap<>();
             
             for (String culture : repNbt.getKeys()) {
-                reputations.put(culture, repNbt.getInt(culture));
+                reputations.put(culture, repNbt.getInt(culture).orElse(0));
             }
             
             playerReputations.put(playerUUID, reputations);
@@ -414,33 +414,33 @@ public class PlayerEventParticipation {
         
         // Load events
         if (nbt.contains("events")) {
-            NbtCompound eventsNbt = nbt.getCompound("events");
-            int count = eventsNbt.getInt("count");
+            NbtCompound eventsNbt = nbt.getCompound("events").orElse(new NbtCompound());
+            int count = eventsNbt.getInt("count").orElse(0);
             Set<EventParticipationData> events = new HashSet<>();
             
             for (int i = 0; i < count; i++) {
-                NbtCompound eventNbt = eventsNbt.getCompound("event" + i);
+                NbtCompound eventNbt = eventsNbt.getCompound("event" + i).orElse(new NbtCompound());
                 
-                String id = eventNbt.getString("id");
-                String culture = eventNbt.getString("culture");
-                String type = eventNbt.getString("type");
-                int x = eventNbt.getInt("locX");
-                int y = eventNbt.getInt("locY");
-                int z = eventNbt.getInt("locZ");
+                String id = eventNbt.getString("id").orElse("");
+                String culture = eventNbt.getString("culture").orElse("");
+                String type = eventNbt.getString("type").orElse("");
+                int x = eventNbt.getInt("locX").orElse(0);
+                int y = eventNbt.getInt("locY").orElse(0);
+                int z = eventNbt.getInt("locZ").orElse(0);
                 BlockPos location = new BlockPos(x, y, z);
                 
                 EventParticipationData data = new EventParticipationData(id, culture, type, location);
-                data.completed = eventNbt.getBoolean("completed");
+                data.completed = eventNbt.getBoolean("completed").orElse(false);
                 
                 // Load completed activities
-                int activityCount = eventNbt.getInt("activityCount");
+                int activityCount = eventNbt.getInt("activityCount").orElse(0);
                 for (int j = 0; j < activityCount; j++) {
-                    String activity = eventNbt.getString("activity" + j);
+                    String activity = eventNbt.getString("activity" + j).orElse("");
                     data.completedActivities.add(activity);
                 }
                 
                 // Only add if not too old (over 7 days)
-                long joinTime = eventNbt.getLong("joinTime");
+                long joinTime = eventNbt.getLong("joinTime").orElse(0L);
                 if (System.currentTimeMillis() - joinTime < 7 * 24 * 60 * 60 * 1000L) {
                     events.add(data);
                 }

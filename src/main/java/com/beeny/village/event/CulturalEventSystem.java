@@ -171,13 +171,13 @@ public class CulturalEventSystem {
         
         // Load event participation data
         if (data.contains("eventParticipation")) {
-            NbtCompound eventData = data.getCompound("eventParticipation");
+            NbtCompound eventData = data.getCompound("eventParticipation").orElse(new NbtCompound());
             PlayerEventParticipation.getInstance().loadPlayerData(playerUUID, eventData);
         }
         
         // Load artifact data
         if (data.contains("artifacts")) {
-            NbtCompound artifactData = data.getCompound("artifacts");
+            NbtCompound artifactData = data.getCompound("artifacts").orElse(new NbtCompound());
             CulturalArtifactSystem.getInstance().loadPlayerArtifacts(playerUUID, artifactData);
         }
     }

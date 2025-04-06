@@ -23,7 +23,7 @@ public class HudRenderer {
         // Register the EventNotificationManager renderer
         HudRenderCallback.EVENT.register((context, tickCounter) -> {
             MinecraftClient client = MinecraftClient.getInstance();
-            EventNotificationManager.getInstance().render(context, client, tickCounter.getTickDelta(false));
+            EventNotificationManager.getInstance().render(context, client, tickCounter.tickDelta); // Final attempt at field access based on docs
         });
     }
 }

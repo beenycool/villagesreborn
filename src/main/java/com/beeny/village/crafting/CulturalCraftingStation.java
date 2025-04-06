@@ -179,7 +179,10 @@ public class CulturalCraftingStation {
             super.readNbt(nbt, lookup);
             if (nbt.contains("StationType")) {
                 try {
-                    this.stationType = StationType.valueOf(nbt.getString("StationType"));
+                    // Get Optional<String>, map to StationType if present, otherwise use default
+                    this.stationType = nbt.getString("StationType")
+                                          .map(StationType::valueOf)
+                                          .orElse(StationType.ROMAN_FORGE); // Default fallback
                 } catch (IllegalArgumentException e) {
                     this.stationType = StationType.ROMAN_FORGE; // Default fallback
                 }

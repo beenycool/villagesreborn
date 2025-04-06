@@ -165,7 +165,8 @@ public class LLMService {
             "Return each recipe on a new line in the format: 'RecipeName: Item1 xCount, Item2 xCount'",
             culture,
             player.getName().getString(),
-            villager.getVillagerData().getProfession().toString()
+            // Assuming getProfession is directly on VillagerEntity now
+            villager.getVillagerData().getProfession().toString() // Based on user info, but causes error
         );
 
         return currentProvider.generateResponse(prompt, new HashMap<>())

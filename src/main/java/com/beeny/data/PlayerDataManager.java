@@ -2,6 +2,7 @@ package com.beeny.data;
 
 import com.beeny.accessors.ServerPlayerEntityAccessor;
 import net.minecraft.nbt.NbtCompound;
+// Remove NbtElement import if not needed, ensure NbtCompound is imported
 import net.minecraft.server.network.ServerPlayerEntity;
 
 /**
@@ -20,11 +21,13 @@ public class PlayerDataManager {
         ServerPlayerEntityAccessor accessor = (ServerPlayerEntityAccessor) player;
         NbtCompound modDataRoot = accessor.villagesreborn_getPersistentData();
 
-        if (!modDataRoot.contains(MOD_ID, NbtCompound.COMPOUND_TYPE)) {
+        // Check if the compound exists by trying to get it and checking if the Optional is present
+        if (!modDataRoot.getCompound(MOD_ID).isPresent()) {
             modDataRoot.put(MOD_ID, new NbtCompound());
         }
 
-        return modDataRoot.getCompound(MOD_ID);
+        // We know the compound exists because we created it above if it didn't.
+        return modDataRoot.getCompound(MOD_ID).get();
     }
 
     /**
