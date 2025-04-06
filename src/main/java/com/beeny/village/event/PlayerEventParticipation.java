@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement; // Added import
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -402,11 +403,11 @@ public class PlayerEventParticipation {
     public void loadPlayerData(UUID playerUUID, NbtCompound nbt) {
         // Load reputations
         if (nbt.contains("reputations")) {
-            NbtCompound repNbt = nbt.getCompound("reputations").orElse(new NbtCompound());
+            NbtCompound repNbt = nbt.contains("reputations", NbtElement.COMPOUND_TYPE) ? nbt.getCompound("reputations") : new NbtCompound();
             Map<String, Integer> reputations = new HashMap<>();
             
             for (String culture : repNbt.getKeys()) {
-                reputations.put(culture, repNbt.getInt(culture).orElse(0));
+                reputations.put(culture, repNbt.contains(culture, NbtElement.INT_TYPE) ? repNbt.getInt(culture) : 0);
             }
             
             playerReputations.put(playerUUID, reputations);
@@ -414,33 +415,33 @@ public class PlayerEventParticipation {
         
         // Load events
         if (nbt.contains("events")) {
-            NbtCompound eventsNbt = nbt.getCompound("events").orElse(new NbtCompound());
-            int count = eventsNbt.getInt("count").orElse(0);
+            NbtCompound eventsNbt = nbt.contains("events", NbtElement.COMPOUND_TYPE) ? nbt.getCompound("events") : new NbtCompound();
+            int count = eventsNbt.contains("count", NbtElement.INT_TYPE) ? eventsNbt.getInt("count") : 0;
             Set<EventParticipationData> events = new HashSet<>();
             
             for (int i = 0; i < count; i++) {
-                NbtCompound eventNbt = eventsNbt.getCompound("event" + i).orElse(new NbtCompound());
+                NbtCompound eventNbt = eventsNbt.contains("event" + i, NbtElement.COMPOUND_TYPE) ? eventsNbt.getCompound("event" + i) : new NbtCompound();
                 
-                String id = eventNbt.getString("id").orElse("");
-                String culture = eventNbt.getString("culture").orElse("");
-                String type = eventNbt.getString("type").orElse("");
-                int x = eventNbt.getInt("locX").orElse(0);
-                int y = eventNbt.getInt("locY").orElse(0);
-                int z = eventNbt.getInt("locZ").orElse(0);
+                String id = eventNbt.contains("id", NbtElement.STRING_TYPE) ? eventNbt.getString("id") : "";
+                String culture = eventNbt.contains("culture", NbtElement.STRING_TYPE) ? eventNbt.getString("culture") : "";
+                String type = eventNbt.contains("type", NbtElement.STRING_TYPE) ? eventNbt.getString("type") : "";
+                int x = eventNbt.contains("locX", NbtElement.INT_TYPE) ? eventNbt.getInt("locX") : 0;
+                int y = eventNbt.contains("locY", NbtElement.INT_TYPE) ? eventNbt.getInt("locY") : 0;
+                int z = eventNbt.contains("locZ", NbtElement.INT_TYPE) ? eventNbt.getInt("locZ") : 0;
                 BlockPos location = new BlockPos(x, y, z);
                 
                 EventParticipationData data = new EventParticipationData(id, culture, type, location);
-                data.completed = eventNbt.getBoolean("completed").orElse(false);
+                data.completed = eventNbt.contains("completed", NbtElement.BYTE_TYPE) ? eventNbt.getBoolean("completed") : false;
                 
                 // Load completed activities
-                int activityCount = eventNbt.getInt("activityCount").orElse(0);
+                int activityCount = eventNbt.contains("activityCount", NbtElement.INT_TYPE) ? eventNbt.getInt("activityCount") : 0;
                 for (int j = 0; j < activityCount; j++) {
-                    String activity = eventNbt.getString("activity" + j).orElse("");
+                    String activity = eventNbt.contains("activity" + j, NbtElement.STRING_TYPE) ? eventNbt.getString("activity" + j) : "";
                     data.completedActivities.add(activity);
                 }
                 
                 // Only add if not too old (over 7 days)
-                long joinTime = eventNbt.getLong("joinTime").orElse(0L);
+                long joinTime = eventNbt.contains("joinTime", NbtElement.LONG_TYPE) ? eventNbt.getLong("joinTime") : 0L;
                 if (System.currentTimeMillis() - joinTime < 7 * 24 * 60 * 60 * 1000L) {
                     events.add(data);
                 }

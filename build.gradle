@@ -23,6 +23,8 @@ repositories {
     maven { url "https://maven.shedaniel.me/" }
     // Add maven repo for ModMenu
     maven { url "https://maven.terraformersmc.com/releases/" }
+    // Add Modrinth Maven repository
+    maven { url "https://api.modrinth.com/maven" }
 }
 
 base {
@@ -54,7 +56,11 @@ dependencies {
     
     // Cloth Config API
     // Find the latest Cloth Config version compatible with 1.21.5
-    modApi("me.shedaniel.cloth:cloth-config-fabric:13.0.121") {
+    modApi("maven.modrinth:cloth-config:17.0.144+fabric") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+    // Add cloth-basic-math dependency
+    modImplementation("me.shedaniel.cloth:basic-math:0.6.1") {
         exclude(group: "net.fabricmc.fabric-api")
     }
     

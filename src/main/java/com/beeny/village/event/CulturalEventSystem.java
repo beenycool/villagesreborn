@@ -6,6 +6,7 @@ import net.minecraft.block.Block;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement; // Added import
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -171,13 +172,13 @@ public class CulturalEventSystem {
         
         // Load event participation data
         if (data.contains("eventParticipation")) {
-            NbtCompound eventData = data.getCompound("eventParticipation").orElse(new NbtCompound());
+            NbtCompound eventData = data.contains("eventParticipation", NbtElement.COMPOUND_TYPE) ? data.getCompound("eventParticipation") : new NbtCompound();
             PlayerEventParticipation.getInstance().loadPlayerData(playerUUID, eventData);
         }
         
         // Load artifact data
         if (data.contains("artifacts")) {
-            NbtCompound artifactData = data.getCompound("artifacts").orElse(new NbtCompound());
+            NbtCompound artifactData = data.contains("artifacts", NbtElement.COMPOUND_TYPE) ? data.getCompound("artifacts") : new NbtCompound();
             CulturalArtifactSystem.getInstance().loadPlayerArtifacts(playerUUID, artifactData);
         }
     }

@@ -449,11 +449,14 @@ public class VillagerManager {
             VillagerAI ai = new VillagerAI(villager, personality);
             villagerAIs.put(villager.getUuid(), ai);
             VillagerMemory memory = new VillagerMemory();
-            VillagerDialogue dialogue = new VillagerDialogue(villager, memory, region.getCulture().toString(), villager.getVillagerData().getProfession().toString()); // Re-applying based on user info
+            // Reverting to direct getProfession() based on conflicting errors
+            VillagerDialogue dialogue = new VillagerDialogue(villager, memory, region.getCulture().toString(), villager.getVillagerData().getProfession().toString());
             villagerDialogues.put(villager.getUuid(), dialogue);
-            String situation = String.format("Starting life as a %s in a %s village", villager.getVillagerData().getProfession().toString(), region.getCulture().toString()); // Re-applying based on user info
+            // Reverting to direct getProfession() based on conflicting errors
+            String situation = String.format("Starting life as a %s in a %s village", villager.getVillagerData().getProfession().toString(), region.getCulture().toString());
             ai.generateBehavior(situation);
-        }), nameGenerator.generateName(region.getCulture().toString(), villager.getVillagerData().getProfession().toString()).thenAccept(name -> { // Re-applying based on user info
+            // Reverting to direct getProfession() based on conflicting errors
+        }), nameGenerator.generateName(region.getCulture().toString(), villager.getVillagerData().getProfession().toString()).thenAccept(name -> {
             villager.setCustomName(Text.of(name));
             villager.setCustomNameVisible(true);
             LOGGER.info("Initialized new villager: {} in {} village", name, region.getCulture().toString());

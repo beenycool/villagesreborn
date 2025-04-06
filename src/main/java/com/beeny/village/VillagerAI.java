@@ -1254,19 +1254,16 @@ public class VillagerAI {
         }
         
         // Check profession-specific locations
-        // Revert to original getProfession call
-        VillagerProfession profession = villager.getVillagerData().getProfession(); // Re-applying based on user info
+        // Updated for 1.21.4
+        VillagerProfession profession = villager.getVillagerData().getProfession();
         
-        // Compare VillagerProfession objects (assuming getProfession returns VillagerProfession)
-        // Compare the profession's key to the constant key
-        // Compare the profession's key to the constant key
-        // Compare the profession's registry key to the constant key
-        // Compare the profession's registry key to the constant key
-        if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FARMER) {
+        // Compare VillagerProfession objects
+        // Updated comparison for 1.21.4
+        if (profession == VillagerProfession.FARMER) {
             return "farmland";
-        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LIBRARIAN) {
+        } else if (profession == VillagerProfession.LIBRARIAN) {
             return "bookshelves";
-        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.ARMORER || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.WEAPONSMITH || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.TOOLSMITH) {
+        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
             return "forge";
         }
         
@@ -1277,16 +1274,13 @@ public class VillagerAI {
     
     private void executeWorkBehavior(ServerWorld world) {
         // Execute working behavior
-        // Revert to original getProfession call
-        VillagerProfession profession = villager.getVillagerData().getProfession(); // Re-applying based on user info
+        // Updated for 1.21.4
+        VillagerProfession profession = villager.getVillagerData().getProfession();
         
         // Profession-specific work behaviors
         // Compare VillagerProfession objects
-        // Compare the profession's key to the constant key
-        // Compare the profession's key to the constant key
-        // Compare the profession's registry key to the constant key
-        // Compare the profession's registry key to the constant key
-        if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.FARMER) {
+        // Updated comparison for 1.21.4
+        if (profession == VillagerProfession.FARMER) {
             // Occasionally show farming particles
             if (world.getRandom().nextInt(20) == 0) {
                 world.spawnParticles(
@@ -1295,7 +1289,7 @@ public class VillagerAI {
                     3, 0.5, 0.5, 0.5, 0.02
                 );
             }
-        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.LIBRARIAN) {
+        } else if (profession == VillagerProfession.LIBRARIAN) {
             // Occasionally show reading particles
             if (world.getRandom().nextInt(30) == 0) {
                 world.spawnParticles(
@@ -1304,7 +1298,7 @@ public class VillagerAI {
                     2, 0.5, 0.5, 0.5, 0.01
                 );
             }
-        } else if (Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.ARMORER || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.WEAPONSMITH || Registries.VILLAGER_PROFESSION.getKey(profession).orElse(null) == VillagerProfession.TOOLSMITH) {
+        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
             // Occasionally show smithing particles
             if (world.getRandom().nextInt(15) == 0) {
                 world.spawnParticles(

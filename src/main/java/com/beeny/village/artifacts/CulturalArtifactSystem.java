@@ -9,6 +9,7 @@ import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import net.minecraft.nbt.NbtElement; // Added import
 import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Style;
@@ -497,24 +498,24 @@ public class CulturalArtifactSystem {
         for (String key : data.getKeys()) {
             if (key.startsWith("artifacts_")) {
                 String culture = key.substring(10);
-                NbtCompound cultureData = data.getCompound(key).orElse(new NbtCompound());
+                NbtCompound cultureData = data.contains(key, NbtElement.COMPOUND_TYPE) ? data.getCompound(key) : new NbtCompound();
                 
                 List<ArtifactInstance> artifacts = new ArrayList<>();
                 for (String artifactId : cultureData.getKeys()) {
-                    NbtCompound artifactData = cultureData.getCompound(artifactId).orElse(new NbtCompound());
+                    NbtCompound artifactData = cultureData.contains(artifactId, NbtElement.COMPOUND_TYPE) ? cultureData.getCompound(artifactId) : new NbtCompound();
                     ArtifactInstance artifact = new ArtifactInstance(artifactId, playerUUID);
                     
                     // Load display status
-                    boolean displayed = artifactData.getBoolean("displayed").orElse(false);
+                    boolean displayed = artifactData.contains("displayed", NbtElement.BYTE_TYPE) ? artifactData.getBoolean("displayed") : false;
                     artifact.setDisplayed(displayed);
                     
                     // Load display location if available
                     if (displayed && artifactData.contains("displayPos")) {
-                        NbtCompound posData = artifactData.getCompound("displayPos").orElse(new NbtCompound());
+                        NbtCompound posData = artifactData.contains("displayPos", NbtElement.COMPOUND_TYPE) ? artifactData.getCompound("displayPos") : new NbtCompound();
                         artifact.setDisplayLocation(new BlockPos(
-                            posData.getInt("x").orElse(0),
-                            posData.getInt("y").orElse(0),
-                            posData.getInt("z").orElse(0)
+                            posData.contains("x", NbtElement.INT_TYPE) ? posData.getInt("x") : 0,
+                            posData.contains("y", NbtElement.INT_TYPE) ? posData.getInt("y") : 0,
+                            posData.contains("z", NbtElement.INT_TYPE) ? posData.getInt("z") : 0
                         ));
                     }
                     

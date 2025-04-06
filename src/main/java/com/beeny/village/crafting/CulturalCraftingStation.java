@@ -178,14 +178,15 @@ public class CulturalCraftingStation {
         public void readNbt(NbtCompound nbt, WrapperLookup lookup) {
             super.readNbt(nbt, lookup);
             if (nbt.contains("StationType")) {
+                String typeName = nbt.getString("StationType");
                 try {
-                    // Get Optional<String>, map to StationType if present, otherwise use default
-                    this.stationType = nbt.getString("StationType")
-                                          .map(StationType::valueOf)
-                                          .orElse(StationType.ROMAN_FORGE); // Default fallback
+                    this.stationType = StationType.valueOf(typeName);
                 } catch (IllegalArgumentException e) {
-                    this.stationType = StationType.ROMAN_FORGE; // Default fallback
+                    // Log warning about invalid type?
+                    this.stationType = StationType.ROMAN_FORGE; // Default fallback if value is invalid
                 }
+            } else {
+                 this.stationType = StationType.ROMAN_FORGE; // Default fallback if key doesn't exist
             }
         }
         

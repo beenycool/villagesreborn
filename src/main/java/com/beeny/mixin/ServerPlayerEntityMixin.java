@@ -2,7 +2,7 @@ package com.beeny.mixin;
 
 import com.beeny.accessors.ServerPlayerEntityAccessor;
 import net.minecraft.nbt.NbtCompound;
-// Remove NbtElement import if not needed, ensure NbtCompound is imported
+import net.minecraft.nbt.NbtElement; // Added import
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -28,10 +28,10 @@ public abstract class ServerPlayerEntityMixin implements ServerPlayerEntityAcces
 
     @Inject(method = "readCustomDataFromNbt", at = @At("RETURN"))
     private void villagesreborn_readNbt(NbtCompound nbt, CallbackInfo ci) {
-        // Check if the compound exists by trying to get it and checking if the Optional is present
-        if (nbt.getCompound("VillagesRebornData").isPresent()) {
-            // getCompound returns Optional, but we know it exists due to the contains check
-            villagesreborn_persistentData = nbt.getCompound("VillagesRebornData").get();
+        // Check if the compound exists using contains with the correct type
+        if (nbt.contains("VillagesRebornData", NbtElement.COMPOUND_TYPE)) {
+            // Retrieve the compound directly
+            villagesreborn_persistentData = nbt.getCompound("VillagesRebornData");
         } else {
             villagesreborn_persistentData = new NbtCompound();
         }
