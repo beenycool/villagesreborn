@@ -21,7 +21,8 @@ import com.beeny.village.SpawnRegion;
 import com.beeny.village.event.CulturalEventSystem;
 import com.beeny.village.event.PlayerDataManager;
 import com.beeny.setup.SystemSpecs;
-import com.beeny.setup.LLMConfig;
+import com.beeny.config.VillagesConfig; // Changed import
+import com.beeny.ai.LLMService; // Added import
 import com.beeny.worldgen.VillagesRebornStructures;
 import com.beeny.network.VillageCraftingNetwork;
 import com.beeny.network.VillagesNetwork; // Added import
@@ -45,7 +46,7 @@ public class Villagesreborn implements ModInitializer {
     public static final String VERSION = "1.0.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static SystemSpecs systemSpecs;
-    private static LLMConfig llmConfig;
+    private static VillagesConfig villagesConfig; // Changed type and name
     private static Villagesreborn INSTANCE;
     private final Map<BlockPos, Culture> villageMap = new ConcurrentHashMap<>();
     private final Map<BlockPos, Integer> villageRadiusMap = new ConcurrentHashMap<>();
@@ -80,9 +81,12 @@ public class Villagesreborn implements ModInitializer {
         systemSpecs = new SystemSpecs();
         systemSpecs.analyzeSystem();
 
-        llmConfig = new LLMConfig();
-        llmConfig.load();
-        llmConfig.initialize(systemSpecs);
+        // Get the singleton instance of VillagesConfig
+        villagesConfig = VillagesConfig.getInstance();
+        villagesConfig.load(); // Ensure config is loaded
+        
+        // Initialize LLMService with the loaded config
+        LLMService.getInstance().initialize(villagesConfig);
 
         VillagerManager.getInstance();
         VillageCraftingManager.getInstance();
@@ -333,12 +337,13 @@ public class Villagesreborn implements ModInitializer {
         return systemSpecs;
     }
 
-    public static LLMConfig getLLMConfig() {
-        if (llmConfig == null) {
-            llmConfig = new LLMConfig();
-            llmConfig.load();
+    // Updated getter to return VillagesConfig
+    public static VillagesConfig getVillagesConfig() {
+        if (villagesConfig == null) {
+            villagesConfig = VillagesConfig.getInstance();
+            villagesConfig.load();
         }
-        return llmConfig;
+        return villagesConfig;
     }
 
     public void pingVillageInfo(PlayerEntity player) {

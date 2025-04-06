@@ -1,7 +1,7 @@
 package com.beeny.ai;
 
 import com.beeny.Villagesreborn;
-import com.beeny.setup.LLMConfig;
+import com.beeny.config.VillagesConfig;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import org.slf4j.Logger;
@@ -49,10 +49,10 @@ public class ModelChecker {
                 HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFileDownload(tempFile, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
                 if (response.statusCode() == 200) {
                     Files.move(tempFile, modelPath, StandardCopyOption.REPLACE_EXISTING);
-                    LLMConfig config = Villagesreborn.getLLMConfig();
-                    config.setProvider("local");
-                    config.setModelType("llama-3.2-1b");
-                    config.saveConfig();
+                    VillagesConfig config = VillagesConfig.getInstance();
+                    config.getLLMSettings().setProvider("local"); // Use nested settings
+                    config.getLLMSettings().setModelType("llama-3.2-1b"); // Use nested settings
+                    config.save(); // Use correct save method
                     LOGGER.info("Llama 3.2 model downloaded successfully to: {}", modelPath);
                     progressCallback.accept(1.0);
                     return modelPath;

@@ -34,7 +34,7 @@ public class VillagesConfig {
         return instance;
     }
 
-    private void load() {
+    public void load() {
         if (configFile.exists()) {
             try (FileReader reader = new FileReader(configFile)) {
                 data = gson.fromJson(reader, ConfigData.class);

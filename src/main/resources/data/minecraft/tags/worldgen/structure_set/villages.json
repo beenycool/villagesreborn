@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "#minecraft:village",
     "villagesreborn:roman_village"
   ]
 }

@@ -35,4 +35,13 @@ public class CulturalTextureManager {
         descriptions.put("nyc", "Modern hoodies and sneakers with bright dye colors");
         return descriptions;
     }
+
+    public static int getRegisteredCultureCount() {
+        return CULTURE_TEXTURES.keySet().size();
+    }
+
+    public static int getTotalTextureCount() {
+        // In this simple map, each culture has one texture entry
+        return CULTURE_TEXTURES.size();
+    }
 }

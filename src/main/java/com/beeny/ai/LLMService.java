@@ -1,7 +1,7 @@
 package com.beeny.ai;
 
 import com.beeny.ai.provider.*;
-import com.beeny.setup.LLMConfig;
+import com.beeny.config.VillagesConfig; // Changed from LLMConfig
 import com.beeny.setup.SystemSpecs;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -22,7 +22,7 @@ public class LLMService {
     private final Map<String, AIProvider> providers = new HashMap<>();
     private AIProvider currentProvider;
     private final Map<String, String> context = new HashMap<>();
-    private LLMConfig config;
+    private VillagesConfig config; // Changed from LLMConfig
     private SystemSpecs systemSpecs;
     private final LLMErrorHandler errorHandler = LLMErrorHandler.getInstance();
 
@@ -42,29 +42,30 @@ public class LLMService {
         return INSTANCE;
     }
 
-    public void initialize(LLMConfig config) {
+    public void initialize(VillagesConfig config) { // Changed parameter type
         this.config = config;
-        String providerName = config.getProvider();
+        // Access settings via getLLMSettings()
+        String providerName = config.getLLMSettings().getProvider();
         currentProvider = providers.get(providerName);
-        if (currentProvider == null || config.isQuickStartMode()) {
-            LOGGER.info("Using DeepSeek provider for {}",
-                config.isQuickStartMode() ? "Quick Start mode" : "fallback");
+        // Access settings via getLLMSettings()
+        if (currentProvider == null) {
+            LOGGER.warn("Configured provider '{}' not found or invalid, falling back to DeepSeek.", providerName);
             currentProvider = providers.get("deepseek");
+            if (currentProvider == null) { // Should not happen if deepseek is always in providers map
+                 LOGGER.error("Fallback provider DeepSeek is also missing. Cannot initialize LLMService.");
+                 // Optionally throw an exception or handle this critical failure
+                 return; // Cannot proceed
+            }
         }
         Map<String, String> providerConfig = new HashMap<>();
-        if (config.isQuickStartMode()) {
-            providerConfig.put("apiKey", "");
-            providerConfig.put("endpoint", "https://api.deepseek.ai/v1");
-            providerConfig.put("modelName", "deepseek-coder");
-        } else {
-            providerConfig.put("apiKey", config.getApiKey());
-            providerConfig.put("endpoint", config.getEndpoint());
-            providerConfig.put("modelName", config.getModelType());
-        }
+        // Access settings via getLLMSettings()
+        // Always use configured settings
+        providerConfig.put("apiKey", config.getLLMSettings().getApiKey());
+        providerConfig.put("endpoint", config.getLLMSettings().getEndpoint());
+        providerConfig.put("modelName", config.getLLMSettings().getModelType());
         try {
             currentProvider.initialize(providerConfig);
-            LOGGER.info("LLMService initialized with provider: {} (Quick Start: {})",
-                currentProvider.getName(), config.isQuickStartMode());
+            LOGGER.info("LLMService initialized with provider: {}", currentProvider.getName());
         } catch (Exception e) {
             LOGGER.error("Failed to initialize LLM provider", e);
             LLMErrorHandler.ErrorType errorType = errorHandler.determineErrorType(e);
@@ -210,9 +211,10 @@ public class LLMService {
             }
             currentProvider = newProvider;
             Map<String, String> providerConfig = new HashMap<>();
-            providerConfig.put("apiKey", config.getApiKey());
-            providerConfig.put("endpoint", config.getEndpoint());
-            providerConfig.put("modelName", config.getModelType());
+            // Access settings via getLLMSettings()
+            providerConfig.put("apiKey", config.getLLMSettings().getApiKey());
+            providerConfig.put("endpoint", config.getLLMSettings().getEndpoint());
+            providerConfig.put("modelName", config.getLLMSettings().getModelType());
             
             try {
                 currentProvider.initialize(providerConfig);

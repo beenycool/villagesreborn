@@ -8,7 +8,8 @@ import com.beeny.village.VillageInfluenceManager.VillageRelationship;
 import com.beeny.village.VillageInfluenceManager.RelationshipStatus;
 import com.beeny.ai.LLMService;
 import com.beeny.server.EventNotificationManager;
-import com.beeny.Villagesreborn; // Fixed import path from com.beeny.village.Villagesreborn to com.beeny.Villagesreborn
+import com.beeny.Villagesreborn;
+import com.beeny.config.VillagesConfig; // Added import
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -31,6 +32,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import com.beeny.commands.DebugCommand; // Import the new command class
 
 public class ModCommands {
     public static void register() {
@@ -488,6 +490,9 @@ public class ModCommands {
                     .executes(ModCommands::checkAIConnection)
                 )
         );
+
+        // Register the new debug command
+        DebugCommand.register(dispatcher, environment == CommandManager.RegistrationEnvironment.DEDICATED);
     }
 
     private static int sendNotification(CommandContext<ServerCommandSource> context, String title) {
@@ -536,7 +541,7 @@ public class ModCommands {
         ServerCommandSource source = context.getSource();
         source.sendMessage(Text.literal("§ePinging AI service...§r"));
         LLMService llmService = LLMService.getInstance();
-        if (Villagesreborn.getLLMConfig() != null && !llmService.getCurrentProviderName().equals("None")) {
+        if (!llmService.getCurrentProviderName().equals("None")) { // Removed Villagesreborn.getLLMConfig() check
             llmService.generateResponse("Say hello.")
                 .orTimeout(10, TimeUnit.SECONDS)
                 .handleAsync((response, error) -> {
