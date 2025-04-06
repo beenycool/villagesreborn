@@ -18,8 +18,8 @@ public class AnimationRenderer {
     };
 
     // Defined but unused; kept for potential future use or compatibility
-    private static final Function<Identifier, RenderLayer> GUI_LAYER = 
-        id -> RenderLayer.getGui();
+    private static final Function<Identifier, RenderLayer> TEXTURE_LAYER =
+        id -> RenderLayer.getGui(); // Renamed from GUI_LAYER
 
     public void render(DrawContext context, int width, int height) {
         if (frames[0] == null) {
@@ -31,15 +31,8 @@ public class AnimationRenderer {
         int x = width / 2 - TEXTURE_SIZE / 2;
         int y = height / 2 - TEXTURE_SIZE / 2;
 
-        context.drawTexture(
-            frames[frameIndex],  // Current animation frame
-            x,                  // x position
-            y,                  // y position
-            0,                  // u (texture x offset)
-            0,                  // v (texture y offset)
-            TEXTURE_SIZE,       // width
-            TEXTURE_SIZE        // height
-        );
+        // Updated to use drawTexture with full arguments for 1.21.4
+        context.drawTexture(TEXTURE_LAYER, frames[frameIndex], x, y, 0.0F, 0.0F, TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE); // Now uses the correctly named variable
     }
 
     public void render(DrawContext context, int width, int height, float delta) {

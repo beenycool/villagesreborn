@@ -59,7 +59,6 @@ public class VillageCraftingClientNetwork {
             }
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeInt(recipes.size());
             for (CraftingRecipe recipe : recipes) {
@@ -68,13 +67,8 @@ public class VillageCraftingClientNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Id<?> getId() { // Renamed from getType
             return ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return RECIPE_LIST_PAYLOAD_ID.getId();
         }
     }
 
@@ -100,7 +94,6 @@ public class VillageCraftingClientNetwork {
             this.message = buf.readString();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
@@ -109,13 +102,8 @@ public class VillageCraftingClientNetwork {
         }
 
         @Override
-        public CustomPayload.Id<? extends CustomPayload> getId() {
+        public CustomPayload.Id<?> getId() { // Renamed from getType
             return ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CRAFT_STATUS_PAYLOAD_ID.getId();
         }
         
         public UUID getVillagerUuid() {
@@ -141,31 +129,32 @@ public class VillageCraftingClientNetwork {
     private static void registerClientHandlers() {
         ClientPlayNetworking.registerGlobalReceiver(
             RECIPE_LIST_PAYLOAD_ID,
-            (context, buf) -> {
-                RecipeListPayload payload = new RecipeListPayload(buf);
-                MinecraftClient client = context.getClient();
-                client.execute(() -> {
-                    VillageCraftingClientHandler.updateAvailableRecipes(
-                        payload.getVillagerUuid(),
-                        payload.getRecipeIds()
-                    );
-                });
+            (payload, context) -> { // No cast needed, payload is already RecipeListPayload
+                MinecraftClient client = context.client(); // Use context.client()
+                // Extract recipe IDs from the list of CraftingRecipe objects
+                List<String> recipeIds = payload.recipes.stream()
+                                                        .map(CraftingRecipe::getId)
+                                                        .toList();
+                // Context handles execution on client thread
+                // Need villager UUID - RecipeListPayload doesn't seem to carry it.
+                // Assuming the handler needs adjustment or the payload needs the UUID.
+                // For now, passing null for UUID as it's missing from payload.
+                // TODO: Revisit payload design if UUID is required here.
+                VillageCraftingClientHandler.updateAvailableRecipes(null, recipeIds);
             }
         );
 
         ClientPlayNetworking.registerGlobalReceiver(
             CRAFT_STATUS_PAYLOAD_ID,
-            (context, buf) -> {
-                CraftStatusPayload payload = new CraftStatusPayload(buf);
-                MinecraftClient client = context.getClient();
-                client.execute(() -> {
-                    VillageCraftingClientHandler.updateCraftingStatus(
-                        payload.getVillagerUuid(),
-                        payload.getRecipeId(),
-                        payload.getStatus(),
-                        payload.getMessage()
-                    );
-                });
+            (payload, context) -> { // No cast needed, payload is already CraftStatusPayload
+                MinecraftClient client = context.client(); // Use context.client()
+                // Context handles execution on client thread
+                VillageCraftingClientHandler.updateCraftingStatus(
+                    payload.getVillagerUuid(),
+                    payload.getRecipeId(),
+                    payload.getStatus(),
+                    payload.getMessage()
+                );
             }
         );
     }
@@ -199,4 +188,17 @@ public class VillageCraftingClientNetwork {
             new VillageCraftingNetwork.CancelCraftPayload(villagerUuid, recipeId);
         ClientPlayNetworking.send(payload);
     }
+
+
+    // Register S2C codecs
+    static {
+        PayloadTypeRegistry.playS2C().register(RecipeListPayload.ID, PacketCodec.of(RecipeListPayload::write, RecipeListPayload::new));
+        PayloadTypeRegistry.playS2C().register(CraftStatusPayload.ID, PacketCodec.of(CraftStatusPayload::write, CraftStatusPayload::new));
+        // Add registration for other S2C packets handled here if any (e.g., CraftProgress, CraftComplete)
+        // Assuming these IDs and Codecs are defined in VillageCraftingNetwork
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_PROGRESS_ID, VillageCraftingNetwork.CRAFT_PROGRESS_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_COMPLETE_ID, VillageCraftingNetwork.CRAFT_COMPLETE_CODEC);
+    }
+
+
 }

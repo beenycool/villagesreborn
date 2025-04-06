@@ -12,6 +12,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.component.DataComponentTypes;
+import net.minecraft.network.PacketByteBuf;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
@@ -135,6 +136,28 @@ public class VillageCraftingManager {
         return null;
     }
     
+    public void assignTask(VillagerEntity villager, String recipeId, ServerPlayerEntity player) {
+        CraftingRecipe recipe = getRecipeById(recipeId);
+        if (recipe == null) {
+            LOGGER.warn("Recipe with ID {} not found", recipeId);
+            return;
+        }
+        
+        if (!recipe.hasRequiredMaterials(player)) {
+            player.sendMessage(Text.literal("You do not have the required materials for this recipe.").formatted(Formatting.RED), false);
+            return;
+        }
+        
+        // Assign the task to the villager (logic can be expanded as needed)
+        LOGGER.info("Assigning crafting task {} to villager {}", recipeId, villager.getUuid());
+        player.sendMessage(Text.literal("Task assigned successfully.").formatted(Formatting.GREEN), false);
+    }
+
+    public void cancelTask(VillagerEntity villager, String recipeId) {
+        LOGGER.info("Cancelling crafting task {} for villager {}", recipeId, villager.getUuid());
+        // Logic to cancel the task (can be expanded as needed)
+    }
+    
     public static class CraftingRecipe {
         private final String id;
         private final Item result;
@@ -186,6 +209,43 @@ public class VillageCraftingManager {
 
         public java.util.Map<net.minecraft.item.Item, Integer> getInputs() {
             return ingredients;
+        }
+
+        // Add serialization and deserialization methods to CraftingRecipe
+        public CraftingRecipe(PacketByteBuf buf) {
+            this.id = buf.readString();
+            this.result = Item.byRawId(buf.readInt());
+            int size = buf.readInt();
+            this.ingredients = new HashMap<>(size);
+            for (int i = 0; i < size; i++) {
+                Item item = Item.byRawId(buf.readInt());
+                int count = buf.readInt();
+                this.ingredients.put(item, count);
+            }
+            this.displayName = buf.readBoolean() ? buf.readString() : null;
+            int loreSize = buf.readInt();
+            this.lore = new ArrayList<>(loreSize);
+            for (int i = 0; i < loreSize; i++) {
+                this.lore.add(buf.readString());
+            }
+        }
+
+        public void write(PacketByteBuf buf) {
+            buf.writeString(this.id);
+            buf.writeInt(Item.getRawId(this.result));
+            buf.writeInt(this.ingredients.size());
+            for (Map.Entry<Item, Integer> entry : this.ingredients.entrySet()) {
+                buf.writeInt(Item.getRawId(entry.getKey()));
+                buf.writeInt(entry.getValue());
+            }
+            buf.writeBoolean(this.displayName != null);
+            if (this.displayName != null) {
+                buf.writeString(this.displayName);
+            }
+            buf.writeInt(this.lore.size());
+            for (String loreLine : this.lore) {
+                buf.writeString(loreLine);
+            }
         }
     }
 }

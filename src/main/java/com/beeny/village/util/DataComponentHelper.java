@@ -4,9 +4,12 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.component.DataComponentTypes;
@@ -14,17 +17,19 @@ import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.component.type.FireworksComponent;
+import net.minecraft.component.type.FireworkExplosionComponent;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.item.FireworkRocketItem;
 import net.minecraft.potion.Potion;
 import net.minecraft.registry.RegistryWrapper;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 
 public class DataComponentHelper {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DataComponentHelper.class);
     
     private static RegistryWrapper.WrapperLookup wrapperLookup = null;
     
@@ -62,23 +67,40 @@ public class DataComponentHelper {
         stack.set(DataComponentTypes.LORE, new LoreComponent(lore));
     }
 
-    public static void setEnchantments(ItemStack stack, Map<Enchantment, Integer> enchantments) {
+    // Renamed and modified to accept String IDs
+    public static void setEnchantmentsById(ItemStack stack, Map<String, Integer> enchantmentIds) {
         if (wrapperLookup == null) {
-            LOGGER.error("WrapperLookup is null! Cannot proceed.");
+            LOGGER.error("WrapperLookup is null! Cannot set enchantments by ID.");
             return;
         }
-        ItemEnchantmentsComponent.Builder builder = ItemEnchantmentsComponent.builder();
-        enchantments.forEach((enchant, level) -> {
-            RegistryKey<Enchantment> registryKey = RegistryKey.of(
-                RegistryKeys.ENCHANTMENT, 
-                Registries.ENCHANTMENT.getId(enchant)
+        ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder(ItemEnchantmentsComponent.DEFAULT);
+
+        enchantmentIds.forEach((idStr, level) -> {
+            Identifier id = Identifier.tryParse(idStr);
+            if (id == null) {
+                LOGGER.warn("Invalid enchantment identifier string: {}", idStr);
+                return; // Skip invalid IDs
+            }
+
+            RegistryKey<Enchantment> key = RegistryKey.of(RegistryKeys.ENCHANTMENT, id);
+
+            // Use flatMap pattern similar to setPotionEffect to get the entry reference
+            Optional<RegistryEntry.Reference<Enchantment>> enchantRefOpt =
+                wrapperLookup.getOptional(RegistryKeys.ENCHANTMENT)
+                             .flatMap(wrapper -> wrapper.getOptional(key));
+
+            enchantRefOpt.ifPresentOrElse(
+                ref -> builder.add(ref, level), // Add if present
+                () -> LOGGER.warn("Could not find registry entry reference for enchantment key: {}", key)
             );
-            Optional<RegistryEntry.Reference<Enchantment>> enchantRef = 
-                wrapperLookup.getWrapperOrThrow(RegistryKeys.ENCHANTMENT).getOptional(registryKey);
-            
-            enchantRef.ifPresent(ref -> builder.add(ref, level));
         });
-        stack.set(DataComponentTypes.ENCHANTMENTS, builder.build());
+        ItemEnchantmentsComponent finalEnchantments = builder.build();
+        // Only apply if the built component is different from the default (meaning enchantments were added)
+        if (!finalEnchantments.equals(ItemEnchantmentsComponent.DEFAULT)) {
+             stack.set(DataComponentTypes.ENCHANTMENTS, finalEnchantments);
+        } else if (!enchantmentIds.isEmpty()) {
+            LOGGER.warn("Attempted to set enchantments by ID, but none were resolved or added: {}", enchantmentIds.keySet());
+        }
     }
 
     public static void setFireworkEffect(ItemStack stack, byte flight, int[] colors) {
@@ -86,22 +108,22 @@ public class DataComponentHelper {
             LOGGER.error("WrapperLookup is null! Cannot proceed.");
             return;
         }
-        FireworksComponent.Builder builder = new FireworksComponent.Builder()
-            .flight(flight);
+        // Create the explosion component directly
+        FireworkExplosionComponent explosion = new FireworkExplosionComponent(
+            FireworkExplosionComponent.Type.LARGE_BALL, // Shape (Assuming Shape was renamed to Type)
+            new IntArrayList(colors), // Colors (converted to IntList)
+            new IntArrayList(),       // Fade Colors (empty IntList)
+            false,           // Twinkle
+            false            // Trail
+        );
+
+        // Create the fireworks component with flight duration and the explosion
+        FireworksComponent fireworks = new FireworksComponent(
+            flight,          // Flight duration
+            List.of(explosion) // List of explosions
+        );
         
-        List<FireworksComponent.Explosion> explosions = new ArrayList<>();
-        FireworksComponent.Explosion.Builder explosionBuilder = 
-            new FireworksComponent.Explosion.Builder()
-                .type(FireworksComponent.Explosion.Type.LARGE_BALL);
-        
-        for (int color : colors) {
-            explosionBuilder.addColor(color);
-        }
-        
-        explosions.add(explosionBuilder.build());
-        builder.explosions(explosions);
-        
-        stack.set(DataComponentTypes.FIREWORKS, builder.build());
+        stack.set(DataComponentTypes.FIREWORKS, fireworks);
     }
 
     public static void setPotionEffect(ItemStack stack, String potionId) {
@@ -113,7 +135,7 @@ public class DataComponentHelper {
         RegistryKey<Potion> potionKey = RegistryKey.of(RegistryKeys.POTION, potionIdentifier);
         
         Optional<RegistryEntry.Reference<Potion>> potionRef = 
-            wrapperLookup.getWrapperOrThrow(RegistryKeys.POTION).getOptional(potionKey);
+            wrapperLookup.getOptional(RegistryKeys.POTION).flatMap(wrapper -> wrapper.getOptional(potionKey)); // Use getOptional and flatMap
         
         potionRef.ifPresent(ref -> {
             PotionContentsComponent potionContents = new PotionContentsComponent(ref);
@@ -122,7 +144,7 @@ public class DataComponentHelper {
     }
 
     public static NbtCompound getCustomData(ItemStack stack) {
-        Optional<NbtComponent> customData = stack.get(DataComponentTypes.CUSTOM_DATA);
-        return customData.map(NbtComponent::copyNbt).orElse(new NbtCompound());
+        NbtComponent customData = stack.get(DataComponentTypes.CUSTOM_DATA); // Get component directly
+        return customData != null ? customData.copyNbt() : new NbtCompound(); // Check for null and return NBT or new compound
     }
 }

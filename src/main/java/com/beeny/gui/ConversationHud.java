@@ -14,7 +14,8 @@ import net.minecraft.util.Identifier;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
-
+import net.minecraft.client.render.RenderLayer; // Added import
+import java.util.function.Function; // Added import
 /**
  * Renders a HUD element showing which villager the player is currently speaking to.
  */
@@ -28,7 +29,7 @@ public class ConversationHud {
     // Use Identifier.of() instead of new Identifier() constructor
     private final Identifier ICON_TEXTURE = Identifier.of("villagesreborn", "textures/gui/conversation_icon.png");
     private final Identifier SPEECH_BUBBLE_TEXTURE = Identifier.of("villagesreborn", "textures/gui/speech_bubble.png");
-    
+    private static final Function<Identifier, RenderLayer> TEXTURE_LAYER = id -> RenderLayer.getGui(); // Added for 1.21.4 drawTexture
     // Animation properties
     private float animationProgress = 0.0f;
     private static final float ANIMATION_SPEED = 0.1f;
@@ -301,7 +302,8 @@ public class ConversationHud {
             boolean hasIcon = MinecraftClient.getInstance().getResourceManager().getResource(ICON_TEXTURE).isPresent();
             if (hasIcon) {
                 // Updated ICON_TEXTURE rendering for Minecraft 1.21.4
-                context.drawTexture(ICON_TEXTURE, x + 5, y + 5, 0, 0, 16, 16, 16, 16);
+                // Updated to use drawTexture for 1.21.4
+                context.drawTexture(TEXTURE_LAYER, ICON_TEXTURE, x + 5, y + 5, 0.0F, 0.0F, 16, 16, 16, 16);
                 textX = x + 26;    // Move text to right of icon
             }
         } catch (Exception e) {
@@ -321,7 +323,8 @@ public class ConversationHud {
                 if (hasBubble) {
                     int bubbleSize = 10;
                     // Updated SPEECH_BUBBLE_TEXTURE rendering for Minecraft 1.21.4
-                    context.drawGuiTexture(SPEECH_BUBBLE_TEXTURE, textX + textWidth + 4, textY + 3, 10, 10);
+                    // Updated to use drawTexture for 1.21.4
+                    context.drawTexture(TEXTURE_LAYER, SPEECH_BUBBLE_TEXTURE, textX + textWidth + 4, textY + 3, 0.0F, 0.0F, 10, 10, 10, 10);
                 }
             } catch (Exception e) {
                 // Texture not found, continue without icon

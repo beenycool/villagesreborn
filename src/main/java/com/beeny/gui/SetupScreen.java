@@ -102,7 +102,8 @@ public class SetupScreen extends Screen {
 
         // Draw background image
         int imageSize = 128;
-        context.drawGuiTexture(BACKGROUND, centerX - imageSize / 2, height / 3, imageSize, imageSize);
+        // Updated to use drawTexture for 1.21.4
+        context.drawTexture(TEXTURE_LAYER, BACKGROUND, centerX - imageSize / 2, height / 3, 0.0F, 0.0F, imageSize, imageSize, imageSize, imageSize);
 
         super.render(context, mouseX, mouseY, delta);
     }

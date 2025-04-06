@@ -34,22 +34,23 @@ public class VillagesClientNetwork {
     public static final Identifier REQUEST_VILLAGE_INFO_ID = Identifier.of(MOD_ID, "request_village_info");
     public static final Identifier JOIN_EVENT_ID = Identifier.of(MOD_ID, "join_event");
 
-    // Custom payload IDs for 1.21.4 - corrected to use the Type constructor with two type parameters
-    public static final CustomPayload.Id<VillagerCulturePayload> VILLAGER_CULTURE_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "villager_culture"));
-    public static final PacketCodec<PacketByteBuf, VillagerCulturePayload> VILLAGER_CULTURE_CODEC = 
+    // Custom payload IDs for 1.21.4
+    public static final CustomPayload.Id<VillagerCulturePayload> VILLAGER_CULTURE_ID_PAYLOAD = new CustomPayload.Id<>(VILLAGER_CULTURE_ID);
+    public static final PacketCodec<PacketByteBuf, VillagerCulturePayload> VILLAGER_CULTURE_CODEC =
         PacketCodec.of(VillagerCulturePayload::write, VillagerCulturePayload::new);
 
-    public static final CustomPayload.Id<VillagerMoodPayload> VILLAGER_MOOD_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "villager_mood"));
-    public static final PacketCodec<PacketByteBuf, VillagerMoodPayload> VILLAGER_MOOD_CODEC = 
+    public static final CustomPayload.Id<VillagerMoodPayload> VILLAGER_MOOD_ID_PAYLOAD = new CustomPayload.Id<>(VILLAGER_MOOD_ID);
+    public static final PacketCodec<PacketByteBuf, VillagerMoodPayload> VILLAGER_MOOD_CODEC =
         PacketCodec.of(VillagerMoodPayload::write, VillagerMoodPayload::new);
 
-    public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "request_village_info"));
+    // C2S Payloads
+    public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_ID_PAYLOAD = new CustomPayload.Id<>(REQUEST_VILLAGE_INFO_ID);
+    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC =
+        PacketCodec.of(RequestVillageInfoPayload::write, RequestVillageInfoPayload::new);
     
-    public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "join_event"));
+    public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_ID_PAYLOAD = new CustomPayload.Id<>(JOIN_EVENT_ID);
+    public static final PacketCodec<PacketByteBuf, JoinEventPayload> JOIN_EVENT_CODEC =
+        PacketCodec.of(JoinEventPayload::write, JoinEventPayload::new);
 
     // Custom payload classes for 1.21.4
     public static class VillagerCulturePayload implements CustomPayload {
@@ -66,15 +67,14 @@ public class VillagesClientNetwork {
             this.culture = buf.readString();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(culture);
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return VILLAGER_CULTURE_PAYLOAD_ID;
+        public CustomPayload.Id<?> getId() {
+            return VILLAGER_CULTURE_ID_PAYLOAD;
         }
         
         public UUID getVillagerUuid() {
@@ -85,10 +85,7 @@ public class VillagesClientNetwork {
             return culture;
         }
 
-        @Override
-        public Identifier getId() {
-            return VILLAGER_CULTURE_PAYLOAD_ID.getId();
-        }
+        // Remove conflicting getId method
     }
     
     public static class VillagerMoodPayload implements CustomPayload {
@@ -105,15 +102,14 @@ public class VillagesClientNetwork {
             this.mood = buf.readString();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(mood);
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return VILLAGER_MOOD_PAYLOAD_ID;
+        public CustomPayload.Id<?> getId() {
+            return VILLAGER_MOOD_ID_PAYLOAD;
         }
         
         public UUID getVillagerUuid() {
@@ -124,10 +120,7 @@ public class VillagesClientNetwork {
             return mood;
         }
 
-        @Override
-        public Identifier getId() {
-            return VILLAGER_MOOD_PAYLOAD_ID.getId();
-        }
+        // Remove conflicting getId method
     }
     
     public static class RequestVillageInfoPayload implements CustomPayload {
@@ -141,24 +134,20 @@ public class VillagesClientNetwork {
             this.position = buf.readBlockPos();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeBlockPos(position);
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
+        public CustomPayload.Id<?> getId() {
+            return REQUEST_VILLAGE_INFO_ID_PAYLOAD;
         }
         
         public BlockPos getPosition() {
             return position;
         }
 
-        @Override
-        public Identifier getId() {
-            return REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId();
-        }
+        // Remove conflicting getId method
     }
     
     public static class JoinEventPayload implements CustomPayload {
@@ -172,60 +161,49 @@ public class VillagesClientNetwork {
             this.eventId = buf.readString();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeString(eventId);
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return JOIN_EVENT_PAYLOAD_ID;
+        public CustomPayload.Id<?> getId() {
+            return JOIN_EVENT_ID_PAYLOAD;
         }
         
         public String getEventId() {
             return eventId;
         }
 
-        @Override
-        public Identifier getId() {
-            return JOIN_EVENT_PAYLOAD_ID.getId();
-        }
+        // Remove conflicting getId method
     }
 
     /**
      * Register all client-side packet receivers
      */
     public static void registerReceivers() {
-        ClientPlayNetworking.registerGlobalReceiver(
-            VILLAGER_CULTURE_PAYLOAD_ID, // Using Id instead of Type
+        // Updated registration to use ID and correct context type
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_CULTURE_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleVillagerCulturePacket(payload.getVillagerUuid(), payload.getCulture());
-                });
+                // No need for separate client.execute, context handles it
+                handleVillagerCulturePacket(payload.getVillagerUuid(), payload.getCulture());
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(
-            VILLAGER_MOOD_PAYLOAD_ID, // Using Id instead of Type
+        // Updated registration to use ID and correct context type
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_MOOD_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleVillagerMoodPacket(payload.getVillagerUuid(), payload.getMood());
-                });
+                handleVillagerMoodPacket(payload.getVillagerUuid(), payload.getMood());
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(
-            VillagesNetwork.VILLAGE_INFO_PAYLOAD_ID, // Using Id instead of Type
+        // Assuming VillagesNetwork.VILLAGE_INFO_ID_PAYLOAD exists and is S2C
+        // Need to ensure VillagesNetwork.VillageInfoPayload class is accessible
+        ClientPlayNetworking.registerGlobalReceiver(VillagesNetwork.VILLAGE_INFO_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleVillageInfoPacket(
-                        payload.getCulture(),
-                        payload.getProsperity(),
-                        payload.getSafety(),
-                        payload.getPopulation()
-                    );
-                });
+                handleVillageInfoPacket(
+                    payload.getCulture(),
+                    payload.getProsperity(),
+                    payload.getSafety(),
+                    payload.getPopulation()
+                );
             });
         
         LOGGER.info("Client-side village network receivers registered");
@@ -235,8 +213,14 @@ public class VillagesClientNetwork {
      * Request culture data for a specific villager
      */
     public static void requestVillagerCultureData(UUID villagerUuid) {
-        VillagerCulturePayload payload = new VillagerCulturePayload(villagerUuid, "");
-        ClientPlayNetworking.send(payload);
+        // Sending requires the payload object directly
+        // This seems like a C2S request, but the payload is registered S2C? Re-evaluating registration.
+        // Let's assume this is meant to be a request *to* the server.
+        // We need a C2S payload for requesting culture, or reuse an existing one if appropriate.
+        // For now, commenting out as the logic seems flawed.
+        // RequestVillagerCulturePayload payload = new RequestVillagerCulturePayload(villagerUuid); // Assuming this payload exists
+        // ClientPlayNetworking.send(payload);
+        LOGGER.warn("requestVillagerCultureData called, but no corresponding C2S payload seems registered.");
     }
 
     /**
@@ -304,8 +288,9 @@ public class VillagesClientNetwork {
      */
     public static void requestVillageInfo(BlockPos pos) {
         LOGGER.debug("Requesting village info at position {}", pos);
+        // Sending requires the payload object directly
         RequestVillageInfoPayload payload = new RequestVillageInfoPayload(pos);
-        ClientPlayNetworking.send(payload);
+        ClientPlayNetworking.send(payload); // Send C2S payload
     }
 
     /**
@@ -315,8 +300,9 @@ public class VillagesClientNetwork {
      */
     public static void requestJoinEvent(String eventId) {
         LOGGER.debug("Requesting to join event {}", eventId);
+        // Sending requires the payload object directly
         JoinEventPayload payload = new JoinEventPayload(eventId);
-        ClientPlayNetworking.send(payload);
+        ClientPlayNetworking.send(payload); // Send C2S payload
 
         // Log the request to help with debugging
         MinecraftClient client = MinecraftClient.getInstance();
@@ -334,9 +320,6 @@ public class VillagesClientNetwork {
         LOGGER.info("Client-side village network handlers registered");
     }
 
-    // Register codecs in Villagesreborn#onInitialize
-    static {
-        PayloadTypeRegistry.playS2C().register(VILLAGER_CULTURE_PAYLOAD_ID, VILLAGER_CULTURE_CODEC);
-        PayloadTypeRegistry.playS2C().register(VILLAGER_MOOD_PAYLOAD_ID, VILLAGER_MOOD_CODEC);
-    }
+    // Payload type registration should happen centrally (e.g., in VillagesNetwork.java)
+    // This class should only register client-side *handlers*.
 }

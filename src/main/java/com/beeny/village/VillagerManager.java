@@ -927,7 +927,7 @@ public class VillagerManager {
                 .findFirst().orElse(null);
                 
             if (region != null) {
-                region.addCulturalStructure(entry.getKey());
+                // region.addCulturalStructure(entry.getKey()); // TODO: Re-implement or remove structure association
             }
         }
         

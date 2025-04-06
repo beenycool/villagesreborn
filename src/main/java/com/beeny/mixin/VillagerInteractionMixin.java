@@ -100,8 +100,8 @@ public abstract class VillagerInteractionMixin {
 
           // Send thinking effect immediately
           VillagerFeedbackHelper.showThinkingEffect(thisVillager);
-
-          dialogue
+          final VillagerAI finalVillagerAI = villagerAI; // Capture for lambda
+          dialogue // Removed stray 'dialogue' from the previous line
               .generatePlayerInteraction(
                   player, personalityPrompt) // Use a specific interaction type if defined
               .orTimeout(7, TimeUnit.SECONDS) // Add timeout
@@ -116,7 +116,7 @@ public abstract class VillagerInteractionMixin {
                       serverPlayer.sendMessage(
                           Text.literal(
                               "§e[" + thisVillager.getName().getString() + "'s Personality]§r\n"
-                                  + villagerAI.getPersonality()),
+                                  + (finalVillagerAI != null ? finalVillagerAI.getPersonality() : "Unknown")), // Use final variable
                           false);
                     } else {
                       serverPlayer.sendMessage(

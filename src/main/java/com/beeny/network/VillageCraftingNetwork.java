@@ -23,6 +23,11 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import net.minecraft.network.codec.PacketCodec;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.network.RegistryByteBuf;
 
 /**
  * Handles network communication for the village crafting system.
@@ -42,31 +47,35 @@ public class VillageCraftingNetwork {
     public static final Identifier CRAFT_PROGRESS_PACKET_ID = Identifier.of(MOD_ID, "craft_progress");
     public static final Identifier CRAFT_COMPLETE_PACKET_ID = Identifier.of(MOD_ID, "craft_complete");
 
-    // Custom payload IDs for 1.21.4 - corrected to use the Type constructor with two type parameters
-    public static final CustomPayload.Id<CraftRecipePayload> CRAFT_RECIPE_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "craft_recipe"));
-    public static final PacketCodec<PacketByteBuf, CraftRecipePayload> CRAFT_RECIPE_CODEC = 
-        PacketCodec.of(CraftRecipePayload::write, CraftRecipePayload::new);
+    // Custom payload IDs for 1.21.4
+    public static final CustomPayload.Id<CraftRecipePayload> CRAFT_RECIPE_ID = new CustomPayload.Id<>(CRAFT_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, CraftRecipePayload> CRAFT_RECIPE_CODEC =
+        PacketCodec.of(CraftRecipePayload::write, CraftRecipePayload::new); // Uses PacketByteBuf, might be okay if no registry items involved directly
 
-    public static final CustomPayload.Id<RequestRecipesPayload> REQUEST_RECIPES_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "request_recipes"));
-    public static final PacketCodec<PacketByteBuf, RequestRecipesPayload> REQUEST_RECIPES_CODEC = 
-        PacketCodec.of(RequestRecipesPayload::write, RequestRecipesPayload::new);
+    public static final CustomPayload.Id<RequestRecipesPayload> REQUEST_RECIPES_ID = new CustomPayload.Id<>(REQUEST_RECIPES_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, RequestRecipesPayload> REQUEST_RECIPES_CODEC =
+        PacketCodec.of(RequestRecipesPayload::write, RequestRecipesPayload::new); // Uses PacketByteBuf
     
-    public static final CustomPayload.Id<CancelCraftPayload> CANCEL_CRAFT_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "cancel_craft"));
+    public static final CustomPayload.Id<CancelCraftPayload> CANCEL_CRAFT_ID = new CustomPayload.Id<>(CANCEL_CRAFT_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, CancelCraftPayload> CANCEL_CRAFT_CODEC =
+        PacketCodec.of(CancelCraftPayload::write, CancelCraftPayload::new); // Uses PacketByteBuf
     
-    public static final CustomPayload.Id<RecipeListPayload> RECIPE_LIST_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "recipe_list"));
+    public static final CustomPayload.Id<RecipeListPayload> RECIPE_LIST_ID = new CustomPayload.Id<>(RECIPE_LIST_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, RecipeListPayload> RECIPE_LIST_CODEC =
+        PacketCodec.of(RecipeListPayload::write, RecipeListPayload::new); // Uses PacketByteBuf
     
-    public static final CustomPayload.Id<CraftStatusPayload> CRAFT_STATUS_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "craft_status"));
+    public static final CustomPayload.Id<CraftStatusPayload> CRAFT_STATUS_ID = new CustomPayload.Id<>(CRAFT_STATUS_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, CraftStatusPayload> CRAFT_STATUS_CODEC =
+        PacketCodec.of(CraftStatusPayload::write, CraftStatusPayload::new); // Uses PacketByteBuf
     
-    public static final CustomPayload.Id<CraftProgressPayload> CRAFT_PROGRESS_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "craft_progress"));
+    public static final CustomPayload.Id<CraftProgressPayload> CRAFT_PROGRESS_ID = new CustomPayload.Id<>(CRAFT_PROGRESS_PACKET_ID);
+    public static final PacketCodec<PacketByteBuf, CraftProgressPayload> CRAFT_PROGRESS_CODEC =
+        PacketCodec.of(CraftProgressPayload::write, CraftProgressPayload::new); // Uses PacketByteBuf
     
-    public static final CustomPayload.Id<CraftCompletePayload> CRAFT_COMPLETE_PAYLOAD_ID = 
-        CustomPayload.createId(Identifier.of(MOD_ID, "craft_complete"));
+    public static final CustomPayload.Id<CraftCompletePayload> CRAFT_COMPLETE_ID = new CustomPayload.Id<>(CRAFT_COMPLETE_PACKET_ID);
+    // Needs RegistryByteBuf because it handles ItemStack
+    public static final PacketCodec<RegistryByteBuf, CraftCompletePayload> CRAFT_COMPLETE_CODEC =
+        PacketCodec.of(CraftCompletePayload::write, CraftCompletePayload::new);
 
     // Custom payload classes for 1.21.4
     public static class CraftRecipePayload implements CustomPayload {
@@ -83,20 +92,14 @@ public class VillageCraftingNetwork {
             this.recipeId = buf.readString();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return CRAFT_RECIPE_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CRAFT_RECIPE_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return CRAFT_RECIPE_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -119,19 +122,13 @@ public class VillageCraftingNetwork {
             this.villagerUuid = buf.readUuid();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return REQUEST_RECIPES_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return REQUEST_RECIPES_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return REQUEST_RECIPES_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -153,20 +150,14 @@ public class VillageCraftingNetwork {
             this.recipeId = buf.readString();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return CANCEL_CRAFT_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CANCEL_CRAFT_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return CANCEL_CRAFT_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -196,7 +187,6 @@ public class VillageCraftingNetwork {
             }
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeInt(recipeIds.size());
@@ -206,13 +196,8 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return RECIPE_LIST_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return RECIPE_LIST_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return RECIPE_LIST_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -244,7 +229,6 @@ public class VillageCraftingNetwork {
             this.message = buf.readString();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
@@ -253,13 +237,8 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return CRAFT_STATUS_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CRAFT_STATUS_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return CRAFT_STATUS_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -299,7 +278,6 @@ public class VillageCraftingNetwork {
             this.maxProgress = buf.readInt();
         }
 
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
@@ -308,13 +286,8 @@ public class VillageCraftingNetwork {
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return CRAFT_PROGRESS_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CRAFT_PROGRESS_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return CRAFT_PROGRESS_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -347,29 +320,27 @@ public class VillageCraftingNetwork {
             this.result = result != null ? result : ItemStack.EMPTY;
         }
 
-        public CraftCompletePayload(PacketByteBuf buf) {
+        // Constructor now takes RegistryByteBuf
+        public CraftCompletePayload(RegistryByteBuf buf) {
             this.villagerUuid = buf.readUuid();
             this.recipeId = buf.readString();
             this.success = buf.readBoolean();
-            this.result = ItemStack.PACKET_CODEC.decode(buf).getOrThrow(false, LOGGER::error);
+            // Decode ItemStack using the codec and the registry lookup from the buffer
+            this.result = ItemStack.PACKET_CODEC.decode(buf);
         }
 
-        @Override
-        public void write(PacketByteBuf buf) {
+        // Write method now takes RegistryByteBuf
+        public void write(RegistryByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(recipeId);
             buf.writeBoolean(success);
+            // Encode ItemStack using the codec and the registry lookup from the buffer
             ItemStack.PACKET_CODEC.encode(buf, result);
         }
 
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return CRAFT_COMPLETE_PAYLOAD_ID;
-        }
-
-        @Override
-        public Identifier getId() {
-            return CRAFT_COMPLETE_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return CRAFT_COMPLETE_ID;
         }
 
         public UUID getVillagerUuid() {
@@ -390,47 +361,44 @@ public class VillageCraftingNetwork {
     }
 
     public static void registerServerHandlers() {
-        ServerPlayNetworking.registerGlobalReceiver(CRAFT_RECIPE_PAYLOAD_ID,
+        // Updated registration to use ID and correct context type
+        ServerPlayNetworking.registerGlobalReceiver(CRAFT_RECIPE_ID,
             (payload, context) -> {
                 ServerPlayerEntity player = context.player();
-                MinecraftServer server = player.getServer();
-                server.execute(() -> {
-                    VillagerEntity villager = (VillagerEntity) player.getServerWorld()
-                        .getEntity(payload.getVillagerUuid());
-                    if (villager != null) {
-                        VillageCraftingManager.getInstance()
-                            .assignTask(villager, payload.getRecipeId(), player);
-                    } else {
-                        LOGGER.warn("Crafting request received for unknown villager {}", 
-                            payload.getVillagerUuid());
-                    }
-                });
-            });
-
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_PAYLOAD_ID, (payload, context) -> {
-            ServerPlayerEntity player = context.player();
-            MinecraftServer server = player.getServer();
-            server.execute(() -> {
-                VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
+                // No need for separate server.execute, context handles it
+                VillagerEntity villager = (VillagerEntity) player.getServerWorld()
+                    .getEntity(payload.getVillagerUuid());
                 if (villager != null) {
-                    handleRecipeRequest(villager, player, context.responseSender());
+                    VillageCraftingManager.getInstance()
+                        .assignTask(villager, payload.getRecipeId(), player);
+                } else {
+                    LOGGER.warn("Crafting request received for unknown villager {}",
+                        payload.getVillagerUuid());
                 }
             });
+
+        // Updated registration to use ID and correct context type
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_RECIPES_ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
+            if (villager != null) {
+                // Pass player directly instead of responseSender if needed by handleRecipeRequest
+                handleRecipeRequest(villager, player);
+            }
         });
 
-        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_PAYLOAD_ID, (payload, context) -> {
+        // Updated registration to use ID and correct context type
+        ServerPlayNetworking.registerGlobalReceiver(CANCEL_CRAFT_ID, (payload, context) -> {
             ServerPlayerEntity player = context.player();
-            MinecraftServer server = player.getServer();
-            server.execute(() -> {
-                VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
-                if (villager != null) {
-                    VillageCraftingManager.getInstance().cancelTask(villager, payload.getRecipeId());
-                }
-            });
+            VillagerEntity villager = (VillagerEntity) player.getServerWorld().getEntity(payload.getVillagerUuid());
+            if (villager != null) {
+                VillageCraftingManager.getInstance().cancelTask(villager, payload.getRecipeId());
+            }
         });
     }
 
-    private static void handleRecipeRequest(VillagerEntity villager, ServerPlayerEntity player, PacketSender responseSender) {
+    // Updated handleRecipeRequest signature (removed PacketSender if not needed)
+    private static void handleRecipeRequest(VillagerEntity villager, ServerPlayerEntity player) {
         VillagerManager vm = VillagerManager.getInstance();
         SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
         String culture = region != null ? region.getCultureAsString() : "default";
@@ -441,12 +409,9 @@ public class VillageCraftingNetwork {
             .collect(Collectors.toList());
 
         RecipeListPayload payload = new RecipeListPayload(villager.getUuid(), recipeIds);
-        ServerPlayNetworking.send(player, payload);
+        // Send payload using the ID - Assuming RecipeListPayload is S2C
+        ServerPlayNetworking.send(player, payload); // Sending S2C requires the payload object directly now
     }
     
-    // Register codecs in Villagesreborn#onInitialize
-    static {
-        PayloadTypeRegistry.playC2S().register(CRAFT_RECIPE_PAYLOAD_ID, CRAFT_RECIPE_CODEC);
-        PayloadTypeRegistry.playC2S().register(REQUEST_RECIPES_PAYLOAD_ID, REQUEST_RECIPES_CODEC);
-    }
+    // Packet type registration should happen centrally in Villagesreborn.onInitialize
 }

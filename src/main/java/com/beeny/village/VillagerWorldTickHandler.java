@@ -7,6 +7,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.border.WorldBorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.minecraft.util.math.Box;
 
 import java.util.List;
 
@@ -60,10 +61,12 @@ public class VillagerWorldTickHandler implements ServerTickEvents.EndWorldTick {
             vm.updateVillagerActivities(world);
         }
         
-        // Get all loaded villagers in the world
+        // Get all loaded villagers within the world border
+        WorldBorder border = world.getWorldBorder();
+        Box searchBox = new Box(border.getBoundWest(), world.getBottomY(), border.getBoundSouth(), border.getBoundEast(), world.getHeight(), border.getBoundNorth());
         List<VillagerEntity> loadedVillagers = world.getEntitiesByClass(
             VillagerEntity.class,
-            world.getWorldBorder().getBoundaries(),
+            searchBox,
             villager -> true
         );
         

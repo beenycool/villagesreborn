@@ -20,14 +20,13 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.UUID;
 
 /**
  * Main network handler for Villages Reborn mod.
@@ -50,28 +49,30 @@ public class VillagesNetwork {
     // AI State Sync Packets
     public static final Identifier VILLAGER_AI_STATE_ID = Identifier.of(MOD_ID, "villager_ai_state");
 
-    // Custom payload ID objects for 1.21.4 - corrected to use the Type constructor with two type parameters
-    public static final CustomPayload.Type<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "village_info"));
-    public static final PacketCodec<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_CODEC = 
+    // Custom payload ID objects for 1.21.4
+    public static final CustomPayload.Id<VillageInfoPayload> VILLAGE_INFO_ID_PAYLOAD = new CustomPayload.Id<>(VILLAGE_INFO_ID);
+    public static final PacketCodec<PacketByteBuf, VillageInfoPayload> VILLAGE_INFO_CODEC =
         PacketCodec.of(VillageInfoPayload::write, VillageInfoPayload::new);
 
-    public static final CustomPayload.Type<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "request_village_info"));
-    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC = 
+    public static final CustomPayload.Id<RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_ID_PAYLOAD = new CustomPayload.Id<>(REQUEST_VILLAGE_INFO_ID);
+    public static final PacketCodec<PacketByteBuf, RequestVillageInfoPayload> REQUEST_VILLAGE_INFO_CODEC =
         PacketCodec.of(RequestVillageInfoPayload::write, RequestVillageInfoPayload::new);
     
-    public static final CustomPayload.Type<PacketByteBuf, EventNotificationPayload> EVENT_NOTIFICATION_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "event_notification"));
+    public static final CustomPayload.Id<EventNotificationPayload> EVENT_NOTIFICATION_ID_PAYLOAD = new CustomPayload.Id<>(EVENT_NOTIFICATION_ID);
+    public static final PacketCodec<PacketByteBuf, EventNotificationPayload> EVENT_NOTIFICATION_CODEC =
+        PacketCodec.of(EventNotificationPayload::write, EventNotificationPayload::new);
     
-    public static final CustomPayload.Type<PacketByteBuf, EventUpdatePayload> EVENT_UPDATE_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "event_update"));
+    public static final CustomPayload.Id<EventUpdatePayload> EVENT_UPDATE_ID_PAYLOAD = new CustomPayload.Id<>(EVENT_UPDATE_ID);
+    public static final PacketCodec<PacketByteBuf, EventUpdatePayload> EVENT_UPDATE_CODEC =
+        PacketCodec.of(EventUpdatePayload::write, EventUpdatePayload::new);
     
-    public static final CustomPayload.Type<PacketByteBuf, JoinEventPayload> JOIN_EVENT_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "join_event"));
+    public static final CustomPayload.Id<JoinEventPayload> JOIN_EVENT_ID_PAYLOAD = new CustomPayload.Id<>(JOIN_EVENT_ID);
+    public static final PacketCodec<PacketByteBuf, JoinEventPayload> JOIN_EVENT_CODEC =
+        PacketCodec.of(JoinEventPayload::write, JoinEventPayload::new);
     
-    public static final CustomPayload.Type<PacketByteBuf, VillagerAIStatePayload> VILLAGER_AI_STATE_PAYLOAD_ID = 
-        CustomPayload.createType(Identifier.of(MOD_ID, "villager_ai_state"));
+    public static final CustomPayload.Id<VillagerAIStatePayload> VILLAGER_AI_STATE_ID_PAYLOAD = new CustomPayload.Id<>(VILLAGER_AI_STATE_ID);
+    public static final PacketCodec<PacketByteBuf, VillagerAIStatePayload> VILLAGER_AI_STATE_CODEC =
+        PacketCodec.of(VillagerAIStatePayload::write, VillagerAIStatePayload::new);
 
     // Custom payload classes for 1.21.4
     public static class VillageInfoPayload implements CustomPayload {
@@ -94,7 +95,6 @@ public class VillagesNetwork {
             this.population = buf.readInt();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeString(culture);
             buf.writeInt(prosperity);
@@ -119,13 +119,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return VILLAGE_INFO_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<VillageInfoPayload> getId() {
-            return VILLAGE_INFO_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return VILLAGE_INFO_ID_PAYLOAD;
         }
     }
     
@@ -140,7 +135,6 @@ public class VillagesNetwork {
             this.playerPos = buf.readBlockPos();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeBlockPos(playerPos);
         }
@@ -150,13 +144,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return REQUEST_VILLAGE_INFO_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<RequestVillageInfoPayload> getId() {
-            return REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return REQUEST_VILLAGE_INFO_ID_PAYLOAD;
         }
     }
     
@@ -177,7 +166,6 @@ public class VillagesNetwork {
             this.durationTicks = buf.readInt();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeString(title);
             buf.writeString(description);
@@ -197,13 +185,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return EVENT_NOTIFICATION_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<EventNotificationPayload> getId() {
-            return EVENT_NOTIFICATION_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return EVENT_NOTIFICATION_ID_PAYLOAD;
         }
     }
     
@@ -224,7 +207,6 @@ public class VillagesNetwork {
             this.message = buf.readString();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeString(eventId);
             buf.writeBoolean(success);
@@ -244,13 +226,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return EVENT_UPDATE_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<EventUpdatePayload> getId() {
-            return EVENT_UPDATE_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return EVENT_UPDATE_ID_PAYLOAD;
         }
     }
     
@@ -265,7 +242,6 @@ public class VillagesNetwork {
             this.eventId = buf.readString();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeString(eventId);
         }
@@ -275,13 +251,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return JOIN_EVENT_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<JoinEventPayload> getId() {
-            return JOIN_EVENT_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return JOIN_EVENT_ID_PAYLOAD;
         }
     }
     
@@ -302,7 +273,6 @@ public class VillagesNetwork {
             this.position = buf.readBlockPos();
         }
         
-        @Override
         public void write(PacketByteBuf buf) {
             buf.writeUuid(villagerUuid);
             buf.writeString(activity);
@@ -322,13 +292,8 @@ public class VillagesNetwork {
         }
         
         @Override
-        public CustomPayload.Type<? extends CustomPayload> getType() {
-            return VILLAGER_AI_STATE_PAYLOAD_ID;
-        }
-
-        @Override
-        public CustomPayload.Id<VillagerAIStatePayload> getId() {
-            return VILLAGER_AI_STATE_PAYLOAD_ID.getId();
+        public CustomPayload.Id<?> getId() {
+            return VILLAGER_AI_STATE_ID_PAYLOAD;
         }
     }
 
@@ -344,23 +309,18 @@ public class VillagesNetwork {
      * Register server-side packet handlers
      */
     public static void registerServerHandlers() {
-        // Register handlers for the custom payload packets
-        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_PAYLOAD_ID.getId(),
+        // Register handlers for C2S packets
+        ServerPlayNetworking.registerGlobalReceiver(REQUEST_VILLAGE_INFO_ID_PAYLOAD,
             (payload, context) -> {
                 ServerPlayerEntity player = context.player();
-                MinecraftServer server = player.getServer();
-                server.execute(() -> {
-                    handleVillageInfoRequest(server, player, payload, context.responseSender());
-                });
+                // Context handles execution on server thread
+                handleVillageInfoRequest(player.getServer(), player, payload);
             });
         
-        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_PAYLOAD_ID.getId(),
+        ServerPlayNetworking.registerGlobalReceiver(JOIN_EVENT_ID_PAYLOAD,
             (payload, context) -> {
                 ServerPlayerEntity player = context.player();
-                MinecraftServer server = player.getServer();
-                server.execute(() -> {
-                    handleJoinEventRequest(server, player, payload, context.responseSender());
-                });
+                handleJoinEventRequest(player.getServer(), player, payload);
             });
             
         LOGGER.info("Server packet handlers registered successfully");
@@ -370,37 +330,26 @@ public class VillagesNetwork {
      * Register client-side packet handlers
      */
     public static void registerClientHandlers() {
-        // Updated to use static CustomPayload.Id<T> field
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_PAYLOAD_ID.getId(),
+        // Register handlers for S2C packets
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGE_INFO_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleVillageInfoUpdate(client, payload);
-                });
+                // Context handles execution on client thread
+                handleVillageInfoUpdate(context.client(), payload);
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_PAYLOAD_ID.getId(),
+        ClientPlayNetworking.registerGlobalReceiver(EVENT_NOTIFICATION_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleEventNotification(client, context.networkHandler(), payload, context.responseSender());
-                });
+                handleEventNotification(context.client(), payload);
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_PAYLOAD_ID.getId(),
+        ClientPlayNetworking.registerGlobalReceiver(EVENT_UPDATE_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleEventUpdate(client, context.networkHandler(), payload, context.responseSender());
-                });
+                handleEventUpdate(context.client(), payload);
             });
 
-        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_PAYLOAD_ID.getId(),
+        ClientPlayNetworking.registerGlobalReceiver(VILLAGER_AI_STATE_ID_PAYLOAD,
             (payload, context) -> {
-                MinecraftClient client = context.client();
-                client.execute(() -> {
-                    handleVillagerAIState(client, context.networkHandler(), payload, context.responseSender());
-                });
+                handleVillagerAIState(context.client(), payload);
             });
             
         LOGGER.info("Client packet handlers registered successfully");
@@ -411,44 +360,35 @@ public class VillagesNetwork {
     /**
      * Handle request for village info from client
      */
-    private static void handleVillageInfoRequest(MinecraftServer server, ServerPlayerEntity player, 
-                                           RequestVillageInfoPayload payload, 
-                                           PacketSender responseSender) {
-        // Get player position from the payload
+    private static void handleVillageInfoRequest(MinecraftServer server, ServerPlayerEntity player,
+                                           RequestVillageInfoPayload payload) {
         BlockPos playerPos = payload.getPlayerPos();
+        // Get village stats at the player's position
+        VillagerManager vm = VillagerManager.getInstance();
+        VillagerManager.VillageStats stats = vm.getVillageStats(playerPos);
         
-        // Execute on server thread
-        server.execute(() -> {
-            // Get village stats at the player's position
-            VillagerManager vm = VillagerManager.getInstance();
-            VillagerManager.VillageStats stats = vm.getVillageStats(playerPos);
-            
-            if (stats != null) {
-                // Send village info back to the client
-                sendVillageInfoToClient(player, stats);
-            }
-        });
+        if (stats != null) {
+            // Send village info back to the client
+            sendVillageInfoToClient(player, stats);
+        }
     }
 
     /**
      * Handle request to join an event from client
      */
     private static void handleJoinEventRequest(MinecraftServer server, ServerPlayerEntity player,
-                                         JoinEventPayload payload,
-                                         PacketSender responseSender) {
+                                         JoinEventPayload payload) {
         String eventId = payload.getEventId();
-        
-        server.execute(() -> {
-            VillageEvent event = VillageEvent.getEvent(eventId); // Updated method
-            if (event != null) {
-                PlayerEventParticipation.getInstance().joinEvent(player, event);
-                
-                EventUpdatePayload updatePayload = new EventUpdatePayload(
-                    eventId, true, "You've joined the " + event.getName() + " event!");
-                
-                ServerPlayNetworking.send(player, updatePayload);
-            }
-        });
+        VillageEvent event = VillageEvent.getEvent(eventId); // Updated method
+        if (event != null) {
+            PlayerEventParticipation.getInstance().joinEvent(player, event);
+            
+            EventUpdatePayload updatePayload = new EventUpdatePayload(
+                eventId, true, "You've joined the " + event.getType() + " event!");
+            
+            // Send S2C payload directly
+            ServerPlayNetworking.send(player, updatePayload);
+        }
     }
 
     // Client-side packet handlers
@@ -463,67 +403,57 @@ public class VillagesNetwork {
         int safety = payload.getSafety();
         int population = payload.getPopulation();
         
-        // Update the HUD on the main thread
-        client.execute(() -> {
-            VillageInfoHud hud = VillageInfoHud.getInstance();
-            if (hud != null) {
-                hud.update(cultureName, prosperity, safety, population); // Updated method
-            }
-        });
+        // Update the HUD directly (context handles thread)
+        VillageInfoHud hud = VillageInfoHud.getInstance();
+        if (hud != null) {
+            hud.update(cultureName, prosperity, safety, population); // Updated method
+        }
     }
 
     /**
      * Handle event notification packet from server
      */
-    private static void handleEventNotification(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                          EventNotificationPayload payload, PacketSender responseSender) {
-        // Read event notification from payload
+    private static void handleEventNotification(MinecraftClient client, EventNotificationPayload payload) {
         String title = payload.getTitle();
         String description = payload.getDescription();
         int durationTicks = payload.getDurationTicks();
         
-        // Show notification on the main thread
-        client.execute(() -> {
-            EventNotificationManager notificationManager = EventNotificationManager.getInstance();
-            notificationManager.showNotification(title, description, durationTicks);
-        });
+        // Show notification directly (context handles thread)
+        EventNotificationManager notificationManager = EventNotificationManager.getInstance();
+        notificationManager.showNotification(title, description, durationTicks);
     }
 
     /**
      * Handle event update packet from server
      */
-    private static void handleEventUpdate(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                    EventUpdatePayload payload, PacketSender responseSender) {
-        // Read event update from payload
+    private static void handleEventUpdate(MinecraftClient client, EventUpdatePayload payload) {
         String eventId = payload.getEventId();
         boolean success = payload.isSuccess();
         String message = payload.getMessage();
         
-        // Handle update on the main thread
-        client.execute(() -> {
-            // Typically used to update the player's HUD or show a message
-            if (client.player != null) {
-                client.player.sendMessage(net.minecraft.text.Text.literal(message), false);
-            }
-        });
+        // Handle update directly (context handles thread)
+        if (client.player != null) {
+            client.player.sendMessage(Text.literal(message), false);
+        }
     }
 
     /**
      * Handle villager AI state update packet from server
      */
-    private static void handleVillagerAIState(MinecraftClient client, ClientPlayNetworkHandler handler,
-                                        VillagerAIStatePayload payload, PacketSender responseSender) {
-        // Read villager AI state from payload
+    private static void handleVillagerAIState(MinecraftClient client, VillagerAIStatePayload payload) {
         UUID villagerUuid = payload.getVillagerUuid();
         String activity = payload.getActivity();
         BlockPos position = payload.getPosition();
         
-        // Update villager rendering state on the main thread
-        client.execute(() -> {
-            // Find the villager entity and update its rendering state
-            // This might involve setting NBT data or other client-side entity properties
-            // which the renderer would use to show special animations or effects
-        });
+        // Update villager rendering state directly (context handles thread)
+        // Find the villager entity and update its rendering state
+        // This might involve setting NBT data or other client-side entity properties
+        // which the renderer would use to show special animations or effects
+        // Example: (Requires access to the entity)
+        // Entity entity = client.world.getEntityById(villagerUuid); // Need a way to get entity by UUID on client
+        // if (entity instanceof VillagerEntity villager) {
+        //     // Apply state update logic here
+        // }
     }
 
     // Server-to-client packet sending methods
@@ -592,4 +522,7 @@ public class VillagesNetwork {
         JoinEventPayload payload = new JoinEventPayload(eventId);
         ClientPlayNetworking.send(payload);
     }
+
+
+    // Packet type registration should happen centrally in Villagesreborn.onInitialize
 }

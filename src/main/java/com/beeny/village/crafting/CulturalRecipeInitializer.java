@@ -12,6 +12,7 @@ import net.minecraft.text.Style;
 import net.minecraft.util.Formatting;
 import net.minecraft.component.DataComponentTypes;
 import java.util.*;
+import net.minecraft.registry.BuiltinRegistries;
 
 public class CulturalRecipeInitializer {
     
@@ -41,14 +42,10 @@ public class CulturalRecipeInitializer {
         }
     }
 
+    // Modified to pass String IDs directly to DataComponentHelper
     private static void addEnchantments(ItemStack stack, Map<String, Integer> enchantments) {
         if (!enchantments.isEmpty()) {
-            Map<Enchantment, Integer> enchantMap = new HashMap<>();
-            enchantments.forEach((id, level) -> {
-                Optional<Enchantment> enchant = Registries.ENCHANTMENT.getOrEmpty(net.minecraft.util.Identifier.of(id));
-                enchant.ifPresent(e -> enchantMap.put(e, level));
-            });
-            DataComponentHelper.setEnchantments(stack, enchantMap);
+            DataComponentHelper.setEnchantmentsById(stack, enchantments); // Use new helper method
         }
     }
 
@@ -600,7 +597,7 @@ public class CulturalRecipeInitializer {
         customData.put("PeacefulAura", true);
         DataComponentHelper.setCustomData(lantern, customData);
         
-        List<ItemStack> ingredients = Arrays.asList(
+        ingredients = Arrays.asList(
             new ItemStack(Items.PAPER, 6),
             new ItemStack(Items.BAMBOO, 4),
             new ItemStack(Items.TORCH, 1)
@@ -672,7 +669,7 @@ public class CulturalRecipeInitializer {
         customData.put("VisionPower", true);
         DataComponentHelper.setCustomData(crystalSkull, customData);
         
-        List<ItemStack> ingredients = Arrays.asList(
+        ingredients = Arrays.asList(
             new ItemStack(Items.DIAMOND, 1),
             new ItemStack(Items.QUARTZ, 3),
             new ItemStack(Items.AMETHYST_SHARD, 4),
@@ -740,13 +737,13 @@ public class CulturalRecipeInitializer {
         
         addCustomProperties(holyGrail, "Holy Grail", Formatting.YELLOW, lore);
         
-        Map<String, Object> customData = new HashMap<>();
+        customData = new HashMap<>();
         customData.put("HealthBonus", 4);
         customData.put("HealingPower", 10);
         customData.put("RegenerationEffect", true);
         DataComponentHelper.setCustomData(holyGrail, customData);
         
-        List<ItemStack> ingredients = Arrays.asList(
+        ingredients = Arrays.asList(
             new ItemStack(Items.GOLD_BLOCK, 1),
             new ItemStack(Items.DIAMOND, 2),
             new ItemStack(Items.GOLDEN_APPLE, 1),
@@ -784,7 +781,7 @@ public class CulturalRecipeInitializer {
         customData.put("attack_speed_bonus", 0.1f);
         DataComponentHelper.setCustomData(chainmail, customData);
         
-        List<ItemStack> ingredients = Arrays.asList(
+        ingredients = Arrays.asList(
             new ItemStack(Items.IRON_NUGGET, 20),
             new ItemStack(Items.STRING, 5)
         );

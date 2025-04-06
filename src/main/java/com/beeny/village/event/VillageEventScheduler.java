@@ -911,11 +911,12 @@ public class VillageEventScheduler {
             }
         }
         
+        final EventTrigger finalSelectedTrigger = selectedTrigger; // Capture for lambda
         // Notify nearby players about the special event
         notifyNearbyPlayers(world, center, radius * 2, player -> {
             player.sendMessage(Text.of("§c§lSpecial Event: " + description + "§r"), false);
             player.sendMessage(Text.of("§6A " + culture + " " + 
-                selectedTrigger.eventType + " is happening in response to " + 
+                finalSelectedTrigger.eventType + " is happening in response to " + // Use final variable
                 getConditionDisplayName(selectedCondition) + "!§r"), false);
             player.sendMessage(Text.of("§eJoin in to help the village and earn special rewards.§r"), false);
         });

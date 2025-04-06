@@ -24,6 +24,9 @@ import com.beeny.setup.SystemSpecs;
 import com.beeny.setup.LLMConfig;
 import com.beeny.worldgen.VillagesRebornStructures;
 import com.beeny.network.VillageCraftingNetwork;
+import com.beeny.network.VillagesNetwork; // Added import
+import com.beeny.network.VillagesClientNetwork; // Added import
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry; // Added import
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
@@ -84,11 +87,14 @@ public class Villagesreborn implements ModInitializer {
         VillagerManager.getInstance();
         VillageCraftingManager.getInstance();
 
+        // Register Packet Types FIRST
+        registerPacketTypes(); // Added call
+
         // Initialize our tick handlers for villager behavior execution
         VillagerWorldTickHandler.init();
         ServerTickHandler.init();
 
-        registerNetworking();
+        registerNetworkingHandlers(); // Renamed for clarity
         VillageCraftingNetwork.registerServerHandlers();
         CulturalEventSystem.getInstance();
         ModCommands.register();
@@ -174,9 +180,38 @@ public class Villagesreborn implements ModInitializer {
         reputations.put(cultureId, Math.max(-100, Math.min(100, currentRep + change)));
     }
 
-    private void registerNetworking() {
+    private void registerPacketTypes() {
+        LOGGER.info("Registering Villages Reborn packet types");
+
+        // S2C Payloads (Server -> Client)
+        PayloadTypeRegistry.playS2C().register(VillagesNetwork.VILLAGE_INFO_ID_PAYLOAD, VillagesNetwork.VILLAGE_INFO_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillagesNetwork.EVENT_NOTIFICATION_ID_PAYLOAD, VillagesNetwork.EVENT_NOTIFICATION_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillagesNetwork.EVENT_UPDATE_ID_PAYLOAD, VillagesNetwork.EVENT_UPDATE_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillagesNetwork.VILLAGER_AI_STATE_ID_PAYLOAD, VillagesNetwork.VILLAGER_AI_STATE_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillagesClientNetwork.VILLAGER_CULTURE_ID_PAYLOAD, VillagesClientNetwork.VILLAGER_CULTURE_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillagesClientNetwork.VILLAGER_MOOD_ID_PAYLOAD, VillagesClientNetwork.VILLAGER_MOOD_CODEC);
+        // Add VillageCraftingNetwork S2C packets
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.RECIPE_LIST_ID, VillageCraftingNetwork.RECIPE_LIST_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_STATUS_ID, VillageCraftingNetwork.CRAFT_STATUS_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_PROGRESS_ID, VillageCraftingNetwork.CRAFT_PROGRESS_CODEC);
+        PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_COMPLETE_ID, VillageCraftingNetwork.CRAFT_COMPLETE_CODEC);
+
+        // C2S Payloads (Client -> Server)
+        PayloadTypeRegistry.playC2S().register(VillagesNetwork.REQUEST_VILLAGE_INFO_ID_PAYLOAD, VillagesNetwork.REQUEST_VILLAGE_INFO_CODEC);
+        PayloadTypeRegistry.playC2S().register(VillagesNetwork.JOIN_EVENT_ID_PAYLOAD, VillagesNetwork.JOIN_EVENT_CODEC);
+        // Add VillageCraftingNetwork C2S packets
+        PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.CRAFT_RECIPE_ID, VillageCraftingNetwork.CRAFT_RECIPE_CODEC);
+        PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.REQUEST_RECIPES_ID, VillageCraftingNetwork.REQUEST_RECIPES_CODEC);
+        PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.CANCEL_CRAFT_ID, VillageCraftingNetwork.CANCEL_CRAFT_CODEC);
+
+        LOGGER.info("Packet types registered successfully");
+    }
+
+    private void registerNetworkingHandlers() {
         LOGGER.info("Registering networking handlers");
-        // VillageCraftingNetwork.register();
+        VillagesNetwork.registerServerHandlers(); // Register common server handlers
+        VillageCraftingNetwork.registerServerHandlers(); // Register crafting server handlers
+        // Client handlers are registered in VillagesrebornClient#onInitializeClient
     }
 
     private void registerVillagerLoadCallback() {

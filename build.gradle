@@ -58,7 +58,7 @@ dependencies {
     }
     
     // ModMenu integration
-    modImplementation("com.terraformersmc:modmenu:7.1.0")
+    modImplementation("com.terraformersmc:modmenu:12.1.1")
 }
 
 tasks.withType(JavaCompile).configureEach {

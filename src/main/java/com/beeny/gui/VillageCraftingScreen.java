@@ -19,11 +19,13 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
 import net.minecraft.client.render.RenderLayer;
+import java.util.function.Function;
 
 public class VillageCraftingScreen extends Screen {
     // Update to use regular constructor rather than Identifier.of
     private static final Identifier BACKGROUND_TEXTURE = Identifier.of("villagesreborn", "textures/gui/crafting_background.png");
     private static final Identifier ICONS_TEXTURE = Identifier.of("minecraft", "textures/gui/widgets.png");
+    private static final Function<Identifier, RenderLayer> TEXTURE_LAYER = id -> RenderLayer.getGui(); // Added for 1.21.4 drawTexture
     private static final int BACKGROUND_WIDTH = 256;
     private static final int BACKGROUND_HEIGHT = 196;
     private static final int RECIPE_BUTTON_HEIGHT = 24;
@@ -191,7 +193,8 @@ public class VillageCraftingScreen extends Screen {
         int guiTop = (height - BACKGROUND_HEIGHT) / 2;
         
         // Updated BACKGROUND_TEXTURE rendering for Minecraft 1.21.4
-        context.drawGuiTexture(BACKGROUND_TEXTURE, guiLeft, guiTop, 0, 0, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
+        // Updated to use drawTexture for 1.21.4, assuming texture dimensions match BACKGROUND_WIDTH/HEIGHT
+        context.drawTexture(TEXTURE_LAYER, BACKGROUND_TEXTURE, guiLeft, guiTop, 0.0F, 0.0F, BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_WIDTH, BACKGROUND_HEIGHT);
         
         // Draw culture-specific decorative elements
         drawCulturalTheme(context, guiLeft, guiTop);
