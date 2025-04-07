@@ -15,6 +15,7 @@ import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -39,6 +40,12 @@ public class AISettingsScreen extends Screen {
     private ButtonWidget testConnectionButton;
     private Text connectionStatusText = Text.empty();
     private boolean isTestingConnection = false;
+    private CyclingButtonWidget<Boolean> developerModeButton;
+    private boolean devMode;
+    private int statusTextY;
+    // Fields to track previous button states for tick-based updates
+    private Boolean previousDevModeState = null; // Keep only one declaration
+    private String previousProviderState = null; // Keep only one declaration
 
     public AISettingsScreen(Screen parent) {
         super(Text.literal("AI Settings"));
@@ -49,7 +56,18 @@ public class AISettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int y = this.height / 4;
+        // --- Developer Mode Toggle ---
+        developerModeButton = CyclingButtonWidget.<Boolean>builder(value -> Text.literal("Dev Mode: " + (value ? "ON" : "OFF")))
+            .values(true, false)
+            .initially(llmSettings.isDeveloperModeEnabled())
+            .tooltip(value -> Tooltip.of(Text.literal(value ? "Show all technical settings" : "Show simplified settings")))
+            // Removed callback from builder chain
+            .build(5, 5, 100, 20, Text.literal("Dev Mode")); // Position top-left
+        this.addDrawableChild(developerModeButton);
+
+        // --- Layout Variables ---
+        this.devMode = llmSettings.isDeveloperModeEnabled(); // Initialize class field
+        int y = this.height / 4; // Initial Y position
         int buttonWidth = 200;
         int labelWidth = 120;
         int fieldX = this.width / 2 - buttonWidth / 2 + labelWidth + 5;
@@ -64,6 +82,8 @@ public class AISettingsScreen extends Screen {
             .values(providers)
             .initially(llmSettings.getProvider() != null ? llmSettings.getProvider().toLowerCase() : "deepseek")
             .tooltip(value -> Tooltip.of(Text.literal("Select the AI service provider.")))
+            // Add the callback here to update models when provider changes
+            // Removed callback from builder chain
             .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("AI Provider"));
         this.addDrawableChild(providerButton);
         y += spacing;
@@ -79,48 +99,65 @@ public class AISettingsScreen extends Screen {
             .build());
         y += spacing;
 
-        // Endpoint URL
-        endpointField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("API Endpoint"));
-        endpointField.setText(llmSettings.getEndpoint() != null ? llmSettings.getEndpoint() : "");
-        endpointField.setMaxLength(256);
-        this.addDrawableChild(endpointField);
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Endpoint:"), button -> {})
-            .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
-            .tooltip(Tooltip.of(Text.literal("The endpoint URL for the AI API (leave blank for default)")))
-            .build());
-        y += spacing;
+        // Endpoint URL (Only in Dev Mode)
+        if (devMode) {
+            endpointField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("API Endpoint"));
+            endpointField.setText(llmSettings.getEndpoint() != null ? llmSettings.getEndpoint() : "");
+            endpointField.setMaxLength(256);
+            this.addDrawableChild(endpointField);
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("Endpoint:"), button -> {})
+                .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
+                .tooltip(Tooltip.of(Text.literal("The endpoint URL for the AI API (leave blank for default)")))
+                .build());
+            y += spacing;
+        } else {
+            endpointField = null; // Ensure it's null if hidden
+        }
 
-        // Model Selection
-        List<String> modelIds = Arrays.asList(ModelType.getAllModelIds());
-        modelButton = CyclingButtonWidget.<String>builder(Text::literal)
-            .values(modelIds)
-            .initially(llmSettings.getModelType() != null ? llmSettings.getModelType() : ModelType.DEEPSEEK_CODER.getId())
-            .tooltip(value -> Tooltip.of(Text.literal("Select the specific AI model to use")))
-            .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("Model"));
-        this.addDrawableChild(modelButton);
-        y += spacing;
+        // Model Selection (Only in Dev Mode - simplified view might just use provider default)
+        if (devMode) {
+            modelButton = CyclingButtonWidget.<String>builder(Text::literal)
+                .values(new ArrayList<String>()) // Start with empty list
+                .initially("") // Start with empty selection
+                .tooltip(value -> Tooltip.of(Text.literal("Select the specific AI model to use (updates with provider)")))
+                .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("Model"));
+            this.addDrawableChild(modelButton);
+            // Update the model list based on the initial provider selection
+            updateModelList(providerButton.getValue());
+            y += spacing;
+        } else {
+            modelButton = null; // Ensure it's null if hidden
+        }
 
-        // Context Length
-        contextLengthField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("Context Length"));
-        contextLengthField.setText(String.valueOf(llmSettings.getContextLength()));
-        contextLengthField.setMaxLength(5);
-        this.addDrawableChild(contextLengthField);
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Context Length:"), button -> {})
-            .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
-            .tooltip(Tooltip.of(Text.literal("Maximum tokens in conversation history (2048-8192)")))
-            .build());
-        y += spacing;
+        // Context Length (Only in Dev Mode)
+        if (devMode) {
+            contextLengthField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("Context Length"));
+            contextLengthField.setText(String.valueOf(llmSettings.getContextLength()));
+            contextLengthField.setMaxLength(5);
+            this.addDrawableChild(contextLengthField);
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("Context Length:"), button -> {})
+                .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
+                .tooltip(Tooltip.of(Text.literal("Maximum tokens in conversation history (e.g., 4096)")))
+                .build());
+            y += spacing;
+        } else {
+            contextLengthField = null;
+        }
 
-        // Temperature
-        temperatureField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("Temperature"));
-        temperatureField.setText(String.format("%.2f", llmSettings.getTemperature()));
-        temperatureField.setMaxLength(4);
-        this.addDrawableChild(temperatureField);
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Temperature:"), button -> {})
-            .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
-            .tooltip(Tooltip.of(Text.literal("Controls randomness in responses (0.0-1.0)")))
-            .build());
-        y += spacing;
+        // Temperature (Only in Dev Mode)
+        if (devMode) {
+            temperatureField = new TextFieldWidget(this.textRenderer, fieldX, y, fieldWidth, 20, Text.literal("Temperature"));
+            temperatureField.setText(String.format("%.2f", llmSettings.getTemperature()));
+            temperatureField.setMaxLength(4);
+            this.addDrawableChild(temperatureField);
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("Temperature:"), button -> {})
+                .dimensions(fieldX - labelWidth - 5, y, labelWidth, 20)
+                .tooltip(Tooltip.of(Text.literal("Controls randomness in responses (0.0-1.0)")))
+                .build());
+            y += spacing;
+        } else {
+            temperatureField = null;
+        }
 
         // Use Local Model Toggle
         localModelButton = CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
@@ -131,14 +168,18 @@ public class AISettingsScreen extends Screen {
         this.addDrawableChild(localModelButton);
         y += spacing;
         
-        // Enable Advanced Conversations
-        enableAdvancedConversationsButton = CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
-            .values(true, false)
-            .initially(llmSettings.isAdvancedConversationsEnabled())
-            .tooltip(value -> Tooltip.of(Text.literal("Enable more complex conversations with villagers")))
-            .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("Advanced Conversations"));
-        this.addDrawableChild(enableAdvancedConversationsButton);
-        y += spacing;
+        // Enable Advanced Conversations (Only in Dev Mode)
+        if (devMode) {
+            enableAdvancedConversationsButton = CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
+                .values(true, false)
+                .initially(llmSettings.isAdvancedConversationsEnabled())
+                .tooltip(value -> Tooltip.of(Text.literal("Enable more complex conversations with villagers")))
+                .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("Advanced Conversations"));
+            this.addDrawableChild(enableAdvancedConversationsButton);
+            y += spacing;
+        } else {
+            enableAdvancedConversationsButton = null;
+        }
 
         // Test Connection Button
         testConnectionButton = ButtonWidget.builder(Text.literal("Test Connection"), button -> testConnection())
@@ -146,7 +187,10 @@ public class AISettingsScreen extends Screen {
             .tooltip(Tooltip.of(Text.literal("Test your current API settings")))
             .build();
         this.addDrawableChild(testConnectionButton);
-        y += spacing + 5; // Add extra spacing after test button
+        // Adjust Y position for connection status text based on dev mode
+        // Use the final calculated 'y' before adding bottom buttons
+        this.statusTextY = y + 5; // Initialize the field
+        y += spacing + 5;
 
         // Save and Back buttons
         int bottomButtonY = this.height - 40;
@@ -156,6 +200,14 @@ public class AISettingsScreen extends Screen {
         this.addDrawableChild(ButtonWidget.builder(Text.literal("Back"), button -> this.client.setScreen(parent))
             .dimensions(this.width / 2 + 2, bottomButtonY, 100, 20)
             .build());
+
+        // Initialize previous states after buttons are built (Keep only one block)
+        if (developerModeButton != null) {
+            this.previousDevModeState = developerModeButton.getValue();
+        }
+        if (providerButton != null) {
+            this.previousProviderState = providerButton.getValue();
+        }
     }
 
     private void testConnection() {
@@ -166,8 +218,10 @@ public class AISettingsScreen extends Screen {
         // Save current settings to temp
         String provider = providerButton.getValue();
         String apiKey = apiKeyField.getText();
-        String endpoint = endpointField.getText();
-        String model = modelButton.getValue();
+        // Only get endpoint/model if in dev mode and fields exist
+        // Use the class field 'this.devMode'
+        String endpoint = (this.devMode && endpointField != null) ? endpointField.getText() : "";
+        String model = (this.devMode && modelButton != null) ? modelButton.getValue() : ""; // Use provider default if not in dev mode? Needs logic in LLMService
         
         // Validate input
         if (apiKey.isEmpty() && !provider.equals("local")) {
@@ -183,8 +237,17 @@ public class AISettingsScreen extends Screen {
         // Apply temporary settings for test
         llmSettings.setProvider(provider);
         llmSettings.setApiKey(apiKey);
-        llmSettings.setEndpoint(endpoint);
-        llmSettings.setModelType(model);
+        // Only set endpoint/model if in dev mode
+        // Use the class field 'this.devMode'
+        if (this.devMode) {
+            llmSettings.setEndpoint(endpoint);
+            llmSettings.setModelType(model);
+        } else {
+            // Optionally clear or set defaults when switching out of dev mode
+            llmSettings.setEndpoint("");
+            // Decide how to handle model - maybe set to a provider default?
+            // For now, let's leave it as is, LLMService might handle defaults.
+        }
         
         // Need to save config to apply these settings
         config.save();
@@ -214,24 +277,35 @@ public class AISettingsScreen extends Screen {
     private void saveAndClose() {
         llmSettings.setProvider(providerButton.getValue());
         llmSettings.setApiKey(apiKeyField.getText());
-        llmSettings.setEndpoint(endpointField.getText());
-        llmSettings.setModelType(modelButton.getValue());
-        llmSettings.setLocalModel(localModelButton.getValue());
-        llmSettings.setAdvancedConversationsEnabled(enableAdvancedConversationsButton.getValue());
+        // Save settings based on whether they were visible (dev mode)
+        // Use the class field 'this.devMode'
+        if (this.devMode) {
+            if (endpointField != null) llmSettings.setEndpoint(endpointField.getText());
+            if (modelButton != null) llmSettings.setModelType(modelButton.getValue());
+            if (enableAdvancedConversationsButton != null) llmSettings.setAdvancedConversationsEnabled(enableAdvancedConversationsButton.getValue());
 
-        try {
-            llmSettings.setContextLength(Integer.parseInt(contextLengthField.getText()));
-        } catch (NumberFormatException e) {
-            LOGGER.warn("Invalid context length value: {}", contextLengthField.getText());
-            // Keep default or previous value if parsing fails
+            try {
+                if (contextLengthField != null) llmSettings.setContextLength(Integer.parseInt(contextLengthField.getText()));
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid context length value: {}", contextLengthField != null ? contextLengthField.getText() : "null");
+            }
+            try {
+                if (temperatureField != null) llmSettings.setTemperature(Float.parseFloat(temperatureField.getText()));
+            } catch (NumberFormatException e) {
+                LOGGER.warn("Invalid temperature value: {}", temperatureField != null ? temperatureField.getText() : "null");
+            }
+        } else {
+            // Reset non-dev settings to defaults or clear them if desired when saving in simple mode
+            // llmSettings.setEndpoint("");
+            // llmSettings.setModelType(""); // Or provider default
+            // llmSettings.setContextLength(default);
+            // llmSettings.setTemperature(default);
+            // llmSettings.setAdvancedConversationsEnabled(false);
         }
-        
-        try {
-            llmSettings.setTemperature(Float.parseFloat(temperatureField.getText()));
-        } catch (NumberFormatException e) {
-            LOGGER.warn("Invalid temperature value: {}", temperatureField.getText());
-            // Keep default or previous value if parsing fails
-        }
+        llmSettings.setLocalModel(localModelButton.getValue()); // Always save this
+        llmSettings.setDeveloperModeEnabled(developerModeButton.getValue()); // Save the toggle state
+
+        // Removed redundant parsing, moved into the devMode check above
 
         config.save();
         
@@ -239,6 +313,71 @@ public class AISettingsScreen extends Screen {
         LLMService.getInstance().setProvider(llmSettings.getProvider());
         
         this.client.setScreen(parent);
+   }
+
+   /** Helper to re-initialize screen elements */
+   protected void clearAndInit() { // Changed to protected
+       // Optional: Store scroll position if applicable
+       this.init(this.client, this.width, this.height);
+       // Optional: Restore scroll position
+   }
+
+   /**
+    * Updates the model selection button based on the chosen provider.
+    * @param selectedProvider The provider name (e.g., "gemini", "openai").
+    */
+
+   private void updateModelList(String selectedProvider) {
+       if (modelButton == null) return; // Ensure button is initialized
+
+       String[] availableModelIds = ModelType.getModelIdsForProvider(selectedProvider);
+       List<String> modelIdList = Arrays.asList(availableModelIds);
+
+       // Get current selection to try and preserve it
+       String currentModelSelection = modelButton.getValue();
+       String configModel = llmSettings.getModelType(); // Model saved in config
+
+       // Determine the initial model for the new list
+       String initialModel = "";
+       if (!modelIdList.isEmpty()) {
+           // If the model from config is valid for this provider, use it
+           if (configModel != null && modelIdList.contains(configModel)) {
+               initialModel = configModel;
+           }
+           // Else if the *currently selected* model in the UI is valid, keep it
+           else if (currentModelSelection != null && modelIdList.contains(currentModelSelection)) {
+                initialModel = currentModelSelection;
+           }
+           // Otherwise, default to the first model in the list
+           else {
+               initialModel = modelIdList.get(0);
+           }
+       }
+
+       // Update the button's values and initial selection
+       // --- Rebuild the modelButton ---
+       // Store original position and dimensions (assuming they are accessible or known)
+       // We know the position from the initial build (lines 99-100 in the previous read)
+       int originalY = this.height / 4 + 3 * 24; // Calculate Y based on initial layout
+       int buttonWidth = 200;
+       int labelWidth = 120;
+       int fieldX = this.width / 2 - buttonWidth / 2 + labelWidth + 5;
+
+       // Remove the old button
+       this.remove(modelButton);
+
+       // Create the new button with the filtered list and correct initial value
+       modelButton = CyclingButtonWidget.<String>builder(Text::literal)
+            .values(modelIdList.isEmpty() ? List.of("(No models available)") : modelIdList) // Use placeholder if empty
+            .initially(initialModel.isEmpty() ? "(No models available)" : initialModel)
+            .tooltip(value -> Tooltip.of(Text.literal("Select the specific AI model to use (updates with provider)")))
+            .build(fieldX - labelWidth - 5, originalY, buttonWidth, 20, Text.literal("Model"));
+
+       // Disable if no real models are available
+       modelButton.active = !modelIdList.isEmpty();
+
+       // Add the new button
+       this.addDrawableChild(modelButton);
     }
 
     @Override
@@ -262,8 +401,8 @@ public class AISettingsScreen extends Screen {
             context.drawText(
                 this.textRenderer,
                 connectionStatusText,
-                this.width / 2 - this.textRenderer.getWidth(connectionStatusText) / 2,
-                this.height / 4 + 24 * 8 + 5, // Position below test button
+                this.width / 2 - this.textRenderer.getWidth(connectionStatusText) / 2, // X position
+                statusTextY, // Use calculated Y position
                 0xFFFFFF,
                 true
             );
@@ -282,4 +421,27 @@ public class AISettingsScreen extends Screen {
     public boolean shouldCloseOnEsc() {
         return true;
     }
-}
+    @Override
+    public void tick() {
+        super.tick(); // Call superclass tick if needed
+
+        // Check Developer Mode Button state change
+        // Ensure previous state is not null before comparing
+        if (developerModeButton != null && this.previousDevModeState != null && !developerModeButton.getValue().equals(this.previousDevModeState)) {
+            this.previousDevModeState = developerModeButton.getValue(); // Update previous state
+            // Original callback logic:
+            llmSettings.setDeveloperModeEnabled(this.previousDevModeState);
+            this.clearAndInit(); // Re-initialize the screen layout
+            // Need to return here because clearAndInit rebuilds everything, including providerButton
+            return;
+        }
+
+        // Check Provider Button state change (only if clearAndInit wasn't called)
+        // Ensure previous state is not null before comparing
+        if (providerButton != null && this.previousProviderState != null && !providerButton.getValue().equals(this.previousProviderState)) {
+            this.previousProviderState = providerButton.getValue(); // Update previous state
+            // Original callback logic:
+            updateModelList(this.previousProviderState); // Call update method on change
+        }
+    }
+} // Moved tick() method inside the class and removed incorrect comment

@@ -67,6 +67,9 @@ dependencies {
     // ModMenu integration
     // Updated ModMenu version based on available releases
     modImplementation("com.terraformersmc:modmenu:13.0.3")
+
+    // OSHI for hardware detection
+    implementation 'com.github.oshi:oshi-core:6.6.1' // Check for latest compatible version
 }
 
 tasks.withType(JavaCompile).configureEach {

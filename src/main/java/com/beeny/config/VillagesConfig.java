@@ -302,14 +302,14 @@ public class VillagesConfig {
     
     public class LLMSettings {
         private String apiKey = "";
-        private String model = "gpt-3.5-turbo";
-        private String endpoint = "https://api.openai.com/v1/chat/completions";
+        private String model = ""; // Default model ID (provider-specific)
+        private String endpoint = ""; // Default endpoint (provider-specific, often optional)
         private int maxTokens = 1000;
         private boolean localModel = false;
         private String localModelPath = "";
         private int contextLength = 4;
         private boolean useMemory = true;
-        private String modelType = "gpt-3.5-turbo";
+        private String modelType = ""; // Renamed from model, ensure consistency if used elsewhere
         private float temperature = 0.7f;
         private int maxCacheSize = 100;
         private int cacheTTLSeconds = 300;
@@ -317,7 +317,8 @@ public class VillagesConfig {
         private String aiDetailLevel = "BALANCED";
         private int aiResponseDelay = 0;
         private String provider = "deepseek"; // Add provider field with default value
-        
+        private boolean developerModeEnabled = false; // Added for simplified UI toggle
+
         public String getProvider() {
             return provider;
         }
@@ -453,6 +454,16 @@ public class VillagesConfig {
         
         public void setAiResponseDelay(int aiResponseDelay) {
             this.aiResponseDelay = Math.max(0, Math.min(5000, aiResponseDelay));
+        }
+        
+        // Moved from VillagesConfig main class
+        public boolean isDeveloperModeEnabled() {
+            return developerModeEnabled;
+        }
+        
+        // Moved from VillagesConfig main class
+        public void setDeveloperModeEnabled(boolean developerModeEnabled) {
+            this.developerModeEnabled = developerModeEnabled;
         }
     }
     

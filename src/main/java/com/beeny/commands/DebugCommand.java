@@ -1,4 +1,4 @@
-package com.beeny.commands;
+hpackage com.beeny.commands;
 
 import com.beeny.Villagesreborn;
 import com.beeny.ai.LLMService;
@@ -21,6 +21,7 @@ import net.minecraft.text.Text;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files; // Added import
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
@@ -42,22 +43,28 @@ public class DebugCommand {
         report.append("Villages Reborn Debug Report - ").append(LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)).append("\n");
         report.append("========================================\n\n");
 
-        // --- Placeholder for Test Sections ---
-        report.append("Section 1: AI Provider Checks\n");
+        // --- Core System Checks ---
+        report.append("Section 0: Core System Checks\n");
         report.append("-----------------------------\n");
+        testCoreSystems(report);
+        report.append("\n");
+
+        // --- Placeholder for Test Sections ---
+        report.append("Section 1: AI Provider & LLM Service Checks\n");
+        report.append("-----------------------------------------\n");
         testAIProviders(report);
         report.append("\n");
-        report.append("Section 2: Cultural Manager Checks\n");
-        report.append("----------------------------------\n");
+        report.append("Section 2: Cultural Asset Manager Checks\n");
+        report.append("--------------------------------------\n");
         testCulturalManagers(report);
         report.append("\n");
 
-        report.append("Section 3: Villager System Checks\n");
-        report.append("---------------------------------\n");
+        report.append("Section 3: Villager Management System Checks\n");
+        report.append("------------------------------------------\n");
         testVillagerSystems(report);
         report.append("\n");
-        report.append("Section 4: Model Checks\n");
-        report.append("-----------------------\n");
+        report.append("Section 4: Local AI Model Checks\n");
+        report.append("------------------------------\n");
         testModelChecks(report);
         report.append("\n");
 
@@ -83,6 +90,43 @@ public class DebugCommand {
         return 1; // Success
     }
 
+    private static void testCoreSystems(StringBuilder report) {
+        // Config Check
+        try {
+            VillagesConfig config = VillagesConfig.getInstance();
+            if (config != null) {
+                report.append("[ ✓ ] VillagesConfig: Instance loaded successfully.\n");
+                // Add checks for specific critical config values if needed
+                // e.g., report.append(String.format("    - Default Culture: %s\n", config.getDefaultCulture()));
+            } else {
+                report.append("[ ✗ ] VillagesConfig: Failed to get instance! Core configuration is missing.\n");
+            }
+        } catch (Exception e) {
+            report.append(String.format("[ ✗ ] VillagesConfig: Error during check - %s\n", e.getMessage()));
+        }
+
+        // Debug Report Directory Write Permissions Check
+        try {
+            Path reportDir = Paths.get("debug_reports");
+            reportDir.toFile().mkdirs(); // Ensure directory exists or is created
+            Path testFile = reportDir.resolve("permission_test_" + System.currentTimeMillis() + ".tmp");
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(testFile.toFile()))) {
+                writer.write("test");
+            } // try-with-resources ensures the writer is closed
+            if (testFile.toFile().delete()) {
+                 report.append("[ ✓ ] Debug Directory: Write permissions confirmed for 'debug_reports'.\n");
+            } else {
+                 report.append("[ ! ] Debug Directory: Wrote test file to 'debug_reports', but failed to delete it.\n");
+            }
+        } catch (IOException e) {
+            report.append(String.format("[ ✗ ] Debug Directory: Failed to write to 'debug_reports' - %s\n", e.getMessage()));
+        } catch (SecurityException e) {
+             report.append(String.format("[ ✗ ] Debug Directory: Security exception accessing 'debug_reports' - %s\n", e.getMessage()));
+        } catch (Exception e) {
+            report.append(String.format("[ ✗ ] Debug Directory: Unexpected error during permission check - %s\n", e.getMessage()));
+        }
+    }
+
     private static void testAIProviders(StringBuilder report) {
         VillagesConfig config = VillagesConfig.getInstance();
         VillagesConfig.LLMSettings llmSettings = config.getLLMSettings(); // Correct type to inner class
@@ -96,33 +140,46 @@ public class DebugCommand {
         report.append(String.format("Active AI Provider: %s\n", activeProvider));
 
         if (isLocal) {
-            report.append(String.format("[ X ] Local Model: Enabled\n"));
-            report.append(String.format("      - Path: %s\n", localPath.isEmpty() ? "(Not Set)" : localPath));
-            report.append(String.format("      - Model File Status: %s\n", ModelChecker.hasLocalModel() ? "Found" : "Missing!"));
+            report.append(String.format("[ ✓ ] Local Model: Enabled\n"));
+            report.append(String.format("      - Configured Model Type: %s\n", llmSettings.getModelType().isEmpty() ? "[ ! ] (Not Set)" : llmSettings.getModelType()));
+            report.append(String.format("      - Expected Path: %s\n", localPath.isEmpty() ? "[ ! ] (Not Set)" : localPath));
+            ModelType localModelType = ModelType.fromString(llmSettings.getModelType()); // Get ModelType from config string
+            boolean modelExists = ModelChecker.hasLocalModel(localModelType); // Pass ModelType
+            report.append(String.format("      - Model File Status: %s\n", modelExists ? "[ ✓ ] Found" : "[ ✗ ] Missing!"));
         } else {
-            report.append(String.format("[ X ] Remote Provider (%s): Enabled\n", activeProvider));
-            report.append(String.format("      - API Key: %s\n", apiKey.isEmpty() ? "Missing!" : "Set"));
-            report.append(String.format("      - Endpoint: %s\n", endpoint.isEmpty() ? "(Default/Not Set)" : endpoint));
-            report.append(String.format("      - Model: %s\n", model.isEmpty() ? "(Default/Not Set)" : model));
+            report.append(String.format("[ ✓ ] Remote Provider (%s): Enabled\n", activeProvider));
+            report.append(String.format("      - API Key: %s\n", apiKey.isEmpty() ? "[ ✗ ] Missing!" : "[ ✓ ] Set"));
+            report.append(String.format("      - Endpoint: %s\n", endpoint.isEmpty() ? "[ i ] (Default/Not Set)" : endpoint));
+            report.append(String.format("      - Model: %s\n", model.isEmpty() ? "[ i ] (Default/Not Set)" : model));
 
             // Specific checks based on provider string
             if ("AZURE".equalsIgnoreCase(activeProvider)) {
                 if (apiKey.isEmpty() || endpoint.isEmpty()) {
-                    report.append("      - Status: Config Missing! (Requires API Key and Endpoint)\n");
+                    report.append("      - Status: [ ✗ ] Config Missing! (Requires API Key and Endpoint)\n");
                 } else {
-                     report.append("      - Status: Configured\n");
+                     report.append("      - Status: [ ✓ ] Configured\n");
                 }
             } else { // OpenAI, OpenRouter, Cohere, Anthropic, Deepseek, Gemini, Mistral etc.
                  if (apiKey.isEmpty()) {
-                    report.append("      - Status: API Key Missing!\n");
+                    report.append("      - Status: [ ✗ ] API Key Missing!\n");
                  } else {
-                     report.append("      - Status: Configured\n");
+                     report.append("      - Status: [ ✓ ] Configured\n");
                  }
             }
         }
-        // Note: LLMService instance check might be useful too, but not directly related to config errors.
-        LLMService service = LLMService.getInstance();
-        report.append(String.format("[ %s ] LLMService: %s\n", service != null ? "X" : "!", service != null ? "Instance OK" : "Instance is null!"));
+        // LLMService Instance Check
+        try {
+            LLMService service = LLMService.getInstance();
+            report.append(String.format("[ %s ] LLMService: %s\n", service != null ? "✓" : "✗", service != null ? "Instance OK" : "Instance is null!"));
+            if (service == null) {
+                 report.append("      - Note: This usually indicates an issue during initialization or with the selected AI provider config.\n");
+            } else {
+                 // Could add a check for service.isReady() or similar if available
+                 report.append("      - Note: Live connectivity checks are complex and not performed here.\n");
+            }
+        } catch (Exception e) {
+             report.append(String.format("[ ✗ ] LLMService: Error getting instance - %s\n", e.getMessage()));
+        }
     }
 
     private static void testCulturalManagers(StringBuilder report) {
@@ -131,9 +188,9 @@ public class DebugCommand {
             // Call new public static methods instead of accessing private map
             int cultureCount = CulturalTextureManager.getRegisteredCultureCount();
             int textureCount = CulturalTextureManager.getTotalTextureCount();
-            report.append(String.format("[ X ] CulturalTextureManager: Loaded (%d cultures, %d textures)\n", cultureCount, textureCount));
+            report.append(String.format("[ ✓ ] CulturalTextureManager: Loaded (%d cultures, %d textures)\n", cultureCount, textureCount));
         } catch (Exception e) { // Catch potential errors during static method calls
-             report.append(String.format("[ E ] CulturalTextureManager: Error during check - %s\n", e.getMessage()));
+             report.append(String.format("[ ✗ ] CulturalTextureManager: Error during check - %s\n", e.getMessage()));
         }
         // Removed duplicate/erroneous catch block here
 
@@ -144,16 +201,18 @@ public class DebugCommand {
                  // Call new public methods instead of accessing private maps
                  try {
                      int cultureCount = soundManager.getRegisteredCultureCount();
-                     long totalSoundCount = soundManager.getTotalSoundCount();
-                     report.append(String.format("[ X ] CulturalSoundManager: Loaded (%d cultures, %d total sounds)\n", cultureCount, totalSoundCount));
+                     long totalSoundCount = soundManager.getTotalSoundCount(); // Assuming this method exists and works
+                     report.append(String.format("[ ✓ ] CulturalSoundManager: Loaded (%d cultures, %d total sounds)\n", cultureCount, totalSoundCount));
+                 } catch (NoSuchMethodError nsme) {
+                     report.append("[ ! ] CulturalSoundManager: Count methods not found (Update needed?). Instance OK.\n");
                  } catch (Exception e) { // Catch potential errors if methods aren't added yet
                      report.append("[ E ] CulturalSoundManager: Error accessing counts - " + e.getMessage() + "\n");
                  }
             } else {
-                report.append("[   ] CulturalSoundManager: Instance is null!\n");
+                report.append("[ ✗ ] CulturalSoundManager: Instance is null!\n");
             }
         } catch (Exception e) {
-            report.append(String.format("[ E ] CulturalSoundManager: Error during check - %s\n", e.getMessage()));
+            report.append(String.format("[ ✗ ] CulturalSoundManager: Error during check - %s\n", e.getMessage()));
         }
     }
 
@@ -162,61 +221,104 @@ public class DebugCommand {
             VillagerManager manager = VillagerManager.getInstance();
             if (manager != null) {
                 int activeVillagers = manager.getActiveVillagers().size();
-                int spawnRegions = manager.getSpawnRegions().size();
-                report.append(String.format("[ X ] VillagerManager: Loaded (Tracking %d active villagers, %d spawn regions)\n", activeVillagers, spawnRegions));
+                int spawnRegions = manager.getSpawnRegions().size(); // Assuming this method exists
+                report.append(String.format("[ ✓ ] VillagerManager: Loaded (Tracking %d active villagers, %d spawn regions)\n", activeVillagers, spawnRegions));
 
-                // Check MoodManager instance (often tied to VillagerManager or global)
-                // Assuming MoodManager might be accessible or part of VillagerManager logic
-                // If MoodManager is a separate singleton:
-                // MoodManager moodManager = MoodManager.getInstance();
-                // report.append(String.format("[ %s ] MoodManager: %s\n", moodManager != null ? "X" : " ", moodManager != null ? "Instance OK" : "Instance is null!"));
+                // Check MoodManager instance (assuming it's a separate singleton)
+                try {
+                    MoodManager moodManager = MoodManager.getInstance(); // Assuming singleton pattern
+                    report.append(String.format("[ %s ] MoodManager: %s\n", moodManager != null ? "✓" : "✗", moodManager != null ? "Instance OK" : "Instance is null!"));
+                } catch (Exception e) {
+                    report.append(String.format("[ ✗ ] MoodManager: Error checking instance - %s\n", e.getMessage()));
+                }
+
+                // Basic VillagerAI Class Check
+                 try {
+                     Class.forName("com.beeny.village.VillagerAI");
+                     report.append("[ ✓ ] VillagerAI: Class loaded successfully.\n");
+                 } catch (ClassNotFoundException e) {
+                     report.append("[ ✗ ] VillagerAI: Class not found! Critical component missing.\n");
+                 } catch (Exception e) {
+                     report.append(String.format("[ ✗ ] VillagerAI: Error checking class - %s\n", e.getMessage()));
+                 }
+
 
                 // Relationship checks are complex globally. Reporting active villagers is a good proxy.
-                report.append("[ i ] Villager Subsystems (Memory, Dialogue, Mood, Relationships): Status inferred from active villager count.\n");
-                report.append("      - Detailed checks require specific villager context.\n");
+                report.append("[ i ] Other Subsystems (Memory, Dialogue, Relationships): Status inferred from VillagerManager & active villagers.\n");
+                report.append("      - Detailed checks require specific villager interaction/context.\n");
 
             } else {
-                report.append("[   ] VillagerManager: Instance is null!\n");
+                report.append("[ ✗ ] VillagerManager: Instance is null!\n");
             }
         } catch (Exception e) {
-             report.append(String.format("[ E ] VillagerManager: Error during check - %s\n", e.getMessage()));
+             report.append(String.format("[ ✗ ] VillagerManager: Error during check - %s\n", e.getMessage()));
         }
     }
 
     private static void testModelChecks(StringBuilder report) {
-        // Get model path directly from ModelChecker
-        Path modelPathObj = ModelChecker.getModelPath();
-        String modelPath = modelPathObj.toString();
+        VillagesConfig.LLMSettings llmSettings = VillagesConfig.getInstance().getLLMSettings();
+        String configuredModelTypeStr = llmSettings.getModelType();
+        ModelType configuredModelType = ModelType.fromString(configuredModelTypeStr); // Get ModelType from config string
 
-        // Model Downloader Check
+        // Get model path using the configured ModelType
+        Path modelPathObj = ModelChecker.getModelPath(configuredModelType);
+        String modelPath = (modelPathObj != null) ? modelPathObj.toString() : "(Path Undefined for ModelType)";
+
+        // Local Model Checks (Path, Existence, Readability)
         try {
-            // ModelDownloader might not be a singleton, depends on usage.
-            // If it's used transiently, check config/path instead.
-            report.append(String.format("[ i ] Model Path: Configured to '%s'\n", modelPath));
-            // Check if the specific model file exists
-             if (ModelChecker.hasLocalModel()) {
-                 report.append("      - Status: Model file exists.\n");
-             } else {
-                 report.append("      - Status: Model file does NOT exist!\n");
-             }
-             // TODO: Add check if ModelDownloader instance is accessible/relevant globally
+            boolean localModelEnabled = llmSettings.isLocalModel();
+
+            if (!localModelEnabled) {
+                report.append("[ i ] Local model usage is DISABLED in configuration.\n");
+            } else {
+                // Local model IS enabled, proceed with detailed checks
+                report.append("[ i ] Local model usage is ENABLED.\n");
+                report.append(String.format("    - Configured Model Type: '%s'\n", configuredModelTypeStr.isEmpty() ? "(Not Set)" : configuredModelTypeStr));
+                report.append(String.format("    - Expected Path: '%s'\n", modelPath));
+
+                // Add a check for consistency between localModel flag and actual ModelType
+                if (!configuredModelType.isLocalModel() && !configuredModelTypeStr.isEmpty()) {
+                     report.append("    - [ ! ] Inconsistency: Local model is enabled, but configured model type '" + configuredModelTypeStr + "' is not a local model type!\n");
+                }
+
+                // Check if the specific model file exists and is readable using the configured ModelType
+                if (modelPathObj != null) { // Check if path is valid for the model type
+                    boolean exists = ModelChecker.hasLocalModel(configuredModelType); // Pass ModelType
+                    boolean readable = false;
+                    if (exists) {
+                        try {
+                           readable = Files.isReadable(modelPathObj); // Use Files.isReadable
+                        } catch (SecurityException se) {
+                            // Ignore, readable remains false
+                        }
+                    }
+
+                    if (exists && readable) {
+                        report.append("    - File Status: [ ✓ ] Model file exists and is readable.\n");
+                    } else if (exists && !readable) {
+                        report.append("    - File Status: [ ! ] Model file exists but is NOT readable (Permissions issue?).\n");
+                    } else {
+                        report.append("    - File Status: [ ✗ ] Model file does NOT exist at the expected path!\n");
+                    }
+
+                    // Static ModelChecker report (confirms the check above) using the configured ModelType
+                    boolean modelAvailable = ModelChecker.hasLocalModel(configuredModelType); // Pass ModelType
+                    report.append(String.format("    - ModelChecker Report: [ %s ] Reports local model file for type '%s' as %s.\n",
+                         modelAvailable ? "✓" : "✗",
+                         configuredModelType.getId(), // Show which model type was checked
+                         modelAvailable ? "Available" : "Missing/Unavailable"));
+
+                } else {
+                    // Path was null, meaning the configured model type isn't a known local one
+                     report.append(String.format("    - Status: [ ! ] Configured model type '%s' is not a known local model or path is undefined.\n", configuredModelTypeStr));
+                }
+            } // End of localModelEnabled check
+
         } catch (Exception e) {
-             report.append(String.format("[ E ] ModelDownloader: Error during check - %s\n", e.getMessage()));
+             report.append(String.format("[ ✗ ] Local Model Checks: Error during check - %s\n", e.getMessage()));
         }
 
-        // Model Checker Check
-        try {
-            // ModelChecker might also be transient or part of initialization.
-            // Check if models specified in config actually exist at the path.
-            // Use static ModelChecker methods
-            boolean modelAvailable = ModelChecker.hasLocalModel();
-            report.append(String.format("[ %s ] ModelChecker: Local model file %s at '%s'\n",
-                 modelAvailable ? "X" : "!",
-                 modelAvailable ? "Available" : "Missing/Unavailable",
-                 modelPath));
-        } catch (Exception e) {
-             report.append(String.format("[ E ] ModelChecker: Error during check - %s\n", e.getMessage()));
-        }
+        // Removed redundant Model Checker Check section as its logic is now integrated above.
     }
 
 }

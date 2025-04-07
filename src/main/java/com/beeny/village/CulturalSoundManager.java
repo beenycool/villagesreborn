@@ -1,27 +1,27 @@
 package com.beeny.village;
 
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.registry.entry.RegistryEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.Optional; // Add Optional import
 
 public class CulturalSoundManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private static final CulturalSoundManager INSTANCE = new CulturalSoundManager();
 
-    private final Map<String, List<RegistryEntry.Reference<SoundEvent>>> culturalAmbientSounds;
-    private final Map<String, List<RegistryEntry.Reference<SoundEvent>>> culturalMusicSounds;
+    private final Map<String, List<SoundEvent>> culturalAmbientSounds;
+    private final Map<String, List<SoundEvent>> culturalMusicSounds;
     private final Random random;
     private final Map<BlockPos, Long> lastSoundTime;
     private static final long SOUND_COOLDOWN = 12000;
@@ -38,50 +38,42 @@ public class CulturalSoundManager {
         return INSTANCE;
     }
 
-    // Helper method to safely get RegistryEntry.Reference
-    private Optional<RegistryEntry.Reference<SoundEvent>> getSoundEntry(SoundEvent event) {
-        return Registries.SOUND_EVENT.getEntry(event);
-    }
-
     private void initializeSoundMaps() {
-        // Egyptian
-        List<RegistryEntry.Reference<SoundEvent>> egyptianAmbient = new ArrayList<>();
-        getSoundEntry(SoundEvents.AMBIENT_CAVE).ifPresent(egyptianAmbient::add);
-        getSoundEntry(SoundEvents.BLOCK_SAND_BREAK).ifPresent(egyptianAmbient::add);
+        // Add SoundEvents directly - they're actually SoundEvent objects
+        List<SoundEvent> egyptianAmbient = new ArrayList<>();
+        egyptianAmbient.add(SoundEvents.AMBIENT_CAVE.value());
+        egyptianAmbient.add(SoundEvents.BLOCK_SAND_BREAK);
         culturalAmbientSounds.put("egyptian", egyptianAmbient);
 
-        List<RegistryEntry.Reference<SoundEvent>> egyptianMusic = new ArrayList<>();
-        getSoundEntry(SoundEvents.MUSIC_DISC_CAT).ifPresent(egyptianMusic::add);
+        List<SoundEvent> egyptianMusic = new ArrayList<>();
+        egyptianMusic.add(SoundEvents.MUSIC_DISC_CAT.value());
         culturalMusicSounds.put("egyptian", egyptianMusic);
 
-        // Roman
-        List<RegistryEntry.Reference<SoundEvent>> romanAmbient = new ArrayList<>();
-        getSoundEntry(SoundEvents.BLOCK_ANVIL_USE).ifPresent(romanAmbient::add);
-        getSoundEntry(SoundEvents.ENTITY_VILLAGER_TRADE).ifPresent(romanAmbient::add);
+        List<SoundEvent> romanAmbient = new ArrayList<>();
+        romanAmbient.add(SoundEvents.BLOCK_ANVIL_USE);
+        romanAmbient.add(SoundEvents.ENTITY_VILLAGER_TRADE);
         culturalAmbientSounds.put("roman", romanAmbient);
 
-        List<RegistryEntry.Reference<SoundEvent>> romanMusic = new ArrayList<>();
-        getSoundEntry(SoundEvents.MUSIC_DISC_BLOCKS).ifPresent(romanMusic::add);
+        List<SoundEvent> romanMusic = new ArrayList<>();
+        romanMusic.add(SoundEvents.MUSIC_DISC_BLOCKS.value());
         culturalMusicSounds.put("roman", romanMusic);
 
-        // Victorian
-        List<RegistryEntry.Reference<SoundEvent>> victorianAmbient = new ArrayList<>();
-        getSoundEntry(SoundEvents.BLOCK_BELL_USE).ifPresent(victorianAmbient::add);
-        getSoundEntry(SoundEvents.BLOCK_CHAIN_BREAK).ifPresent(victorianAmbient::add);
+        List<SoundEvent> victorianAmbient = new ArrayList<>();
+        victorianAmbient.add(SoundEvents.BLOCK_BELL_USE);
+        victorianAmbient.add(SoundEvents.BLOCK_CHAIN_BREAK);
         culturalAmbientSounds.put("victorian", victorianAmbient);
 
-        List<RegistryEntry.Reference<SoundEvent>> victorianMusic = new ArrayList<>();
-        getSoundEntry(SoundEvents.MUSIC_DISC_WAIT).ifPresent(victorianMusic::add);
+        List<SoundEvent> victorianMusic = new ArrayList<>();
+        victorianMusic.add(SoundEvents.MUSIC_DISC_WAIT.value());
         culturalMusicSounds.put("victorian", victorianMusic);
 
-        // NYC
-        List<RegistryEntry.Reference<SoundEvent>> nycAmbient = new ArrayList<>();
-        getSoundEntry(SoundEvents.ENTITY_MINECART_RIDING).ifPresent(nycAmbient::add);
-        getSoundEntry(SoundEvents.BLOCK_NOTE_BLOCK_BELL).ifPresent(nycAmbient::add);
+        List<SoundEvent> nycAmbient = new ArrayList<>();
+        nycAmbient.add(SoundEvents.ENTITY_MINECART_RIDING);
+        nycAmbient.add(SoundEvents.BLOCK_NOTE_BLOCK_BELL.value());
         culturalAmbientSounds.put("nyc", nycAmbient);
 
-        List<RegistryEntry.Reference<SoundEvent>> nycMusic = new ArrayList<>();
-        getSoundEntry(SoundEvents.MUSIC_DISC_13).ifPresent(nycMusic::add);
+        List<SoundEvent> nycMusic = new ArrayList<>();
+        nycMusic.add(SoundEvents.MUSIC_DISC_13.value());
         culturalMusicSounds.put("nyc", nycMusic);
     }
 
@@ -90,25 +82,19 @@ public class CulturalSoundManager {
             return;
         }
 
-        List<RegistryEntry.Reference<SoundEvent>> ambientSounds = culturalAmbientSounds.get(culture.toLowerCase());
+        List<SoundEvent> ambientSounds = culturalAmbientSounds.get(culture.toLowerCase());
         if (ambientSounds == null || ambientSounds.isEmpty()) {
-            return;
-        }
-
-        List<RegistryEntry.Reference<SoundEvent>> ambientSounds = culturalAmbientSounds.get(culture.toLowerCase());
-        if (ambientSounds == null || ambientSounds.isEmpty()) {
-            // Optionally log a warning if sounds are missing for a culture
-            // LOGGER.warn("No ambient sounds defined for culture: {}", culture);
             return;
         }
 
         world.getPlayers().forEach(player -> {
             if (isPlayerInRange(player, pos, 32)) {
-                RegistryEntry.Reference<SoundEvent> soundEntry = ambientSounds.get(random.nextInt(ambientSounds.size()));
+                SoundEvent soundEvent = ambientSounds.get(random.nextInt(ambientSounds.size()));
                 float volume = calculateVolume(player.getBlockPos(), pos);
-                // Play sound using the RegistryEntry reference
+                
+                // Play sound with the sound event directly
                 world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                    soundEntry, SoundCategory.AMBIENT, volume, 1.0f, random.nextLong()); // Added seed
+                    soundEvent, SoundCategory.AMBIENT, volume, 1.0f, random.nextLong());
             }
         });
 
@@ -116,45 +102,45 @@ public class CulturalSoundManager {
     }
 
     public void playEventSounds(ServerWorld world, BlockPos pos, String culture, String eventType) {
-        Optional<RegistryEntry.Reference<SoundEvent>> eventSoundOpt = switch(culture.toLowerCase()) {
+        // Select appropriate sound based on culture and event type
+        SoundEvent selectedSound = switch(culture.toLowerCase()) {
             case "egyptian" -> eventType.contains("festival") ?
-                getSoundEntry(SoundEvents.BLOCK_NOTE_BLOCK_FLUTE) : getSoundEntry(SoundEvents.AMBIENT_CAVE);
+                SoundEvents.BLOCK_NOTE_BLOCK_FLUTE.value() : SoundEvents.AMBIENT_CAVE.value();
             case "roman" -> eventType.contains("market") ?
-                getSoundEntry(SoundEvents.ENTITY_VILLAGER_YES) : getSoundEntry(SoundEvents.BLOCK_ANVIL_USE);
+                SoundEvents.ENTITY_VILLAGER_YES : SoundEvents.BLOCK_ANVIL_USE;
             case "victorian" -> eventType.contains("social") ?
-                getSoundEntry(SoundEvents.BLOCK_NOTE_BLOCK_CHIME) : getSoundEntry(SoundEvents.BLOCK_BELL_USE);
+                SoundEvents.BLOCK_NOTE_BLOCK_CHIME.value() : SoundEvents.BLOCK_BELL_USE;
             case "nyc" -> eventType.contains("parade") ?
-                getSoundEntry(SoundEvents.BLOCK_NOTE_BLOCK_BASS) : getSoundEntry(SoundEvents.ENTITY_MINECART_RIDING);
-            default -> getSoundEntry(SoundEvents.AMBIENT_CAVE); // Default sound
+                SoundEvents.BLOCK_NOTE_BLOCK_BASS.value() : SoundEvents.ENTITY_MINECART_RIDING;
+            default -> SoundEvents.AMBIENT_CAVE.value(); // Default sound
         };
 
-        eventSoundOpt.ifPresent(eventSound ->
-            world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                eventSound, SoundCategory.RECORDS, 1.0f, 1.0f, random.nextLong()) // Added seed
-        );
+        // Play sound directly using SoundEvent
+        world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
+            selectedSound, SoundCategory.RECORDS, 1.0f, 1.0f, random.nextLong());
     }
 
     public void playVillagerInteractionSounds(ServerWorld world, VillagerEntity villager1,
             VillagerEntity villager2, String culture) {
         BlockPos pos = villager1.getBlockPos();
 
-        Optional<RegistryEntry.Reference<SoundEvent>> interactionSoundOpt = switch(culture.toLowerCase()) {
-            case "egyptian" -> getSoundEntry(SoundEvents.ENTITY_VILLAGER_AMBIENT);
-            case "roman" -> getSoundEntry(SoundEvents.ENTITY_VILLAGER_CELEBRATE);
-            case "victorian" -> getSoundEntry(SoundEvents.ENTITY_VILLAGER_YES);
-            case "nyc" -> getSoundEntry(SoundEvents.ENTITY_VILLAGER_TRADE);
-            default -> getSoundEntry(SoundEvents.ENTITY_VILLAGER_AMBIENT); // Default sound
+        // Select sound based on culture
+        SoundEvent selectedSound = switch(culture.toLowerCase()) {
+            case "egyptian" -> SoundEvents.ENTITY_VILLAGER_AMBIENT;
+            case "roman" -> SoundEvents.ENTITY_VILLAGER_CELEBRATE;
+            case "victorian" -> SoundEvents.ENTITY_VILLAGER_YES;
+            case "nyc" -> SoundEvents.ENTITY_VILLAGER_TRADE;
+            default -> SoundEvents.ENTITY_VILLAGER_AMBIENT; // Default sound
         };
 
-        interactionSoundOpt.ifPresent(interactionSound ->
-            world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                interactionSound, SoundCategory.NEUTRAL, 0.5f, 1.0f, random.nextLong()) // Added seed
-        );
+        // Play sound directly using SoundEvent
+        world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
+            selectedSound, SoundCategory.NEUTRAL, 0.5f, 1.0f, random.nextLong());
     }
 
     private boolean canPlaySound(BlockPos pos) {
         long lastTime = lastSoundTime.getOrDefault(pos, 0L);
-        return !lastSoundTime.containsKey(pos) || 
+        return !lastSoundTime.containsKey(pos) ||
             System.currentTimeMillis() - lastTime >= SOUND_COOLDOWN;
     }
 
@@ -169,7 +155,7 @@ public class CulturalSoundManager {
     }
 
     public void playCulturalMusic(ServerWorld world, BlockPos pos, String culture) {
-        List<RegistryEntry.Reference<SoundEvent>> musicSounds = culturalMusicSounds.get(culture.toLowerCase());
+        List<SoundEvent> musicSounds = culturalMusicSounds.get(culture.toLowerCase());
         if (musicSounds == null || musicSounds.isEmpty()) {
             return;
         }
@@ -177,46 +163,42 @@ public class CulturalSoundManager {
         if (random.nextFloat() < 0.01f) { // Consider making this probability configurable
             world.getPlayers().forEach(player -> {
                 if (isPlayerInRange(player, pos, 48)) {
-                    RegistryEntry.Reference<SoundEvent> musicEntry = musicSounds.get(random.nextInt(musicSounds.size()));
+                    SoundEvent musicEvent = musicSounds.get(random.nextInt(musicSounds.size()));
+                    
+                    // Play sound directly using SoundEvent
                     world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                        musicEntry, SoundCategory.RECORDS, 0.3f, 1.0f, random.nextLong()); // Added seed
+                        musicEvent, SoundCategory.RECORDS, 0.3f, 1.0f, random.nextLong());
                 }
             });
         }
-    } // Added missing closing brace for playCulturalMusic method
+    }
 
     public int getRegisteredCultureCount() {
-            // Combine keys from both maps and count distinct cultures
-            Set<String> cultures = new HashSet<>(culturalAmbientSounds.keySet());
-            cultures.addAll(culturalMusicSounds.keySet());
-            return cultures.size();
-        }
-    
-        public long getTotalSoundCount() {
-            long ambientCount = culturalAmbientSounds.values().stream().mapToLong(List::size).sum();
-            long musicCount = culturalMusicSounds.values().stream().mapToLong(List::size).sum();
-            return ambientCount + musicCount;
-        }
-    // Removed extra closing brace here
+        // Combine keys from both maps and count distinct cultures
+        Set<String> cultures = new HashSet<>(culturalAmbientSounds.keySet());
+        cultures.addAll(culturalMusicSounds.keySet());
+        return cultures.size();
+    }
+
+    public long getTotalSoundCount() {
+        long ambientCount = culturalAmbientSounds.values().stream().mapToLong(List::size).sum();
+        long musicCount = culturalMusicSounds.values().stream().mapToLong(List::size).sum();
+        return ambientCount + musicCount;
+    }
 
     public void clearSoundHistory(BlockPos pos) {
         lastSoundTime.remove(pos);
     }
 
     public void stopAllSounds(ServerWorld world, BlockPos pos) {
-        // Stopping sounds directly isn't straightforward.
-        // Playing a silent sound might not work as intended.
-        // A better approach might involve client-side handling or specific stop packets if needed.
-        // For now, this method might not function as expected.
-        // Consider removing or redesigning if stopping sounds is critical.
-        getSoundEntry(SoundEvents.BLOCK_NOTE_BLOCK_BASS).ifPresent(sound -> {
-            world.getPlayers().forEach(player -> {
-                if (isPlayerInRange(player, pos, 48)) {
-                    // Playing a sound with 0 volume doesn't guarantee stopping others.
-                    world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                        sound, SoundCategory.MASTER, 0.0f, 1.0f, random.nextLong()); // Added seed
-                }
-            });
+        // Use a silent sound
+        SoundEvent silentSound = SoundEvents.BLOCK_NOTE_BLOCK_BASS.value();
+        world.getPlayers().forEach(player -> {
+            if (isPlayerInRange(player, pos, 48)) {
+                // Play with 0 volume to effectively silence other sounds
+                world.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
+                    silentSound, SoundCategory.MASTER, 0.0f, 1.0f, random.nextLong());
+            }
         });
         LOGGER.warn("stopAllSounds method may not effectively stop ongoing sounds.");
     }
