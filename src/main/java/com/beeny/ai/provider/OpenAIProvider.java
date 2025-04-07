@@ -102,44 +102,35 @@ public class OpenAIProvider implements AIProvider {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                JsonObject requestBody = new JsonObject();
+                var requestBody = new JsonObject();
                 requestBody.addProperty("model", modelName);
-                
-                JsonArray messagesArray = new JsonArray();
-                JsonObject userMessage = new JsonObject();
+                var messagesArray = new JsonArray();
+                var userMessage = new JsonObject();
                 userMessage.addProperty("role", "user");
                 userMessage.addProperty("content", "Validate API key (respond with OK)");
                 messagesArray.add(userMessage);
-                
                 requestBody.add("messages", messagesArray);
                 requestBody.addProperty("max_tokens", 1);
                 
-                Request request = new Request.Builder()
+                var request = new Request.Builder()
                     .url(API_URL)
                     .post(RequestBody.create(requestBody.toString(), JSON))
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .build();
                 
-                try (Response response = client.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        return true;
+                try (var response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) return true;
+                    int statusCode = response.code();
+                    var body = response.body() != null ? response.body().string() : "";
+                    if (statusCode == 401 || statusCode == 403) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "OpenAI rejected your API key. Please check it is correct.");
+                    } else if (statusCode == 429) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "OpenAI rate limit exceeded. Please try again later.");
                     } else {
-                        int statusCode = response.code();
-                        String body = response.body() != null ? response.body().string() : "";
-                        
-                        if (statusCode == 401 || statusCode == 403) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
-                                "OpenAI rejected your API key. Please check it is correct.");
-                        } else if (statusCode == 429) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
-                                "OpenAI rate limit exceeded. Please try again later.");
-                        } else {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
-                                "OpenAI API error: " + statusCode + " - " + body);
-                        }
-                        return false;
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "OpenAI API error: " + statusCode + " - " + body);
                     }
+                    return false;
                 }
             } catch (IOException e) {
                 LOGGER.error("Error validating OpenAI access", e);
@@ -153,11 +144,9 @@ public class OpenAIProvider implements AIProvider {
     private String callOpenAIApi(String prompt, Map<String, String> context) throws IOException {
         JsonArray messagesArray = new JsonArray();
         if (context != null && !context.isEmpty()) {
-            StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
-            context.forEach((key, value) -> {
-                if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append(".");
-            });
-            JsonObject systemMessage = new JsonObject();
+            var systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+            context.forEach((key, value) -> { if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append("."); });
+            var systemMessage = new JsonObject();
             systemMessage.addProperty("role", "system");
             systemMessage.addProperty("content", systemContent.toString());
             messagesArray.add(systemMessage);
@@ -166,27 +155,26 @@ public class OpenAIProvider implements AIProvider {
         userMessage.addProperty("role", "user");
         userMessage.addProperty("content", prompt);
         messagesArray.add(userMessage);
-        JsonObject requestBody = new JsonObject();
+        var requestBody = new JsonObject();
         requestBody.addProperty("model", modelName);
         requestBody.add("messages", messagesArray);
         requestBody.addProperty("temperature", 0.7);
         requestBody.addProperty("max_tokens", modelName.contains("gpt-4-turbo") ? 4096 : modelName.contains("gpt-4") ? 8192 : 4096);
         if (modelName.startsWith("gpt-4-turbo") || modelName.startsWith("gpt-4")) {
-            JsonObject responseFormat = new JsonObject();
+            var responseFormat = new JsonObject();
             responseFormat.addProperty("type", "text");
             requestBody.add("response_format", responseFormat);
         }
-        Request request = new Request.Builder()
+        var request = new Request.Builder()
             .url(API_URL)
             .post(RequestBody.create(requestBody.toString(), JSON))
             .header("Authorization", "Bearer " + apiKey)
             .header("Content-Type", "application/json")
             .build();
-        try (Response response = client.newCall(request).execute()) {
+        try (var response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 int code = response.code();
-                String responseBody = response.body() != null ? response.body().string() : "";
-                
+                var responseBody = response.body() != null ? response.body().string() : "";
                 if (code == 401 || code == 403) {
                     throw new IOException("Authentication error: Invalid API key or insufficient permissions");
                 } else if (code == 429) {
@@ -194,16 +182,13 @@ public class OpenAIProvider implements AIProvider {
                 } else if (code == 500 || code == 502 || code == 503) {
                     throw new IOException("OpenAI service is currently unavailable: " + code);
                 } else {
-                    throw new IOException("OpenAI API error: " + code + " - " + response.message() + 
-                                         (responseBody.isEmpty() ? "" : " - " + responseBody));
+                    throw new IOException("OpenAI API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
                 }
             }
-            String responseBody = response.body().string();
-            JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+            var responseBody = response.body().string();
+            var jsonResponse = gson.fromJson(responseBody, JsonObject.class);
             if (jsonResponse.has("choices") && jsonResponse.getAsJsonArray("choices").size() > 0) {
-                return jsonResponse.getAsJsonArray("choices").get(0)
-                    .getAsJsonObject().getAsJsonObject("message")
-                    .get("content").getAsString().trim();
+                return jsonResponse.getAsJsonArray("choices").get(0).getAsJsonObject().getAsJsonObject("message").get("content").getAsString().trim();
             } else {
                 LOGGER.error("Unexpected OpenAI API response structure: {}", responseBody);
                 throw new IOException("Unexpected OpenAI API response structure");
@@ -221,7 +206,7 @@ public class OpenAIProvider implements AIProvider {
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {
-        StringBuilder key = new StringBuilder(prompt);
+        var key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
     }

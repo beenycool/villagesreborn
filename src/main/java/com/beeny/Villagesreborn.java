@@ -42,26 +42,25 @@ import java.util.stream.Collectors;
 import net.minecraft.structure.pool.StructurePool;
 
 public class Villagesreborn implements ModInitializer {
-    public static final String MOD_ID = "villagesreborn";
-    public static final String VERSION = "1.0.0";
+    public static final String MOD_ID = "villagesreborn", VERSION = "1.0.0";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static SystemSpecs systemSpecs;
-    private static VillagesConfig villagesConfig; // Changed type and name
+    private static VillagesConfig villagesConfig;
     private static Villagesreborn INSTANCE;
-    private final Map<BlockPos, Culture> villageMap = new ConcurrentHashMap<>();
-    private final Map<BlockPos, Integer> villageRadiusMap = new ConcurrentHashMap<>();
-    private final Map<BlockPos, Integer> villageEventsMap = new ConcurrentHashMap<>();
+    private final var villageMap = new ConcurrentHashMap<BlockPos, Culture>();
+    private final var villageRadiusMap = new ConcurrentHashMap<BlockPos, Integer>();
+    private final var villageEventsMap = new ConcurrentHashMap<BlockPos, Integer>();
     private static MinecraftServer serverInstance;
-    private static final Identifier ROMAN_HOUSE = Identifier.of(MOD_ID, "roman/house");
-    private static final Identifier ROMAN_FORUM = Identifier.of(MOD_ID, "roman/forum");
-    private static final Identifier EGYPTIAN_HOUSE = Identifier.of(MOD_ID, "egyptian/house");
-    private static final Identifier EGYPTIAN_TEMPLE = Identifier.of(MOD_ID, "egyptian/temple");
-    private static final Identifier VICTORIAN_HOUSE = Identifier.of(MOD_ID, "victorian/house");
-    private static final Identifier VICTORIAN_SQUARE = Identifier.of(MOD_ID, "victorian/square");
-    private static final Identifier NYC_APARTMENT = Identifier.of(MOD_ID, "nyc/apartment");
-    private static final Identifier NYC_SKYSCRAPER = Identifier.of(MOD_ID, "nyc/skyscraper");
+    private static final Identifier ROMAN_HOUSE = Identifier.of(MOD_ID, "roman/house"),
+            ROMAN_FORUM = Identifier.of(MOD_ID, "roman/forum"),
+            EGYPTIAN_HOUSE = Identifier.of(MOD_ID, "egyptian/house"),
+            EGYPTIAN_TEMPLE = Identifier.of(MOD_ID, "egyptian/temple"),
+            VICTORIAN_HOUSE = Identifier.of(MOD_ID, "victorian/house"),
+            VICTORIAN_SQUARE = Identifier.of(MOD_ID, "victorian/square"),
+            NYC_APARTMENT = Identifier.of(MOD_ID, "nyc/apartment"),
+            NYC_SKYSCRAPER = Identifier.of(MOD_ID, "nyc/skyscraper");
 
-    private final List<Float> tickTimes = new ArrayList<>();
+    private final var tickTimes = new ArrayList<Float>();
     private int pendingNetworkRequests = 0;
     private final Map<UUID, Map<String, Integer>> playerReputation = new ConcurrentHashMap<>();
 
@@ -77,79 +76,49 @@ public class Villagesreborn implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing Villages Reborn mod");
         INSTANCE = this;
-
         systemSpecs = new SystemSpecs();
         systemSpecs.analyzeSystem();
-
-        // Get the singleton instance of VillagesConfig
         villagesConfig = VillagesConfig.getInstance();
-        villagesConfig.load(); // Ensure config is loaded
-        
-        // Initialize LLMService with the loaded config
+        villagesConfig.load();
         LLMService.getInstance().initialize(villagesConfig);
-
         VillagerManager.getInstance();
         VillageCraftingManager.getInstance();
-
-        // Register Packet Types FIRST
-        registerPacketTypes(); // Added call
-
-        // Initialize our tick handlers for villager behavior execution
+        registerPacketTypes();
         VillagerWorldTickHandler.init();
         ServerTickHandler.init();
-
-        registerNetworkingHandlers(); // Renamed for clarity
+        registerNetworkingHandlers();
         VillageCraftingNetwork.registerServerHandlers();
         CulturalEventSystem.getInstance();
         ModCommands.register();
         VillagerEvents.registerTheftDetection();
-
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             serverInstance = server;
             VillagerManager.getInstance().setServer(server);
             LOGGER.info("Villages Reborn detected server start.");
         });
-
         // Keep for backward compatibility but our new tick handlers will handle this
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (serverInstance != null) {
-                // This will be handled by our specialized tick handlers
-                // VillagerManager.getInstance().updateVillagerActivities(server.getOverworld());
-
-                // Track tick time for performance monitoring
                 long startTime = System.nanoTime();
-                // Main update logic would go here
                 long endTime = System.nanoTime();
-                float tickTime = (endTime - startTime) / 1_000_000.0f; // Convert to milliseconds
+                float tickTime = (endTime - startTime) / 1_000_000.0f;
                 trackTickTime(tickTime);
             }
         });
-
         registerVillagerLoadCallback();
         registerPlayerDataEvents();
         registerStructureModifications();
         VillagesRebornStructures.registerStructures();
-
         LOGGER.info("Villages Reborn mod initialization complete");
     }
 
     private void trackTickTime(float tickTime) {
         tickTimes.add(tickTime);
-        // Keep only the last 100 tick times
-        if (tickTimes.size() > 100) {
-            tickTimes.remove(0);
-        }
+        if (tickTimes.size() > 100) tickTimes.remove(0);
     }
 
     public float getAverageTickTime() {
-        if (tickTimes.isEmpty()) {
-            return 0;
-        }
-        float sum = 0;
-        for (float time : tickTimes) {
-            sum += time;
-        }
-        return sum / tickTimes.size();
+        return tickTimes.isEmpty() ? 0 : (float) tickTimes.stream().mapToDouble(Float::doubleValue).average().orElse(0);
     }
 
     public int getTotalActiveEvents() {
@@ -167,55 +136,45 @@ public class Villagesreborn implements ModInitializer {
     }
 
     public void decrementPendingNetworkRequests() {
-        if (pendingNetworkRequests > 0) {
-            pendingNetworkRequests--;
-        }
+        if (pendingNetworkRequests > 0) pendingNetworkRequests--;
     }
 
-    public int getPlayerReputation(UUID playerUuid, String cultureId) {
+    public int getPlayerReputation(UUID playerId, String cultureId) {
         return playerReputation
-            .getOrDefault(playerUuid, new HashMap<>())
+            .getOrDefault(playerId, new HashMap<>())
             .getOrDefault(cultureId, 0);
     }
 
-    public void updatePlayerReputation(UUID playerUuid, String cultureId, int change) {
-        Map<String, Integer> reputations = playerReputation.computeIfAbsent(playerUuid, k -> new HashMap<>());
+    public void updatePlayerReputation(UUID playerId, String cultureId, int change) {
+        Map<String, Integer> reputations = playerReputation.computeIfAbsent(playerId, k -> new HashMap<>());
         int currentRep = reputations.getOrDefault(cultureId, 0);
         reputations.put(cultureId, Math.max(-100, Math.min(100, currentRep + change)));
     }
 
     private void registerPacketTypes() {
         LOGGER.info("Registering Villages Reborn packet types");
-
-        // S2C Payloads (Server -> Client)
         PayloadTypeRegistry.playS2C().register(VillagesNetwork.VILLAGE_INFO_ID_PAYLOAD, VillagesNetwork.VILLAGE_INFO_CODEC);
         PayloadTypeRegistry.playS2C().register(VillagesNetwork.EVENT_NOTIFICATION_ID_PAYLOAD, VillagesNetwork.EVENT_NOTIFICATION_CODEC);
         PayloadTypeRegistry.playS2C().register(VillagesNetwork.EVENT_UPDATE_ID_PAYLOAD, VillagesNetwork.EVENT_UPDATE_CODEC);
         PayloadTypeRegistry.playS2C().register(VillagesNetwork.VILLAGER_AI_STATE_ID_PAYLOAD, VillagesNetwork.VILLAGER_AI_STATE_CODEC);
         PayloadTypeRegistry.playS2C().register(VillagesClientNetwork.VILLAGER_CULTURE_ID_PAYLOAD, VillagesClientNetwork.VILLAGER_CULTURE_CODEC);
         PayloadTypeRegistry.playS2C().register(VillagesClientNetwork.VILLAGER_MOOD_ID_PAYLOAD, VillagesClientNetwork.VILLAGER_MOOD_CODEC);
-        // Add VillageCraftingNetwork S2C packets
         PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.RECIPE_LIST_ID, VillageCraftingNetwork.RECIPE_LIST_CODEC);
         PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_STATUS_ID, VillageCraftingNetwork.CRAFT_STATUS_CODEC);
         PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_PROGRESS_ID, VillageCraftingNetwork.CRAFT_PROGRESS_CODEC);
         PayloadTypeRegistry.playS2C().register(VillageCraftingNetwork.CRAFT_COMPLETE_ID, VillageCraftingNetwork.CRAFT_COMPLETE_CODEC);
-
-        // C2S Payloads (Client -> Server)
         PayloadTypeRegistry.playC2S().register(VillagesNetwork.REQUEST_VILLAGE_INFO_ID_PAYLOAD, VillagesNetwork.REQUEST_VILLAGE_INFO_CODEC);
         PayloadTypeRegistry.playC2S().register(VillagesNetwork.JOIN_EVENT_ID_PAYLOAD, VillagesNetwork.JOIN_EVENT_CODEC);
-        // Add VillageCraftingNetwork C2S packets
         PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.CRAFT_RECIPE_ID, VillageCraftingNetwork.CRAFT_RECIPE_CODEC);
         PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.REQUEST_RECIPES_ID, VillageCraftingNetwork.REQUEST_RECIPES_CODEC);
         PayloadTypeRegistry.playC2S().register(VillageCraftingNetwork.CANCEL_CRAFT_ID, VillageCraftingNetwork.CANCEL_CRAFT_CODEC);
-
         LOGGER.info("Packet types registered successfully");
     }
 
     private void registerNetworkingHandlers() {
         LOGGER.info("Registering networking handlers");
-        VillagesNetwork.registerServerHandlers(); // Register common server handlers
-        VillageCraftingNetwork.registerServerHandlers(); // Register crafting server handlers
-        // Client handlers are registered in VillagesrebornClient#onInitializeClient
+        VillagesNetwork.registerServerHandlers();
+        VillageCraftingNetwork.registerServerHandlers();
     }
 
     private void registerVillagerLoadCallback() {
@@ -224,9 +183,7 @@ public class Villagesreborn implements ModInitializer {
                 if (VillagerManager.getInstance().getVillagerAI(villager.getUuid()) == null) {
                     LOGGER.debug("Detected Villager load: {}", villager.getUuid());
                     if (serverInstance != null) {
-                        serverInstance.execute(() -> {
-                            VillagerManager.getInstance().onVillagerSpawn(villager, (ServerWorld) world);
-                        });
+                        serverInstance.execute(() -> VillagerManager.getInstance().onVillagerSpawn(villager, (ServerWorld) world));
                     } else {
                         LOGGER.warn("Server instance not available during villager load for {}", villager.getUuid());
                     }
@@ -241,16 +198,12 @@ public class Villagesreborn implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
             LOGGER.debug("Player joined: {}", player.getName().getString());
-            server.execute(() -> {
-                PlayerDataManager.getInstance().loadPlayerData(player);
-            });
+            server.execute(() -> PlayerDataManager.getInstance().loadPlayerData(player));
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
             LOGGER.debug("Player disconnected: {}", player.getName().getString());
-            server.execute(() -> {
-                PlayerDataManager.getInstance().savePlayerData(player);
-            });
+            server.execute(() -> PlayerDataManager.getInstance().savePlayerData(player));
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             LOGGER.info("Saving all player data before server stop");
@@ -270,48 +223,14 @@ public class Villagesreborn implements ModInitializer {
 
     private void registerStructureModifications() {
         LOGGER.info("Registering structure modifications...");
-        registerCultureStructures(
-            "plains",
-            BiomeSelectors.includeByKey(BiomeKeys.PLAINS, BiomeKeys.MEADOW, BiomeKeys.SUNFLOWER_PLAINS),
-            "roman",
-            Map.of(
-                ROMAN_HOUSE, 15,
-                ROMAN_FORUM, 8
-            )
-        );
-        registerCultureStructures(
-            "desert",
-            BiomeSelectors.includeByKey(BiomeKeys.DESERT, BiomeKeys.BADLANDS),
-            "egyptian",
-            Map.of(
-                EGYPTIAN_HOUSE, 15,
-                EGYPTIAN_TEMPLE, 7
-            )
-        );
-        registerCultureStructures(
-            "taiga",
-            BiomeSelectors.includeByKey(BiomeKeys.TAIGA, BiomeKeys.OLD_GROWTH_PINE_TAIGA, BiomeKeys.OLD_GROWTH_SPRUCE_TAIGA),
-            "victorian",
-            Map.of(
-                VICTORIAN_HOUSE, 15,
-                VICTORIAN_SQUARE, 8
-            )
-        );
-        registerCultureStructures(
-            "savanna",
-            BiomeSelectors.includeByKey(BiomeKeys.SAVANNA, BiomeKeys.SAVANNA_PLATEAU, BiomeKeys.WINDSWEPT_SAVANNA),
-            "nyc",
-            Map.of(
-                NYC_APARTMENT, 15,
-                NYC_SKYSCRAPER, 7
-            )
-        );
+        registerCultureStructures("plains", BiomeSelectors.includeByKey(BiomeKeys.PLAINS, BiomeKeys.MEADOW, BiomeKeys.SUNFLOWER_PLAINS), "roman", Map.of(ROMAN_HOUSE, 15, ROMAN_FORUM, 8));
+        registerCultureStructures("desert", BiomeSelectors.includeByKey(BiomeKeys.DESERT, BiomeKeys.BADLANDS), "egyptian", Map.of(EGYPTIAN_HOUSE, 15, EGYPTIAN_TEMPLE, 7));
+        registerCultureStructures("taiga", BiomeSelectors.includeByKey(BiomeKeys.TAIGA, BiomeKeys.OLD_GROWTH_PINE_TAIGA, BiomeKeys.OLD_GROWTH_SPRUCE_TAIGA), "victorian", Map.of(VICTORIAN_HOUSE, 15, VICTORIAN_SQUARE, 8));
+        registerCultureStructures("savanna", BiomeSelectors.includeByKey(BiomeKeys.SAVANNA, BiomeKeys.SAVANNA_PLATEAU, BiomeKeys.WINDSWEPT_SAVANNA), "nyc", Map.of(NYC_APARTMENT, 15, NYC_SKYSCRAPER, 7));
         LOGGER.info("Structure modifications registration complete.");
     }
 
-    private void registerCultureStructures(String vanillaType, 
-                                         java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector,
-                                         String cultureType, Map<Identifier, Integer> structures) {
+    private void registerCultureStructures(String vanillaType, java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType, Map<Identifier, Integer> structures) {
         // Register the culture-biome association for villager behavior
         VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
         

@@ -9,21 +9,15 @@ public class Relationship {
     
     public Relationship(RelationshipType type) {
         this.type = type;
-        this.establishedTime = System.currentTimeMillis();
-        this.interactionCount = 0;
+        establishedTime = System.currentTimeMillis();
+        interactionCount = 0;
     }
     
-    public RelationshipType getType() {
-        return type;
-    }
+    public RelationshipType getType() { return type; }
     
-    public long getEstablishedTime() {
-        return establishedTime;
-    }
+    public long getEstablishedTime() { return establishedTime; }
     
-    public int getInteractionCount() {
-        return interactionCount;
-    }
+    public int getInteractionCount() { return interactionCount; }
     
     public void incrementInteractions() {
         interactionCount++;

@@ -29,7 +29,7 @@ public class VillagerDialogue {
     }
 
     public CompletableFuture<String> generateBackstory() {
-        Map<String, String> context = new HashMap<>();
+        var context = new HashMap<String, String>();
         context.put("culture", cultureType);
         context.put("profession", profession);
         context.put("personality", String.join(", ", 
@@ -64,10 +64,10 @@ public class VillagerDialogue {
     }
 
     public CompletableFuture<String> generatePlayerInteraction(PlayerEntity player, String interactionType) {
-        List<VillagerMemory.Memory> relevantMemories = memory.getMemoriesInvolvingPlayer(player.getUuid());
+        var relevantMemories = memory.getMemoriesInvolvingPlayer(player.getUuid());
         float relationship = memory.getPlayerRelationship(player.getUuid());
 
-        Map<String, String> context = new HashMap<>();
+        var context = new HashMap<String, String>();
         context.put("player_name", player.getName().getString());
         context.put("relationship_level", String.format("%.2f", relationship));
         context.put("emotional_state", memory.getEmotionalState());
@@ -96,7 +96,7 @@ public class VillagerDialogue {
     }
 
     public CompletableFuture<String> generateQuestDialog(String questType, Map<String, String> questContext) {
-        Map<String, String> context = new HashMap<>();
+        var context = new HashMap<String, String>();
         context.put("quest_type", questType);
         context.put("culture", cultureType);
         context.put("profession", profession);
@@ -122,7 +122,7 @@ public class VillagerDialogue {
     }
 
     public CompletableFuture<String> generateEventNarration(String eventType, Map<String, String> eventContext) {
-        Map<String, String> context = new HashMap<>();
+        var context = new HashMap<String, String>();
         context.put("event_type", eventType);
         context.put("culture", cultureType);
         context.putAll(eventContext);

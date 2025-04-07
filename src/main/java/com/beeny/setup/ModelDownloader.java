@@ -75,11 +75,8 @@ public class ModelDownloader {
                     return;
                 }
 
-                try (InputStream in = response.body();
-                     OutputStream out = Files.newOutputStream(destination)) {
-                    long totalBytes = response.headers()
-                        .firstValueAsLong("Content-Length")
-                        .orElse(100_000_000L);
+                try (InputStream in = response.body(); OutputStream out = Files.newOutputStream(destination)) {
+                    long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(100_000_000L);
                     byte[] buffer = new byte[8192];
                     long downloadedBytes = 0;
                     int bytesRead;
@@ -152,8 +149,8 @@ public class ModelDownloader {
         } else {
             future.completeExceptionally(error);
             activeDownloads.remove(modelName);
-            MinecraftClient.getInstance().execute(() -> {
-                MinecraftClient.getInstance().setScreen(new Screen(Text.literal("Download Failed")) {
+            MinecraftClient.getInstance().execute(() -> MinecraftClient.getInstance().setScreen(
+                new Screen(Text.literal("Download Failed")) {
                     @Override
                     public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
                         super.render(context, mouseX, mouseY, delta);
@@ -163,8 +160,8 @@ public class ModelDownloader {
                             height / 2,
                             0xFFFFFF);
                     }
-                });
-            });
+                }
+            ));
         }
     }
 

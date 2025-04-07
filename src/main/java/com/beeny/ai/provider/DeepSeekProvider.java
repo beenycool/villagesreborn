@@ -40,10 +40,11 @@ public class DeepSeekProvider implements AIProvider {
         this.model = config.getOrDefault("model", "deepseek-1.0");
         if (apiKey == null || apiKey.isEmpty()) {
             String errorMsg = "DeepSeek provider initialization failed: missing API key";
-            LOGGER.error(errorMsg);
-            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, 
+            LOGGER.warn(errorMsg); // Log as warning instead of error
+            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
                 "Please provide a valid DeepSeek API key in the configuration.");
-            throw new IllegalArgumentException(errorMsg);
+            initialized = false; // Ensure provider is marked as not initialized
+            return; // Exit initialization early
         }
         initialized = true;
         LOGGER.info("DeepSeek provider initialized with model: {}", model);

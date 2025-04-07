@@ -170,7 +170,7 @@ public class VillagerManager {
             if (v1 == null || !v1.isAlive()) continue;
             int chunkX = v1.getBlockX() >> 4;
             int chunkZ = v1.getBlockZ() >> 4;
-            List<UUID> nearby = new ArrayList<>();
+            var nearby = new ArrayList<UUID>();
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     long adjacentChunk = (((long) (chunkX + dx)) << 32) | ((chunkZ + dz) & 0xFFFFFFFFL);
@@ -282,7 +282,7 @@ public class VillagerManager {
         long timeOfDay = world.getTimeOfDay();
         culturalEventLock.writeLock().lock();
         try {
-            List<String> expiredEvents = new ArrayList<>();
+            var expiredEvents = new ArrayList<String>();
             for (Map.Entry<String, CulturalEvent> entry : culturalEvents.entrySet()) {
                 if (timeOfDay > entry.getValue().startTime + entry.getValue().duration) {
                     expiredEvents.add(entry.getKey());
@@ -613,9 +613,9 @@ public class VillagerManager {
     private void positionVillagersForInteraction(VillagerEntity v1, VillagerEntity v2) {
         double dx = v2.getX() - v1.getX();
         double dz = v2.getZ() - v1.getZ();
-        float yaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) - 90.0F;
+        float yaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) - 90;
         v1.setYaw(yaw);
-        v2.setYaw(yaw + 180.0F);
+        v2.setYaw(yaw + 180);
         if (v1.squaredDistanceTo(v2) > 4.0) {
             v1.getNavigation().startMovingTo(v2.getX() + dx * 0.3, v2.getY(), v2.getZ() + dz * 0.3, 0.5D);
         }

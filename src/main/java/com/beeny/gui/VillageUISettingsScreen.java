@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class VillageUISettingsScreen extends Screen {
+    private static final int BUTTON_WIDTH = 200, BUTTON_HEIGHT = 20, LABEL_WIDTH = 100;
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final Screen parent;
     private final VillagesConfig.UISettings uiSettings;
@@ -32,11 +33,11 @@ public class VillageUISettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        int buttonWidth = 200;
-        int buttonHeight = 20;
+        int buttonWidth = BUTTON_WIDTH;
+        int buttonHeight = BUTTON_HEIGHT;
         int centerX = this.width / 2 - buttonWidth / 2;
         int startY = 40;
-        int labelWidth = 100;
+        int labelWidth = LABEL_WIDTH;
         
         // Label format field
         this.labelFormatField = new TextFieldWidget(
@@ -121,8 +122,8 @@ public class VillageUISettingsScreen extends Screen {
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
         
         // Draw labels for all fields
-        int buttonWidth = 200;
-        int labelWidth = 100;
+        int buttonWidth = BUTTON_WIDTH;
+        int labelWidth = LABEL_WIDTH;
         int centerX = this.width / 2 - buttonWidth / 2;
         int startY = 40;
         

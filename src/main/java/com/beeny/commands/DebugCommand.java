@@ -1,4 +1,4 @@
-hpackage com.beeny.commands;
+package com.beeny.commands;
 
 import com.beeny.Villagesreborn;
 import com.beeny.ai.LLMService;

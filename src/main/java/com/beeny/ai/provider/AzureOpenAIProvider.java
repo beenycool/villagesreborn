@@ -99,22 +99,20 @@ public class AzureOpenAIProvider implements AIProvider {
 
     private String callAzureOpenAI(String prompt, Map<String, String> context) {
         try {
-            List<ChatMessage> messages = new ArrayList<>();
+            var messages = new ArrayList<ChatMessage>();
             if (context != null && !context.isEmpty()) {
-                StringBuilder systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
-                context.forEach((key, value) -> {
-                    if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append(".");
-                });
+                var systemContent = new StringBuilder("You are a helpful assistant for a Minecraft villager AI.");
+                context.forEach((key, value) -> { if (value != null && !value.isEmpty()) systemContent.append(" ").append(key).append(": ").append(value).append("."); });
                 messages.add(new ChatMessage(ChatRole.SYSTEM, systemContent.toString()));
             }
             messages.add(new ChatMessage(ChatRole.USER, prompt));
-            ChatCompletionsOptions options = new ChatCompletionsOptions(messages);
+            var options = new ChatCompletionsOptions(messages);
             options.setMaxTokens(300);
             options.setTemperature(0.7);
             options.setModel(modelName);
-            ChatCompletions completions = client.getChatCompletions(modelName, options);
+            var completions = client.getChatCompletions(modelName, options);
             if (completions != null && !completions.getChoices().isEmpty()) {
-                ChatChoice choice = completions.getChoices().get(0);
+                var choice = completions.getChoices().get(0);
                 return choice.getMessage().getContent();
             } else {
                 LOGGER.warn("Empty response received from Azure OpenAI");
@@ -146,7 +144,7 @@ public class AzureOpenAIProvider implements AIProvider {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                List<ChatMessage> messages = new ArrayList<>();
+                var messages = new ArrayList<ChatMessage>();
                 messages.add(new ChatMessage(ChatRole.USER, "Validation ping"));
                 ChatCompletionsOptions options = new ChatCompletionsOptions(messages);
                 options.setMaxTokens(1);
@@ -184,7 +182,7 @@ public class AzureOpenAIProvider implements AIProvider {
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {
-        StringBuilder key = new StringBuilder(prompt);
+        var key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
     }

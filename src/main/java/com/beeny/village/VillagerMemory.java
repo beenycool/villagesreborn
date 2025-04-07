@@ -46,22 +46,16 @@ public class VillagerMemory {
         
         public Memory(String description, MemoryType type, float importance) {
             this.description = description;
-            this.timestamp = System.currentTimeMillis();
+            timestamp = System.currentTimeMillis();
             this.type = type;
             this.importance = importance;
-            this.associatedPlayerId = null;
-            this.additionalData = new HashMap<>();
+            associatedPlayerId = null;
+            additionalData = new HashMap<>();
         }
         
-        public Memory withPlayer(UUID playerId) {
-            this.associatedPlayerId = playerId;
-            return this;
-        }
+        public Memory withPlayer(UUID playerId) { this.associatedPlayerId = playerId; return this; }
         
-        public Memory withData(String key, Object value) {
-            additionalData.put(key, value);
-            return this;
-        }
+        public Memory withData(String key, Object value) { additionalData.put(key, value); return this; }
         
         public String getDescription() { return description; }
         public long getTimestamp() { return timestamp; }
@@ -70,11 +64,8 @@ public class VillagerMemory {
         public UUID getAssociatedPlayerId() { return associatedPlayerId; }
         public Object getData(String key) { return additionalData.get(key); }
         
-        public void decayImportance(float rate) {
-            importance = Math.max(0.01f, importance - rate);
-        }
+        public void decayImportance(float rate) { importance = Math.max(0.01f, importance - rate); }
         
-        // Sort memories by importance (descending)
         @Override
         public int compareTo(Memory other) {
             return Float.compare(other.importance, this.importance);

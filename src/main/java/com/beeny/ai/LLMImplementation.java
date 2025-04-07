@@ -23,7 +23,7 @@ public class LLMImplementation {
     private final TTLCache responseCache;
 
     public LLMImplementation() {
-        VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
+        var settings = VillagesConfig.getInstance().getLLMSettings();
         this.client = new OpenAIClientBuilder()
             .credential(new AzureKeyCredential(settings.getApiKey()))
             .endpoint(settings.getEndpoint())
@@ -32,7 +32,7 @@ public class LLMImplementation {
     }
 
     public CompletableFuture<String> generateResponse(String prompt, Map<String, String> context) {
-        String cacheKey = generateCacheKey(prompt, context); VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
+        var cacheKey = generateCacheKey(prompt, context); var settings = VillagesConfig.getInstance().getLLMSettings();
         String cachedResponse = responseCache.get(cacheKey);
         if (cachedResponse != null) return CompletableFuture.completedFuture(cachedResponse);
         CompletableFuture<String> future = new CompletableFuture<>();
@@ -54,7 +54,7 @@ public class LLMImplementation {
     private String callLLMWithRetry(String prompt, Map<String, String> context, int retryCount) throws Exception {
         VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();
         try {
-            List<ChatMessage> messages = new ArrayList<>();
+            var messages = new ArrayList<ChatMessage>();
             messages.add(new ChatMessage(ChatRole.SYSTEM, getSystemPrompt(context)));
             messages.add(new ChatMessage(ChatRole.USER, prompt));
             ChatCompletions completions = client.getChatCompletions(
@@ -75,22 +75,20 @@ public class LLMImplementation {
     }
 
     private String getSystemPrompt(Map<String, String> context) {
-        StringBuilder systemPrompt = new StringBuilder();
-        systemPrompt.append("You are an AI assistant specialized in generating content for a Minecraft village mod.\n");
-        systemPrompt.append("Generate specific, practical responses that can be implemented in Minecraft.\n");
-        systemPrompt.append("Consider available blocks, game mechanics, and maintain cultural authenticity.\n");
-        systemPrompt.append("Keep responses concise and focused on the requested format.\n\n");
+        var systemPrompt = new StringBuilder()
+            .append("You are an AI assistant specialized in generating content for a Minecraft village mod.\n")
+            .append("Generate specific, practical responses that can be implemented in Minecraft.\n")
+            .append("Consider available blocks, game mechanics, and maintain cultural authenticity.\n")
+            .append("Keep responses concise and focused on the requested format.\n\n");
         if (!context.isEmpty()) {
             systemPrompt.append("Current context:\n");
-            context.forEach((key, value) -> 
-                systemPrompt.append("- ").append(key).append(": ").append(value).append("\n")
-            );
+            context.forEach((key, value) -> systemPrompt.append("- ").append(key).append(": ").append(value).append("\n"));
         }
         return systemPrompt.toString();
     }
 
     private String generateCacheKey(String prompt, Map<String, String> context) {
-        StringBuilder key = new StringBuilder(prompt);
+        var key = new StringBuilder(prompt);
         context.forEach((k, v) -> key.append("|").append(k).append("=").append(v));
         return key.toString();
     }
@@ -111,7 +109,7 @@ public class LLMImplementation {
     }
 
     private class TTLCache {
-        private final Map<String, CacheEntry> cache = new LinkedHashMap<String, CacheEntry>(16, 0.75f, true) {
+        private final Map<String, CacheEntry> cache = new LinkedHashMap<>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
                 VillagesConfig.LLMSettings settings = VillagesConfig.getInstance().getLLMSettings();

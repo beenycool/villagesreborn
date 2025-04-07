@@ -219,7 +219,7 @@ public class LLMService {
             try {
                 currentProvider.initialize(providerConfig);
                 LOGGER.info("Switched to provider: {}", currentProvider.getName());
-                testConnection();
+                // testConnection(); // Removed: Connection test should be triggered explicitly by UI if needed
                 return true;
             } catch (Exception e) {
                 LOGGER.error("Failed to initialize provider: {}", providerName, e);

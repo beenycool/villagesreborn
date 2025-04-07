@@ -36,11 +36,11 @@ public class MoodManager {
     }
 
     public void updateVillagerMood(VillagerAI villagerAI, ServerWorld world) {
-        UUID villagerUUID = villagerAI.getVillager().getUuid();
-        MoodStats stats = moodStats.computeIfAbsent(villagerUUID, k -> new MoodStats());
-        VillagerManager vm = VillagerManager.getInstance();
+        var villagerUUID = villagerAI.getVillager().getUuid();
+        var stats = moodStats.computeIfAbsent(villagerUUID, k -> new MoodStats());
+        var vm = VillagerManager.getInstance();
 
-        String prompt = String.format(
+        var prompt = String.format(
             "Analyze this villager's current state and determine their mood:\n" +
             "- Personality: %s\n" +
             "- Current activity: %s\n" +
@@ -52,18 +52,14 @@ public class MoodManager {
             villagerAI.getPersonality(),
             villagerAI.getCurrentActivity(),
             villagerAI.getSocialSummary(),
-            getLastDangerTick(villagerUUID, world.getTime()).map(time -> 
-                String.format("Danger experienced %d ticks ago", world.getTime() - time))
-                .orElse("No recent dangers"),
-            vm.getCurrentEvents(villagerAI.getVillager().getBlockPos(), world).stream()
-                .map(e -> e.name)
-                .collect(Collectors.joining(", "))
+            getLastDangerTick(villagerUUID, world.getTime()).map(time -> String.format("Danger experienced %d ticks ago", world.getTime() - time)).orElse("No recent dangers"),
+            vm.getCurrentEvents(villagerAI.getVillager().getBlockPos(), world).stream().map(e -> e.name).collect(Collectors.joining(", "))
         );
 
         LLMService.getInstance()
             .generateResponse(prompt)
             .thenAccept(response -> {
-                Map<String, Integer> values = parseMoodResponse(response);
+                var values = parseMoodResponse(response);
                 
                 stats.baseHappiness = values.getOrDefault("BASE_HAPPINESS", 50);
                 stats.socialBonus = values.getOrDefault("SOCIAL_BONUS", 0);
@@ -71,11 +67,7 @@ public class MoodManager {
                 stats.safetyBonus = values.getOrDefault("SAFETY_BONUS", 0);
                 stats.eventBonus = values.getOrDefault("EVENT_BONUS", 0);
                 
-                int totalMood = stats.baseHappiness + 
-                               stats.socialBonus + 
-                               stats.prosperityBonus + 
-                               stats.safetyBonus + 
-                               stats.eventBonus;
+                int totalMood = stats.baseHappiness + stats.socialBonus + stats.prosperityBonus + stats.safetyBonus + stats.eventBonus;
                                
                 villagerAI.setHappiness(Math.max(0, Math.min(100, totalMood)));
                 moodModifiers.put(villagerUUID, totalMood - stats.baseHappiness);
@@ -83,10 +75,7 @@ public class MoodManager {
                 // Generate mood-specific behavior if mood changed significantly
                 int previousMood = villagerAI.getHappiness();
                 if (Math.abs(totalMood - previousMood) > 20) {
-                    String situation = String.format("Feeling %s after mood change from %d to %d",
-                        getMoodDescription(totalMood),
-                        previousMood,
-                        totalMood);
+                    var situation = String.format("Feeling %s after mood change from %d to %d", getMoodDescription(totalMood), previousMood, totalMood);
                     villagerAI.generateBehavior(situation);
                 }
             })
@@ -135,18 +124,14 @@ public class MoodManager {
 
     public void reportDanger(UUID villagerUUID, ServerWorld world) {
         lastDangerTick.put(villagerUUID, world.getTime());
-        
-        // Generate danger response behavior
-        VillagerManager vm = VillagerManager.getInstance();
-        VillagerAI endangeredVillager = vm.getVillagerAI(villagerUUID);
+        var vm = VillagerManager.getInstance();
+        var endangeredVillager = vm.getVillagerAI(villagerUUID);
         
         if (endangeredVillager != null) {
-            String situation = "Reacting to immediate danger";
+            var situation = "Reacting to immediate danger";
             endangeredVillager.generateBehavior(situation)
                 .thenAccept(behavior -> {
-                    LOGGER.info("Villager {} reacts to danger: {}", 
-                        endangeredVillager.getVillager().getName().getString(),
-                        behavior);
+                    LOGGER.info("Villager {} reacts to danger: {}", endangeredVillager.getVillager().getName().getString(), behavior);
                 });
 
             // Propagate danger awareness to nearby villagers
@@ -155,8 +140,7 @@ public class MoodManager {
                 .forEach(ai -> {
                     lastDangerTick.put(ai.getVillager().getUuid(), world.getTime());
                     
-                    String nearbySituation = String.format("Reacting to danger near %s",
-                        endangeredVillager.getVillager().getName().getString());
+                    var nearbySituation = String.format("Reacting to danger near %s", endangeredVillager.getVillager().getName().getString());
                     ai.generateBehavior(nearbySituation);
                 });
         }

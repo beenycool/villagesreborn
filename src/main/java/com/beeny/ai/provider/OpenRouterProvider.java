@@ -58,19 +58,18 @@ public class OpenRouterProvider implements AIProvider {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                JsonObject requestBody = new JsonObject();
+                var requestBody = new JsonObject();
                 requestBody.addProperty("model", model);
                 
-                JsonArray messages = new JsonArray();
-                
+                var messages = new JsonArray();
                 if (context.containsKey("system_prompt")) {
-                    JsonObject systemMessage = new JsonObject();
+                    var systemMessage = new JsonObject();
                     systemMessage.addProperty("role", "system");
                     systemMessage.addProperty("content", context.get("system_prompt"));
                     messages.add(systemMessage);
                 }
                 
-                JsonObject userMessage = new JsonObject();
+                var userMessage = new JsonObject();
                 userMessage.addProperty("role", "user");
                 userMessage.addProperty("content", prompt);
                 messages.add(userMessage);
@@ -79,8 +78,8 @@ public class OpenRouterProvider implements AIProvider {
                 requestBody.addProperty("temperature", 0.7);
                 requestBody.addProperty("max_tokens", getMaxTokensForModel(model));
                 
-                RequestBody body = RequestBody.create(requestBody.toString(), JSON);
-                Request request = new Request.Builder()
+                var body = RequestBody.create(requestBody.toString(), JSON);
+                var request = new Request.Builder()
                     .url(API_URL)
                     .post(body)
                     .addHeader("Authorization", "Bearer " + apiKey)
@@ -88,12 +87,10 @@ public class OpenRouterProvider implements AIProvider {
                     .addHeader("X-Title", "Villagesreborn Minecraft Mod")
                     .build();
 
-                try (Response response = client.newCall(request).execute()) {
+                try (var response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) {
                         int code = response.code();
-                        String responseBody = response.body() != null ? response.body().string() : "";
-                        
-                        // Generate more helpful error messages based on status code
+                        var responseBody = response.body() != null ? response.body().string() : "";
                         if (code == 401 || code == 403) {
                             throw new IOException("Authentication error: Invalid OpenRouter API key or insufficient permissions");
                         } else if (code == 429) {
@@ -101,19 +98,12 @@ public class OpenRouterProvider implements AIProvider {
                         } else if (code >= 500) {
                             throw new IOException("OpenRouter service is currently unavailable: " + code);
                         } else {
-                            throw new IOException("OpenRouter API error: " + code + " - " + response.message() + 
-                                                (responseBody.isEmpty() ? "" : " - " + responseBody));
+                            throw new IOException("OpenRouter API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
                         }
                     }
-                    
-                    String responseBody = response.body().string();
-                    JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
-                    String generatedText = jsonResponse.getAsJsonArray("choices")
-                        .get(0).getAsJsonObject()
-                        .getAsJsonObject("message")
-                        .get("content").getAsString();
-                    
-                    return generatedText;
+                    var responseBody = response.body().string();
+                    var jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
+                    return jsonResponse.getAsJsonArray("choices").get(0).getAsJsonObject().getAsJsonObject("message").get("content").getAsString();
                 }
             } catch (Exception e) {
                 LOGGER.error("Error generating response from OpenRouter", e);
@@ -145,42 +135,34 @@ public class OpenRouterProvider implements AIProvider {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 // Minimal validation request
-                JsonObject requestBody = new JsonObject();
+                var requestBody = new JsonObject();
                 requestBody.addProperty("model", model);
-                JsonArray messages = new JsonArray();
-                JsonObject message = new JsonObject();
+                var messages = new JsonArray();
+                var message = new JsonObject();
                 message.addProperty("role", "user");
                 message.addProperty("content", "Validation ping");
                 messages.add(message);
                 requestBody.add("messages", messages);
                 requestBody.addProperty("max_tokens", 1);
 
-                Request request = new Request.Builder()
+                var request = new Request.Builder()
                     .url(API_URL)
                     .post(RequestBody.create(requestBody.toString(), JSON))
                     .addHeader("Authorization", "Bearer " + apiKey)
                     .build();
 
-                try (Response response = client.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        return true;
+                try (var response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) return true;
+                    int statusCode = response.code();
+                    var body = response.body() != null ? response.body().string() : "";
+                    if (statusCode == 401 || statusCode == 403) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "OpenRouter rejected your API key. Please check it is correct.");
+                    } else if (statusCode == 429) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "OpenRouter API rate limit exceeded. Please try again later.");
                     } else {
-                        int statusCode = response.code();
-                        String body = response.body() != null ? response.body().string() : "";
-                        
-                        // Handle specific error codes
-                        if (statusCode == 401 || statusCode == 403) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY,
-                                "OpenRouter rejected your API key. Please check it is correct.");
-                        } else if (statusCode == 429) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT,
-                                "OpenRouter API rate limit exceeded. Please try again later.");
-                        } else {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR,
-                                "OpenRouter API error: " + statusCode + " - " + body);
-                        }
-                        return false;
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "OpenRouter API error: " + statusCode + " - " + body);
                     }
+                    return false;
                 }
             } catch (IOException e) {
                 LOGGER.error("Error validating OpenRouter access", e);

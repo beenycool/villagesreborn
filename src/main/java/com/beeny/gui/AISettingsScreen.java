@@ -117,8 +117,8 @@ public class AISettingsScreen extends Screen {
         // Model Selection (Only in Dev Mode - simplified view might just use provider default)
         if (devMode) {
             modelButton = CyclingButtonWidget.<String>builder(Text::literal)
-                .values(new ArrayList<String>()) // Start with empty list
-                .initially("") // Start with empty selection
+                .values(List.of("(Select Provider)")) // Provide a placeholder value initially
+                .initially("(Select Provider)") // Set initial value to the placeholder
                 .tooltip(value -> Tooltip.of(Text.literal("Select the specific AI model to use (updates with provider)")))
                 .build(fieldX - labelWidth - 5, y, buttonWidth, 20, Text.literal("Model"));
             this.addDrawableChild(modelButton);
@@ -297,7 +297,7 @@ public class AISettingsScreen extends Screen {
         } else {
             // Reset non-dev settings to defaults or clear them if desired when saving in simple mode
             // llmSettings.setEndpoint("");
-            // llmSettings.setModelType(""); // Or provider default
+            llmSettings.setModelType(null); // Set to null so provider uses default when not in dev mode
             // llmSettings.setContextLength(default);
             // llmSettings.setTemperature(default);
             // llmSettings.setAdvancedConversationsEnabled(false);
@@ -315,12 +315,6 @@ public class AISettingsScreen extends Screen {
         this.client.setScreen(parent);
    }
 
-   /** Helper to re-initialize screen elements */
-   protected void clearAndInit() { // Changed to protected
-       // Optional: Store scroll position if applicable
-       this.init(this.client, this.width, this.height);
-       // Optional: Restore scroll position
-   }
 
    /**
     * Updates the model selection button based on the chosen provider.
@@ -431,9 +425,9 @@ public class AISettingsScreen extends Screen {
             this.previousDevModeState = developerModeButton.getValue(); // Update previous state
             // Original callback logic:
             llmSettings.setDeveloperModeEnabled(this.previousDevModeState);
-            this.clearAndInit(); // Re-initialize the screen layout
-            // Need to return here because clearAndInit rebuilds everything, including providerButton
-            return;
+            // Re-create the screen entirely to reflect the mode change
+            this.client.setScreen(new AISettingsScreen(this.parent));
+            return; // Exit tick early as the screen is being replaced
         }
 
         // Check Provider Button state change (only if clearAndInit wasn't called)

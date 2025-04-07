@@ -28,7 +28,6 @@ public class VillagerDialogueScreen extends Screen {
 
     @Override
     protected void init() {
-        // Add input field at the bottom
         inputField = new TextFieldWidget(
             this.textRenderer,
             width / 4,
@@ -39,10 +38,8 @@ public class VillagerDialogueScreen extends Screen {
         );
         inputField.setMaxLength(256);
         addDrawableChild(inputField);
-
-        // Add scroll buttons if needed
         if (conversation.size() * LINE_HEIGHT > height - 80) {
-            ButtonWidget scrollUpButton = ButtonWidget.builder(Text.literal("↑"), button -> {
+            var scrollUpButton = ButtonWidget.builder(Text.literal("↑"), button -> {
                 if (scrollOffset > 0) scrollOffset--;
             })
             .dimensions(width / 2 + width / 4 + 10, height / 2 - 40, 20, 20)

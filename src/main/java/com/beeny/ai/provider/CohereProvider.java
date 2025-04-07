@@ -67,9 +67,9 @@ public class CohereProvider implements AIProvider {
     }
 
     private String callCohereApi(String prompt, Map<String, String> context) throws IOException {
-        JsonObject reqBody = new JsonObject();
-        String sysPrompt = context.getOrDefault("system_prompt", "");
-        String fullPrompt = sysPrompt.isEmpty() ? prompt : sysPrompt + "\n\n" + prompt;
+        var reqBody = new JsonObject();
+        var sysPrompt = context.getOrDefault("system_prompt", "");
+        var fullPrompt = sysPrompt.isEmpty() ? prompt : sysPrompt + "\n\n" + prompt;
         reqBody.addProperty("model", model);
         reqBody.addProperty("prompt", fullPrompt);
         reqBody.addProperty("max_tokens", 1024);
@@ -77,12 +77,12 @@ public class CohereProvider implements AIProvider {
         reqBody.addProperty("k", 0);
         reqBody.addProperty("stop_sequences", "");
         reqBody.addProperty("return_likelihoods", "NONE");
-        RequestBody body = RequestBody.create(reqBody.toString(), JSON);
-        Request request = new Request.Builder().url(API_URL).post(body).addHeader("Authorization", "Bearer " + apiKey).addHeader("Content-Type", "application/json").build();
-        try (Response response = client.newCall(request).execute()) {
+        var body = RequestBody.create(reqBody.toString(), JSON);
+        var request = new Request.Builder().url(API_URL).post(body).addHeader("Authorization", "Bearer " + apiKey).addHeader("Content-Type", "application/json").build();
+        try (var response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 int code = response.code();
-                String responseBody = response.body() != null ? response.body().string() : "";
+                var responseBody = response.body() != null ? response.body().string() : "";
                 if (code == 401 || code == 403) {
                     throw new IOException("Authentication error: Invalid Cohere API key or insufficient permissions");
                 } else if (code == 429) {
@@ -93,8 +93,8 @@ public class CohereProvider implements AIProvider {
                     throw new IOException("Cohere API error: " + code + " - " + response.message() + (responseBody.isEmpty() ? "" : " - " + responseBody));
                 }
             }
-            String responseBody = response.body().string();
-            JsonObject jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
+            var responseBody = response.body().string();
+            var jsonResponse = new com.google.gson.JsonParser().parse(responseBody).getAsJsonObject();
             return jsonResponse.get("generations").getAsJsonArray().get(0).getAsJsonObject().get("text").getAsString().trim();
         }
     }
@@ -106,27 +106,24 @@ public class CohereProvider implements AIProvider {
         }
         return CompletableFuture.supplyAsync(() -> {
             try {
-                JsonObject reqBody = new JsonObject();
+                var reqBody = new JsonObject();
                 reqBody.addProperty("model", model);
                 reqBody.addProperty("prompt", "Validation ping");
                 reqBody.addProperty("max_tokens", 1);
                 reqBody.addProperty("temperature", 0.0);
-                Request request = new Request.Builder().url(API_URL).post(RequestBody.create(reqBody.toString(), JSON)).addHeader("Authorization", "Bearer " + apiKey).addHeader("Content-Type", "application/json").build();
-                try (Response response = client.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        return true;
+                var request = new Request.Builder().url(API_URL).post(RequestBody.create(reqBody.toString(), JSON)).addHeader("Authorization", "Bearer " + apiKey).addHeader("Content-Type", "application/json").build();
+                try (var response = client.newCall(request).execute()) {
+                    if (response.isSuccessful()) return true;
+                    int statusCode = response.code();
+                    var body = response.body() != null ? response.body().string() : "";
+                    if (statusCode == 401 || statusCode == 403) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "Cohere rejected your API key. Please check it is correct.");
+                    } else if (statusCode == 429) {
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "Cohere API rate limit exceeded. Please try again later.");
                     } else {
-                        int statusCode = response.code();
-                        String body = response.body() != null ? response.body().string() : "";
-                        if (statusCode == 401 || statusCode == 403) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.INVALID_API_KEY, "Cohere rejected your API key. Please check it is correct.");
-                        } else if (statusCode == 429) {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.API_RATE_LIMIT, "Cohere API rate limit exceeded. Please try again later.");
-                        } else {
-                            errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "Cohere API error: " + statusCode + " - " + body);
-                        }
-                        return false;
+                        errorHandler.reportErrorToClient(LLMErrorHandler.ErrorType.PROVIDER_ERROR, "Cohere API error: " + statusCode + " - " + body);
                     }
+                    return false;
                 }
             } catch (IOException e) {
                 LOGGER.error("Error validating Cohere access", e);
