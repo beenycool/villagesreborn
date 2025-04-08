@@ -601,70 +601,71 @@ public class VillagesConfig {
         public void togglePlayerReputationAffectsEvents() {
             this.playerReputationAffectsEvents = !this.playerReputationAffectsEvents;
         }
-    }
-
-    // Added getters/setters/togglers for fields moved from ConfigData
-    public boolean isVillagerPvPEnabled() {
-        return villagerPvPEnabled;
-    }
-
-    public void toggleVillagerPvP() {
-        this.villagerPvPEnabled = !this.villagerPvPEnabled;
-    }
+        
+        // --- Gameplay Settings Getters/Setters/Togglers ---
+        
+        public boolean isVillagerPvPEnabled() {
+            return villagerPvPEnabled;
+        }
     
-    public void setVillagerPvPEnabled(boolean enabled) { // Added explicit setter
-         this.villagerPvPEnabled = enabled;
-    }
-
-    public boolean isTheftDetectionEnabled() {
-        return theftDetectionEnabled;
-    }
-
-    public void toggleTheftDetection() {
-        this.theftDetectionEnabled = !this.theftDetectionEnabled;
-    }
+        public void toggleVillagerPvP() {
+            this.villagerPvPEnabled = !this.villagerPvPEnabled;
+        }
+        
+        public void setVillagerPvPEnabled(boolean enabled) { // Added explicit setter
+             this.villagerPvPEnabled = enabled;
+        }
     
-    public void setTheftDetectionEnabled(boolean enabled) { // Added explicit setter
-         this.theftDetectionEnabled = enabled;
-    }
-
-    public int getVillagerMemoryDuration() {
-        return villagerMemoryDuration;
-    }
-
-    public void setVillagerMemoryDuration(int days) {
-        this.villagerMemoryDuration = Math.max(1, Math.min(7, days));
-    }
-
-    public boolean isVillagerTradingBoostEnabled() {
-        return villagerTradingBoostEnabled;
-    }
-
-    public void toggleVillagerTradingBoost() {
-        this.villagerTradingBoostEnabled = !this.villagerTradingBoostEnabled;
-    }
+        public boolean isTheftDetectionEnabled() {
+            return theftDetectionEnabled;
+        }
     
-    public void setVillagerTradingBoostEnabled(boolean enabled) { // Added explicit setter
-         this.villagerTradingBoostEnabled = enabled;
-    }
-
-    public boolean isUniqueCraftingRecipesEnabled() {
-        return uniqueCraftingRecipesEnabled;
-    }
-
-    public void toggleUniqueCraftingRecipes() {
-        this.uniqueCraftingRecipesEnabled = !this.uniqueCraftingRecipesEnabled;
-    }
+        public void toggleTheftDetection() {
+            this.theftDetectionEnabled = !this.theftDetectionEnabled;
+        }
+        
+        public void setTheftDetectionEnabled(boolean enabled) { // Added explicit setter
+             this.theftDetectionEnabled = enabled;
+        }
     
-    public void setUniqueCraftingRecipesEnabled(boolean enabled) { // Added explicit setter
-         this.uniqueCraftingRecipesEnabled = enabled;
-    }
-
-    public int getCulturalGiftModifier() {
-        return culturalGiftModifier;
-    }
-
-    public void setCulturalGiftModifier(int percentage) {
-        this.culturalGiftModifier = Math.max(50, Math.min(200, percentage));
+        public int getVillagerMemoryDuration() {
+            return villagerMemoryDuration;
+        }
+    
+        public void setVillagerMemoryDuration(int days) {
+            this.villagerMemoryDuration = Math.max(1, Math.min(7, days));
+        }
+    
+        public boolean isVillagerTradingBoostEnabled() {
+            return villagerTradingBoostEnabled;
+        }
+    
+        public void toggleVillagerTradingBoost() {
+            this.villagerTradingBoostEnabled = !this.villagerTradingBoostEnabled;
+        }
+        
+        public void setVillagerTradingBoostEnabled(boolean enabled) { // Added explicit setter
+             this.villagerTradingBoostEnabled = enabled;
+        }
+    
+        public boolean isUniqueCraftingRecipesEnabled() {
+            return uniqueCraftingRecipesEnabled;
+        }
+    
+        public void toggleUniqueCraftingRecipes() {
+            this.uniqueCraftingRecipesEnabled = !this.uniqueCraftingRecipesEnabled;
+        }
+        
+        public void setUniqueCraftingRecipesEnabled(boolean enabled) { // Added explicit setter
+             this.uniqueCraftingRecipesEnabled = enabled;
+        }
+    
+        public int getCulturalGiftModifier() {
+            return culturalGiftModifier;
+        }
+    
+        public void setCulturalGiftModifier(int percentage) {
+            this.culturalGiftModifier = Math.max(50, Math.min(200, percentage));
+        }
     }
 }

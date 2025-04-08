@@ -322,7 +322,7 @@ public class ClothConfigProvider {
                 llm.getProvider())
                 .setDefaultValue("deepseek")
                 .setTooltip(Text.literal("Select the AI service provider"))
-                .setSaveConsumer(llm::setProvider) // Use direct setter from LLMSettings
+                .setSaveConsumer(value -> llm.setProvider((String) value)) // Cast selected object to String
                 .build());
         
         // API Key
