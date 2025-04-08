@@ -2,6 +2,7 @@ package com.beeny.ai.provider;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.beeny.config.VillagesConfig; // Added import
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +77,9 @@ public class OpenRouterProvider implements AIProvider {
                 
                 requestBody.add("messages", messages);
                 requestBody.addProperty("temperature", 0.7);
-                requestBody.addProperty("max_tokens", getMaxTokensForModel(model));
+                // Use max_tokens from config instead of hardcoded values
+                int maxTokens = VillagesConfig.getInstance().getLLMSettings().getMaxTokens();
+                requestBody.addProperty("max_tokens", Math.max(10, maxTokens)); // Ensure a minimum value
                 
                 var body = RequestBody.create(requestBody.toString(), JSON);
                 var request = new Request.Builder()
@@ -173,14 +176,7 @@ public class OpenRouterProvider implements AIProvider {
         });
     }
 
-    private int getMaxTokensForModel(String model) {
-        return switch (model) {
-            case "openrouter/command-r" -> 4096;
-            case "openrouter/solar" -> 8192;
-            case "openrouter/neural-chat" -> 4096;
-            default -> 4096;
-        };
-    }
+    // Removed unused getMaxTokensForModel method
 
     @Override
     public boolean isAvailable() {

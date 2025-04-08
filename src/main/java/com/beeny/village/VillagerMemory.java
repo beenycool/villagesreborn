@@ -1,8 +1,8 @@
 package com.beeny.village;
 
+import com.beeny.config.VillagesConfig; // Added import
 import net.minecraft.entity.player.PlayerEntity;
 import java.util.*;
-
 public class VillagerMemory {
     private static final int MAX_MEMORIES = 20;
     private static final float MEMORY_DECAY_RATE = 0.05f;
@@ -229,10 +229,16 @@ public class VillagerMemory {
     }
 
     public void updateMemories() {
+        // Get memory duration from config (in days) and convert to milliseconds
+        int memoryDurationDays = VillagesConfig.getInstance().getGameplaySettings().getVillagerMemoryDuration();
+        long maxMemoryAgeMillis = (long)memoryDurationDays * 24 * 60 * 60 * 1000; // days * hours * mins * secs * ms
+        long currentTime = System.currentTimeMillis();
+
         for (Memory memory : memories) {
             memory.decayImportance(MEMORY_DECAY_RATE);
         }
-        memories.removeIf(memory -> memory.getImportance() < INTERACTION_IMPORTANCE_THRESHOLD);
+        // Remove memories older than the configured duration
+        memories.removeIf(memory -> (currentTime - memory.getTimestamp()) > maxMemoryAgeMillis);
     }
 
     public float getPersonalityTrait(Culture.CulturalTrait trait) {

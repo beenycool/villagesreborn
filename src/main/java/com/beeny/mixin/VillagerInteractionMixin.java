@@ -1,5 +1,6 @@
 package com.beeny.mixin;
 
+import com.beeny.config.VillagesConfig; // Added import
 import com.beeny.gui.TutorialScreen;
 import com.beeny.gui.VillageCraftingScreen;
 import com.beeny.village.SpawnRegion;
@@ -160,6 +161,14 @@ public abstract class VillagerInteractionMixin {
 
     if (atWorkstation) {
       // --- Workstation Interaction ---
+      // Check if unique crafting is enabled
+      if (!VillagesConfig.getInstance().getGameplaySettings().isUniqueCraftingRecipesEnabled()) {
+        vr_LOGGER.debug("Unique crafting disabled. Allowing vanilla trade screen.");
+        // Do not cancel the event, let vanilla handle it
+        return;
+      }
+      
+      // Proceed with custom crafting logic if enabled
       if (isClient) {
         SpawnRegion region = vm.getNearestSpawnRegion(thisVillager.getBlockPos());
         String culture = (region != null) ? region.getCultureAsString() : "default";

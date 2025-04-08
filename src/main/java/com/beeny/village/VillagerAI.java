@@ -188,6 +188,7 @@ public class VillagerAI {
     private long llmActivityExpiration = 0;
     private long lastActivityTransition = 0;
     
+    private static final long MIN_TICKS_BETWEEN_ACTIVITIES = 100; // Base cooldown (5 seconds)
     // Track active behavior execution
     private String activeBehavior = null;
     private long behaviorStartTime = 0;
@@ -269,6 +270,14 @@ public class VillagerAI {
         long currentTime = world.getTimeOfDay();
         long timeSinceLastTransition = currentTime - lastActivityTransition;
         
+        // Apply activity frequency multiplier
+        float activityMultiplier = VillagesConfig.getInstance().getGameplaySettings().getVillagerActivityFrequencyMultiplier();
+        if (activityMultiplier <= 0) activityMultiplier = 1.0f; // Prevent issues with zero or negative values
+        long requiredTicksBetweenActivities = (long) (MIN_TICKS_BETWEEN_ACTIVITIES / activityMultiplier);
+
+        // Check cooldown before allowing any activity change logic (except LLM override)
+        boolean canTransition = timeSinceLastTransition >= requiredTicksBetweenActivities;
+
         // Check if there's an active LLM-suggested activity
         if (llmSuggestedActivity != null && currentTime < llmActivityExpiration) {
             // The LLM-suggested activity is still valid, keep it
@@ -303,7 +312,7 @@ public class VillagerAI {
         }
         
         // Apply the new activity if it's different from the current one
-        if (!newActivity.equals(currentActivity)) {
+        if (canTransition && !newActivity.equals(currentActivity)) {
             // Record the transition time
             lastActivityTransition = currentTime;
             
@@ -369,15 +378,64 @@ public class VillagerAI {
     
     public CompletableFuture<String> generateBehavior(String situation) {
         Map<String, String> context = new HashMap<>();
-        context.put("timeout", "60");
+        context.put("timeout", "60"); // Keep timeout context
 
-        String prompt = String.format("Villager personality: %s, Situation: %s", personality, situation);
+        // Get AI detail level from config
+        String detailLevel = VillagesConfig.getInstance().getLLMSettings().getAiDetailLevel();
+        String prompt;
+
+        // Adjust prompt based on detail level
+        switch (detailLevel.toUpperCase()) {
+            case "MINIMAL":
+                prompt = String.format("Brief action for villager. Personality: %s. Situation: %s.",
+                                       personality, situation);
+                // Optionally reduce max tokens if LLMService supports it per-request
+                // context.put("max_tokens", "50");
+                break;
+            case "DETAILED":
+                // Add more context, e.g., recent memories or relationships
+                String recentMemory = getRecentMemoryDescription(); // Need to implement this helper
+                prompt = String.format("Detailed behavior for villager. Personality: %s. Situation: %s. Recent memory: %s. Respond with ACTION: and TARGET:",
+                                       personality, situation, recentMemory);
+                // Optionally increase max tokens
+                // context.put("max_tokens", "200");
+                break;
+            case "CUSTOM":
+                 // For CUSTOM, maybe use temperature/other settings more directly?
+                 // For now, treat as BALANCED.
+            case "BALANCED":
+            default:
+                prompt = String.format("Villager behavior. Personality: %s. Situation: %s. Respond with ACTION: and TARGET:",
+                                       personality, situation);
+                // context.put("max_tokens", "100"); // Default max tokens
+                break;
+        }
+        LOGGER.debug("Generating behavior with detail level '{}'. Prompt: {}", detailLevel, prompt);
         return LLMService.getInstance().generateResponse(prompt, context)
             .thenApply(this::parseBehaviorAndUpdateGoals)
             .exceptionally(ex -> {
                 LOGGER.error("Error generating behavior", ex);
                 return "Default behavior";
             });
+    }
+
+    // Helper method to get a description of a recent memory
+    @Unique
+    private String getRecentMemoryDescription() {
+        // Check if memory system is enabled in config
+        if (!VillagesConfig.getInstance().getLLMSettings().isUseMemory()) {
+            return "Memory disabled";
+        }
+        // Retrieve and format a recent, relevant memory
+        VillagerMemory memory = VillagerManager.getInstance().getVillagerMemory(this.villager.getUuid());
+        if (memory != null) {
+            List<VillagerMemory.Memory> recent = memory.getMemories(EnumSet.allOf(VillagerMemory.Memory.MemoryType.class), 0.3f); // Get recent important memories
+            if (!recent.isEmpty()) {
+                // Return the description of the most important recent memory
+                return recent.get(0).getDescription();
+            }
+        }
+        return "None";
     }
     
     /**
@@ -499,116 +557,134 @@ public class VillagerAI {
                 applyLookGoals(target);
                 break;
             default:
-                LOGGER.info("Unknown action: {}, defaulting to wander behavior", action);
+                LOGGER.warn("Unknown action '{}', applying wander goals", action);
                 applyWanderGoals("around");
-                break;
         }
     }
     
     /**
      * Applies goals related to working
-     * @param target The target location or type
+     * @param target The target of the work (e.g., "job", "farm")
      */
     private void applyWorkGoals(String target) {
-        // Update the activity
+        boolean resourceGathering = VillagesConfig.getInstance().getGameplaySettings().isResourceGatheringEnabled();
+
         updateActivity("working");
         
-        // Work behavior typically involves going to job site
-        if (target.contains("farm")) {
-            // For farmers, try to find farmland
-            findAndMoveToBlockType(Blocks.FARMLAND, 5, 1);
-        } else if (target.contains("job") || target.contains("work")) {
-            // Go to profession workstation
+        if (target.contains("job") || target.contains("workstation")) {
+            // Move to workstation (always allowed regardless of resource gathering setting)
             moveToWorkstation();
+        } else if (target.contains("farm")) {
+            if (!resourceGathering) {
+                LOGGER.debug("Resource gathering disabled, skipping farm goal for {}", villager.getName().getString());
+                // Optionally, add a default wander near workstation instead
+            } else {
+            // Find and move to farmland
+            findAndMoveToBlockType(Blocks.FARMLAND, 10, 1);
+            }
         } else {
-            // Default work behavior - wander near home with occasional pauses
-            Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.6D);
+            // Default work behavior: wander near workstation
+            moveToWorkstation(); // Try to get close first
+            Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.5D);
             addGoal(wanderGoal, 3, "work_wander");
         }
         
-        // Add a look goal with low priority
-        Goal lookGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 8.0F, 0.02F);
-        addGoal(lookGoal, 5, "work_look");
+        // Look at nearby players/villagers while working
+        Goal lookPlayerGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 6.0F, 0.5F);
+        addGoal(lookPlayerGoal, 4, "work_look_player");
+        Goal lookVillagerGoal = new LookAtEntityGoal(villager, VillagerEntity.class, 6.0F, 0.5F);
+        addGoal(lookVillagerGoal, 5, "work_look_villager");
     }
     
     /**
      * Applies goals related to socializing
-     * @param target The target entity or location
+     * @param target Who to socialize with (e.g., "villager", "player")
      */
     private void applySocializeGoals(String target) {
         updateActivity("socializing");
         
-        // Higher priority for looking at entities
-        Goal lookGoal = new LookAtEntityGoal(villager, VillagerEntity.class, 8.0F, 0.8F);
-        addGoal(lookGoal, 2, "socialize_look_villager");
+        if (target.contains("villager")) {
+            // Look at other villagers
+            Goal lookGoal = new LookAtEntityGoal(villager, VillagerEntity.class, 8.0F, 0.8F);
+            addGoal(lookGoal, 1, "socialize_look");
+        } else if (target.contains("player")) {
+            // Look at players
+            Goal lookGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 8.0F, 0.8F);
+            addGoal(lookGoal, 1, "socialize_look");
+        }
         
-        // Also look at players
-        Goal lookPlayerGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 8.0F, 0.4F);
-        addGoal(lookPlayerGoal, 3, "socialize_look_player");
-        
-        // Lower priority wandering to move around the village
-        Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.5D);
-        addGoal(wanderGoal, 4, "socialize_wander");
+        // Wander around while socializing
+        Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.6D);
+        addGoal(wanderGoal, 2, "socialize_wander");
     }
     
     /**
      * Applies goals related to fleeing
-     * @param target What to flee from
+     * @param target What to flee from (e.g., "danger", "monster")
      */
     private void applyFleeGoals(String target) {
+        // Check if village defense is enabled
+        if (!VillagesConfig.getInstance().getGameplaySettings().isVillageDefenseEnabled()) {
+            LOGGER.debug("Village defense disabled, skipping flee goal application for {}", villager.getName().getString());
+            return; // Don't apply flee goals if defense is off
+        }
+
         updateActivity("fleeing");
         
-        // Priority for escape danger
-        Goal escapeGoal = new EscapeDangerGoal((PathAwareEntity)villager, 1.2D);
-        addGoal(escapeGoal, 1, "flee_danger");
-        
-        if (target.contains("player")) {
-            // Avoid players
-            Goal avoidPlayerGoal = new AvoidEntityGoal<>((PathAwareEntity)villager, PlayerEntity.class, 8.0F, 1.0D, 1.2D);
-            addGoal(avoidPlayerGoal, 2, "flee_player");
-        } else if (target.contains("monster") || target.contains("danger")) {
-            // Avoid monsters - this is a generic goal
-            addGoal(escapeGoal, 1, "flee_monster");
+        if (target.contains("monster") || target.contains("zombie")) {
+            // Flee from monsters
+            Goal fleeMonsterGoal = new FleeEntityGoal<>((PathAwareEntity)villager, Monster.class, 8.0F, 1.0D, 1.2D);
+            addGoal(fleeMonsterGoal, 1, "flee_monster");
+        } else if (target.contains("danger")) {
+            // Escape general danger
+            Goal escapeGoal = new EscapeDangerGoal((PathAwareEntity)villager, 1.0D);
+            addGoal(escapeGoal, 1, "flee_danger");
+        } else if (target.contains("player")) {
+            // Avoid players (if needed)
+            Goal avoidPlayerGoal = new AvoidEntityGoal<>((PathAwareEntity)villager, PlayerEntity.class, 6.0F, 1.0D, 1.2D);
+            addGoal(avoidPlayerGoal, 1, "flee_player");
+        } else {
+            // Default flee: Escape general danger
+            Goal escapeGoal = new EscapeDangerGoal((PathAwareEntity)villager, 1.0D);
+            addGoal(escapeGoal, 1, "flee_default");
         }
         
-        // Add a wander far goal for more distance
-        Goal wanderFarGoal = new WanderAroundFarGoal((PathAwareEntity)villager, 1.0D);
-        addGoal(wanderFarGoal, 3, "flee_wander");
+        // Add a faster wander goal while fleeing
+        Goal wanderGoal = new WanderAroundFarGoal((PathAwareEntity)villager, 1.0D);
+        addGoal(wanderGoal, 2, "flee_wander");
     }
     
     /**
-     * Applies goals related to wandering/exploring
-     * @param target The target area or direction
+     * Applies goals related to wandering
+     * @param target Where to wander (e.g., "around", "far")
      */
     private void applyWanderGoals(String target) {
-        updateActivity("exploring");
+        updateActivity("wandering");
         
-        // Wander goals with different speeds based on target
-        if (target.contains("far") || target.contains("explore")) {
-            Goal wanderFarGoal = new WanderAroundFarGoal((PathAwareEntity)villager, 0.8D);
-            addGoal(wanderFarGoal, 2, "wander_far");
+        if (target.contains("far")) {
+            // Wander far
+            Goal wanderFarGoal = new WanderAroundFarGoal((PathAwareEntity)villager, 0.7D);
+            addGoal(wanderFarGoal, 1, "wander_far");
         } else {
+            // Wander nearby
             Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.6D);
-            addGoal(wanderGoal, 2, "wander_normal");
+            addGoal(wanderGoal, 1, "wander_around");
         }
         
-        // Add look goals with lower priority
-        Goal lookGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 8.0F, 0.02F);
-        addGoal(lookGoal, 4, "wander_look");
+        // Look at nearby entities while wandering
+        Goal lookPlayerGoal = new LookAtEntityGoal(villager, PlayerEntity.class, 6.0F, 0.3F);
+        addGoal(lookPlayerGoal, 2, "wander_look_player");
+        Goal lookVillagerGoal = new LookAtEntityGoal(villager, VillagerEntity.class, 6.0F, 0.3F);
+        addGoal(lookVillagerGoal, 3, "wander_look_villager");
     }
     
     /**
      * Applies goals related to resting/sleeping
-     * @param target The target location
+     * @param target Where to rest (e.g., "bed", "home")
      */
     private void applyRestGoals(String target) {
-        updateActivity("resting");
+        updateActivity("sleeping");
         
-        // Lower speed wandering, occasional looks
-        Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.3D);
-        addGoal(wanderGoal, 3, "rest_wander");
-        
-        // If target specifies bed or home, try to go there
         if (target.contains("bed") || target.contains("home")) {
             // Try to find a bed or move toward home
             findAndMoveToBlockType(Blocks.RED_BED, 10, 1);
@@ -700,493 +776,437 @@ public class VillagerAI {
         
         // Look for the block in a radius around the villager
         for (int x = -searchRadius; x <= searchRadius; x++) {
-            for (int y = -2; y <= 2; y++) {
+            for (int y = -2; y <= 2; y++) { // Check slightly above/below
                 for (int z = -searchRadius; z <= searchRadius; z++) {
                     BlockPos checkPos = villagerPos.add(x, y, z);
                     if (serverWorld.getBlockState(checkPos).getBlock() == blockType) {
-                        // Found a matching block, create a goal to move to it
-                        moveToPosition(checkPos, 0.5D, priority);
-                        return;
+                        // Found the block, move to it
+                        moveToPosition(checkPos, 0.6D, priority);
+                        return; // Move to the first one found
                     }
                 }
             }
         }
-        
-        // If no matching block was found, just wander
-        Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.5D);
-        addGoal(wanderGoal, priority + 1, "wander_fallback");
+        LOGGER.debug("Could not find block {} within radius {} for villager {}", 
+            blockType.toString(), searchRadius, villager.getName().getString());
     }
     
     /**
-     * Helper method to move to the villager's workstation
+     * Moves the villager towards their workstation
      */
     private void moveToWorkstation() {
-        // Try to get the workstation from the villager's brain
         villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE)
             .ifPresent(globalPos -> {
-                // Check if workstation is in the same dimension
+                // Check if the job site is in the same dimension
                 if (globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
-                    BlockPos pos = globalPos.pos();
-                    moveToPosition(pos, 0.5D, 1);
-                    LOGGER.debug("Moving villager {} to workstation at {}", villager.getName().getString(), pos);
+                    moveToPosition(globalPos.pos(), 0.6D, 1);
+                } else {
+                    LOGGER.warn("Villager {} cannot path to workstation in different dimension: {}", 
+                        villager.getName().getString(), globalPos.dimension().getValue());
                 }
             });
     }
     
     /**
-     * Helper method to move to a specific position
-     * @param pos The position to move to
-     * @param speed The movement speed
-     * @param priority The priority for the goal
+     * Adds a goal to move the villager to a specific position
+     * @param pos The target position
+     * @param speed The movement speed modifier
+     * @param priority The goal priority
      */
     private void moveToPosition(BlockPos pos, double speed, int priority) {
-        // Create a custom MoveToTargetPosGoal, tuned for immediate movement
+        // Custom goal to move to a specific position
         class SimpleMoveToGoal extends MoveToTargetPosGoal {
-            private final BlockPos targetPos;
-            
-            public SimpleMoveToGoal(PathAwareEntity entity, double speed, BlockPos targetPos) {
-                super(entity, speed, 1, 1); // reduced range for more precise movement
-                this.targetPos = targetPos;
+            public SimpleMoveToGoal(PathAwareEntity mob, BlockPos target, double speed, int range) {
+                // The 'range' parameter here is the search range, not the acceptance range
+                // We set 'targetExpected' to false as we don't require a specific block state
+                super(mob, speed, range, 1); // Use range 1 for acceptance distance
+                this.targetPos = target;
             }
             
             @Override
             protected boolean isTargetPos(net.minecraft.world.WorldView world, BlockPos pos) {
-                return true; // Always consider our target valid
+                // We consider the target reached if we are close enough
+                return pos.getSquaredDistance(this.targetPos) <= 2.0; // Within ~1 block distance
+            }
+            
+            @Override
+            public double getDesiredSquaredDistanceToTarget() {
+                return 1.5; // Try to get within 1.5 blocks squared
             }
             
             @Override
             public void start() {
-                this.mob.getNavigation().startMovingTo(
-                    targetPos.getX() + 0.5, 
-                    targetPos.getY(), 
-                    targetPos.getZ() + 0.5, 
-                    this.speed
-                );
-            }
-            
-            @Override
-            protected BlockPos getTargetPos() {
-                return targetPos;
+                super.start();
+                LOGGER.debug("Villager {} starting move to {}", mob.getName().getString(), targetPos);
             }
         }
         
-        SimpleMoveToGoal moveGoal = new SimpleMoveToGoal((PathAwareEntity)villager, speed, pos);
-        addGoal(moveGoal, priority, "move_to_pos");
+        Goal moveToGoal = new SimpleMoveToGoal((PathAwareEntity)villager, pos, speed, 8); // Search range 8
+        addGoal(moveToGoal, priority, "move_to_" + pos.getX() + "_" + pos.getY() + "_" + pos.getZ());
     }
     
     /**
-     * Helper method to move to a GlobalPos (which contains dimension and position)
-     * @param globalPos The GlobalPos to move to
-     * @param speed The movement speed
-     * @param priority The priority for the goal
+     * Adds a goal to move the villager to a specific global position (handles dimension checks)
+     * @param globalPos The target global position
+     * @param speed The movement speed modifier
+     * @param priority The goal priority
      */
     private void moveToPosition(net.minecraft.util.math.GlobalPos globalPos, double speed, int priority) {
-        // Extract the BlockPos from the GlobalPos
-        BlockPos pos = globalPos.pos();
-        
-        // Only move if we're in the right dimension
-        if (!globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
-            LOGGER.warn("Attempted to move villager to a position in a different dimension");
-            return;
-        }
-        
-        // Use the existing BlockPos method
-        moveToPosition(pos, speed, priority);
-    }
-
-    /**
-     * Adds a goal to the villager with the given priority and identifier
-     * @param goal The goal to add
-     * @param priority The priority (lower number = higher priority)
-     * @param id An identifier for tracking the goal
-     */
-    private void addGoal(Goal goal, int priority, String id) {
-        try {
-            // Check if the villager is a MobEntity (it should be)
-            if (villager instanceof MobEntity) {
-                MobEntity mobEntity = (MobEntity) villager;
-                
-                // Using reflection to access the goal selector and add the goal
-                try {
-                    // Get the goalSelector field
-                    java.lang.reflect.Field goalSelectorField = MobEntity.class.getDeclaredField("goalSelector");
-                    goalSelectorField.setAccessible(true);
-                    
-                    // Get the GoalSelector instance
-                    GoalSelector goalSelector = (GoalSelector) goalSelectorField.get(mobEntity);
-                    
-                    // Add the goal
-                    goalSelector.add(priority, goal);
-                    
-                    // Store the goal for later management
-                    activeGoals.put(id, goal);
-                    goalPriorities.put(id, priority);
-                    
-                    LOGGER.debug("Added goal {} with priority {} to villager {}", 
-                        goal.getClass().getSimpleName(), priority, villager.getName().getString());
-                } catch (Exception e) {
-                    LOGGER.error("Failed to add goal using reflection: {}", e.getMessage());
-                }
-            } else {
-                LOGGER.warn("Cannot add goal to entity: Not a MobEntity");
-            }
-        } catch (Exception e) {
-            LOGGER.error("Failed to add goal to villager: {}", e.getMessage());
+        if (globalPos.dimension().equals(villager.getWorld().getRegistryKey())) {
+            moveToPosition(globalPos.pos(), speed, priority);
+        } else {
+            LOGGER.warn("Cannot move villager {} to different dimension: {}", 
+                villager.getName().getString(), globalPos.dimension().getValue());
         }
     }
     
     /**
-     * Removes a goal from the villager
+     * Adds a goal to the villager's goal selector if it's not already present
+     * @param goal The goal to add
+     * @param priority The priority of the goal
+     * @param id A unique ID for the goal (used for tracking)
+     */
+    private void addGoal(Goal goal, int priority, String id) {
+        if (villager instanceof MobEntity) {
+            MobEntity mobEntity = (MobEntity) villager;
+            GoalSelector goalSelector = mobEntity.goalSelector;
+            
+            // Check if a goal with this ID is already active
+            if (activeGoals.containsKey(id)) {
+                // If priorities differ, remove the old one first
+                if (goalPriorities.getOrDefault(id, -1) != priority) {
+                    removeGoal(activeGoals.get(id));
+                } else {
+                    // Goal with same ID and priority already exists, do nothing
+                    return;
+                }
+            }
+            
+            // Check if the exact goal instance is already added (less reliable)
+            boolean alreadyAdded = goalSelector.getGoals().stream()
+                .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal().equals(goal));
+                
+            if (!alreadyAdded) {
+                try {
+                    goalSelector.add(priority, goal);
+                    activeGoals.put(id, goal);
+                    goalPriorities.put(id, priority);
+                    LOGGER.debug("Added goal '{}' with priority {} to villager {}", id, priority, villager.getName().getString());
+                } catch (Exception e) {
+                    LOGGER.error("Failed to add goal '{}' to villager {}", id, villager.getName().getString(), e);
+                }
+            }
+        } else {
+            LOGGER.warn("Cannot add goal: Villager is not a MobEntity");
+        }
+    }
+    
+    /**
+     * Removes a goal from the villager's goal selector
      * @param goal The goal to remove
      */
     private void removeGoal(Goal goal) {
-        try {
-            // Check if the villager is a MobEntity (it should be)
-            if (villager instanceof MobEntity) {
-                MobEntity mobEntity = (MobEntity) villager;
-                
-                // Using reflection to access the goal selector and remove the goal
-                try {
-                    // Get the goalSelector field
-                    java.lang.reflect.Field goalSelectorField = MobEntity.class.getDeclaredField("goalSelector");
-                    goalSelectorField.setAccessible(true);
-                    
-                    // Get the GoalSelector instance
-                    GoalSelector goalSelector = (GoalSelector) goalSelectorField.get(mobEntity);
-                    
-                    // Get the goals field from GoalSelector
-                    java.lang.reflect.Field goalsField = GoalSelector.class.getDeclaredField("goals");
-                    goalsField.setAccessible(true);
-                    
-                    // Get the goals set
-                    Set<PrioritizedGoal> goals = (Set<PrioritizedGoal>) goalsField.get(goalSelector);
-                    
-                    // Create a copy to avoid concurrent modification
-                    Set<PrioritizedGoal> copy = new HashSet<>(goals);
-                    
-                    // Find and remove the goal
-                    for (PrioritizedGoal prioritizedGoal : copy) {
-                        // Use reflection to get the goal field
-                        java.lang.reflect.Field goalField = PrioritizedGoal.class.getDeclaredField("goal");
-                        goalField.setAccessible(true);
-                        Goal goalObj = (Goal) goalField.get(prioritizedGoal);
-                        
-                        if (goalObj == goal) {
-                            goalSelector.remove(goal);
-                            LOGGER.debug("Removed goal {} from villager {}", 
-                                goal.getClass().getSimpleName(), villager.getName().getString());
-                            break;
-                        }
+        if (villager instanceof MobEntity) {
+            MobEntity mobEntity = (MobEntity) villager;
+            GoalSelector goalSelector = mobEntity.goalSelector;
+            
+            try {
+                // Find the ID associated with this goal instance
+                String goalIdToRemove = null;
+                for (Map.Entry<String, Goal> entry : activeGoals.entrySet()) {
+                    if (entry.getValue().equals(goal)) {
+                        goalIdToRemove = entry.getKey();
+                        break;
                     }
-                } catch (Exception e) {
-                    LOGGER.error("Failed to remove goal using reflection: {}", e.getMessage());
                 }
+                
+                goalSelector.remove(goal);
+                
+                // Remove from tracking maps if found
+                if (goalIdToRemove != null) {
+                    activeGoals.remove(goalIdToRemove);
+                    goalPriorities.remove(goalIdToRemove);
+                    LOGGER.debug("Removed goal '{}' from villager {}", goalIdToRemove, villager.getName().getString());
+                } else {
+                    LOGGER.debug("Removed untracked goal instance from villager {}", villager.getName().getString());
+                }
+                
+            } catch (Exception e) {
+                LOGGER.error("Failed to remove goal from villager {}", villager.getName().getString(), e);
             }
-        } catch (Exception e) {
-            LOGGER.error("Failed to remove goal from villager: {}", e.getMessage());
+        } else {
+            LOGGER.warn("Cannot remove goal: Villager is not a MobEntity");
         }
     }
     
-    private Map<UUID, RelationshipType> relationships = new ConcurrentHashMap<>();
+    // --- Relationship and Memory Methods ---
     
     public void addRelationship(UUID targetVillager, RelationshipType type) {
-        relationships.put(targetVillager, type);
-        adjustHappiness(type == RelationshipType.FRIEND || type == RelationshipType.FAMILY ? 5 : -5);
+        // Implementation depends on how relationships are stored (e.g., in VillagerManager)
+        VillagerManager.getInstance().addRelationship(villager.getUuid(), targetVillager, type);
     }
-
+    
     public void recordTheft(UUID thiefId, String itemDescription, BlockPos location) {
-        // Implementation for recording theft
-        LOGGER.info("Theft recorded: Thief={}, Item={}, Location={}", thiefId, itemDescription, location);
+        // Implementation depends on memory system
+        // Example: getVillagerMemory().addMemory("theft", Map.of("thief", thiefId, "item", itemDescription, "location", location));
     }
-
+    
     public int getFriendshipLevel() {
-        long friendCount = relationships.values().stream()
-            .filter(r -> r == RelationshipType.FRIEND || r == RelationshipType.FAMILY)
-            .count();
-        return (int)Math.min(10, friendCount);
+        // Placeholder - needs implementation based on relationship storage
+        return 50; // Neutral default
     }
-
+    
     public void updateProfessionSkill(String skill) {
-        // Implementation for updating profession skill
-        LOGGER.info("Updated profession skill: {}", skill);
+        // Placeholder - needs implementation
     }
-
-    public RelationshipType getRelationshipWith(UUID villagerId) {
-        return relationships.getOrDefault(villagerId, RelationshipType.NEUTRAL);
-    }
-
+    
+    // --- Dialogue and Learning ---
+    
     public CompletableFuture<String> generateDialogue(String input, Object context) {
-        Map<String, String> contextMap = new HashMap<>();
-        contextMap.put("timeout", "45");
-        
-        String prompt = String.format(
-            "Villager personality: %s, Happiness: %d, Activity: %s, Input: %s",
-            personality, happiness, currentActivity, input
-        );
-        return LLMService.getInstance().generateResponse(prompt, contextMap)
-            .exceptionally(ex -> "Hello there!");
+        // Implementation depends on dialogue system
+        VillagerDialogue dialogue = VillagerManager.getInstance().getVillagerDialogue(villager.getUuid());
+        if (dialogue != null) {
+            return dialogue.generatePlayerInteraction(null, input); // Context needs mapping
+        }
+        return CompletableFuture.completedFuture("Hmm?");
     }
-
+    
     public void learnFromEvent(VillageEvent event, String reflection) {
-        // Implementation for learning from events
-        LOGGER.info("Learning from event: {}, Reflection={}", event, reflection);
+        // Implementation depends on memory system
+        // Example: getVillagerMemory().addMemory("event_reflection", Map.of("event", event.getName(), "reflection", reflection));
     }
-
+    
     public String getSocialSummary() {
-        int friends = (int)relationships.values().stream()
-            .filter(r -> r == RelationshipType.FRIEND)
-            .count();
-        int family = (int)relationships.values().stream()
-            .filter(r -> r == RelationshipType.FAMILY)
-            .count();
-        int rivals = (int)relationships.values().stream()
-            .filter(r -> r == RelationshipType.RIVAL)
-            .count();
-        int enemies = (int)relationships.values().stream()
-            .filter(r -> r == RelationshipType.ENEMY)
-            .count();
-        
-        return String.format("Friends: %d, Family: %d, Rivals: %d, Enemies: %d", 
-            friends, family, rivals, enemies);
+        // Placeholder - needs implementation based on relationship storage
+        int friendCount = VillagerManager.getInstance().getRelationshipCount(villager.getUuid()); // Example
+        return String.format("Has %d known associates.", friendCount);
     }
-
-    public void setHappiness(int happiness) {
-        this.happiness = Math.max(0, Math.min(100, happiness));
-    }
-
+    
+    // --- PvP and Combat ---
+    
+    /**
+     * Adds PvP-related goals to the villager if PvP is enabled.
+     */
     public void addPvPGoals() {
+        if (!(villager instanceof MobEntity mobEntity)) {
+            LOGGER.warn("Cannot add PvP goals: Villager is not a MobEntity");
+            return;
+        }
+        
         if (!VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) {
+            LOGGER.debug("PvP is disabled, not adding PvP goals for {}", villager.getName().getString());
             return;
         }
-
-        if (pvpEnabled) {
-            return;
-        }
-
-        RevengeGoal revengeGoal = new RevengeGoal((PathAwareEntity)villager, VillagerEntity.class);
-        addGoal(revengeGoal, 1, "pvp_revenge");
-
-        // Custom targeting goal for villager PvP
+        
+        if (pvpEnabled) return; // Already added
+        
+        LOGGER.info("Adding PvP goals for villager {}", villager.getName().getString());
+        
+        // Target other villagers who are enemies or rivals
         class VillagerTargetGoal extends ActiveTargetGoal<VillagerEntity> {
-            private final VillagerEntity owner;
+            private final VillagerAI attackerAI;
             
-            VillagerTargetGoal(VillagerEntity owner) {
-                super((MobEntity)(Object)owner, VillagerEntity.class, true);
-                this.owner = owner;
+            public VillagerTargetGoal(MobEntity mob, VillagerAI attackerAI) {
+                super(mob, VillagerEntity.class, true, false); // Check sight, don't check visibility
+                this.attackerAI = attackerAI;
             }
             
             @Override
             public boolean canStart() {
-                return super.canStart();  // Let parent handle basic checks
+                if (!VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) return false;
+                return super.canStart();
             }
-
+            
             @Override
-            public boolean shouldContinue() {
-                if (!super.shouldContinue()) {
-                    return false;
-                }
+            protected boolean shouldContinue(LivingEntity target, Box box) {
+                if (!VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) return false;
                 
-                if (this.targetEntity instanceof VillagerEntity otherVillager) {
-                    RelationshipType relationship = getRelationshipWith(otherVillager.getUuid());
-                    return relationship == RelationshipType.ENEMY ||
-                          (relationship == RelationshipType.RIVAL &&
-                           otherVillager.squaredDistanceTo(owner) < 5);
-                }
-                return false;
+                RelationshipType relationship = attackerAI.getRelationshipWith(target.getUuid());
+                // Only target enemies or rivals
+                return (relationship == RelationshipType.ENEMY || relationship == RelationshipType.RIVAL) &&
+                       super.shouldContinue(target, box);
             }
         }
-
-        ActiveTargetGoal<VillagerEntity> targetGoal = new VillagerTargetGoal(villager);
-
-        addGoal(targetGoal, 2, "pvp_target");
-        pvpGoals.put(villager.getUuid(), targetGoal);
+        
+        ActiveTargetGoal<VillagerEntity> targetGoal = new VillagerTargetGoal(mobEntity, this);
+        addGoal(targetGoal, 1, "pvp_target_villager");
+        
+        // Add revenge goal
+        Goal revengeGoal = new RevengeGoal((PathAwareEntity)villager);
+        addGoal(revengeGoal, 2, "pvp_revenge");
+        
         pvpEnabled = true;
-
-        if (((MobEntity)(Object)villager).getTarget() != null) {
-            villager.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.SPEED, 100, 1, false, false));
-        }
-
-        LOGGER.debug("Added PvP goals to villager: {}", villager.getName().getString());
     }
-
+    
+    /**
+     * Checks if a location is considered safe (e.g., well-lit, no monsters nearby).
+     * @param world The world
+     * @param pos The position to check
+     * @return True if the location is safe, false otherwise
+     */
     private boolean isSafeLocation(ServerWorld world, BlockPos pos) {
-        boolean hasRoof = false;
-        for (int y = 1; y <= 4; y++) {
-            if (!world.getBlockState(pos.up(y)).isAir()) {
-                hasRoof = true;
-                break;
-            }
+        // Check light level
+        if (world.getLightLevel(pos) < 8 && !world.isDay()) {
+            return false; // Too dark at night
         }
-
-        if (!hasRoof) return false;
-
-        // Simplified approach - do a simpler query since we can't get the predicate right
-        // This still achieves the same result by checking for monsters in the area
-        List<Entity> entities = world.getOtherEntities(null, new Box(pos).expand(8));
-        for (Entity entity : entities) {
-            if (entity instanceof Monster) {
-                return false;
-            }
+        
+        // Check for nearby monsters
+        Box checkBox = new Box(pos).expand(8.0); // Check within 8 blocks
+        List<Monster> nearbyMonsters = world.getEntitiesByClass(Monster.class, checkBox, monster -> monster.isAlive());
+        if (!nearbyMonsters.isEmpty()) {
+            return false; // Monsters nearby
         }
-
+        
+        // Add more safety checks if needed (e.g., hazards like lava)
+        
         return true;
     }
     
-    /**
-     * Checks if the villager has PvP enabled
-     * @return true if the villager can engage in PvP
-     */
-    public boolean isPvPEnabled() {
-        return pvpEnabled;
-    }
+    // --- Behavior Execution ---
     
     /**
-     * Main tick method for behavior execution
-     * This should be called every server tick for each villager
+     * Ticks the current behavior, checking for completion or interruption.
      * @param world The server world
      */
     public void tickBehavior(ServerWorld world) {
-        if (villager == null || !villager.isAlive()) {
+        if (activeBehavior == null) {
+            // If no specific behavior, maybe generate a random one occasionally?
+            if (world.getTime() % 600 == 0 && Math.random() < 0.1) { // Every 30 seconds, 10% chance
+                generateRandomBehavior(world);
+            }
             return;
         }
         
-        // Check if we're executing a specific behavior
-        if (activeBehavior != null) {
-            // Check if behavior has timed out
-            if (world.getTime() - behaviorStartTime > behaviorDuration) {
-                completeBehavior();
-                return;
-            }
-            
-            // Execute the active behavior
-            executeBehavior(world);
-        } else {
-            // Update time-based activities if no specific behavior is active
-            if (world.getTime() % 100 == 0 && !busy) { // Only check every 5 seconds if not busy
-                updateActivityBasedOnTime(world);
-            }
-            
-            // Random chance to generate a new behavior if not busy
-            if (!busy && world.getTime() % 200 == 0 && Math.random() < 0.1) {
-                generateRandomBehavior(world);
-            }
+        long currentTime = world.getTime();
+        
+        // Check if behavior duration has expired
+        if (currentTime >= behaviorStartTime + behaviorDuration) {
+            LOGGER.debug("Behavior '{}' completed for villager {}", activeBehavior, villager.getName().getString());
+            completeBehavior();
+            return;
         }
+        
+        // Execute the logic for the current behavior
+        executeBehavior(world);
+        
+        // TODO: Add conditions for interrupting behavior (e.g., danger, player interaction)
     }
     
     /**
-     * Execute the currently active behavior
+     * Executes the logic associated with the currently active behavior.
      * @param world The server world
      */
     private void executeBehavior(ServerWorld world) {
         if (activeBehavior == null) return;
         
+        // Use a switch or if-else chain to call specific execution methods
         switch (activeBehavior) {
-            case "working":
+            case "work":
                 executeWorkBehavior(world);
                 break;
-            case "socializing":
+            case "socialize":
                 executeSocializeBehavior(world);
                 break;
-            case "trading":
+            case "trade":
                 executeTradeBehavior(world);
                 break;
-            case "celebrating":
+            case "celebrate":
                 executeCelebrationBehavior(world);
                 break;
-            case "fleeing":
+            case "flee":
                 executeFleeingBehavior(world);
                 break;
-            case "sleeping":
+            case "sleep":
                 executeSleepingBehavior(world);
                 break;
+            case "idle":
             default:
-                // Default to idle behavior
                 executeIdleBehavior(world);
                 break;
         }
+    }
+    
+    /**
+     * Starts a new behavior, clearing old goals and applying new ones.
+     * @param behaviorName The name of the behavior (e.g., "work", "socialize")
+     * @param durationTicks The duration in game ticks
+     * @param params Additional parameters for the behavior
+     */
+    public void startBehavior(String behaviorName, long durationTicks, Map<String, Object> params) {
+        if (busy && !behaviorName.equals("flee")) { // Allow fleeing even if busy
+            LOGGER.debug("Villager {} is busy, cannot start behavior '{}'", villager.getName().getString(), behaviorName);
+            return;
+        }
         
-        // Broadcast villager AI state to nearby clients for visuals
-        if (world.getTime() % 20 == 0) { // Once per second
-            com.beeny.network.VillagesNetwork.broadcastVillagerAIState(
-                villager, activeBehavior, villager.getBlockPos());
+        LOGGER.info("Villager {} starting behavior: '{}' for {} ticks", villager.getName().getString(), behaviorName, durationTicks);
+        
+        // Clear previous behavior goals
+        clearGoalsForNewBehavior(behaviorName); // Use action name to clear relevant goals
+        
+        this.activeBehavior = behaviorName;
+        this.behaviorStartTime = villager.getWorld().getTime();
+        this.behaviorDuration = durationTicks;
+        this.behaviorParams = params != null ? new HashMap<>(params) : new HashMap<>();
+        
+        // Apply initial goals for the new behavior
+        applyInitialBehaviorGoals(behaviorName);
+        
+        // Set busy state if appropriate for the behavior
+        if (!behaviorName.equals("idle") && !behaviorName.equals("wander")) {
+            setBusy(true);
         }
     }
     
     /**
-     * Start a new behavior with parameters
-     * @param behaviorName The behavior to start
-     * @param durationTicks How long the behavior should last
-     * @param params Additional parameters for the behavior
-     */
-    public void startBehavior(String behaviorName, long durationTicks, Map<String, Object> params) {
-        this.activeBehavior = behaviorName;
-        this.behaviorStartTime = villager.getWorld().getTime();
-        this.behaviorDuration = durationTicks;
-        this.behaviorParams = params != null ? params : new HashMap<>();
-        
-        LOGGER.debug("Villager {} starting behavior: {} for {} ticks", 
-            villager.getName().getString(), behaviorName, durationTicks);
-            
-        // Update activity to match behavior
-        updateActivity(behaviorName);
-        
-        // Set busy state during behavior execution
-        setBusy(true);
-        
-        // Apply initial goals based on the behavior
-        applyInitialBehaviorGoals(behaviorName);
-    }
-    
-    /**
-     * Complete the current behavior and clean up
+     * Completes the current behavior, clearing its goals and busy state.
      */
     private void completeBehavior() {
-        LOGGER.debug("Villager {} completed behavior: {}", 
-            villager.getName().getString(), activeBehavior);
-            
-        // Reset state
+        if (activeBehavior != null) {
+            LOGGER.debug("Villager {} completing behavior: {}", villager.getName().getString(), activeBehavior);
+            clearGoalsForNewBehavior(activeBehavior); // Clear goals associated with the completed behavior
+        }
+        
         this.activeBehavior = null;
+        this.behaviorStartTime = 0;
+        this.behaviorDuration = 0;
         this.behaviorParams.clear();
+        setBusy(false); // No longer busy
         
-        // Clear goals
-        clearGoalsForNewBehavior("");
-        
-        // Update to a default activity
-        updateActivity("idle");
-        
-        // No longer busy
-        setBusy(false);
+        // Trigger a re-evaluation of time-based activity
+        if (villager.getWorld() instanceof ServerWorld sw) {
+            updateActivityBasedOnTime(sw);
+        }
     }
     
     /**
-     * Apply initial goals for a behavior
-     * @param behaviorName The behavior to set up
+     * Applies the initial set of goals when a behavior starts.
+     * @param behaviorName The name of the behavior that started.
      */
     private void applyInitialBehaviorGoals(String behaviorName) {
-        // Clear previous goals
-        clearGoalsForNewBehavior(behaviorName);
+        // This is similar to applyBehaviorGoals, but might set up longer-term goals
+        // or initial movement targets based on behaviorParams.
         
-        // Apply appropriate goals based on behavior
         switch (behaviorName) {
-            case "working":
-                applyWorkGoals("job");
+            case "work":
+                applyWorkGoals(behaviorParams.getOrDefault("target", "job").toString());
                 break;
-            case "socializing":
-                applySocializeGoals("villager");
+            case "socialize":
+                applySocializeGoals(behaviorParams.getOrDefault("target", "villager").toString());
                 break;
-            case "trading":
-                applyTradeGoals("player");
+            case "trade":
+                applyTradeGoals(behaviorParams.getOrDefault("target", "player").toString());
                 break;
-            case "celebrating":
-                applyWanderGoals("around");
+            case "celebrate":
+                // Maybe wander near a specific celebration point?
+                applyWanderGoals("around"); // Placeholder
                 break;
-            case "fleeing":
-                applyFleeGoals("danger");
+            case "flee":
+                applyFleeGoals(behaviorParams.getOrDefault("target", "danger").toString());
                 break;
-            case "sleeping":
-                applyRestGoals("bed");
+            case "sleep":
+                applyRestGoals(behaviorParams.getOrDefault("target", "bed").toString());
                 break;
+            case "idle":
             default:
                 applyWanderGoals("around");
                 break;
@@ -1194,28 +1214,39 @@ public class VillagerAI {
     }
     
     /**
-     * Generate a random behavior based on context
+     * Generates a random, short-term behavior based on the current situation.
      * @param world The server world
      */
     private void generateRandomBehavior(ServerWorld world) {
-        // Get time of day and cultural context
-        long timeOfDay = world.getTimeOfDay() % 24000;
-        VillagerManager vm = VillagerManager.getInstance();
-        SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
-        String culture = region != null ? region.getCultureAsString().toLowerCase() : "generic";
+        if (busy) return; // Don't generate if already busy
         
-        // Generate a situation prompt for the LLM
-        String situation = String.format("It's %s and this villager is in a %s village near %s", 
-            getTimeDescription(timeOfDay), 
-            culture,
-            getNearbyDescription(world));
+        String situation = String.format("Villager %s (%s) is currently %s near %s. Weather is %s. Time is %s.",
+            villager.getName().getString(),
+            personality,
+            currentActivity,
+            getNearbyDescription(world),
+            world.isRaining() ? "rainy" : (world.isThundering() ? "stormy" : "clear"),
+            getTimeDescription(world.getTimeOfDay() % 24000)
+        );
         
-        // Generate behavior using LLM
-        generateBehavior(situation)
+        String prompt = String.format(
+            "Based on the situation: \"%s\"\nSuggest a brief, simple action (10-30 seconds) for the villager. Format: ACTION: [action_verb] TARGET: [target_noun]",
+            situation
+        );
+        
+        generateBehavior(prompt)
             .thenAccept(behavior -> {
-                // The parseBehaviorAndUpdateGoals will handle setting up the behavior
-                LOGGER.debug("Generated random behavior for {}: {}", 
-                    villager.getName().getString(), behavior);
+                // Behavior is parsed and goals applied within parseBehaviorAndUpdateGoals
+                LOGGER.debug("Generated random behavior for {}: {}", villager.getName().getString(), behavior);
+                // Set a short duration for this random behavior
+                this.behaviorDuration = 200 + world.random.nextInt(400); // 10-30 seconds
+                this.behaviorStartTime = world.getTime();
+                // Extract action for setting busy state
+                Map<String, String> parsed = parseBehaviorString(behavior);
+                this.activeBehavior = parsed.getOrDefault("ACTION", "idle").toLowerCase();
+                if (!activeBehavior.equals("idle") && !activeBehavior.equals("wander")) {
+                    setBusy(true);
+                }
             })
             .exceptionally(e -> {
                 LOGGER.error("Error generating random behavior", e);
@@ -1224,364 +1255,312 @@ public class VillagerAI {
     }
     
     /**
-     * Get a description of nearby entities and blocks
+     * Gets a brief description of the villager's surroundings.
      * @param world The server world
-     * @return A description of what's nearby
+     * @return A string describing nearby blocks or entities.
      */
     private String getNearbyDescription(ServerWorld world) {
         BlockPos pos = villager.getBlockPos();
         
-        // Check for nearby players
-        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
-            PlayerEntity.class, 
-            new Box(pos).expand(10), 
-            player -> true
-        );
-        
-        if (!nearbyPlayers.isEmpty()) {
-            return "some players";
-        }
-        
-        // Check for nearby villagers
-        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
-            VillagerEntity.class, 
-            new Box(pos).expand(8), 
-            v -> v != villager
-        );
-        
-        if (!nearbyVillagers.isEmpty()) {
-            return "other villagers";
-        }
-        
-        // Check profession-specific locations
-        // Updated for 1.21.4
-        VillagerProfession profession = villager.getVillagerData().getProfession();
-        
-        // Compare VillagerProfession objects
-        // Updated comparison for 1.21.4
-        if (profession == VillagerProfession.FARMER) {
-            return "farmland";
-        } else if (profession == VillagerProfession.LIBRARIAN) {
-            return "bookshelves";
-        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
-            return "forge";
-        }
-        
-        return "their village";
-    }
-    
-    // Behavior execution methods for specific behaviors
-    
-    private void executeWorkBehavior(ServerWorld world) {
-        // Execute working behavior
-        // Updated for 1.21.4
-        VillagerProfession profession = villager.getVillagerData().getProfession();
-        
-        // Profession-specific work behaviors
-        // Compare VillagerProfession objects
-        // Updated comparison for 1.21.4
-        if (profession == VillagerProfession.FARMER) {
-            // Occasionally show farming particles
-            if (world.getRandom().nextInt(20) == 0) {
-                world.spawnParticles(
-                    ParticleTypes.HAPPY_VILLAGER,
-                    villager.getX(), villager.getY() + 1, villager.getZ(),
-                    3, 0.5, 0.5, 0.5, 0.02
-                );
-            }
-        } else if (profession == VillagerProfession.LIBRARIAN) {
-            // Occasionally show reading particles
-            if (world.getRandom().nextInt(30) == 0) {
-                world.spawnParticles(
-                    ParticleTypes.ENCHANT,
-                    villager.getX(), villager.getY() + 1, villager.getZ(),
-                    2, 0.5, 0.5, 0.5, 0.01
-                );
-            }
-        } else if (profession == VillagerProfession.ARMORER || profession == VillagerProfession.WEAPONSMITH || profession == VillagerProfession.TOOLSMITH) {
-            // Occasionally show smithing particles
-            if (world.getRandom().nextInt(15) == 0) {
-                world.spawnParticles(
-                    ParticleTypes.FLAME,
-                    villager.getX(), villager.getY() + 1, villager.getZ(),
-                    2, 0.3, 0.3, 0.3, 0.01
-                );
-            }
-        }
-        
-        // Make sure we occasionally look around while working
-        if (world.getRandom().nextInt(50) == 0) {
-            // Look at random position
-            double lookX = villager.getX() + world.getRandom().nextDouble() * 10 - 5;
-            double lookY = villager.getY() + world.getRandom().nextDouble() * 2;
-            double lookZ = villager.getZ() + world.getRandom().nextDouble() * 10 - 5;
-            villager.getLookControl().lookAt(lookX, lookY, lookZ);
-        }
-    }
-    
-    private void executeSocializeBehavior(ServerWorld world) {
-        // Find nearby villagers to socialize with
-        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
-            VillagerEntity.class, 
-            new Box(villager.getBlockPos()).expand(5), 
-            v -> v != villager
-        );
-        
-        if (!nearbyVillagers.isEmpty()) {
-            // Look at the nearest villager
-            VillagerEntity nearest = nearbyVillagers.get(0);
-            villager.getLookControl().lookAt(nearest, 30f, 30f);
-            
-            // Occasional chat particle effects
-            if (world.getRandom().nextInt(30) == 0) {
-                VillagerFeedbackHelper.showSpeakingEffect(villager);
-            }
-        } else {
-            // If no villagers nearby, look for players
-            List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
-                PlayerEntity.class, 
-                new Box(villager.getBlockPos()).expand(8), 
-                player -> true
-            );
-            
-            if (!nearbyPlayers.isEmpty()) {
-                // Look at the nearest player
-                PlayerEntity nearest = nearbyPlayers.get(0);
-                villager.getLookControl().lookAt(nearest, 30f, 30f);
-            }
-        }
-    }
-    
-    private void executeTradeBehavior(ServerWorld world) {
-        // Trading behavior is mostly reactive to player interactions
-        // Here we'll just make the villager look more attentive
-        
-        // Look for nearby players
-        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(
-            PlayerEntity.class, 
-            new Box(villager.getBlockPos()).expand(5), 
-            player -> true
-        );
-        
-        if (!nearbyPlayers.isEmpty()) {
-            // Look at the nearest player
-            PlayerEntity nearest = nearbyPlayers.get(0);
-            villager.getLookControl().lookAt(nearest, 30f, 30f);
-            
-            // Occasionally show interest particles
-            if (world.getRandom().nextInt(40) == 0) {
-                world.spawnParticles(
-                    ParticleTypes.HAPPY_VILLAGER,
-                    villager.getX(), villager.getY() + 1, villager.getZ(),
-                    1, 0.5, 0.5, 0.5, 0.01
-                );
-            }
-        }
-    }
-    
-    private void executeCelebrationBehavior(ServerWorld world) {
-        // Celebration effects - particles and animations
-        if (world.getRandom().nextInt(10) == 0) {
-            world.spawnParticles(
-                ParticleTypes.NOTE,
-                villager.getX(), villager.getY() + 1, villager.getZ(),
-                1, 0.5, 0.5, 0.5, 0
-            );
-        }
-        
-        // Occasionally jump with happiness
-        if (world.getRandom().nextInt(40) == 0 && villager.isOnGround()) {
-            villager.setVelocity(villager.getVelocity().add(0, 0.42, 0));
-            villager.velocityModified = true;
-        }
-        
-        // Look at other celebrating villagers or players
-        List<Entity> nearbyEntities = world.getOtherEntities(
-            villager, 
-            new Box(villager.getBlockPos()).expand(8), 
-            e -> e instanceof VillagerEntity || e instanceof PlayerEntity
-        );
-        
-        if (!nearbyEntities.isEmpty()) {
-            Entity target = nearbyEntities.get(world.getRandom().nextInt(nearbyEntities.size()));
-            villager.getLookControl().lookAt(target, 30f, 30f);
-        }
-    }
-    
-    private void executeFleeingBehavior(ServerWorld world) {
-        // Get the danger source from parameters if available
-        BlockPos dangerPos = null;
-        if (behaviorParams.containsKey("dangerPos")) {
-            dangerPos = (BlockPos) behaviorParams.get("dangerPos");
-        }
-        
-        // If we have a danger position, ensure we're moving away from it
-        if (dangerPos != null) {
-            // Calculate direction away from danger
-            double dx = villager.getX() - dangerPos.getX();
-            double dz = villager.getZ() - dangerPos.getZ();
-            
-            // Normalize and scale
-            double length = Math.sqrt(dx * dx + dz * dz);
-            if (length < 0.1) {
-                // If too close to danger, pick a random direction
-                dx = world.getRandom().nextDouble() * 2 - 1;
-                dz = world.getRandom().nextDouble() * 2 - 1;
-                length = Math.sqrt(dx * dx + dz * dz);
-            }
-            
-            dx = dx / length * 10; // Scale to 10 blocks away
-            dz = dz / length * 10;
-            
-            // Set flee destination
-            BlockPos fleePos = new BlockPos(
-                dangerPos.getX() + (int)dx,
-                dangerPos.getY(),
-                dangerPos.getZ() + (int)dz
-            );
-            
-            // Move to the flee position if we're not already moving
-            if (!villager.getNavigation().isFollowingPath()) {
-                moveToPosition(fleePos, 1.0, 1);
-            }
-        }
-        
-        // Occasional panic particles
-        if (world.getRandom().nextInt(15) == 0) {
-            world.spawnParticles(
-                ParticleTypes.SMOKE,
-                villager.getX(), villager.getY() + 1, villager.getZ(),
-                3, 0.3, 0.3, 0.3, 0.02
-            );
-        }
-    }
-    
-    private void executeSleepingBehavior(ServerWorld world) {
-        // Check time of day - should only sleep at night
-        long timeOfDay = world.getTimeOfDay() % 24000;
-        if (timeOfDay >= 1000 && timeOfDay <= 13000) {
-            // It's daytime, end sleep behavior
-            completeBehavior();
-            return;
-        }
-        
-        // Sleeping behaviors - reduced movement and occasional Z particles
-        if (world.getRandom().nextInt(50) == 0) {
-            world.spawnParticles(
-                ParticleTypes.CLOUD,
-                villager.getX(), villager.getY() + 0.8, villager.getZ(),
-                1, 0.1, 0.1, 0.1, 0.01
-            );
-        }
-        
-        // If we're not at a bed, try to find one occasionally
-        if (world.getRandom().nextInt(100) == 0) {
-            BlockPos bedPos = findNearestBed(world);
-            if (bedPos != null) {
-                moveToPosition(bedPos, 0.5, 1);
-            }
-        }
-    }
-    
-    private void executeIdleBehavior(ServerWorld world) {
-        // Basic idle behavior - occasional looking around
-        if (world.getRandom().nextInt(60) == 0) {
-            // Look at random position
-            double lookX = villager.getX() + world.getRandom().nextDouble() * 16 - 8;
-            double lookY = villager.getY() + world.getRandom().nextDouble() * 3 - 1;
-            double lookZ = villager.getZ() + world.getRandom().nextDouble() * 16 - 8;
-            villager.getLookControl().lookAt(lookX, lookY, lookZ);
-        }
-        
-        // Occasionally wander if stationary for too long
-        if (world.getRandom().nextInt(120) == 0 && !villager.getNavigation().isFollowingPath()) {
-            BlockPos randomPos = getRandomPositionAround(villager.getBlockPos(), 8);
-            moveToPosition(randomPos, 0.4, 3);
-        }
-    }
-    
-    /**
-     * Find the nearest bed block
-     * @param world The server world
-     * @return The position of the nearest bed, or null if none found
-     */
-    private BlockPos findNearestBed(ServerWorld world) {
-        BlockPos villagerPos = villager.getBlockPos();
-        BlockPos nearest = null;
-        double nearestDistSq = Double.MAX_VALUE;
-        
-        // Check for a remembered home bed first
-        Optional<net.minecraft.util.math.GlobalPos> homeMem = villager.getBrain().getOptionalMemory(
-            net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
-        
-        if (homeMem.isPresent()) {
-            net.minecraft.util.math.GlobalPos homeGlobalPos = homeMem.get();
-            // Check if the home is in the same dimension
-            if (homeGlobalPos.dimension().equals(world.getRegistryKey())) {
-                BlockPos homePos = homeGlobalPos.pos();
-                if (world.getBlockState(homePos).getBlock() instanceof net.minecraft.block.BedBlock) {
-                    return homePos;
-                }
-            }
-        }
-        
-        // Search in a radius
-        int radius = 15;
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -3; y <= 3; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    BlockPos checkPos = villagerPos.add(x, y, z);
-                    if (world.getBlockState(checkPos).getBlock() instanceof net.minecraft.block.BedBlock) {
-                        double distSq = checkPos.getSquaredDistance(villagerPos);
-                        if (distSq < nearestDistSq) {
-                            nearest = checkPos;
-                            nearestDistSq = distSq;
-                        }
+        // Check nearby blocks
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    BlockState state = world.getBlockState(pos.add(dx, dy, dz));
+                    if (!state.isAir()) {
+                        // Simple description based on block type
+                        if (state.getBlock() == Blocks.CRAFTING_TABLE) return "a crafting table";
+                        if (state.getBlock() == Blocks.FURNACE) return "a furnace";
+                        if (state.getBlock() == Blocks.CHEST) return "a chest";
+                        if (state.getBlock().toString().contains("door")) return "a door";
+                        if (state.getBlock().toString().contains("bed")) return "a bed";
+                        // Add more common blocks if needed
                     }
                 }
             }
         }
         
-        return nearest;
+        // Check nearby entities
+        Box checkBox = villager.getBoundingBox().expand(5.0);
+        List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(VillagerEntity.class, checkBox, v -> v != villager);
+        if (!nearbyVillagers.isEmpty()) {
+            return "other villagers";
+        }
+        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(PlayerEntity.class, checkBox, p -> true);
+        if (!nearbyPlayers.isEmpty()) {
+            return "a player";
+        }
+        
+        return "open space"; // Default
+    }
+    
+    // --- Specific Behavior Execution Methods ---
+    
+    private void executeWorkBehavior(ServerWorld world) {
+        // Example: If at workstation, occasionally interact with it
+        if (villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE).isPresent()) {
+            BlockPos jobSitePos = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE).get().pos();
+            if (villager.getBlockPos().getSquaredDistance(jobSitePos) < 4.0) { // If close to job site
+                if (world.random.nextInt(100) == 0) { // Occasionally
+                    villager.swingHand(Hand.MAIN_HAND);
+                    // Play work sound based on profession?
+                    LOGGER.trace("Villager {} working at {}", villager.getName().getString(), jobSitePos);
+                }
+            }
+        }
+        // Add more profession-specific work actions here
+    }
+    
+    private void executeSocializeBehavior(ServerWorld world) {
+        // Example: Look for nearby villagers/players and path towards them slightly
+        Box checkBox = villager.getBoundingBox().expand(10.0);
+        List<LivingEntity> potentialTargets = world.getEntitiesByClass(LivingEntity.class, checkBox, e ->
+            (e instanceof VillagerEntity && e != villager) || e instanceof PlayerEntity);
+            
+        if (!potentialTargets.isEmpty()) {
+            LivingEntity target = potentialTargets.get(world.random.nextInt(potentialTargets.size()));
+            villager.getLookControl().lookAt(target, 30f, 30f);
+            
+            // Slightly move towards target if far, but don't chase aggressively
+            if (villager.distanceTo(target) > 4.0 && world.random.nextInt(5) == 0) {
+                villager.getNavigation().startMovingTo(target, 0.6D);
+            }
+            LOGGER.trace("Villager {} socializing near {}", villager.getName().getString(), target.getName().getString());
+        } else {
+            // If no one nearby, just continue wandering slowly
+            if (!activeGoals.containsKey("socialize_wander")) {
+                 Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.5D);
+                 addGoal(wanderGoal, 2, "socialize_wander");
+            }
+        }
+    }
+    
+    private void executeTradeBehavior(ServerWorld world) {
+        // Example: Look for players, maybe display emerald particles?
+        Box checkBox = villager.getBoundingBox().expand(8.0);
+        List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(PlayerEntity.class, checkBox, p -> true);
+        
+        if (!nearbyPlayers.isEmpty()) {
+            PlayerEntity targetPlayer = nearbyPlayers.get(0); // Look at the first player found
+            villager.getLookControl().lookAt(targetPlayer, 30f, 30f);
+            
+            // Show emerald particles occasionally
+            if (world.random.nextInt(40) == 0) {
+                world.spawnParticles(ParticleTypes.EMERALD,
+                    villager.getX(), villager.getY() + 1.5, villager.getZ(),
+                    3, 0.2, 0.2, 0.2, 0.0);
+                LOGGER.trace("Villager {} ready to trade near {}", villager.getName().getString(), targetPlayer.getName().getString());
+            }
+        }
+        // Villager should mostly stay put while trading (handled by low wander speed in applyTradeGoals)
+    }
+    
+    private void executeCelebrationBehavior(ServerWorld world) {
+        // Example: Wander around happily, occasionally jump or show happy particles
+        if (!activeGoals.containsKey("celebrate_wander")) {
+            Goal wanderGoal = new WanderAroundGoal((PathAwareEntity)villager, 0.7D);
+            addGoal(wanderGoal, 1, "celebrate_wander");
+        }
+        
+        if (world.random.nextInt(60) == 0) { // Occasionally jump
+            villager.getJumpControl().setActive();
+            LOGGER.trace("Villager {} jumping during celebration", villager.getName().getString());
+        }
+        
+        if (world.random.nextInt(30) == 0) { // Occasionally show happy particles
+            world.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
+                villager.getX(), villager.getY() + 1.0, villager.getZ(),
+                4, 0.3, 0.3, 0.3, 0.0);
+        }
+    }
+    
+    private void executeFleeingBehavior(ServerWorld world) {
+        // Goals for fleeing are already applied in applyFleeGoals.
+        // This method could add extra effects, like panic particles.
+        if (world.random.nextInt(10) == 0) {
+            world.spawnParticles(ParticleTypes.SMOKE, // Or another particle?
+                villager.getX(), villager.getY() + 0.5, villager.getZ(),
+                2, 0.1, 0.1, 0.1, 0.01);
+        }
+        
+        // Check if the danger source is gone
+        String target = behaviorParams.getOrDefault("target", "danger").toString();
+        boolean dangerPresent = false;
+        if (target.contains("monster")) {
+             Box checkBox = villager.getBoundingBox().expand(10.0);
+             dangerPresent = !world.getEntitiesByClass(Monster.class, checkBox, m -> m.isAlive()).isEmpty();
+        } else if (target.contains("player")) {
+             Box checkBox = villager.getBoundingBox().expand(8.0);
+             dangerPresent = !world.getEntitiesByClass(PlayerEntity.class, checkBox, p -> true).isEmpty(); // Simple check if any player is nearby
+        } else {
+            // General danger check - maybe based on memory?
+             dangerPresent = villager.getBrain().getOptionalMemory(MemoryModuleType.HURT_BY).isPresent() ||
+                             villager.getBrain().getOptionalMemory(MemoryModuleType.HURT_BY_ENTITY).isPresent();
+        }
+        
+        // If danger is gone, complete the behavior early
+        if (!dangerPresent && world.getTime() > behaviorStartTime + 40) { // Minimum flee time 2 seconds
+             LOGGER.debug("Danger seems gone, villager {} stopping flee behavior", villager.getName().getString());
+             completeBehavior();
+        }
+    }
+    
+    private void executeSleepingBehavior(ServerWorld world) {
+        // Villager should be pathing towards bed via goals applied in applyRestGoals.
+        // Check if villager has reached a bed.
+        BlockPos currentPos = villager.getBlockPos();
+        BlockState blockState = world.getBlockState(currentPos);
+        
+        // Crude check if the block is a bed
+        if (blockState.getBlock().toString().contains("bed")) {
+            // If on a bed, stop moving and maybe play sleeping particles/sounds?
+            if (villager.getNavigation().isIdle()) {
+                 // Already stopped moving
+                 if (world.random.nextInt(100) == 0) {
+                     // Play Zzz particle? (No standard particle for this)
+                     LOGGER.trace("Villager {} sleeping at {}", villager.getName().getString(), currentPos);
+                 }
+            } else {
+                 villager.getNavigation().stop();
+                 LOGGER.debug("Villager {} reached bed at {}, stopping navigation", villager.getName().getString(), currentPos);
+            }
+        } else {
+            // If not near a bed, ensure the move goal is still active
+            if (!activeGoals.containsKey("move_to_bed")) { // Assuming the move goal ID is consistent
+                 applyRestGoals("bed"); // Re-apply goals if needed
+                 LOGGER.trace("Villager {} re-applying sleep goals", villager.getName().getString());
+            }
+        }
+    }
+    
+    private void executeIdleBehavior(ServerWorld world) {
+        // Default behavior when nothing else is happening.
+        // Mostly relies on the wander/look goals applied.
+        // Could add very occasional small actions.
+        if (world.random.nextInt(500) == 0) {
+            // Briefly look around or scratch head? (No standard animation)
+            villager.swingHand(Hand.MAIN_HAND); // Simple visual cue
+            LOGGER.trace("Villager {} idling", villager.getName().getString());
+        }
+    }
+    
+    // --- Utility Methods ---
+    
+    /**
+     * Finds the nearest bed block within a certain radius.
+     * @param world The server world
+     * @return Optional containing the BlockPos of the nearest bed, or empty if none found.
+     */
+    private Optional<BlockPos> findNearestBed(ServerWorld world) {
+        BlockPos villagerPos = villager.getBlockPos();
+        int searchRadius = 16; // Search radius for beds
+        
+        return BlockPos.streamOutwards(villagerPos, searchRadius, searchRadius, searchRadius)
+            .filter(pos -> {
+                BlockState state = world.getBlockState(pos);
+                // Basic check for any block containing "bed" in its name
+                return state.getBlock().toString().toLowerCase().contains("bed");
+            })
+            .min(Comparator.comparingDouble(pos -> pos.getSquaredDistance(villagerPos)))
+            .map(BlockPos::toImmutable); // Make sure the returned pos is immutable
     }
     
     /**
-     * Get a random position around a center point
+     * Gets a random position within a certain radius around a center point.
      * @param center The center position
-     * @param radius The radius to search within
-     * @return A random position
+     * @param radius The radius
+     * @return A random BlockPos within the radius
      */
     private BlockPos getRandomPositionAround(BlockPos center, int radius) {
-        Random random = new Random();
-        return center.add(
-            random.nextInt(radius * 2) - radius,
-             0,
-            random.nextInt(radius * 2) - radius
-        );
+        Random random = villager.getWorld().random;
+        int x = center.getX() + random.nextInt(radius * 2 + 1) - radius;
+        int y = center.getY(); // Keep Y level the same for simplicity, or add small variation
+        int z = center.getZ() + random.nextInt(radius * 2 + 1) - radius;
+        return new BlockPos(x, y, z);
     }
     
-    /**
-     * Get a villager's skill level in a specific profession
-     * 
-     * @param skill The skill name to get (e.g., "crafting", "farming", "trading")
-     * @return The skill level (0.0f to 10.0f)
-     */
+    // --- Getters/Setters for internal state ---
+    
     public float getProfessionSkill(String skill) {
-        // Return the skill value if it exists, or 0 if it doesn't
-        return professionSkills.getOrDefault(skill, 0.0f);
+        return professionSkills.getOrDefault(skill.toLowerCase(), 0.0f);
     }
     
-    /**
-     * Update a villager's skill level in a specific profession
-     * 
-     * @param skill The skill name to update
-     * @param newValue The new skill value
-     */
+    public boolean isPvPEnabled() {
+        return pvpEnabled;
+    }
+    
+    public RelationshipType getRelationshipWith(UUID otherVillagerId) {
+        // Needs implementation based on how relationships are stored
+        // Example: return VillagerManager.getInstance().getRelationship(villager.getUuid(), otherVillagerId);
+        return RelationshipType.NEUTRAL; // Placeholder
+    }
+    
     public void updateProfessionSkill(String skill, float newValue) {
-        // Keep skill values between 0 and 10
-        float clampedValue = Math.max(0.0f, Math.min(10.0f, newValue));
-        professionSkills.put(skill, clampedValue);
-        LOGGER.debug("Updated {} skill for villager {} to {}", 
-            skill, villager.getName().getString(), clampedValue);
+        professionSkills.put(skill.toLowerCase(), Math.max(0.0f, Math.min(1.0f, newValue)));
+    }
+    
+    // Add other necessary getters/setters if needed
+
+    /**
+     * Updates relationships based on interaction sentiment, applying intensity and cultural bias.
+     * @param v1 The first villager AI
+     * @param v2 The second villager AI
+     * @param interaction The parsed interaction details from the LLM
+     */
+    private void updateRelationships(VillagerAI v1, VillagerAI v2, Map<String, String> interaction) {
+        // Get multipliers from config
+        VillagesConfig.GameplaySettings gameplaySettings = VillagesConfig.getInstance().getGameplaySettings();
+        float intensityMultiplier = gameplaySettings.getRelationshipIntensityMultiplier();
+        boolean culturalBias = gameplaySettings.isCulturalBiasEnabled();
+        if (intensityMultiplier <= 0) intensityMultiplier = 1.0f; // Safety check
+
+        String sentiment = interaction.getOrDefault("SENTIMENT", "neutral").toLowerCase();
+        RelationshipType newType = RelationshipType.NEUTRAL;
+        int baseChange = 0; // Base amount relationship changes per interaction
+
+        if (sentiment.contains("positive")) {
+            newType = RelationshipType.FRIEND;
+            baseChange = 5; // Example base positive change
+        } else if (sentiment.contains("negative")) {
+            newType = RelationshipType.RIVAL;
+            baseChange = -5; // Example base negative change
+        }
+
+        int adjustedChange = (int) (baseChange * intensityMultiplier);
+
+        // Apply cultural bias if enabled
+        if (culturalBias) {
+            VillagerManager vm = VillagerManager.getInstance();
+            SpawnRegion region1 = vm.getNearestSpawnRegion(v1.getVillager().getBlockPos());
+            SpawnRegion region2 = vm.getNearestSpawnRegion(v2.getVillager().getBlockPos());
+            String culture1 = (region1 != null) ? region1.getCultureAsString() : null;
+            String culture2 = (region2 != null) ? region2.getCultureAsString() : null;
+
+            int biasModifier = 0;
+            final int CULTURAL_BIAS_AMOUNT = 2; // Example value
+
+            if (culture1 != null && culture2 != null) {
+                if (culture1.equals(culture2)) {
+                    biasModifier = CULTURAL_BIAS_AMOUNT; // Positive bias for same culture
+                } else {
+                    biasModifier = -CULTURAL_BIAS_AMOUNT; // Negative bias for different cultures
+                }
+            }
+            adjustedChange += biasModifier;
+            LOGGER.trace("Applied cultural bias: {} (Culture1: {}, Culture2: {})", biasModifier, culture1, culture2);
+        }
+
+
+        // TODO: Apply adjustedChange to the numerical relationship score between v1 and v2
+        // This likely involves getting the current score and updating it via VillagerManager or Relationship class
+        LOGGER.debug("Applying relationship change: {} (Base: {}, Intensity Multiplier: {}, Bias Applied: {}) between {} and {}",
+            adjustedChange, baseChange, intensityMultiplier, culturalBias, v1.getVillager().getName().getString(), v2.getVillager().getName().getString());
+
+        // Update the categorical relationship type (Friend/Rival/Neutral) based on the sentiment
+        // This part might need refinement based on how numerical scores translate to types
+        // For now, we still use the sentiment-based type, but the underlying score is adjusted.
+        v1.addRelationship(v2.getVillager().getUuid(), newType);
+        v2.addRelationship(v1.getVillager().getUuid(), newType);
     }
 }

@@ -2,6 +2,7 @@ package com.beeny.village;
 
 import com.beeny.ai.CulturalPromptTemplates;
 import com.beeny.ai.LLMService;
+import com.beeny.config.VillagesConfig; // Added import
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
@@ -71,26 +72,43 @@ public class VillagerDialogue {
         context.put("player_name", player.getName().getString());
         context.put("relationship_level", String.format("%.2f", relationship));
         context.put("emotional_state", memory.getEmotionalState());
-        context.put("recent_memories", relevantMemories.stream()
-            .limit(3)
+
+        // Check if advanced conversations are enabled
+        boolean advanced = VillagesConfig.getInstance().getLLMSettings().isAdvancedConversationsEnabled();
+        int memoryLimit = advanced ? 10 : 3; // Use more memories if advanced
+        String memoryContext = relevantMemories.stream()
+            .limit(memoryLimit)
             .map(VillagerMemory.Memory::getDescription)
             .reduce((a, b) -> a + "; " + b)
-            .orElse("None"));
+            .orElse("None");
+        context.put("recent_memories", memoryContext);
 
-        String prompt = CulturalPromptTemplates.getTemplate("villager_interaction",
-            villager.getName().getString(),
-            profession,
-            memory.getEmotionalState(),
-            player.getName().getString(),
-            "player",
-            "unknown",
-            interactionType,
-            "current",
-            context.get("recent_memories"),
-            cultureType,
-            "clear",
-            "trading"
+        // Adjust prompt slightly for advanced conversations
+        String promptTemplateKey = advanced ? "villager_interaction_advanced" : "villager_interaction";
+        String interactionDetail = advanced ? "detailed conversation" : interactionType;
+
+        // Assuming CulturalPromptTemplates has an "villager_interaction_advanced" variant
+        // If not, we can just modify the existing prompt string directly here.
+        // For now, let's assume the template exists or the standard one adapts.
+        String prompt = CulturalPromptTemplates.getTemplate(promptTemplateKey,
+            villager.getName().getString(),      // villagerName
+            profession,                          // villagerProfession
+            memory.getEmotionalState(),          // villagerMood
+            player.getName().getString(),        // targetName
+            "player",                            // targetType (assuming player)
+            "unknown",                           // targetProfession (if applicable)
+            interactionDetail,                   // interactionContext (greeting, trade, advanced convo)
+            "current",                           // timeOfDay
+            context.get("recent_memories"),      // recentEvents/Memories
+            cultureType,                         // culture
+            "clear",                             // weather
+            "general interaction"                // activity
         );
+
+        // Optionally adjust max_tokens for advanced conversations
+        if (advanced) {
+            context.put("max_tokens", "250"); // Request longer response
+        }
 
         return llmService.generateResponse(prompt, context);
     }

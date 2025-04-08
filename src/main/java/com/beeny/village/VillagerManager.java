@@ -1,6 +1,7 @@
 package com.beeny.village;
 
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import com.beeny.ai.LLMService;
 import com.beeny.ai.CulturalPromptTemplates;
 import com.beeny.util.NameGenerator;
+import com.beeny.config.VillagesConfig; // Added import
 import com.beeny.api.VillageHudAPI;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -30,6 +32,13 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.command.CommandRegistryAccess;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.structure.pool.StructurePool;
+import net.minecraft.structure.pool.StructurePoolElement;
+import net.minecraft.structure.processor.StructureProcessorList;
+import net.minecraft.structure.processor.StructureProcessorLists;
 import net.minecraft.util.math.Box;
 
 public class VillagerManager {

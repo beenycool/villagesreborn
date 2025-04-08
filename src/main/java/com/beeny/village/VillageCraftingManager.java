@@ -1,6 +1,8 @@
 package com.beeny.village;
 
+import com.beeny.Villagesreborn; // Added import
 import com.beeny.ai.LLMService;
+import com.beeny.config.VillagesConfig; // Added import
 import com.beeny.village.util.DataComponentHelper;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -143,14 +145,69 @@ public class VillageCraftingManager {
             return;
         }
         
-        if (!recipe.hasRequiredMaterials(player)) {
+        Map<Item, Integer> requiredIngredients = recipe.getIngredients();
+        boolean bonusApplied = false;
+        float costMultiplier = 1.0f;
+
+        // Check for cultural trading bonus
+        if (VillagesConfig.getInstance().getGameplaySettings().isVillagerTradingBoostEnabled()) {
+            VillagerManager vm = VillagerManager.getInstance();
+            SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+            String culture = (region != null) ? region.getCultureAsString().toUpperCase() : null; // Use uppercase for consistency
+
+            if (culture != null) {
+                int reputation = Villagesreborn.getInstance().getPlayerReputation(player.getUuid(), culture);
+                final int REPUTATION_THRESHOLD = 50; // Example threshold for bonus
+                final float BONUS_MULTIPLIER = 0.8f; // Example: 20% discount
+
+                if (reputation >= REPUTATION_THRESHOLD) {
+                    costMultiplier = BONUS_MULTIPLIER;
+                    bonusApplied = true;
+                    LOGGER.debug("Applying trading bonus (Rep: {}, Culture: {}) for player {} crafting with {}", reputation, culture, player.getName().getString(), villager.getName().getString());
+                }
+            }
+        }
+
+        // Calculate potentially modified ingredients
+        Map<Item, Integer> finalIngredients = new HashMap<>();
+        if (bonusApplied) {
+            for (Map.Entry<Item, Integer> entry : requiredIngredients.entrySet()) {
+                // Apply multiplier, round up, ensure minimum of 1
+                int modifiedCount = Math.max(1, (int) Math.ceil(entry.getValue() * costMultiplier));
+                finalIngredients.put(entry.getKey(), modifiedCount);
+            }
+        } else {
+            finalIngredients.putAll(requiredIngredients); // Use original ingredients
+        }
+
+
+        // Check if player has the FINAL required materials
+        boolean hasMaterials = true;
+        for (Map.Entry<Item, Integer> entry : finalIngredients.entrySet()) {
+            if (!player.getInventory().containsAny(stack -> stack.isOf(entry.getKey()) && stack.getCount() >= entry.getValue())) {
+                hasMaterials = false;
+                break;
+            }
+        }
+
+        if (!hasMaterials) {
             player.sendMessage(Text.literal("You do not have the required materials for this recipe.").formatted(Formatting.RED), false);
+            // Optionally list missing materials
             return;
+        }
+
+        // Consume the FINAL required materials
+        for (Map.Entry<Item, Integer> entry : finalIngredients.entrySet()) {
+            player.getInventory().remove(stack -> stack.isOf(entry.getKey()), entry.getValue(), player.getInventory());
         }
         
         // Assign the task to the villager (logic can be expanded as needed)
         LOGGER.info("Assigning crafting task {} to villager {}", recipeId, villager.getUuid());
-        player.sendMessage(Text.literal("Task assigned successfully.").formatted(Formatting.GREEN), false);
+        if (bonusApplied) {
+            player.sendMessage(Text.literal("Task assigned! Your good reputation granted a discount.").formatted(Formatting.GREEN), false);
+        } else {
+            player.sendMessage(Text.literal("Task assigned successfully.").formatted(Formatting.GREEN), false);
+        }
     }
 
     public void cancelTask(VillagerEntity villager, String recipeId) {

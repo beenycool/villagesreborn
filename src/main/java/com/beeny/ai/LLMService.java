@@ -88,8 +88,17 @@ public class LLMService {
         Map<String, String> fullContext = new HashMap<>(this.context);
         fullContext.putAll(context);
 
-        return currentProvider.generateResponse(finalPrompt, fullContext)
-            .orTimeout(30, TimeUnit.SECONDS)
+        CompletableFuture<String> future = currentProvider.generateResponse(finalPrompt, fullContext);
+
+        // Apply AI response delay if configured
+        int delayMs = config.getLLMSettings().getAiResponseDelay();
+        if (delayMs > 0) {
+            LOGGER.debug("Applying AI response delay: {} ms", delayMs);
+            future = future.thenApplyAsync(response -> response,
+                                           CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS));
+        }
+
+        return future.orTimeout(30 + (delayMs / 1000), TimeUnit.SECONDS) // Adjust timeout to account for delay
             .exceptionally(e -> {
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 LOGGER.error("Error generating response", cause);

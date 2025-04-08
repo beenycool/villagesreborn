@@ -7,6 +7,7 @@ import net.minecraft.client.gui.tooltip.Tooltip; // Import Tooltip
 import net.minecraft.text.Text;
 import com.beeny.config.VillagesConfig;
 import com.beeny.config.ClothConfigProvider;
+import java.util.Map; // Added import
 
 public class VillagesRebornSettingsScreen extends Screen {
     private final Screen parent;
@@ -102,8 +103,20 @@ public class VillagesRebornSettingsScreen extends Screen {
     public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
         // Render background darkens the screen slightly
         this.renderBackground(context, mouseX, mouseY, delta);
-        // Draw the title centered
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        // Define simple color schemes
+        Map<String, Integer> titleColors = Map.of(
+            "DEFAULT", 0xFFFFFF, // White
+            "DARK", 0xAAAAAA,    // Gray (Example for a potential dark theme)
+            "CONTRAST", 0xFFFF00 // Yellow (Example)
+            // Add more schemes as needed
+        );
+
+        // Get current color scheme from config
+        String currentScheme = config.getUISettings().getColorScheme();
+        int titleColor = titleColors.getOrDefault(currentScheme.toUpperCase(), 0xFFFFFF); // Default to white
+
+        // Draw the title centered using the selected color
+        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, titleColor);
         // Render widgets (buttons, etc.)
         super.render(context, mouseX, mouseY, delta);
     }

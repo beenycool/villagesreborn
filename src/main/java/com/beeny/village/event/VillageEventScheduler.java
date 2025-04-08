@@ -1,6 +1,7 @@
 package com.beeny.village.event;
 
 import com.beeny.village.VillageInfluenceManager;
+import com.beeny.config.VillagesConfig; // Added import
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
@@ -10,6 +11,7 @@ import net.minecraft.world.World;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -83,17 +85,23 @@ public class VillageEventScheduler {
         public final Map<Season, Integer> seasonalWeights;
         public final boolean requiresSpecialCondition;
         public final String specialCondition;
+        public final boolean isCultural; // Added flag
+        public final boolean isOutdoor; // Added flag
         
-        public EventTemplate(String type, String[] descriptions, int weight, 
+        public EventTemplate(String type, String[] descriptions, int weight,
                            int baseMinDuration, int baseMaxDuration) {
-            this(type, descriptions, weight, baseMinDuration, baseMaxDuration, null, false, null);
+            // Default outdoor based on type
+            boolean outdoor = type.equalsIgnoreCase("festival") || type.equalsIgnoreCase("competition") || type.equalsIgnoreCase("market") || type.equalsIgnoreCase("parade");
+            this(type, descriptions, weight, baseMinDuration, baseMaxDuration, null, false, null, true, outdoor);
         }
         
         public EventTemplate(String type, String[] descriptions, int weight, 
                            int baseMinDuration, int baseMaxDuration,
                            Map<Season, Integer> seasonalWeights, 
-                           boolean requiresSpecialCondition, 
-                           String specialCondition) {
+                           boolean requiresSpecialCondition,
+                           String specialCondition,
+                           boolean isCultural,
+                           boolean isOutdoor) { // Added parameter
             this.type = type;
             this.descriptions = descriptions;
             this.weight = weight;
@@ -102,6 +110,8 @@ public class VillageEventScheduler {
             this.seasonalWeights = seasonalWeights != null ? seasonalWeights : new EnumMap<>(Season.class);
             this.requiresSpecialCondition = requiresSpecialCondition;
             this.specialCondition = specialCondition;
+            this.isCultural = isCultural;
+            this.isOutdoor = isOutdoor; // Assign flag
         }
         
         /**
@@ -499,23 +509,59 @@ public class VillageEventScheduler {
         egyptianEvents.add(new EventTemplate(
             "competition",
             new String[] {
-                "Nile Boat Race", 
-                "Egyptian Wrestling", 
-                "Archery Contest",
-                "Hunting Tournament"
+                "Royal Hunt", 
+                "Scribe Competition", 
+                "Chariot Race (Egyptian Style)",
+                "Archery Contest"
             },
-            70, 60, 150
+            50, 60, 120
         ));
         
-        // Special condition events
+        // Special condition: Low Nile (Drought)
         egyptianEvents.add(new EventTemplate(
-            "flood_preparation",
+            "drought_ritual",
             new String[] {
-                "Nile Flood Preparation", 
-                "Hapi Worship Ritual",
-                "Levee Construction Effort" 
+                "Prayer to Hapi (Nile God)", 
+                "Water Scarcity Ceremony",
+                "Offering to Ra for Sun's Mercy"
             },
-            20, 45, 90, null, true, "flood_warning"
+            30, 45, 90, null, true, "drought"
+        ));
+        
+        // Special condition: High Priest Population
+        egyptianEvents.add(new EventTemplate(
+            "temple_ceremony",
+            new String[] {
+                "Grand Temple Procession", 
+                "Sacred Animal Blessing",
+                "Reading of Sacred Texts",
+                "Oracle Consultation Ritual"
+            },
+            45, 60, 150, null, true, "high_priest_population"
+        ));
+        
+        // Special condition: High Farmer Population
+        egyptianEvents.add(new EventTemplate(
+            "harvest_festival",
+            new String[] {
+                "First Harvest Offering", 
+                "Nile Flood Thanksgiving",
+                "Grain Storage Blessing",
+                "Fertility Ritual for Fields"
+            },
+            55, 45, 120, null, true, "high_farmer_population"
+        ));
+        
+        // Special condition: High Mason Population
+        egyptianEvents.add(new EventTemplate(
+            "construction_ceremony",
+            new String[] {
+                "Monument Foundation Ritual", 
+                "Tool Blessing Ceremony",
+                "Quarry Opening Rite",
+                "Completion Celebration"
+            },
+            50, 75, 180, null, true, "high_mason_population"
         ));
         
         eventTemplatesByCulture.put("egyptian", egyptianEvents);
@@ -523,71 +569,81 @@ public class VillageEventScheduler {
         // Victorian events
         List<EventTemplate> victorianEvents = new ArrayList<>();
         
-        // Seasonal weights for Victorian festivals
+        // Seasonal adjustments for Victorian events
         Map<Season, Integer> victorianFestivalSeasons = new EnumMap<>(Season.class);
-        victorianFestivalSeasons.put(Season.WINTER, 130); // Christmas markets and winter balls
-        victorianFestivalSeasons.put(Season.SPRING, 110); // Spring fairs
+        victorianFestivalSeasons.put(Season.WINTER, 140); // Christmas/Winter festivals
+        victorianFestivalSeasons.put(Season.SUMMER, 120); // Summer fairs
         
         victorianEvents.add(new EventTemplate(
             "festival",
             new String[] {
-                "Victorian Garden Party", 
-                "Industrial Exhibition", 
-                "Christmas Market",
-                "Grand Ball",
-                "Spring Fair"
+                "Victorian Christmas Market", 
+                "Summer Fair", 
+                "Queen's Jubilee Celebration",
+                "Harvest Festival",
+                "May Day Fair"
             },
-            100, 60, 180, victorianFestivalSeasons, false, null
+            100, 90, 240, victorianFestivalSeasons, false, null
         ));
         
         victorianEvents.add(new EventTemplate(
             "ceremony",
             new String[] {
-                "Royal Visit", 
-                "Knighting Ceremony", 
-                "Factory Inauguration",
-                "Town Hall Assembly"
+                "Town Hall Meeting", 
+                "Factory Opening Ceremony", 
+                "Remembrance Day Service",
+                "Royal Visit Preparation"
             },
-            80, 45, 120
+            60, 60, 120
         ));
+        
+        // Victorian rituals often tied to social events
+        Map<Season, Integer> victorianRitualSeasons = new EnumMap<>(Season.class);
+        victorianRitualSeasons.put(Season.AUTUMN, 90); // Autumn social season
         
         victorianEvents.add(new EventTemplate(
-            "market",
+            "ritual", // More like social rituals
             new String[] {
-                "Street Market", 
-                "Trade Exposition", 
-                "Antique Auction",
-                "Factory Goods Fair"
+                "High Tea Gathering", 
+                "Formal Ball", 
+                "Sunday Church Service",
+                "Debating Society Meeting"
             },
-            90, 60, 150
+            70, 45, 90, victorianRitualSeasons, false, null
         ));
-        
-        // Victorian competitions vary by season
-        Map<Season, Integer> victorianCompetitionSeasons = new EnumMap<>(Season.class);
-        victorianCompetitionSeasons.put(Season.SUMMER, 100); // Summer sporting events
-        victorianCompetitionSeasons.put(Season.AUTUMN, 80);  // Autumn competitions
-        victorianCompetitionSeasons.put(Season.WINTER, 40);  // Fewer winter competitions
         
         victorianEvents.add(new EventTemplate(
             "competition",
             new String[] {
                 "Cricket Match", 
-                "Horse Race", 
-                "Poetry Contest",
-                "Scientific Demonstration"
+                "Baking Competition", 
+                "Scientific Invention Fair",
+                "Flower Show"
             },
-            70, 60, 150, victorianCompetitionSeasons, false, null
+            50, 60, 150
         ));
         
-        // Special condition events
+        // Special condition: Industrial Boom
         victorianEvents.add(new EventTemplate(
-            "industrial_showcase",
+            "industrial_expo",
             new String[] {
-                "Industrial Innovation Showcase", 
-                "Engineering Marvel Exhibition",
-                "Modern Machinery Demonstration" 
+                "Factory Technology Showcase", 
+                "Steam Power Exhibition",
+                "New Invention Unveiling"
             },
-            20, 60, 120, null, true, "industrial_boom"
+            40, 90, 180, null, true, "industrial_boom"
+        ));
+        
+        // Special condition: High Scholar Population
+        victorianEvents.add(new EventTemplate(
+            "academic_lecture",
+            new String[] {
+                "Scientific Discovery Lecture", 
+                "Philosophical Debate",
+                "Literary Society Reading",
+                "Historical Society Meeting"
+            },
+            45, 60, 120, null, true, "scholarly_population"
         ));
         
         eventTemplatesByCulture.put("victorian", victorianEvents);
@@ -595,246 +651,228 @@ public class VillageEventScheduler {
         // NYC events
         List<EventTemplate> nycEvents = new ArrayList<>();
         
-        // Seasonal adjustments for NYC festivals
+        // Seasonal adjustments for NYC events
         Map<Season, Integer> nycFestivalSeasons = new EnumMap<>(Season.class);
-        nycFestivalSeasons.put(Season.SUMMER, 120); // Summer street festivals
-        nycFestivalSeasons.put(Season.WINTER, 110); // Winter holiday celebrations
+        nycFestivalSeasons.put(Season.SUMMER, 130); // Summer street fairs, concerts
+        nycFestivalSeasons.put(Season.WINTER, 130); // Holiday markets, New Year's
         
         nycEvents.add(new EventTemplate(
             "festival",
             new String[] {
-                "Broadway Street Party", 
-                "Rooftop Celebration", 
-                "Cultural Diversity Festival",
-                "Downtown Music Festival",
-                "Art Gallery Opening"
-            },
-            100, 60, 180, nycFestivalSeasons, false, null
-        ));
-        
-        // NYC markets vary by season
-        Map<Season, Integer> nycMarketSeasons = new EnumMap<>(Season.class);
-        nycMarketSeasons.put(Season.SPRING, 120); // Spring markets
-        nycMarketSeasons.put(Season.AUTUMN, 110); // Fall markets
-        
-        nycEvents.add(new EventTemplate(
-            "market",
-            new String[] {
-                "Farmers Market", 
-                "Stock Exchange Day", 
-                "Fashion Week Market",
-                "Street Food Fair"
-            },
-            90, 45, 120, nycMarketSeasons, false, null
-        ));
-        
-        nycEvents.add(new EventTemplate(
-            "celebration",
-            new String[] {
-                "New Year's Celebration", 
-                "Independence Day Party", 
-                "Central Park Concert",
+                "Street Fair", 
+                "Central Park Concert", 
+                "Holiday Market",
+                "Food Truck Festival",
                 "Neighborhood Block Party"
             },
-            80, 60, 150
+            100, 120, 300, nycFestivalSeasons, false, null
+        ));
+        
+        nycEvents.add(new EventTemplate(
+            "ceremony", // More like public gatherings
+            new String[] {
+                "Building Inauguration", 
+                "Public Art Unveiling", 
+                "Political Rally",
+                "Memorial Service"
+            },
+            50, 60, 120
+        ));
+        
+        nycEvents.add(new EventTemplate(
+            "ritual", // Modern rituals/routines
+            new String[] {
+                "Rush Hour Commute", // :)
+                "Weekend Brunch Gathering", 
+                "Coffee Shop Meetup",
+                "Gallery Opening Night"
+            },
+            60, 30, 60 // Shorter, more frequent 'rituals'
         ));
         
         nycEvents.add(new EventTemplate(
             "competition",
             new String[] {
-                "Marathon Race", 
                 "Street Basketball Tournament", 
-                "Hot Dog Eating Contest",
-                "Subway Art Competition"
+                "Hot Dog Eating Contest", 
+                "Taxi Race (Conceptual)",
+                "Stock Market Challenge"
             },
-            70, 60, 150
+            40, 60, 180
         ));
         
-        // Special condition events
+        // Special condition: Financial Boom
         nycEvents.add(new EventTemplate(
-            "cleanup_initiative",
+            "financial_gala",
             new String[] {
-                "Community Cleanup Drive", 
-                "Green Space Restoration",
-                "Urban Beautification Project" 
+                "Wall Street Gala", 
+                "Investment Bankers Ball",
+                "Stock Exchange Celebration"
             },
-            20, 45, 90, null, true, "pollution"
+            30, 120, 240, null, true, "financial_boom"
+        ));
+        
+        // Special condition: High Artist Population
+        nycEvents.add(new EventTemplate(
+            "art_exhibition",
+            new String[] {
+                "Gallery Opening Night", 
+                "Street Art Festival",
+                "Avant-Garde Performance",
+                "Museum Exhibit Premiere"
+            },
+            50, 90, 180, null, true, "high_artist_population"
         ));
         
         eventTemplatesByCulture.put("nyc", nycEvents);
+        
+        // TODO: Add templates for Nether and End cultures
     }
     
     /**
-     * Register a village for event scheduling
-     * 
-     * @param center The village center position
-     * @param frequency How often events should occur (in minutes)
-     * @param radius The radius for village events
+     * Registers a village with the scheduler
+     * @param center The center BlockPos of the village
+     * @param frequency The base frequency of events in minutes
+     * @param radius The radius of the village for event effects
      */
     public void registerVillage(BlockPos center, int frequency, int radius) {
+        nextEventTimes.put(center, System.currentTimeMillis() + (long)frequency * 60 * 1000); // Schedule first event
         eventFrequencies.put(center, frequency);
         eventRadii.put(center, radius);
         villageEventHistory.put(center, new ArrayList<>());
         villageConditions.put(center, new HashMap<>());
-        
-        // Initialize other trackers
-        villageHappiness.put(center, 75); // Default happiness value
-        eventComplexityLevel.put(center, 1); // Start with simple events
-        
-        // Schedule the first event
-        scheduleNextEvent(center);
+        villageDemographics.put(center, new VillageDemographics(0, 0, 0, new HashMap<>(), false)); // Initial empty demographics
+        villageHappiness.put(center, 50); // Start at neutral happiness
+        eventComplexityLevel.put(center, 1); // Start at base complexity
     }
     
     /**
-     * Update village demographic information
+     * Updates the demographic information for a village
+     * @param center The center BlockPos of the village
+     * @param demographics The new demographic data
      */
     public void updateVillageDemographics(BlockPos center, VillageDemographics demographics) {
         villageDemographics.put(center, demographics);
         
-        // Check for demographic-based conditions
+        // Update conditions based on demographics
         Map<String, Object> conditions = villageConditions.computeIfAbsent(center, k -> new HashMap<>());
         
-        // Check for demographic-based triggers
-        if (demographics.getChildPopulation() > demographics.getTotalPopulation() * 0.3) {
-            conditions.put("high_child_population", true);
-        } else {
-            conditions.remove("high_child_population");
-        }
+        // Example conditions based on demographics
+        conditions.put("high_child_population", demographics.getChildPopulation() > demographics.getTotalPopulation() * 0.3);
+        conditions.put("scholarly_population", demographics.getPopulationByProfession("librarian") > 2); // Example threshold
+        conditions.put("high_farmer_population", demographics.getPopulationByProfession("farmer") > 5);
+        conditions.put("high_priest_population", demographics.getPopulationByProfession("cleric") > 3);
+        conditions.put("high_mason_population", demographics.getPopulationByProfession("mason") > 4);
+        conditions.put("high_smith_population", 
+            demographics.getPopulationByProfession("armorer") + 
+            demographics.getPopulationByProfession("weaponsmith") + 
+            demographics.getPopulationByProfession("toolsmith") > 5);
         
-        // Check profession-based conditions
-        Map<String, Integer> professions = demographics.getProfessionCounts();
-        for (Map.Entry<String, Integer> entry : professions.entrySet()) {
-            String profession = entry.getKey();
-            int count = entry.getValue();
-            
-            if (count >= 3 && count > demographics.getTotalPopulation() * 0.2) {
-                conditions.put("high_" + profession + "_population", true);
-            } else {
-                conditions.remove("high_" + profession + "_population");
-            }
-        }
-        
-        // Check for scholarly population (librarians, etc.)
-        if (demographics.hasProfession("librarian") || demographics.hasProfession("cleric")) {
-            conditions.put("scholarly_population", true);
-        } else {
-            conditions.remove("scholarly_population");
-        }
+        // Add more conditions as needed
     }
     
     /**
-     * Update village happiness level
+     * Updates the happiness level for a village
+     * @param center The center BlockPos of the village
+     * @param happinessLevel The new happiness level (0-100)
      */
     public void updateVillageHappiness(BlockPos center, int happinessLevel) {
-        villageHappiness.put(center, happinessLevel);
+        int clampedHappiness = Math.max(0, Math.min(100, happinessLevel));
+        villageHappiness.put(center, clampedHappiness);
         
+        // Update conditions based on happiness
         Map<String, Object> conditions = villageConditions.computeIfAbsent(center, k -> new HashMap<>());
-        
-        // Check for happiness-based conditions
-        if (happinessLevel < 40) {
-            conditions.put("low_happiness", true);
-        } else {
-            conditions.remove("low_happiness");
-        }
-        
-        if (happinessLevel > 80) {
-            conditions.put("high_happiness", true);
-        } else {
-            conditions.remove("high_happiness");
-        }
+        conditions.put("low_happiness", clampedHappiness < 30);
+        conditions.put("high_happiness", clampedHappiness > 75);
     }
     
     /**
-     * Schedule the next event for a village
+     * Schedules the next event for a specific village
      */
     private void scheduleNextEvent(BlockPos center) {
-        int frequency = eventFrequencies.getOrDefault(center, 180); // Default to 3 hours
-        
-        // Get village development level to adjust frequency
-        VillageInfluenceManager.VillageDevelopmentData village = 
-            VillageInfluenceManager.getInstance().getVillageDevelopment(center);
-        
-        if (village != null) {
-            int level = village.getVillageLevel();
-            // Higher level villages have more frequent events
-            frequency = Math.max(30, frequency - ((level - 1) * 30));
-        }
-        
-        // Adjust frequency based on active conditions
-        Map<String, Object> conditions = villageConditions.getOrDefault(center, Collections.emptyMap());
-        if (conditions.containsKey("festival_season")) {
-            frequency = (int)(frequency * 0.7); // More frequent during festival seasons
-        }
-        
-        // Additional factors for event frequency
-        int happiness = villageHappiness.getOrDefault(center, 75);
-        
-        // Unhappy villages need more events to improve morale
-        if (happiness < 50) {
-            frequency = (int)(frequency * 0.8); // 20% more frequent
-        }
-        
-        // Very happy villages may have more celebrations
-        if (happiness > 85) {
-            frequency = (int)(frequency * 0.9); // 10% more frequent
-        }
-        
-        // Add some randomness to the frequency (±20%)
-        int randomizedFrequency = (int)(frequency * (0.8 + random.nextFloat() * 0.4));
-        
-        // Calculate next event time
-        long nextEventTime = System.currentTimeMillis() + (randomizedFrequency * 60 * 1000L);
+        // Get the event frequency multiplier from config
+        float frequencyMultiplier = VillagesConfig.getInstance().getGameplaySettings().getEventFrequencyMultiplier();
+        if (frequencyMultiplier <= 0) frequencyMultiplier = 1.0f; // Avoid division by zero or negative delays
+
+        // Get minimum days between events and convert to milliseconds
+        int minDays = VillagesConfig.getInstance().getGameplaySettings().getMinDaysBetweenEvents();
+        long minMillisBetweenEvents = TimeUnit.DAYS.toMillis(minDays);
+
+        int baseFrequencyMinutes = eventFrequencies.getOrDefault(center, 60 * 24); // Default to once per Minecraft day
+        // Adjust frequency based on multiplier (lower multiplier = longer delay)
+        long baseDelayMillis = (long) (baseFrequencyMinutes * 60 * 1000 / frequencyMultiplier);
+        long randomizedDelayMillis = (long) (baseDelayMillis * (0.8 + random.nextDouble() * 0.4)); // Add +/- 20% randomness
+
+        long nextEventTime = System.currentTimeMillis() + randomizedDelayMillis;
+
+        // Find the start time of the last event in this village
+        // Assuming VillageEvent.findEventsNear can get recent events and their start times
+        long lastEventStartTime = VillageEvent.findEventsNear(center, eventRadii.getOrDefault(center, 64))
+                                      .stream()
+                                      .mapToLong(VillageEvent::getStartTime) // Assuming getStartTime exists
+                                      .max()
+                                      .orElse(0); // 0 if no previous events
+
+        // Ensure the next event time respects the minimum days constraint
+        nextEventTime = Math.max(nextEventTime, lastEventStartTime + minMillisBetweenEvents);
+
         nextEventTimes.put(center, nextEventTime);
+
+        // Log the scheduled time (optional)
+        // System.out.println("Next event for village at " + center + " scheduled in " + 
+        //                    (randomizedDelayMillis / 1000 / 60) + " minutes (adjusted for min days).");
     }
     
     /**
-     * Check for villages with scheduled events and create them if it's time
+     * Checks villages and potentially triggers new events based on schedule and conditions
      */
     public void update(World world) {
-        long currentTime = System.currentTimeMillis();
-        
-        // Only check periodically to reduce overhead
-        if (currentTime - lastCheckTime < MIN_CHECK_INTERVAL) {
-            return;
+        // Check max concurrent events globally first
+        int maxConcurrent = VillagesConfig.getInstance().getGameplaySettings().getMaxConcurrentEvents();
+        // Need a way to get the current number of active events.
+        // Assuming VillageEvent.getActiveEventCount() provides the correct global count.
+        int currentActiveEvents = VillageEvent.getActiveEventCount();
+        if (currentActiveEvents >= maxConcurrent) {
+            return; // Don't schedule new events if limit is reached
         }
-        
-        lastCheckTime = currentTime;
-        
-        // Calculate current season based on world time
-        Season currentSeason = getCurrentSeason(world);
-        
-        // Process each village with scheduled events
-        for (Map.Entry<BlockPos, Long> entry : nextEventTimes.entrySet()) {
-            BlockPos villageCenter = entry.getKey();
-            long scheduledTime = entry.getValue();
-            
-            // Check if it's time for the event
-            if (currentTime >= scheduledTime) {
-                // Get village culture
-                VillageInfluenceManager.VillageDevelopmentData village = 
-                    VillageInfluenceManager.getInstance().getVillageDevelopment(villageCenter);
-                
-                if (village != null) {
-                    String culture = village.getCulture();
-                    int radius = eventRadii.getOrDefault(villageCenter, 32);
+
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastCheckTime < MIN_CHECK_INTERVAL) {
+            return; // Don't check too frequently
+        }
+        lastCheckTime = currentTime; // Update last check time
+
+        // Iterate through registered villages
+        for (BlockPos center : nextEventTimes.keySet()) {
+            long nextEventTime = nextEventTimes.getOrDefault(center, 0L);
+            if (currentTime >= nextEventTime) {
+                // Time for a potential event in this village
+                String culture = VillageInfluenceManager.getInstance().getCultureAt(center); // Assuming this exists
+
+                // Re-check concurrent events before creating one for *this* village
+                if (VillageEvent.getActiveEventCount() >= maxConcurrent) {
+                    continue; // Skip this village if limit reached just now
+                }
+
+                if (culture != null) {
+                    // Try triggering a special event first
+                    boolean specialEventTriggered = checkAndTriggerSpecialEvent(world, center, culture, 
+                        eventRadii.getOrDefault(center, 64), 
+                        villageConditions.getOrDefault(center, new HashMap<>()));
                     
-                    // Check for special condition triggers first
-                    Map<String, Object> conditions = villageConditions.getOrDefault(villageCenter, new HashMap<>());
-                    boolean triggeredSpecialEvent = checkAndTriggerSpecialEvent(world, villageCenter, culture, radius, conditions);
-                    
-                    // If no special event was triggered, create a regular random event
-                    if (!triggeredSpecialEvent) {
-                        createRandomEvent(world, villageCenter, culture, radius, currentSeason, conditions);
+                    // If no special event, try a regular random event
+                    if (!specialEventTriggered) {
+                        createRandomEvent(world, center, culture, 
+                            eventRadii.getOrDefault(center, 64), 
+                            getCurrentSeason(world), 
+                            villageConditions.getOrDefault(center, new HashMap<>()));
                     }
                     
-                    // Schedule next event
-                    scheduleNextEvent(villageCenter);
+                    // Schedule the next check for this village
+                    scheduleNextEvent(center);
                 }
             }
         }
-        
-        // Update all existing events
-        VillageEvent.updateAllEvents(world);
     }
     
     /**
@@ -843,290 +881,279 @@ public class VillageEventScheduler {
      */
     private boolean checkAndTriggerSpecialEvent(World world, BlockPos center, String culture, 
                                               int radius, Map<String, Object> conditions) {
-        if (conditions.isEmpty()) {
-            return false;
+        if (conditions.isEmpty()) return false;
+        
+        List<EventTrigger> possibleTriggers = new ArrayList<>();
+        for (String conditionKey : conditions.keySet()) {
+            if (eventTriggersByCondition.containsKey(conditionKey)) {
+                // Check if the condition value is met (if applicable, e.g., boolean true)
+                Object conditionValue = conditions.get(conditionKey);
+                if (conditionValue instanceof Boolean && !(Boolean)conditionValue) {
+                    continue; // Skip if boolean condition is false
+                }
+                possibleTriggers.addAll(eventTriggersByCondition.get(conditionKey));
+            }
         }
         
-        // Get all conditions that have active triggers
-        List<String> activeConditions = conditions.keySet().stream()
-            .filter(eventTriggersByCondition::containsKey)
-            .collect(Collectors.toList());
+        if (possibleTriggers.isEmpty()) return false;
         
-        if (activeConditions.isEmpty()) {
-            return false;
-        }
+        // Select trigger based on weight
+        int totalWeight = possibleTriggers.stream().mapToInt(t -> t.priorityWeight).sum();
+        if (totalWeight <= 0) return false;
         
-        // Sort by priority potential triggers
-        String selectedCondition = activeConditions.get(random.nextInt(activeConditions.size()));
-        List<EventTrigger> potentialTriggers = eventTriggersByCondition.get(selectedCondition);
-        
-        // Random trigger selection weighted by priority
-        int totalPriority = potentialTriggers.stream().mapToInt(t -> t.priorityWeight).sum();
-        int randomValue = random.nextInt(totalPriority);
-        int currentPriority = 0;
-        
+        int roll = random.nextInt(totalWeight);
+        int currentWeight = 0;
         EventTrigger selectedTrigger = null;
-        for (EventTrigger trigger : potentialTriggers) {
-            currentPriority += trigger.priorityWeight;
-            if (randomValue < currentPriority) {
+        for (EventTrigger trigger : possibleTriggers) {
+            currentWeight += trigger.priorityWeight;
+            if (roll < currentWeight) {
                 selectedTrigger = trigger;
                 break;
             }
         }
         
-        if (selectedTrigger == null) {
-            selectedTrigger = potentialTriggers.get(0);
-        }
+        if (selectedTrigger == null) return false; // Should not happen if totalWeight > 0
         
-        // Select a random description
-        String description = selectedTrigger.eventDescriptions[
-            random.nextInt(selectedTrigger.eventDescriptions.length)];
+        // Create the event
+        String description = selectedTrigger.eventDescriptions[random.nextInt(selectedTrigger.eventDescriptions.length)];
+        long durationTicks = (long)selectedTrigger.durationMinutes * 60 * 20; // Convert minutes to ticks
         
-        // Create the special event
-        VillageEvent event = VillageEvent.createEvent(
-            selectedTrigger.eventType,
-            culture,
-            description,
-            center,
-            radius,
-            selectedTrigger.durationMinutes
+        VillageEvent event = new VillageEvent(
+            selectedTrigger.eventType + " (" + getConditionDisplayName(selectedTrigger.triggerCondition) + ")", 
+            description, 
+            center, 
+            radius, 
+            durationTicks, 
+            culture
         );
         
-        // Store event type in history
+        VillageEventManager.getInstance().addEvent(event);
         recordEventInHistory(center, selectedTrigger.eventType);
         
-        // Mark this condition as handled (optionally clear it if it's a one-time event)
-        if (conditions.get(selectedCondition) instanceof Boolean && (Boolean)conditions.get(selectedCondition)) {
-            conditions.remove(selectedCondition);
-        }
-        
-        // Add extras to the event based on village complexity
-        int complexity = eventComplexityLevel.getOrDefault(center, 1);
-        if (complexity > 1) {
-            event.setEventData("complexity", complexity);
-            
-            // For higher complexity events, add extra rewards or challenges
-            if (complexity >= 3) {
-                event.setEventData("bonus_rewards", true);
-            }
-        }
-        
-        final EventTrigger finalSelectedTrigger = selectedTrigger; // Capture for lambda
-        // Notify nearby players about the special event
+        // Notify players
         notifyNearbyPlayers(world, center, radius * 2, player -> {
-            player.sendMessage(Text.of("§c§lSpecial Event: " + description + "§r"), false);
-            player.sendMessage(Text.of("§6A " + culture + " " + 
-                finalSelectedTrigger.eventType + " is happening in response to " + // Use final variable
-                getConditionDisplayName(selectedCondition) + "!§r"), false);
-            player.sendMessage(Text.of("§eJoin in to help the village and earn special rewards.§r"), false);
+            player.sendMessage(Text.literal("A special event has started nearby: " + event.getName()), false);
+            player.sendMessage(Text.literal(event.getDescription()).fillStyle(Style.EMPTY.withItalic(true)), false);
         });
         
         return true;
     }
     
     /**
-     * Get user-friendly display name for a condition
+     * Gets a user-friendly display name for a condition ID
      */
     private String getConditionDisplayName(String conditionId) {
         return switch (conditionId) {
-            case "drought" -> "severe drought";
-            case "prosperity" -> "village prosperity";
-            case "war" -> "ongoing conflict";
-            case "flood_warning" -> "flood warnings";
-            case "trade_boom" -> "a trade boom";
-            case "industrial_boom" -> "rapid industrialization";
-            case "pollution" -> "urban pollution";
-            case "food_shortage" -> "food shortages";
-            case "festival_season" -> "the festival season";
-            case "low_happiness" -> "low village happiness";
-            case "high_child_population" -> "high child population";
-            case "scholarly_population" -> "scholarly population";
-            case "new_leader" -> "new village leader";
-            default -> conditionId.replace('_', ' ');
+            case "drought" -> "Drought";
+            case "prosperity" -> "Prosperity";
+            case "war" -> "War Time";
+            case "trade_boom" -> "Trade Boom";
+            case "low_happiness" -> "Low Morale";
+            case "high_child_population" -> "Many Children";
+            case "scholarly_population" -> "Scholarly Focus";
+            case "new_leader" -> "New Leader";
+            default -> conditionId; // Fallback to ID
         };
     }
     
     /**
-     * Create a random event for a village based on templates and current conditions
+     * Creates a random event based on available templates for the culture and conditions
      */
-    private void createRandomEvent(World world, BlockPos center, String culture, 
+    private void createRandomEvent(World world, BlockPos center, String culture,
                                  int radius, Season currentSeason, Map<String, Object> conditions) {
-        // Get event templates for this culture
         List<EventTemplate> templates = eventTemplatesByCulture.get(culture.toLowerCase());
         if (templates == null || templates.isEmpty()) {
-            return;
+            // System.out.println("No event templates found for culture: " + culture);
+            return; // No templates for this culture
         }
         
-        // Get village event history to avoid repetition
-        List<String> recentEvents = villageEventHistory.getOrDefault(center, new ArrayList<>());
-        
-        // Filter templates to avoid recent repeats if we have enough history
-        List<EventTemplate> availableTemplates;
-        if (recentEvents.size() >= 2) {
-            String lastEventType = recentEvents.get(recentEvents.size() - 1);
-            availableTemplates = templates.stream()
-                .filter(t -> !t.type.equals(lastEventType) || random.nextFloat() < 0.2f) // 20% chance to repeat
-                .collect(Collectors.toList());
-        } else {
-            availableTemplates = new ArrayList<>(templates);
+        // Select a template based on adjusted weights
+        EventTemplate selectedTemplate = selectRandomTemplate(world, center, culture, templates, currentSeason, conditions);
+        if (selectedTemplate == null) {
+            // System.out.println("Could not select a valid event template for culture: " + culture);
+            return; // No valid template could be selected
         }
         
-        // Select a random event template based on weights adjusted for season and conditions
-        EventTemplate selectedTemplate = selectRandomTemplate(availableTemplates, currentSeason, conditions);
+        // Determine duration
+        int minDuration = selectedTemplate.baseMinDuration;
+        int maxDuration = selectedTemplate.baseMaxDuration;
+        int durationMinutes = minDuration + random.nextInt(maxDuration - minDuration + 1);
+        long durationTicks = (long)durationMinutes * 60 * 20; // Convert minutes to ticks
         
-        // Pick a random description
+        // Select a random description
         String description = selectedTemplate.descriptions[random.nextInt(selectedTemplate.descriptions.length)];
         
-        // Calculate duration based on village development level and conditions
-        VillageInfluenceManager.VillageDevelopmentData village = 
-            VillageInfluenceManager.getInstance().getVillageDevelopment(center);
-        
-        int durationMinutes = selectedTemplate.baseMinDuration;
-        if (village != null) {
-            int villageLevel = village.getVillageLevel();
-            // Larger duration for higher level villages
-            durationMinutes += (villageLevel - 1) * 30;
-            durationMinutes = Math.min(durationMinutes, selectedTemplate.baseMaxDuration);
-            
-            // Adjust duration based on player participation history (longer events if popular)
-            if (conditions.containsKey("high_participation")) {
-                durationMinutes = (int)(durationMinutes * 1.5);
-            }
-        }
-        
         // Create the event
-        VillageEvent event = VillageEvent.createEvent(
-            selectedTemplate.type,
-            culture,
+        VillageEvent event = new VillageEvent(
+            selectedTemplate.type, 
             description, 
-            center,
-            radius,
-            durationMinutes
+            center, 
+            radius, 
+            durationTicks, 
+            culture
         );
         
-        // Record this event type in history
+        VillageEventManager.getInstance().addEvent(event);
         recordEventInHistory(center, selectedTemplate.type);
         
-        // Add demographic influence to event selection
-        VillageDemographics demographics = villageDemographics.get(center);
-        if (demographics != null) {
-            // Add demographic data to the event for customization
-            event.setEventData("total_population", demographics.getTotalPopulation());
-            event.setEventData("child_population", demographics.getChildPopulation());
-            event.setEventData("elderly_population", demographics.getElderlyPopulation());
-            event.setEventData("dominant_profession", demographics.getDominantProfession());
-            
-            // Add specialized event features based on village composition
-            String dominantProfession = demographics.getDominantProfession();
-            if (!dominantProfession.equals("none")) {
-                event.setEventData("profession_focus", dominantProfession);
-            }
-        }
-        
-        // Add complexity level
-        int complexity = eventComplexityLevel.getOrDefault(center, 1);
-        event.setEventData("complexity", complexity);
-        
-        // Notify nearby players about the new event
+        // Notify players
         notifyNearbyPlayers(world, center, radius * 2, player -> {
-            player.sendMessage(Text.of("§6§lNew Event: " + description + "§r"), false);
-            player.sendMessage(Text.of("§eA " + culture + " " + 
-                selectedTemplate.type + " has begun nearby!§r"), false);
-            player.sendMessage(Text.of("§eJoin in to earn reputation and rewards.§r"), false);
+            player.sendMessage(Text.literal("An event has started nearby: " + event.getName()), false);
+            player.sendMessage(Text.literal(event.getDescription()).fillStyle(Style.EMPTY.withItalic(true)), false);
         });
+        
+        // System.out.println("Created event '" + event.getName() + "' for village at " + center);
     }
     
     /**
-     * Record an event type in the village's history
+     * Records an event in the village's history
      */
     private void recordEventInHistory(BlockPos center, String eventType) {
         List<String> history = villageEventHistory.computeIfAbsent(center, k -> new ArrayList<>());
         history.add(eventType);
-        
-        // Trim history if it's too long
         if (history.size() > MAX_EVENT_HISTORY) {
-            history.remove(0);
+            history.remove(0); // Keep history size limited
         }
     }
     
     /**
-     * Select a random event template based on weights adjusted for season and conditions
+     * Selects a random event template based on weights adjusted for season and conditions
      */
-    private EventTemplate selectRandomTemplate(List<EventTemplate> templates, 
-                                             Season currentSeason, 
-                                             Map<String, Object> conditions) {
-        int totalWeight = 0;
-        int[] adjustedWeights = new int[templates.size()];
-        
-        for (int i = 0; i < templates.size(); i++) {
-            EventTemplate template = templates.get(i);
-            adjustedWeights[i] = template.getAdjustedWeight(currentSeason, conditions);
-            totalWeight += adjustedWeights[i];
+    private EventTemplate selectRandomTemplate(World world, BlockPos center, String culture, List<EventTemplate> templates,
+                                             Season currentSeason, Map<String, Object> conditions) {
+        // Imports needed: com.beeny.Villagesreborn, net.minecraft.server.network.ServerPlayerEntity, java.util.UUID
+        boolean checkReputation = VillagesConfig.getInstance().getGameplaySettings().isPlayerReputationAffectsEvents();
+        double averageReputation = 0;
+        int playerCount = 0;
+
+        if (checkReputation && world instanceof ServerWorld serverWorld) {
+            double radiusSq = 100 * 100; // Check players within 100 blocks for reputation influence
+            List<ServerPlayerEntity> nearbyPlayers = serverWorld.getPlayers(player -> player.getBlockPos().getSquaredDistance(center) <= radiusSq);
+            if (!nearbyPlayers.isEmpty()) {
+                double totalReputation = 0;
+                for (ServerPlayerEntity player : nearbyPlayers) {
+                    // Ensure culture is uppercase for getPlayerReputation lookup if needed
+                    totalReputation += Villagesreborn.getInstance().getPlayerReputation(player.getUuid(), culture.toUpperCase());
+                }
+                averageReputation = totalReputation / nearbyPlayers.size();
+                playerCount = nearbyPlayers.size();
+            }
         }
+
+        // Calculate total adjusted weight
+        int totalWeight = 0;
+        Map<EventTemplate, Integer> adjustedWeights = new HashMap<>();
         
-        // If no valid templates (all weights zero), use default weights
-        if (totalWeight <= 0) {
-            totalWeight = 0;
-            for (int i = 0; i < templates.size(); i++) {
-                adjustedWeights[i] = templates.get(i).weight;
-                totalWeight += adjustedWeights[i];
+        for (EventTemplate template : templates) {
+            int baseWeight = template.getAdjustedWeight(currentSeason, conditions);
+            int adjustedWeight = baseWeight; // Start with base weight
+
+            // Apply reputation modifier if enabled and players are nearby
+            if (checkReputation && playerCount > 0 && baseWeight > 0) {
+                final double HIGH_REP_THRESHOLD = 50.0;
+                final double LOW_REP_THRESHOLD = -30.0;
+                final float POSITIVE_EVENT_REP_MODIFIER = 1.3f; // 30% boost for high rep
+                final float NEGATIVE_EVENT_REP_MODIFIER = 0.7f; // 30% reduction for low rep
+
+                boolean isPositiveEvent = template.type.equalsIgnoreCase("festival") || template.type.equalsIgnoreCase("celebration");
+                // Add other positive/negative event types here if needed
+
+                if (averageReputation >= HIGH_REP_THRESHOLD && isPositiveEvent) {
+                    adjustedWeight = (int) (baseWeight * POSITIVE_EVENT_REP_MODIFIER);
+                    // System.out.println("Boosting weight for " + template.type + " due to high reputation (" + averageReputation + ")");
+                } else if (averageReputation <= LOW_REP_THRESHOLD && isPositiveEvent) {
+                    adjustedWeight = (int) (baseWeight * NEGATIVE_EVENT_REP_MODIFIER);
+                    // System.out.println("Reducing weight for " + template.type + " due to low reputation (" + averageReputation + ")");
+                }
+                // Ensure weight doesn't become negative
+                adjustedWeight = Math.max(1, adjustedWeight);
+            }
+
+            // Apply cultural event multiplier if applicable
+            if (template.isCultural && baseWeight > 0) { // Check baseWeight > 0 to avoid multiplying zero
+                float culturalMultiplier = VillagesConfig.getInstance().getGameplaySettings().getCulturalEventMultiplier();
+                if (culturalMultiplier > 0) { // Avoid zero/negative multipliers
+                    adjustedWeight = (int) (adjustedWeight * culturalMultiplier);
+                    // Ensure weight doesn't become zero if multiplier is very small but > 0
+                    adjustedWeight = Math.max(1, adjustedWeight);
+                    // System.out.println("Applying cultural multiplier (" + culturalMultiplier + ") to " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+
+            // Apply weather modifier if enabled
+            if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) {
+                boolean isBadWeather = world.isRaining() || world.isThundering();
+                if (isBadWeather && template.isOutdoor) {
+                    final float WEATHER_PENALTY_MULTIPLIER = 0.1f; // Reduce weight significantly in bad weather
+                    adjustedWeight = (int) (adjustedWeight * WEATHER_PENALTY_MULTIPLIER);
+                    adjustedWeight = Math.max(1, adjustedWeight); // Ensure minimum weight
+                    // System.out.println("Applying weather penalty to outdoor event " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+            if (adjustedWeight > 0) {
+                adjustedWeights.put(template, adjustedWeight);
+                totalWeight += adjustedWeight;
             }
         }
         
-        int randomValue = random.nextInt(totalWeight);
+        if (totalWeight <= 0) {
+            return null; // No valid templates to choose from
+        }
+        
+        // Roll the dice
+        int roll = random.nextInt(totalWeight);
         int currentWeight = 0;
         
-        for (int i = 0; i < templates.size(); i++) {
-            currentWeight += adjustedWeights[i];
-            if (randomValue < currentWeight) {
-                return templates.get(i);
+        // Find the selected template
+        for (Map.Entry<EventTemplate, Integer> entry : adjustedWeights.entrySet()) {
+            currentWeight += entry.getValue();
+            if (roll < currentWeight) {
+                return entry.getKey();
             }
         }
         
-        // Fallback
-        return templates.get(0);
+        return null; // Should not happen if totalWeight > 0
     }
     
     /**
-     * Get the current season based on world time
+     * Determines the current season based on world time
      */
     private Season getCurrentSeason(World world) {
-        // Calculate day of the year (0-365)
-        long worldTime = world.getTimeOfDay();
-        long dayCount = worldTime / 24000L;
-        long dayOfYear = dayCount % 365L;
+        // Minecraft day is 24000 ticks. Let's assume 30 days per season (720000 ticks)
+        long day = world.getTime() / 24000;
+        int seasonIndex = (int) ((day / 30) % 4); // 0=Spring, 1=Summer, 2=Autumn, 3=Winter
         
-        // Divide the year into 4 seasons
-        if (dayOfYear < 91) {
-            return Season.SPRING;
-        } else if (dayOfYear < 182) {
-            return Season.SUMMER;
-        } else if (dayOfYear < 273) {
-            return Season.AUTUMN;
-        } else {
-            return Season.WINTER;
-        }
+        return switch (seasonIndex) {
+            case 0 -> Season.SPRING;
+            case 1 -> Season.SUMMER;
+            case 2 -> Season.AUTUMN;
+            case 3 -> Season.WINTER;
+            default -> Season.SPRING; // Fallback
+        };
     }
     
     /**
-     * Notify players near a position about something
+     * Helper to notify players within a certain radius of an event
      */
     private void notifyNearbyPlayers(World world, BlockPos center, int radius, Consumer<ServerPlayerEntity> action) {
-        if (!(world instanceof ServerWorld serverWorld)) {
-            return;
+        // Check if notifications are enabled
+        if (!VillagesConfig.getInstance().getGameplaySettings().isShowEventNotifications()) {
+            return; // Don't send notifications if disabled
         }
-        
-        Vec3d centerVec = new Vec3d(center.getX(), center.getY(), center.getZ());
-        
-        for (ServerPlayerEntity player : serverWorld.getPlayers()) {
-            if (player.getPos().squaredDistanceTo(centerVec) <= radius * radius) {
-                action.accept(player);
+
+        if (world instanceof ServerWorld serverWorld) {
+            double radiusSq = radius * radius;
+            for (ServerPlayerEntity player : serverWorld.getPlayers()) {
+                if (player.getBlockPos().getSquaredDistance(center) <= radiusSq) {
+                    action.accept(player);
+                }
             }
         }
     }
     
     /**
-     * Get the time until the next event for a village (in minutes)
+     * Gets the estimated time until the next event for a village (in seconds)
+     * Returns -1 if the village is not registered or no event is scheduled.
      */
     public int getTimeUntilNextEvent(BlockPos center) {
         Long nextTime = nextEventTimes.get(center);
@@ -1134,128 +1161,108 @@ public class VillageEventScheduler {
             return -1;
         }
         
-        long remainingMs = nextTime - System.currentTimeMillis();
-        if (remainingMs <= 0) {
-            return 0;
-        }
-        
-        return (int)(remainingMs / (1000 * 60)); // Convert ms to minutes
+        long diff = nextTime - System.currentTimeMillis();
+        return diff > 0 ? (int) (diff / 1000) : 0;
     }
     
     /**
-     * Force an immediate event at a village
+     * Forces a specific event type to start immediately in a village
+     * @param world The world
+     * @param center The village center
+     * @param eventType The type of event to force (e.g., "festival", "ceremony")
      */
     public void forceEvent(World world, BlockPos center, String eventType) {
-        VillageInfluenceManager.VillageDevelopmentData village = 
-            VillageInfluenceManager.getInstance().getVillageDevelopment(center);
-        
-        if (village == null) {
+        String culture = VillageInfluenceManager.getInstance().getCultureAt(center);
+        if (culture == null) {
+            System.out.println("Cannot force event: No culture found for village at " + center);
             return;
         }
         
-        String culture = village.getCulture();
-        int radius = eventRadii.getOrDefault(center, 32);
-        
-        // Find matching event template
         List<EventTemplate> templates = eventTemplatesByCulture.get(culture.toLowerCase());
-        if (templates == null || templates.isEmpty()) {
+        if (templates == null) {
+            System.out.println("Cannot force event: No templates for culture " + culture);
             return;
         }
         
-        EventTemplate matchingTemplate = null;
+        // Find a template matching the type
+        EventTemplate selectedTemplate = null;
         for (EventTemplate template : templates) {
             if (template.type.equalsIgnoreCase(eventType)) {
-                matchingTemplate = template;
+                selectedTemplate = template;
                 break;
             }
         }
         
-        // If no matching template, use first available
-        if (matchingTemplate == null) {
-            matchingTemplate = templates.get(0);
+        if (selectedTemplate == null) {
+            System.out.println("Cannot force event: No template found for type '" + eventType + "' in culture " + culture);
+            return;
         }
         
-        // Pick a random description
-        String description = matchingTemplate.descriptions[random.nextInt(matchingTemplate.descriptions.length)];
+        // Use the selected template to create the event
+        int radius = eventRadii.getOrDefault(center, 64);
+        int minDuration = selectedTemplate.baseMinDuration;
+        int maxDuration = selectedTemplate.baseMaxDuration;
+        int durationMinutes = minDuration + random.nextInt(maxDuration - minDuration + 1);
+        long durationTicks = (long)durationMinutes * 60 * 20;
+        String description = selectedTemplate.descriptions[random.nextInt(selectedTemplate.descriptions.length)];
         
-        // Create the event with a standard duration
-        VillageEvent.createEvent(
-            matchingTemplate.type,
-            culture,
-            description,
-            center,
-            radius,
-            90  // 90 minutes duration
+        VillageEvent event = new VillageEvent(
+            selectedTemplate.type, 
+            description, 
+            center, 
+            radius, 
+            durationTicks, 
+            culture
         );
         
-        // Record in history
-        recordEventInHistory(center, matchingTemplate.type);
+        VillageEventManager.getInstance().addEvent(event);
+        recordEventInHistory(center, selectedTemplate.type);
         
-        // Store needed data in final variables before using in lambda
-        final String eventType_final = matchingTemplate.type;
-        
-        // Notify nearby players
+        // Notify players
         notifyNearbyPlayers(world, center, radius * 2, player -> {
-            player.sendMessage(Text.of("§6§lSpecial Event: " + description + "§r"), false);
-            player.sendMessage(Text.of("§eA " + culture + " " + 
-                eventType_final + " has begun nearby!§r"), false);
-            player.sendMessage(Text.of("§eJoin in to earn reputation and rewards.§r"), false);
+            player.sendMessage(Text.literal("A forced event has started nearby: " + event.getName()), false);
+            player.sendMessage(Text.literal(event.getDescription()).fillStyle(Style.EMPTY.withItalic(true)), false);
         });
         
-        // Schedule next normal event
+        // Reschedule next random event
         scheduleNextEvent(center);
+        System.out.println("Forced event '" + event.getName() + "' for village at " + center);
     }
     
     /**
-     * Increase event complexity level for a village after successful events
+     * Increases the complexity level for events in a village
+     * @param center The village center
      */
     public void increaseEventComplexity(BlockPos center) {
         int currentLevel = eventComplexityLevel.getOrDefault(center, 1);
-        int maxLevel = 5; // Cap complexity at level 5
-        
-        if (currentLevel < maxLevel) {
-            eventComplexityLevel.put(center, currentLevel + 1);
-        }
+        // Increase complexity, maybe cap it?
+        eventComplexityLevel.put(center, Math.min(5, currentLevel + 1)); 
+        // System.out.println("Increased event complexity for village at " + center + " to level " + (currentLevel + 1));
     }
     
     /**
-     * Reset event complexity to a lower level if players are struggling
+     * Gets the current event complexity level for a village
+     * @param center The village center
+     * @return The complexity level (1-5, default 1)
      */
-    public void resetEventComplexity(BlockPos center) {
-        eventComplexityLevel.put(center, 1);
-    }
+    // public int getEventComplexityLevel(BlockPos center) {
+    //     return eventComplexityLevel.getOrDefault(center, 1);
+    // }
     
     /**
-     * Get current event complexity level for a village
-     */
-    public int getEventComplexityLevel(BlockPos center) {
-        return eventComplexityLevel.getOrDefault(center, 1);
-    }
-    
-    /**
-     * Get current happiness level for a village
-     */
-    public int getVillageHappiness(BlockPos center) {
-        return villageHappiness.getOrDefault(center, 75);
-    }
-    
-    /**
-     * Get current demographics for a village
-     */
-    public VillageDemographics getVillageDemographics(BlockPos center) {
-        return villageDemographics.get(center);
-    }
-    
-    /**
-     * Add a special condition to a village that may trigger special events
+     * Adds or updates a special condition for a village
+     * @param center The village center
+     * @param condition The condition ID (e.g., "drought", "prosperity")
+     * @param value The value of the condition (often just true/false, but could be numeric)
      */
     public void addVillageCondition(BlockPos center, String condition, Object value) {
-        Map<String, Object> conditions = villageConditions.computeIfAbsent(center, k -> new HashMap<>());
-        conditions.put(condition, value);
+        villageConditions.computeIfAbsent(center, k -> new HashMap<>()).put(condition, value);
     }
     
     /**
-     * Remove a special condition from a village
+     * Removes a special condition from a village
+     * @param center The village center
+     * @param condition The condition ID to remove
      */
     public void removeVillageCondition(BlockPos center, String condition) {
         Map<String, Object> conditions = villageConditions.get(center);
@@ -1265,59 +1272,35 @@ public class VillageEventScheduler {
     }
     
     /**
-     * Check if a village has a specific condition
+     * Checks if a village has a specific condition
+     * @param center The village center
+     * @param condition The condition ID to check
+     * @return true if the condition exists (and is typically true if boolean)
      */
     public boolean hasVillageCondition(BlockPos center, String condition) {
         Map<String, Object> conditions = villageConditions.get(center);
-        return conditions != null && conditions.containsKey(condition);
+        if (conditions != null && conditions.containsKey(condition)) {
+            Object value = conditions.get(condition);
+            // Treat non-boolean or true boolean values as the condition being present
+            return !(value instanceof Boolean) || (Boolean) value;
+        }
+        return false;
     }
     
     /**
-     * Get all village conditions
-     */
-    public Map<String, Object> getVillageConditions(BlockPos center) {
-        return new HashMap<>(villageConditions.getOrDefault(center, Collections.emptyMap()));
-    }
-    
-    /**
-     * Get recently occurred event types for a village
-     */
-    public List<String> getRecentEventTypes(BlockPos center) {
-        return new ArrayList<>(villageEventHistory.getOrDefault(center, Collections.emptyList()));
-    }
-    
-    /**
-     * Update the event frequency for a village
-     */
-    public void setEventFrequency(BlockPos center, int frequencyMinutes) {
-        eventFrequencies.put(center, frequencyMinutes);
-    }
-    
-    /**
-     * Update the event radius for a village
-     */
-    public void setEventRadius(BlockPos center, int radius) {
-        eventRadii.put(center, radius);
-    }
-    
-    /**
-     * Record player participation in events to adjust future events
+     * Records player participation in an event, potentially increasing future complexity
+     * @param villageCenter The center of the village where the event occurred
+     * @param playerCount The number of players who participated
      */
     public void recordPlayerParticipation(BlockPos villageCenter, int playerCount) {
-        Map<String, Object> conditions = villageConditions.computeIfAbsent(villageCenter, k -> new HashMap<>());
-        
-        // Mark as high participation if more than 3 players participated
-        if (playerCount > 3) {
-            conditions.put("high_participation", true);
-        } else if (playerCount == 0) {
-            // If no players participated, consider increasing the frequency
-            int currentFrequency = eventFrequencies.getOrDefault(villageCenter, 180);
-            eventFrequencies.put(villageCenter, Math.min(currentFrequency + 30, 240));
-        }
-        
-        // Increase event complexity if many players participated successfully
-        if (playerCount > 5) {
-            increaseEventComplexity(villageCenter);
+        if (playerCount > 0) {
+            // Simple logic: if players participate, increase complexity slightly
+            // More complex logic could depend on success/failure or specific actions
+            if (random.nextInt(3) == 0) { // 1 in 3 chance to increase complexity per participation
+                increaseEventComplexity(villageCenter);
+            }
         }
     }
+    
+    // Add methods to load/save scheduler state if needed
 }

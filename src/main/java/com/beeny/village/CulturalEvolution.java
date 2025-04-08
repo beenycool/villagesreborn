@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.beeny.ai.LLMService;
+import com.beeny.config.VillagesConfig; // Added import
 import com.beeny.ai.CulturalPromptTemplates;
 import net.minecraft.server.world.ServerWorld;
 
@@ -48,6 +49,12 @@ public class CulturalEvolution {
 
     public CompletableFuture<String> evolveVillageCulture(String baseCulture, ServerWorld world, List<VillagerAI> villagers) {
         CulturalState state = culturalStates.computeIfAbsent(baseCulture, CulturalState::new);
+        
+        // Check if progressive development is enabled
+        if (!VillagesConfig.getInstance().getGameplaySettings().isProgressiveVillageDevelopment()) {
+            LOGGER.debug("Progressive village development is disabled. Skipping cultural evolution for {}.", baseCulture);
+            return CompletableFuture.completedFuture("Progressive development disabled.");
+        }
         
         // Build rich context for cultural evolution
         Map<String, String> context = new HashMap<>();

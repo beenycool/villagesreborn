@@ -8,7 +8,8 @@
     "VillagerInteractionMixin",
     "OptionsScreenMixin",
     "ChatMessageMixin",
-    "CreateWorldScreenMixin"
+    "CreateWorldScreenMixin",
+    "VillagerEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1
