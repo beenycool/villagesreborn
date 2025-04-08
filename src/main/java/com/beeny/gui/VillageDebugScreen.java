@@ -421,8 +421,8 @@ public class VillageDebugScreen extends Screen {
         debugInfo.add("§aVillage Spawn Rate: §f" + config.getVillageSpawnRate());
         debugInfo.add("§aAI Provider: §f" + config.getLLMSettings().getProvider());
         debugInfo.add("§aModel Type: §f" + config.getLLMSettings().getModel());
-        debugInfo.add("§aVillager PvP: §f" + (config.isVillagerPvPEnabled() ? "Enabled" : "Disabled"));
-        debugInfo.add("§aTheft Detection: §f" + (config.isTheftDetectionEnabled() ? "Enabled" : "Disabled"));
+        debugInfo.add("§aVillager PvP: §f" + (config.getGameplaySettings().isVillagerPvPEnabled() ? "Enabled" : "Disabled"));
+        debugInfo.add("§aTheft Detection: §f" + (config.getGameplaySettings().isTheftDetectionEnabled() ? "Enabled" : "Disabled"));
         
         // UI settings
         debugInfo.add("§aConversation HUD Position: §f" + config.getUISettings().getConversationHudPosition());

@@ -14,25 +14,17 @@ import net.minecraft.component.type.NbtComponent;
 import java.util.*;
 import java.util.function.Consumer;
 
-/**
- * Manages the cultural crafting system, including recipes and artifacts
- */
 public class CulturalCrafting {
-    // Map of culture types to their specific recipes
     private static final Map<Culture.CultureType, List<CulturalRecipe>> CULTURAL_RECIPES = new HashMap<>();
-    // Map of artifact IDs to their definitions
     private static final Map<String, CulturalArtifact> REGISTERED_ARTIFACTS = new HashMap<>();
     
-    /**
-     * A recipe specific to a culture that players can learn from villagers
-     */
     public static class CulturalRecipe {
         private final String id;
         private final String name;
         private final Culture.CultureType cultureType;
         private final List<ItemStack> ingredients;
         private final ItemStack result;
-        private final int skillLevel; // Minimum skill level required to craft
+        private final int skillLevel;
         private final Map<String, Object> additionalData;
         private Consumer<PlayerEntity> onCraftAction;
         
@@ -47,7 +39,6 @@ public class CulturalCrafting {
             this.additionalData = new HashMap<>();
         }
         
-        // Builder pattern for fluent API
         public static class Builder {
             private final String id;
             private String name;
@@ -105,12 +96,10 @@ public class CulturalCrafting {
                 
                 CulturalRecipe recipe = new CulturalRecipe(id, name, cultureType, ingredients, result, skillLevel);
                 
-                // Add additional data
                 for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
                     recipe.additionalData.put(entry.getKey(), entry.getValue());
                 }
                 
-                // Set craft action if provided
                 if (onCraftAction != null) {
                     recipe.onCraftAction = onCraftAction;
                 }
@@ -140,16 +129,13 @@ public class CulturalCrafting {
         }
     }
     
-    /**
-     * Cultural artifacts that provide special bonuses
-     */
     public static class CulturalArtifact {
         private final String id;
         private final String name;
         private final Culture.CultureType cultureType;
         private ItemStack itemRepresentation;
         private final String description;
-        private final int durability; // -1 for infinite durability
+        private final int durability;
         private final List<ArtifactBonus> bonuses;
         private final Map<String, Object> additionalData;
         
@@ -164,8 +150,6 @@ public class CulturalCrafting {
             this.bonuses = new ArrayList<>();
             this.additionalData = new HashMap<>();
             
-            // Add cultural data using Item Components
-            // Create custom data to store artifact information
             NbtCompound customData = itemRepresentation.getOrDefault(
                 DataComponentTypes.CUSTOM_DATA, 
                 NbtComponent.DEFAULT
@@ -174,16 +158,10 @@ public class CulturalCrafting {
             customData.putString("cultural_artifact_id", id);
             customData.putString("culture_type", cultureType.getId());
             
-            // Apply the custom data to the item
             this.itemRepresentation.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
-            
-            // Set a custom name for the item
             this.itemRepresentation.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name));
         }
         
-        /**
-         * Builder for creating cultural artifacts
-         */
         public static class Builder {
             private final String id;
             private String name;
@@ -242,12 +220,10 @@ public class CulturalCrafting {
                 CulturalArtifact artifact = new CulturalArtifact(id, name, cultureType, 
                                                                itemRepresentation, description, durability);
                 
-                // Add bonuses
                 for (ArtifactBonus bonus : bonuses) {
                     artifact.addBonus(bonus);
                 }
                 
-                // Add additional data
                 for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
                     artifact.additionalData.put(entry.getKey(), entry.getValue());
                 }
@@ -256,9 +232,6 @@ public class CulturalCrafting {
             }
         }
         
-        /**
-         * Add a bonus effect to this artifact
-         */
         public void addBonus(ArtifactBonus bonus) {
             bonuses.add(bonus);
         }
@@ -281,9 +254,6 @@ public class CulturalCrafting {
             }
         }
         
-        /**
-         * Remove all bonuses from a player
-         */
         public void removeBonuses(PlayerEntity player) {
             for (ArtifactBonus bonus : bonuses) {
                 bonus.remove(player);
@@ -291,9 +261,6 @@ public class CulturalCrafting {
         }
     }
     
-    /**
-     * Represents a bonus effect granted by an artifact
-     */
     public static class ArtifactBonus {
         private final BonusType type;
         private final float value;
@@ -325,64 +292,36 @@ public class CulturalCrafting {
             return this;
         }
         
-        // Getters
         public BonusType getType() { return type; }
         public float getValue() { return value; }
         public String getDescription() { return description; }
         
-        /**
-         * Apply this bonus to a player
-         */
         public void apply(PlayerEntity player) {
-            // Implementation would depend on the bonus type
-            // For example, adding attribute modifiers for stats
-            
-            // Notify player of bonus
             player.sendMessage(Text.of("You feel the power of the artifact: " + description), false);
         }
         
-        /**
-         * Remove this bonus from a player
-         */
         public void remove(PlayerEntity player) {
-            // Implementation would depend on the bonus type
-            // For example, removing attribute modifiers
         }
     }
     
-    /**
-     * Initialize the cultural crafting system with default recipes
-     */
     public static void initialize() {
         registerDefaultRecipes();
         registerDefaultArtifacts();
     }
     
-    /**
-     * Register a cultural recipe
-     */
     public static void registerRecipe(CulturalRecipe recipe) {
         CULTURAL_RECIPES.computeIfAbsent(recipe.getCultureType(), k -> new ArrayList<>())
                        .add(recipe);
     }
     
-    /**
-     * Register a cultural artifact
-     */
     public static void registerArtifact(CulturalArtifact artifact) {
         REGISTERED_ARTIFACTS.put(artifact.getId(), artifact);
     }
     
-    /**
-     * Get recipes for a specific culture
-     */
     public static List<CulturalRecipe> getRecipesForCulture(Culture.CultureType cultureType) {
         return CULTURAL_RECIPES.getOrDefault(cultureType, Collections.emptyList());
     }
     
-    /**
-     * Get all recipes for a hybrid culture, including those from both parent cultures
-     */
     public static List<CulturalRecipe> getRecipesForHybridCulture(Culture culture) {
         if (!culture.isHybrid()) {
             return getRecipesForCulture(culture.getType());
@@ -401,18 +340,11 @@ public class CulturalCrafting {
         return recipes;
     }
     
-    /**
-     * Get a specific artifact by ID
-     */
     public static CulturalArtifact getArtifact(String artifactId) {
         return REGISTERED_ARTIFACTS.get(artifactId);
     }
     
-    /**
-     * Register default cultural recipes
-     */
     private static void registerDefaultRecipes() {
-        // ROMAN RECIPES
         registerRecipe(new CulturalRecipe.Builder("gladius")
             .withName("Gladius")
             .withCulture(Culture.CultureType.ROMAN)
@@ -485,7 +417,6 @@ public class CulturalCrafting {
             .withSkillLevel(1)
             .build());
             
-        // MAYAN RECIPES
         registerRecipe(new CulturalRecipe.Builder("obsidian_blade")
             .withName("Ceremonial Obsidian Blade")
             .withCulture(Culture.CultureType.MAYAN)
@@ -498,11 +429,7 @@ public class CulturalCrafting {
             .build());
     }
     
-    /**
-     * Register default cultural artifacts
-     */
     private static void registerDefaultArtifacts() {
-        // ROMAN ARTIFACTS
         registerArtifact(new CulturalArtifact.Builder("imperial_seal")
             .withName("Imperial Seal of Rome")
             .withCulture(Culture.CultureType.ROMAN)
@@ -512,7 +439,6 @@ public class CulturalCrafting {
                      "Roman merchants respect your authority and offer better prices."))
             .build());
             
-        // MEDIEVAL ARTIFACTS
         registerArtifact(new CulturalArtifact.Builder("holy_grail")
             .withName("Holy Grail")
             .withCulture(Culture.CultureType.MEDIEVAL)
@@ -522,7 +448,6 @@ public class CulturalCrafting {
                      "The Grail's magic increases your vitality."))
             .build());
             
-        // GREEK ARTIFACTS
         registerArtifact(new CulturalArtifact.Builder("olympic_wreath")
             .withName("Olympic Victor's Wreath")
             .withCulture(Culture.CultureType.GREEK)
@@ -532,7 +457,6 @@ public class CulturalCrafting {
                      "Your movements become swift as an Olympic athlete."))
             .build());
             
-        // JAPANESE ARTIFACTS
         registerArtifact(new CulturalArtifact.Builder("samurai_banner")
             .withName("Samurai Clan Banner")
             .withCulture(Culture.CultureType.JAPANESE)
@@ -544,7 +468,6 @@ public class CulturalCrafting {
                      "You stand firm like a disciplined warrior."))
             .build());
             
-        // MAYAN ARTIFACTS
         registerArtifact(new CulturalArtifact.Builder("crystal_skull")
             .withName("Crystal Skull of Knowledge")
             .withCulture(Culture.CultureType.MAYAN)
@@ -555,9 +478,6 @@ public class CulturalCrafting {
             .build());
     }
     
-    /**
-     * Create a random hybrid artifact from two cultures
-     */
     public static CulturalArtifact createHybridArtifact(Culture.CultureType primary, Culture.CultureType secondary) {
         String id = "hybrid_" + primary.getId() + "_" + secondary.getId() + "_artifact";
         String name = "Artifact of Cultural Exchange: " + primary.getId() + " and " + secondary.getId();

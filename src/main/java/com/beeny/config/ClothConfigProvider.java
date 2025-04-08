@@ -155,21 +155,21 @@ public class ClothConfigProvider {
         // Villager Memory Duration
         category.addEntry(entryBuilder.startIntSlider(
                 Text.literal("Villager Memory Duration (days)"),
-                config.getVillagerMemoryDuration(),
+                gameplay.getVillagerMemoryDuration(), // Use gameplay settings
                 1, 7)
                 .setDefaultValue(3)
                 .setTooltip(Text.literal("How long villagers remember player actions"))
-                .setSaveConsumer(config::setVillagerMemoryDuration)
+                .setSaveConsumer(gameplay::setVillagerMemoryDuration) // Use gameplay settings
                 .build());
         
         // Cultural Gift Modifier
         category.addEntry(entryBuilder.startIntSlider(
                 Text.literal("Cultural Gift Value Modifier (%)"),
-                config.getCulturalGiftModifier(),
+                gameplay.getCulturalGiftModifier(), // Use gameplay settings
                 50, 200)
                 .setDefaultValue(150)
                 .setTooltip(Text.literal("How much cultural preferences affect gift values"))
-                .setSaveConsumer(config::setCulturalGiftModifier)
+                .setSaveConsumer(gameplay::setCulturalGiftModifier) // Use gameplay settings
                 .build());
         
         // Progressive Village Development
@@ -276,53 +276,37 @@ public class ClothConfigProvider {
         // Villager PvP
         category.addEntry(entryBuilder.startBooleanToggle(
                 Text.literal("Villager PvP"),
-                config.isVillagerPvPEnabled())
+                gameplay.isVillagerPvPEnabled())
                 .setDefaultValue(false)
                 .setTooltip(Text.literal("Villagers can fight each other and the player"))
-                .setSaveConsumer(value -> {
-                    if (value != config.isVillagerPvPEnabled()) {
-                        config.toggleVillagerPvP();
-                    }
-                })
+                .setSaveConsumer(gameplay::setVillagerPvPEnabled) // Use direct setter from GameplaySettings
                 .build());
         
         // Theft Detection
         category.addEntry(entryBuilder.startBooleanToggle(
                 Text.literal("Theft Detection"),
-                config.isTheftDetectionEnabled())
+                gameplay.isTheftDetectionEnabled())
                 .setDefaultValue(true)
                 .setTooltip(Text.literal("Villagers detect when you steal items"))
-                .setSaveConsumer(value -> {
-                    if (value != config.isTheftDetectionEnabled()) {
-                        config.toggleTheftDetection();
-                    }
-                })
+                .setSaveConsumer(gameplay::setTheftDetectionEnabled) // Use direct setter from GameplaySettings
                 .build());
         
         // Villager Trading Boost
         category.addEntry(entryBuilder.startBooleanToggle(
                 Text.literal("Cultural Trading Bonus"),
-                config.isVillagerTradingBoostEnabled())
+                gameplay.isVillagerTradingBoostEnabled())
                 .setDefaultValue(true)
                 .setTooltip(Text.literal("Better trades with villagers of cultures you have good relations with"))
-                .setSaveConsumer(value -> {
-                    if (value != config.isVillagerTradingBoostEnabled()) {
-                        config.toggleVillagerTradingBoost();
-                    }
-                })
+                .setSaveConsumer(gameplay::setVillagerTradingBoostEnabled) // Use direct setter from GameplaySettings
                 .build());
         
         // Unique Crafting Recipes
         category.addEntry(entryBuilder.startBooleanToggle(
                 Text.literal("Cultural Crafting"),
-                config.isUniqueCraftingRecipesEnabled())
+                gameplay.isUniqueCraftingRecipesEnabled())
                 .setDefaultValue(true)
                 .setTooltip(Text.literal("Enable culture-specific crafting recipes"))
-                .setSaveConsumer(value -> {
-                    if (value != config.isUniqueCraftingRecipesEnabled()) {
-                        config.toggleUniqueCraftingRecipes();
-                    }
-                })
+                .setSaveConsumer(gameplay::setUniqueCraftingRecipesEnabled) // Use direct setter from GameplaySettings
                 .build());
     }
     
@@ -335,14 +319,10 @@ public class ClothConfigProvider {
         category.addEntry(entryBuilder.startSelector(
                 Text.literal("AI Provider"),
                 providers.toArray(),
-                config.getAIProvider())
-                .setDefaultValue("OPENAI")
+                llm.getProvider())
+                .setDefaultValue("deepseek")
                 .setTooltip(Text.literal("Select the AI service provider"))
-                .setSaveConsumer(value -> {
-                    while (!config.getAIProvider().equals(value)) {
-                        config.cycleAIProvider();
-                    }
-                })
+                .setSaveConsumer(llm::setProvider) // Use direct setter from LLMSettings
                 .build());
         
         // API Key

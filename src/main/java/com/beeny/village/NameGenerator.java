@@ -55,7 +55,6 @@ public class NameGenerator {
             String title = getRandomElement(PROFESSION_TITLES.getOrDefault(profession,
                 List.of("Villager")));
 
-            // 30% chance to add a culture-specific suffix to the first name
             if (RANDOM.nextDouble() < 0.3) {
                 String suffix = getRandomElement(CULTURE_NAME_SUFFIXES.getOrDefault(culture,
                     CULTURE_NAME_SUFFIXES.get("roman")));

@@ -14,11 +14,7 @@ import net.minecraft.server.world.ServerWorld;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Represents a cultural village event that players can participate in
- */
 public class VillageEvent {
-    // Map of active events by ID
     private static final Map<String, VillageEvent> activeEvents = new ConcurrentHashMap<>();
     
     private final String id;
@@ -28,7 +24,7 @@ public class VillageEvent {
     private final BlockPos location;
     private final int radius;
     private final long startTime;
-    private final long duration; // in milliseconds
+    private final long duration;
     private final Set<UUID> participants = new HashSet<>();
     private boolean completed = false;
     private final Map<String, Object> eventData = new HashMap<>();

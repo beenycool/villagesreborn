@@ -62,7 +62,7 @@ public class LLMService {
         // Always use configured settings
         providerConfig.put("apiKey", config.getLLMSettings().getApiKey());
         providerConfig.put("endpoint", config.getLLMSettings().getEndpoint());
-        providerConfig.put("modelName", config.getLLMSettings().getModelType());
+        providerConfig.put("modelName", config.getLLMSettings().getModel());
         try {
             currentProvider.initialize(providerConfig);
             LOGGER.info("LLMService initialized with provider: {}", currentProvider.getName());
@@ -214,7 +214,7 @@ public class LLMService {
             // Access settings via getLLMSettings()
             providerConfig.put("apiKey", config.getLLMSettings().getApiKey());
             providerConfig.put("endpoint", config.getLLMSettings().getEndpoint());
-            providerConfig.put("modelName", config.getLLMSettings().getModelType());
+            providerConfig.put("modelName", config.getLLMSettings().getModel());
             
             try {
                 currentProvider.initialize(providerConfig);

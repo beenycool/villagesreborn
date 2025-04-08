@@ -3,7 +3,7 @@ package com.beeny.gui;
 import com.beeny.ai.ModelChecker;
 import com.beeny.ai.ModelType; // Need ModelType enum
 import com.beeny.util.HardwareUtil; // Need HardwareUtil
-import com.beeny.setup.LLMConfig;
+import com.beeny.config.VillagesConfig; // Use main config
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ModelDownloadScreen extends Screen {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn");
     private final Screen parent;
-    private final LLMConfig config;
+    private final VillagesConfig config; // Use main config instance
     private double downloadProgress = 0.0;
     private boolean isDownloading = false;
     private boolean downloadComplete = false;
@@ -43,7 +43,7 @@ public class ModelDownloadScreen extends Screen {
     private ButtonWidget loginButton;
     private ButtonWidget configureApiButton;
 
-    public ModelDownloadScreen(Screen parent, LLMConfig config) {
+    public ModelDownloadScreen(Screen parent, VillagesConfig config) { // Accept main config
         super(Text.literal("Villages Reborn - AI Model Setup"));
         this.parent = parent;
         this.config = config;
@@ -142,7 +142,7 @@ public class ModelDownloadScreen extends Screen {
             addDrawableChild(loginButton);
             
             configureApiButton = ButtonWidget.builder(Text.literal("Configure API Setup"), button -> {
-                MinecraftClient.getInstance().setScreen(new SetupScreen(config));
+                MinecraftClient.getInstance().setScreen(new SetupScreen(config)); // Pass main config
             })
             .dimensions(centerX - buttonWidth / 2, height / 2 + 30, buttonWidth, 20)
             .build();

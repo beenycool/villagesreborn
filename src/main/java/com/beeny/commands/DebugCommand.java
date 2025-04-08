@@ -130,7 +130,7 @@ public class DebugCommand {
     private static void testAIProviders(StringBuilder report) {
         VillagesConfig config = VillagesConfig.getInstance();
         VillagesConfig.LLMSettings llmSettings = config.getLLMSettings(); // Correct type to inner class
-        String activeProvider = config.getAIProvider(); // Get the selected provider string
+        String activeProvider = llmSettings.getProvider(); // Get the selected provider string from LLMSettings
         String apiKey = llmSettings.getApiKey();
         String endpoint = llmSettings.getEndpoint();
         String model = llmSettings.getModel();
@@ -141,9 +141,9 @@ public class DebugCommand {
 
         if (isLocal) {
             report.append(String.format("[ ✓ ] Local Model: Enabled\n"));
-            report.append(String.format("      - Configured Model Type: %s\n", llmSettings.getModelType().isEmpty() ? "[ ! ] (Not Set)" : llmSettings.getModelType()));
+            report.append(String.format("      - Configured Model Type: %s\n", llmSettings.getModel().isEmpty() ? "[ ! ] (Not Set)" : llmSettings.getModel()));
             report.append(String.format("      - Expected Path: %s\n", localPath.isEmpty() ? "[ ! ] (Not Set)" : localPath));
-            ModelType localModelType = ModelType.fromString(llmSettings.getModelType()); // Get ModelType from config string
+            ModelType localModelType = ModelType.fromString(llmSettings.getModel()); // Get ModelType from config string
             boolean modelExists = ModelChecker.hasLocalModel(localModelType); // Pass ModelType
             report.append(String.format("      - Model File Status: %s\n", modelExists ? "[ ✓ ] Found" : "[ ✗ ] Missing!"));
         } else {
@@ -257,7 +257,7 @@ public class DebugCommand {
 
     private static void testModelChecks(StringBuilder report) {
         VillagesConfig.LLMSettings llmSettings = VillagesConfig.getInstance().getLLMSettings();
-        String configuredModelTypeStr = llmSettings.getModelType();
+        String configuredModelTypeStr = llmSettings.getModel();
         ModelType configuredModelType = ModelType.fromString(configuredModelTypeStr); // Get ModelType from config string
 
         // Get model path using the configured ModelType

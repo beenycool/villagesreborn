@@ -241,7 +241,7 @@ public class AISettingsScreen extends Screen {
         // Use the class field 'this.devMode'
         if (this.devMode) {
             llmSettings.setEndpoint(endpoint);
-            llmSettings.setModelType(model);
+            llmSettings.setModel(model);
         } else {
             // Optionally clear or set defaults when switching out of dev mode
             llmSettings.setEndpoint("");
@@ -281,7 +281,7 @@ public class AISettingsScreen extends Screen {
         // Use the class field 'this.devMode'
         if (this.devMode) {
             if (endpointField != null) llmSettings.setEndpoint(endpointField.getText());
-            if (modelButton != null) llmSettings.setModelType(modelButton.getValue());
+            if (modelButton != null) llmSettings.setModel(modelButton.getValue());
             if (enableAdvancedConversationsButton != null) llmSettings.setAdvancedConversationsEnabled(enableAdvancedConversationsButton.getValue());
 
             try {
@@ -297,7 +297,7 @@ public class AISettingsScreen extends Screen {
         } else {
             // Reset non-dev settings to defaults or clear them if desired when saving in simple mode
             // llmSettings.setEndpoint("");
-            llmSettings.setModelType(null); // Set to null so provider uses default when not in dev mode
+            llmSettings.setModel(null); // Set to null so provider uses default when not in dev mode
             // llmSettings.setContextLength(default);
             // llmSettings.setTemperature(default);
             // llmSettings.setAdvancedConversationsEnabled(false);
@@ -329,7 +329,7 @@ public class AISettingsScreen extends Screen {
 
        // Get current selection to try and preserve it
        String currentModelSelection = modelButton.getValue();
-       String configModel = llmSettings.getModelType(); // Model saved in config
+       String configModel = llmSettings.getModel(); // Model saved in config
 
        // Determine the initial model for the new list
        String initialModel = "";

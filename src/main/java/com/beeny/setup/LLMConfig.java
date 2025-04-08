@@ -44,7 +44,6 @@ public class LLMConfig {
         LOGGER.info("Initializing LLM configuration with system specs");
         useGPU = specs.hasGpuSupport();
         
-        // Adjust context length based on available RAM
         if (specs.getAvailableRam() > 8192) { // More than 8GB
             contextLength = 4096;
         } else if (specs.getAvailableRam() > 4096) { // More than 4GB

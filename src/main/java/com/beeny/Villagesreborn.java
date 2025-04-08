@@ -21,13 +21,13 @@ import com.beeny.village.SpawnRegion;
 import com.beeny.village.event.CulturalEventSystem;
 import com.beeny.village.event.PlayerDataManager;
 import com.beeny.setup.SystemSpecs;
-import com.beeny.config.VillagesConfig; // Changed import
-import com.beeny.ai.LLMService; // Added import
+import com.beeny.config.VillagesConfig;
+import com.beeny.ai.LLMService;
 import com.beeny.worldgen.VillagesRebornStructures;
 import com.beeny.network.VillageCraftingNetwork;
-import com.beeny.network.VillagesNetwork; // Added import
-import com.beeny.network.VillagesClientNetwork; // Added import
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry; // Added import
+import com.beeny.network.VillagesNetwork;
+import com.beeny.network.VillagesClientNetwork;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
@@ -47,9 +47,9 @@ public class Villagesreborn implements ModInitializer {
     private static SystemSpecs systemSpecs;
     private static VillagesConfig villagesConfig;
     private static Villagesreborn INSTANCE;
-    private final var villageMap = new ConcurrentHashMap<BlockPos, Culture>();
-    private final var villageRadiusMap = new ConcurrentHashMap<BlockPos, Integer>();
-    private final var villageEventsMap = new ConcurrentHashMap<BlockPos, Integer>();
+    private final ConcurrentHashMap<BlockPos, Culture> villageMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<BlockPos, Integer> villageRadiusMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<BlockPos, Integer> villageEventsMap = new ConcurrentHashMap<>();
     private static MinecraftServer serverInstance;
     private static final Identifier ROMAN_HOUSE = Identifier.of(MOD_ID, "roman/house"),
             ROMAN_FORUM = Identifier.of(MOD_ID, "roman/forum"),
@@ -60,7 +60,7 @@ public class Villagesreborn implements ModInitializer {
             NYC_APARTMENT = Identifier.of(MOD_ID, "nyc/apartment"),
             NYC_SKYSCRAPER = Identifier.of(MOD_ID, "nyc/skyscraper");
 
-    private final var tickTimes = new ArrayList<Float>();
+    private final List<Float> tickTimes = new ArrayList<>();
     private int pendingNetworkRequests = 0;
     private final Map<UUID, Map<String, Integer>> playerReputation = new ConcurrentHashMap<>();
 
@@ -96,7 +96,6 @@ public class Villagesreborn implements ModInitializer {
             VillagerManager.getInstance().setServer(server);
             LOGGER.info("Villages Reborn detected server start.");
         });
-        // Keep for backward compatibility but our new tick handlers will handle this
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (serverInstance != null) {
                 long startTime = System.nanoTime();
@@ -231,19 +230,13 @@ public class Villagesreborn implements ModInitializer {
     }
 
     private void registerCultureStructures(String vanillaType, java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType, Map<Identifier, Integer> structures) {
-        // Register the culture-biome association for villager behavior
         VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
-        
+
         LOGGER.info("Registered {} culture for {} biomes", cultureType, vanillaType);
-        
-        // In 1.21.4, structure additions should be handled through data packs
-        // or through the Structure API directly rather than FabricStructurePool
-        
-        // Add structures to the custom registry when the server starts
+
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             LOGGER.info("Initializing structure generation for {} culture in {} villages",
                        cultureType, vanillaType);
-            // Register culture-specific spawning logic
             VillagerManager.getInstance().initializeCultureStructures(server, cultureType, vanillaType, structures);
         });
     }
@@ -256,7 +249,6 @@ public class Villagesreborn implements ModInitializer {
         return systemSpecs;
     }
 
-    // Updated getter to return VillagesConfig
     public static VillagesConfig getVillagesConfig() {
         if (villagesConfig == null) {
             villagesConfig = VillagesConfig.getInstance();

@@ -1,6 +1,6 @@
 package com.beeny.gui;
 
-import com.beeny.setup.LLMConfig;
+import com.beeny.config.VillagesConfig; // Use main config
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -10,14 +10,16 @@ import net.minecraft.client.render.RenderLayer;
 import java.util.function.Function;
 
 public class SetupScreen extends Screen {
-    private final LLMConfig llmConfig;
+    private final VillagesConfig config; // Use main config instance
+    private final VillagesConfig.LLMSettings llmSettings; // Get nested settings
     private final AnimationRenderer animationRenderer = new AnimationRenderer();
     private static final Identifier BACKGROUND = Identifier.of("villagesreborn", "textures/gui/anim_frame1.png");
     private static final Function<Identifier, RenderLayer> TEXTURE_LAYER = id -> RenderLayer.getGui();
 
-    public SetupScreen(LLMConfig llmConfig) {
+    public SetupScreen(VillagesConfig config) { // Accept main config
         super(Text.literal("Villages Reborn"));
-        this.llmConfig = llmConfig;
+        this.config = config;
+        this.llmSettings = config.getLLMSettings(); // Get nested settings
     }
 
     @Override
@@ -34,11 +36,11 @@ public class SetupScreen extends Screen {
 
         // Quick Start button
         addDrawableChild(ButtonWidget.builder(Text.literal("Quick Start (Recommended)"), button -> {
-            llmConfig.setQuickStartMode(true);
-            llmConfig.setSetupComplete(true);
-            llmConfig.setModelType("deepseek-coder");
-            llmConfig.setProvider("deepseek");
-            llmConfig.saveConfig();
+            // QuickStartMode and SetupComplete are part of the old LLMConfig, not needed here.
+            // Set provider and model directly in the main config's LLMSettings.
+            llmSettings.setProvider("deepseek");
+            llmSettings.setModel("deepseek-coder"); // Use setModel
+            config.save(); // Save the main config
             close();
         })
         .dimensions(centerX, centerY - spacing, buttonWidth, buttonHeight)
@@ -46,16 +48,18 @@ public class SetupScreen extends Screen {
 
         // Advanced Setup button
         addDrawableChild(ButtonWidget.builder(Text.literal("Advanced Setup"), button -> {
-            llmConfig.setQuickStartMode(false);
-            client.setScreen(new ModelDownloadScreen(this, llmConfig));
+            // QuickStartMode is part of the old LLMConfig.
+            // Pass the main config to ModelDownloadScreen
+            client.setScreen(new ModelDownloadScreen(this, config));
         })
         .dimensions(centerX, centerY, buttonWidth, buttonHeight)
         .build());
 
         // Skip button
         addDrawableChild(ButtonWidget.builder(Text.literal("Skip AI Features"), button -> {
-            llmConfig.setSetupComplete(true);
-            llmConfig.saveConfig();
+            // SetupComplete is part of the old LLMConfig.
+            // Just save the main config to persist any defaults if needed.
+            config.save();
             close();
         })
         .dimensions(centerX, centerY + spacing, buttonWidth, buttonHeight)

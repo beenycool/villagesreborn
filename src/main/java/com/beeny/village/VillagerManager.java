@@ -53,8 +53,6 @@ public class VillagerManager {
     private Culture.CultureType currentCulture;
     private MinecraftServer server;
     private final Map<java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext>, String> biomeCultureAssociations = new HashMap<>();
-    
-    // Add a static reference to the server for safe access
     private static MinecraftServer staticServerInstance;
 
     private VillagerManager() {
@@ -77,10 +75,6 @@ public class VillagerManager {
         return server;
     }
 
-    /**
-     * Get the server instance safely from a static context
-     * @return The current MinecraftServer instance
-     */
     public static MinecraftServer getServerInstance() {
         if (staticServerInstance == null) {
             staticServerInstance = INSTANCE.server;
@@ -90,7 +84,7 @@ public class VillagerManager {
 
     public void setServer(MinecraftServer server) {
         this.server = server;
-        staticServerInstance = server; // Also update static reference
+        staticServerInstance = server;
     }
 
     public void registerSpawnRegion(BlockPos center, int radius, String cultureName) {
@@ -160,16 +154,14 @@ public class VillagerManager {
         for (VillagerAI ai : villagerAIs.values()) {
             VillagerEntity villager = ai.getVillager();
             if (villager == null || !villager.isAlive()) continue;
-            int chunkX = villager.getBlockX() >> 4;
-            int chunkZ = villager.getBlockZ() >> 4;
+            int chunkX = villager.getBlockX() >> 4, chunkZ = villager.getBlockZ() >> 4;
             long chunkPos = (((long) chunkX) << 32) | (chunkZ & 0xFFFFFFFFL);
             chunkMap.computeIfAbsent(chunkPos, k -> new ArrayList<>()).add(ai);
         }
         for (VillagerAI ai1 : villagerAIs.values()) {
             VillagerEntity v1 = ai1.getVillager();
             if (v1 == null || !v1.isAlive()) continue;
-            int chunkX = v1.getBlockX() >> 4;
-            int chunkZ = v1.getBlockZ() >> 4;
+            int chunkX = v1.getBlockX() >> 4, chunkZ = v1.getBlockZ() >> 4;
             var nearby = new ArrayList<UUID>();
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
@@ -261,20 +253,14 @@ public class VillagerManager {
     }
 
     private void addInteractionEffects(ServerWorld world, VillagerEntity v1, VillagerEntity v2, VillagerAI.RelationshipType type) {
-        double x = (v1.getX() + v2.getX()) / 2;
-        double y = (v1.getY() + v2.getY()) / 2 + 1;
-        double z = (v1.getZ() + v2.getZ()) / 2;
+        double x = (v1.getX() + v2.getX()) / 2, y = (v1.getY() + v2.getY()) / 2 + 1, z = (v1.getZ() + v2.getZ()) / 2;
         switch (type) {
-            case FRIEND:
-                world.spawnParticles(ParticleTypes.HEART, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
-                break;
-            case FAMILY:
+            case FRIEND -> world.spawnParticles(ParticleTypes.HEART, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
+            case FAMILY -> {
                 world.spawnParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 3, 0.2, 0.2, 0.2, 0.02);
                 world.spawnParticles(ParticleTypes.HEART, x, y, z, 1, 0.2, 0.2, 0.2, 0.02);
-                break;
-            case RIVAL:
-                world.spawnParticles(ParticleTypes.ANGRY_VILLAGER, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
-                break;
+            }
+            case RIVAL -> world.spawnParticles(ParticleTypes.ANGRY_VILLAGER, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
         }
     }
 
@@ -337,8 +323,7 @@ public class VillagerManager {
     }
 
     private void updateVillageStatsHeuristically(VillageStats stats, SpawnRegion region, int villagerCount) {
-        int structureCount = region.getCulturalStructures().size();
-        int poiCount = region.getPointsOfInterest().size();
+        int structureCount = region.getCulturalStructures().size(), poiCount = region.getPointsOfInterest().size();
         stats.prosperity = Math.min(100, Math.max(10, (structureCount * 5) + (villagerCount * 3) + (poiCount * 2)));
         double density = villagerCount / (Math.PI * region.getRadius() * region.getRadius());
         stats.safety = Math.min(100, Math.max(0, (int) (density * 50) + (stats.prosperity / 4) + 20));
@@ -381,10 +366,10 @@ public class VillagerManager {
                 Map<String, String> eventDetails = parseResponse(response);
                 String eventName = eventDetails.getOrDefault("NAME", "Village Gathering");
                 String description = eventDetails.getOrDefault("DESCRIPTION", "A cultural gathering");
-                int duration = 0;
+                int duration;
                 try {
                     duration = Integer.parseInt(eventDetails.getOrDefault("DURATION", "1")) * 24000;
-                } catch (NumberFormatException e) {
+                } catch (NumberFormatException e2) {
                     duration = 24000;
                 }
                 CulturalEvent event = new CulturalEvent(eventName, description, duration, world.getTimeOfDay());
@@ -449,13 +434,10 @@ public class VillagerManager {
             VillagerAI ai = new VillagerAI(villager, personality);
             villagerAIs.put(villager.getUuid(), ai);
             VillagerMemory memory = new VillagerMemory();
-            // Reverting to direct getProfession() based on conflicting errors
             VillagerDialogue dialogue = new VillagerDialogue(villager, memory, region.getCulture().toString(), villager.getVillagerData().getProfession().toString());
             villagerDialogues.put(villager.getUuid(), dialogue);
-            // Reverting to direct getProfession() based on conflicting errors
             String situation = String.format("Starting life as a %s in a %s village", villager.getVillagerData().getProfession().toString(), region.getCulture().toString());
             ai.generateBehavior(situation);
-            // Reverting to direct getProfession() based on conflicting errors
         }), nameGenerator.generateName(region.getCulture().toString(), villager.getVillagerData().getProfession().toString()).thenAccept(name -> {
             villager.setCustomName(Text.of(name));
             villager.setCustomNameVisible(true);
@@ -584,8 +566,7 @@ public class VillagerManager {
     }
 
     public static class CulturalEvent {
-        public final String name;
-        public final String description;
+        public final String name, description;
         public final int duration;
         public final long startTime;
 
@@ -598,8 +579,7 @@ public class VillagerManager {
     }
 
     public static class VillageStats {
-        public int prosperity = 50;
-        public int safety = 50;
+        public int prosperity = 50, safety = 50;
         public BlockPos center;
         public String culture;
         public UUID leaderUUID;
@@ -611,13 +591,12 @@ public class VillagerManager {
     }
 
     private void positionVillagersForInteraction(VillagerEntity v1, VillagerEntity v2) {
-        double dx = v2.getX() - v1.getX();
-        double dz = v2.getZ() - v1.getZ();
-        float yaw = (float) (Math.atan2(dz, dx) * 180.0 / Math.PI) - 90;
+        double dx = v2.getX() - v1.getX(), dz = v2.getZ() - v1.getZ();
+        float yaw = (float) (Math.atan2(dz, dx) * 180 / Math.PI) - 90;
         v1.setYaw(yaw);
         v2.setYaw(yaw + 180);
-        if (v1.squaredDistanceTo(v2) > 4.0) {
-            v1.getNavigation().startMovingTo(v2.getX() + dx * 0.3, v2.getY(), v2.getZ() + dz * 0.3, 0.5D);
+        if (v1.squaredDistanceTo(v2) > 4) {
+            v1.getNavigation().startMovingTo(v2.getX() + dx * 0.3, v2.getY(), v2.getZ() + dz * 0.3, 0.5);
         }
     }
 
@@ -640,25 +619,20 @@ public class VillagerManager {
 
     private String getSharedHistory(VillagerAI v1, VillagerAI v2) {
         Relationship relationship = getRelationship(v1.getVillager().getUuid(), v2.getVillager().getUuid());
-        if (relationship == null) return "first meeting";
-        return relationship.toString();
+        return relationship == null ? "first meeting" : relationship.toString();
     }
 
     private String getNearbyActivities(ServerWorld world, BlockPos pos) {
         List<String> activities = new ArrayList<>();
         int searchRadius = 10;
-        List<VillagerAI> nearbyVillagers = villagerAIs.values().stream().filter(ai -> ai.getVillager().getBlockPos().isWithinDistance(pos, searchRadius)).collect(Collectors.toList());
-        for (VillagerAI ai : nearbyVillagers) {
-            activities.add(ai.getCurrentActivity());
-        }
+        List<VillagerAI> nearbyVillagers = villagerAIs.values().stream().filter(ai -> ai.getVillager().getBlockPos().isWithinDistance(pos, searchRadius)).toList();
+        for (VillagerAI ai : nearbyVillagers) activities.add(ai.getCurrentActivity());
         return activities.stream().distinct().collect(Collectors.joining(", "));
     }
 
     private void applyInteractionEffects(ServerWorld world, VillagerEntity v1, VillagerEntity v2, Map<String, String> interaction) {
         String outcome = interaction.getOrDefault("OUTCOME", "neutral");
-        double x = (v1.getX() + v2.getX()) / 2;
-        double y = (v1.getY() + v2.getY()) / 2 + 1;
-        double z = (v1.getZ() + v2.getZ()) / 2;
+        double x = (v1.getX() + v2.getX()) / 2, y = (v1.getY() + v2.getY()) / 2 + 1, z = (v1.getZ() + v2.getZ()) / 2;
         if (outcome.contains("positive") || outcome.contains("friend")) {
             world.spawnParticles(ParticleTypes.HEART, x, y, z, 2, 0.2, 0.2, 0.2, 0.02);
         } else if (outcome.contains("negative") || outcome.contains("rival")) {
@@ -681,14 +655,11 @@ public class VillagerManager {
     }
 
     private void displayInteraction(ServerWorld world, VillagerEntity v1, VillagerEntity v2, Map<String, String> interaction) {
-        String dialogue = interaction.getOrDefault("DIALOGUE", "...");
-        String actions = interaction.getOrDefault("ACTIONS", "");
+        String dialogue = interaction.getOrDefault("DIALOGUE", "..."), actions = interaction.getOrDefault("ACTIONS", "");
         for (ServerPlayerEntity player : world.getPlayers()) {
             if (player.squaredDistanceTo(v1) < 100) {
                 player.sendMessage(Text.of("§6" + v1.getName().getString() + ": §f" + dialogue), false);
-                if (!actions.isEmpty()) {
-                    player.sendMessage(Text.of("§7* " + v1.getName().getString() + " " + actions), false);
-                }
+                if (!actions.isEmpty()) player.sendMessage(Text.of("§7* " + v1.getName().getString() + " " + actions), false);
             }
         }
     }
@@ -696,11 +667,8 @@ public class VillagerManager {
     private void updateVillagerStates(VillagerAI v1, VillagerAI v2, Map<String, String> interaction) {
         String moodChange = interaction.getOrDefault("MOOD_CHANGE", "neutral");
         int moodDelta = 0;
-        if (moodChange.contains("positive")) {
-            moodDelta = 5;
-        } else if (moodChange.contains("negative")) {
-            moodDelta = -3;
-        }
+        if (moodChange.contains("positive")) moodDelta = 5;
+        else if (moodChange.contains("negative")) moodDelta = -3;
         if (moodDelta != 0) {
             v1.adjustHappiness(moodDelta);
             v2.adjustHappiness(moodDelta);
@@ -716,7 +684,7 @@ public class VillagerManager {
     }
 
     public Map<String, String> parseInteractionResponse(String response) {
-        return parseResponse(response); // Reuse the existing private parseResponse method
+        return parseResponse(response);
     }
 
     private Map<String, String> parseResponse(String response) {
@@ -766,58 +734,38 @@ public class VillagerManager {
         List<BlockPos> villageCenters = new ArrayList<>(spawnRegions.keySet());
         for (int i = 0; i < villageCenters.size(); i++) {
             for (int j = i + 1; j < villageCenters.size(); j++) {
-                BlockPos village1 = villageCenters.get(i);
-                BlockPos village2 = villageCenters.get(j);
+                BlockPos village1 = villageCenters.get(i), village2 = villageCenters.get(j);
                 relationshipEffects.processVillageRelationships(village1, village2);
             }
         }
     }
 
-    /**
-     * Synchronize village data between server and clients
-     * Called periodically from the ServerTickHandler
-     * @param server The Minecraft server
-     */
     public void syncVillageData(MinecraftServer server) {
         if (server == null) return;
-        
         villageLock.readLock().lock();
         try {
-            // Sync all village regions data to clients
             for (Map.Entry<BlockPos, SpawnRegion> entry : spawnRegions.entrySet()) {
                 BlockPos center = entry.getKey();
                 SpawnRegion region = entry.getValue();
                 VillageStats stats = villageStats.get(center);
-                
                 if (stats == null) continue;
-                
-                // Get all villagers in this region
                 List<VillagerEntity> regionVillagers = new ArrayList<>();
                 for (VillagerAI ai : villagerAIs.values()) {
                     VillagerEntity villager = ai.getVillager();
-                    if (villager != null && villager.isAlive() && 
-                        region.isWithinRegion(villager.getBlockPos())) {
+                    if (villager != null && villager.isAlive() && region.isWithinRegion(villager.getBlockPos())) {
                         regionVillagers.add(villager);
                     }
                 }
-                
-                // Calculate region leadership if needed
                 if (stats.leaderUUID == null && !regionVillagers.isEmpty()) {
                     determineVillageLeader(stats, regionVillagers);
                 }
-                
-                // Broadcast stats to nearby players
                 broadcastVillageInfoUpdate(center);
             }
-            
-            // Sync all active cultural events
             culturalEventLock.readLock().lock();
             try {
                 for (CulturalEvent event : culturalEvents.values()) {
-                    // Broadcast event info to nearby players
                     for (SpawnRegion region : spawnRegions.values()) {
-                        broadcastEventNotification(
-                            event.name, event.description, region.getCenter(), region.getRadius() * 2);
+                        broadcastEventNotification(event.name, event.description, region.getCenter(), region.getRadius() * 2);
                     }
                 }
             } finally {
@@ -826,24 +774,15 @@ public class VillagerManager {
         } finally {
             villageLock.readLock().unlock();
         }
-        
         LOGGER.debug("Synchronized village data across the server");
     }
 
-    /**
-     * Determine which villager should be the village leader
-     * @param stats The village stats to update
-     * @param villagers List of villagers in the region
-     */
     private void determineVillageLeader(VillageStats stats, List<VillagerEntity> villagers) {
-        // Simple algorithm: pick the villager with the most relationships
         UUID bestCandidate = null;
         int maxRelationships = -1;
-        
         for (VillagerEntity villager : villagers) {
             UUID id = villager.getUuid();
             VillagerAI ai = getVillagerAI(id);
-            
             if (ai != null) {
                 int relationshipCount = getRelationshipCount(id);
                 if (relationshipCount > maxRelationships) {
@@ -852,88 +791,47 @@ public class VillagerManager {
                 }
             }
         }
-        
-        // Set the village leader
         if (bestCandidate != null) {
             stats.leaderUUID = bestCandidate;
-            
-            // Notify the villager they're now a leader
             VillagerAI leaderAI = getVillagerAI(bestCandidate);
             if (leaderAI != null) {
                 Map<String, Object> params = new HashMap<>();
                 params.put("leadershipRole", "village_leader");
                 leaderAI.startBehavior("leadership", 1200, params);
-                
                 VillagerEntity leader = leaderAI.getVillager();
-                if (leader != null && leader.getWorld() instanceof ServerWorld) {
-                    ServerWorld world = (ServerWorld) leader.getWorld();
-                    world.spawnParticles(
-                        ParticleTypes.HAPPY_VILLAGER,
-                        leader.getX(), leader.getY() + 1, leader.getZ(),
-                        10, 0.5, 0.5, 0.5, 0.05
-                    );
+                if (leader != null && leader.getWorld() instanceof ServerWorld sw) {
+                    sw.spawnParticles(ParticleTypes.HAPPY_VILLAGER, leader.getX(), leader.getY() + 1, leader.getZ(), 10, 0.5, 0.5, 0.5, 0.05);
                 }
             }
         }
     }
 
-    /**
-     * Get the villagers in a spawn region
-     * @param region The spawn region
-     * @return A list of villagers in the region
-     */
     public List<VillagerEntity> getVillagersInRegion(SpawnRegion region) {
-        if (region == null || server == null) {
-            return Collections.emptyList();
-        }
+        if (region == null || server == null) return Collections.emptyList();
         List<VillagerEntity> villagersInRegion = new ArrayList<>();
-        // Iterate through all server worlds to find villagers
         for (ServerWorld world : server.getWorlds()) {
-             // Check if the world dimension matches the region, if necessary (using region.canSpawnInDimension)
-             // Efficiently get entities in the region's bounding box
-             Box regionBox = new Box(region.getCenter()).expand(region.getRadius());
-             List<VillagerEntity> worldVillagers = world.getEntitiesByClass(VillagerEntity.class, regionBox, v -> region.isWithinRegion(v.getBlockPos()));
-             villagersInRegion.addAll(worldVillagers);
+            Box regionBox = new Box(region.getCenter()).expand(region.getRadius());
+            List<VillagerEntity> worldVillagers = world.getEntitiesByClass(VillagerEntity.class, regionBox, v -> region.isWithinRegion(v.getBlockPos()));
+            villagersInRegion.addAll(worldVillagers);
         }
-         return villagersInRegion;
-     }
-    
+        return villagersInRegion;
+    }
+
     public void registerBiomeCultureAssociation(java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType) {
         biomeCultureAssociations.put(selector, cultureType);
     }
 
-    /**
-     * Initialize culture-specific structures for a village type
-     * This replaces the deprecated FabricStructurePool.registerAddition in 1.21.4
-     * 
-     * @param server The Minecraft server
-     * @param cultureType The culture type (e.g., "roman", "egyptian")
-     * @param vanillaType The vanilla village type (e.g., "plains", "desert")
-     * @param structures Map of structure Identifiers to their weights
-     */
-    public void initializeCultureStructures(MinecraftServer server, String cultureType, 
-                                          String vanillaType, Map<net.minecraft.util.Identifier, Integer> structures) {
-        // Get the registry manager from the server
+    public void initializeCultureStructures(MinecraftServer server, String cultureType, String vanillaType, Map<net.minecraft.util.Identifier, Integer> structures) {
         net.minecraft.registry.RegistryWrapper.WrapperLookup registryManager = server.getRegistryManager();
-        
-        // In 1.21.4, the correct way to add structures is through data packs
-        // We'll log what structures would have been added so the user knows
-        // what to include in their data pack
-        
         LOGGER.info("Structures for {} culture in {} villages:", cultureType, vanillaType);
         for (Map.Entry<net.minecraft.util.Identifier, Integer> entry : structures.entrySet()) {
             LOGGER.info(" - {} (weight: {})", entry.getKey(), entry.getValue());
-            
-            // Store the structure reference for later use in the mod
-            SpawnRegion region = spawnRegions.values().stream()
-                .filter(r -> r.getCulture().toString().equalsIgnoreCase(cultureType))
-                .findFirst().orElse(null);
-                
+            SpawnRegion region = spawnRegions.values().stream().filter(r -> r.getCulture().toString().equalsIgnoreCase(cultureType)).findFirst().orElse(null);
             if (region != null) {
-                // region.addCulturalStructure(entry.getKey()); // TODO: Re-implement or remove structure association
             }
         }
-        
         LOGGER.info("To add these structures, include them in a data pack with appropriate structure pool templates");
     }
+
+    
 }

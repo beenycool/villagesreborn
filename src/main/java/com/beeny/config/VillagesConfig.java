@@ -16,17 +16,10 @@ public class VillagesConfig {
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final File configFile;
     private ConfigData data;
-    
-    private UISettings uiSettings;
-    private LLMSettings llmSettings;
-    private GameplaySettings gameplaySettings;
-
     private VillagesConfig() {
         configFile = FabricLoader.getInstance().getConfigDir().resolve("villagesreborn.json").toFile();
         load();
-        uiSettings = new UISettings();
-        llmSettings = new LLMSettings();
-        gameplaySettings = new GameplaySettings();
+        // Nested settings objects are now part of ConfigData and initialized there
     }
 
     public static VillagesConfig getInstance() {
@@ -42,7 +35,13 @@ public class VillagesConfig {
                 e.printStackTrace();
             }
         }
-        if (data == null) data = new ConfigData();
+        if (data == null) {
+            data = new ConfigData();
+            // Ensure nested objects are initialized if creating new data
+            if (data.uiSettings == null) data.uiSettings = new UISettings();
+            if (data.llmSettings == null) data.llmSettings = new LLMSettings();
+            if (data.gameplaySettings == null) data.gameplaySettings = new GameplaySettings();
+        }
     }
 
     public void save() {
@@ -65,96 +64,49 @@ public class VillagesConfig {
         };
     }
 
-    public String getAIProvider() {
-        return data.aiProvider;
-    }
-
-    public void cycleAIProvider() {
-        List<String> providers = new ArrayList<>(List.of(
-            "OPENAI", "ANTHROPIC", "DEEPSEEK", "GEMINI", "MISTRAL", 
-            "AZURE", "COHERE", "OPENROUTER"
-        ));
-        int currentIndex = providers.indexOf(data.aiProvider);
-        data.aiProvider = providers.get((currentIndex + 1) % providers.size());
-    }
+    // AI Provider is now managed within LLMSettings
 
     public List<String> getEnabledCultures() {
         return data.enabledCultures;
     }
 
-    public boolean isVillagerPvPEnabled() {
-        return data.villagerPvPEnabled;
-    }
-
-    public void toggleVillagerPvP() {
-        data.villagerPvPEnabled = !data.villagerPvPEnabled;
-    }
-
-    public boolean isTheftDetectionEnabled() {
-        return data.theftDetectionEnabled;
-    }
-
-    public void toggleTheftDetection() {
-        data.theftDetectionEnabled = !data.theftDetectionEnabled;
-    }
-    
-    public int getVillagerMemoryDuration() {
-        return data.villagerMemoryDuration;
-    }
-    
-    public void setVillagerMemoryDuration(int days) {
-        data.villagerMemoryDuration = Math.max(1, Math.min(7, days));
-    }
-    
-    public boolean isVillagerTradingBoostEnabled() {
-        return data.villagerTradingBoostEnabled;
-    }
-    
-    public void toggleVillagerTradingBoost() {
-        data.villagerTradingBoostEnabled = !data.villagerTradingBoostEnabled;
-    }
-    
-    public boolean isUniqueCraftingRecipesEnabled() {
-        return data.uniqueCraftingRecipesEnabled;
-    }
-    
-    public void toggleUniqueCraftingRecipes() {
-        data.uniqueCraftingRecipesEnabled = !data.uniqueCraftingRecipesEnabled;
-    }
-    
-    public int getCulturalGiftModifier() {
-        return data.culturalGiftModifier;
-    }
-    
-    public void setCulturalGiftModifier(int percentage) {
-        data.culturalGiftModifier = Math.max(50, Math.min(200, percentage));
-    }
+    // Gameplay settings (PvP, Theft, Memory, Trading, Crafting, Gifts) are now managed within GameplaySettings
     
     public UISettings getUISettings() {
-        return uiSettings;
+        // Ensure data and nested object are not null
+        if (data == null) load(); // Try loading if data is null
+        if (data == null) data = new ConfigData(); // Create if still null
+        if (data.uiSettings == null) data.uiSettings = new UISettings(); // Initialize if null
+        return data.uiSettings;
     }
-    
+
     public LLMSettings getLLMSettings() {
-        return llmSettings;
+        if (data == null) load();
+        if (data == null) data = new ConfigData();
+        if (data.llmSettings == null) data.llmSettings = new LLMSettings();
+        return data.llmSettings;
     }
-    
+
     public GameplaySettings getGameplaySettings() {
-        return gameplaySettings;
+        if (data == null) load();
+        if (data == null) data = new ConfigData();
+        if (data.gameplaySettings == null) data.gameplaySettings = new GameplaySettings();
+        return data.gameplaySettings;
     }
 
     private static class ConfigData {
         String villageSpawnRate = "MEDIUM";
-        String aiProvider = "OPENAI";
+        // aiProvider removed, now in LLMSettings
         List<String> enabledCultures = new ArrayList<>(List.of("ROMAN", "EGYPTIAN", "VICTORIAN", "NYC", "NETHER", "END"));
-        boolean villagerPvPEnabled = false;
-        boolean theftDetectionEnabled = true;
-        int villagerMemoryDuration = 3;
-        boolean villagerTradingBoostEnabled = true;
-        boolean uniqueCraftingRecipesEnabled = true;
-        int culturalGiftModifier = 150;
+        // Gameplay settings moved to GameplaySettings class
+        
+        // Hold instances of the settings classes
+        UISettings uiSettings = new UISettings();
+        LLMSettings llmSettings = new LLMSettings();
+        GameplaySettings gameplaySettings = new GameplaySettings();
     }
     
-    public class UISettings {
+    public static class UISettings { // Made static
         private boolean showVillagerNameTags = true;
         private boolean showVillagerHealthBars = true;
         private boolean showVillageMarkers = true;
@@ -300,16 +252,16 @@ public class VillagesConfig {
         }
     }
     
-    public class LLMSettings {
+    public static class LLMSettings { // Made static
         private String apiKey = "";
-        private String model = ""; // Default model ID (provider-specific)
+        // private String model = ""; // Removed redundant field
         private String endpoint = ""; // Default endpoint (provider-specific, often optional)
         private int maxTokens = 1000;
         private boolean localModel = false;
         private String localModelPath = "";
         private int contextLength = 4;
         private boolean useMemory = true;
-        private String modelType = ""; // Renamed from model, ensure consistency if used elsewhere
+        private String model = ""; // Renamed from modelType back to model for clarity
         private float temperature = 0.7f;
         private int maxCacheSize = 100;
         private int cacheTTLSeconds = 300;
@@ -335,14 +287,7 @@ public class VillagesConfig {
             this.apiKey = apiKey;
         }
         
-        public String getModel() {
-            return model;
-        }
-        
-        public void setModel(String model) {
-            this.model = model;
-        }
-        
+        // Removed getter/setter for the redundant 'model' field
         public String getEndpoint() {
             return endpoint;
         }
@@ -391,12 +336,12 @@ public class VillagesConfig {
             this.useMemory = useMemory;
         }
         
-        public String getModelType() {
-            return modelType;
+        public String getModel() { // Renamed from getModelType
+            return model;
         }
-        
-        public void setModelType(String modelType) {
-            this.modelType = modelType;
+
+        public void setModel(String model) { // Renamed from setModelType
+            this.model = model;
         }
         
         public float getTemperature() {
@@ -467,7 +412,7 @@ public class VillagesConfig {
         }
     }
     
-    public class GameplaySettings {
+    public static class GameplaySettings { // Made static
         private float eventFrequencyMultiplier = 1.0f;
         private float villagerActivityFrequencyMultiplier = 1.0f;
         private float tradingFrequencyMultiplier = 1.0f;
@@ -484,6 +429,14 @@ public class VillagesConfig {
         private boolean showEventNotifications = true;
         private int maxConcurrentEvents = 3;
         private boolean playerReputationAffectsEvents = true;
+
+        // Added fields moved from ConfigData
+        private boolean villagerPvPEnabled = false;
+        private boolean theftDetectionEnabled = true;
+        private int villagerMemoryDuration = 3; // days
+        private boolean villagerTradingBoostEnabled = true;
+        private boolean uniqueCraftingRecipesEnabled = true;
+        private int culturalGiftModifier = 150; // percentage
         
         public float getEventFrequencyMultiplier() {
             return eventFrequencyMultiplier;
@@ -648,5 +601,70 @@ public class VillagesConfig {
         public void togglePlayerReputationAffectsEvents() {
             this.playerReputationAffectsEvents = !this.playerReputationAffectsEvents;
         }
+    }
+
+    // Added getters/setters/togglers for fields moved from ConfigData
+    public boolean isVillagerPvPEnabled() {
+        return villagerPvPEnabled;
+    }
+
+    public void toggleVillagerPvP() {
+        this.villagerPvPEnabled = !this.villagerPvPEnabled;
+    }
+    
+    public void setVillagerPvPEnabled(boolean enabled) { // Added explicit setter
+         this.villagerPvPEnabled = enabled;
+    }
+
+    public boolean isTheftDetectionEnabled() {
+        return theftDetectionEnabled;
+    }
+
+    public void toggleTheftDetection() {
+        this.theftDetectionEnabled = !this.theftDetectionEnabled;
+    }
+    
+    public void setTheftDetectionEnabled(boolean enabled) { // Added explicit setter
+         this.theftDetectionEnabled = enabled;
+    }
+
+    public int getVillagerMemoryDuration() {
+        return villagerMemoryDuration;
+    }
+
+    public void setVillagerMemoryDuration(int days) {
+        this.villagerMemoryDuration = Math.max(1, Math.min(7, days));
+    }
+
+    public boolean isVillagerTradingBoostEnabled() {
+        return villagerTradingBoostEnabled;
+    }
+
+    public void toggleVillagerTradingBoost() {
+        this.villagerTradingBoostEnabled = !this.villagerTradingBoostEnabled;
+    }
+    
+    public void setVillagerTradingBoostEnabled(boolean enabled) { // Added explicit setter
+         this.villagerTradingBoostEnabled = enabled;
+    }
+
+    public boolean isUniqueCraftingRecipesEnabled() {
+        return uniqueCraftingRecipesEnabled;
+    }
+
+    public void toggleUniqueCraftingRecipes() {
+        this.uniqueCraftingRecipesEnabled = !this.uniqueCraftingRecipesEnabled;
+    }
+    
+    public void setUniqueCraftingRecipesEnabled(boolean enabled) { // Added explicit setter
+         this.uniqueCraftingRecipesEnabled = enabled;
+    }
+
+    public int getCulturalGiftModifier() {
+        return culturalGiftModifier;
+    }
+
+    public void setCulturalGiftModifier(int percentage) {
+        this.culturalGiftModifier = Math.max(50, Math.min(200, percentage));
     }
 }

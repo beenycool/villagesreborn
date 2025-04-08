@@ -88,7 +88,7 @@ public class VillageRelationshipEffects {
      */
     public void processHostileEffects(VillagerEntity villager) {
         if (!villager.isAlive() || villager.getWorld().isClient()) return;
-        if (!VillagesConfig.getInstance().isVillagerPvPEnabled()) return;
+        if (!VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) return;
         
         ServerWorld world = (ServerWorld) villager.getWorld();
         VillagerManager vm = VillagerManager.getInstance();
@@ -180,7 +180,7 @@ public class VillageRelationshipEffects {
         
         // Check if ally is under attack - if so, defend them!
         LivingEntity attacker = allyInNeed.getAttacker();
-        if (attacker != null && attacker.isAlive() && VillagesConfig.getInstance().isVillagerPvPEnabled()) {
+        if (attacker != null && attacker.isAlive() && VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) {
             // If the attacker is another villager and we have PvP enabled
             if (attacker instanceof VillagerEntity enemyVillager &&
                 helperAI.getRelationshipWith(enemyVillager.getUuid()) != VillagerAI.RelationshipType.FRIEND &&

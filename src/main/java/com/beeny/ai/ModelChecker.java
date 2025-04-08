@@ -116,7 +116,7 @@ public class ModelChecker {
                     Files.move(tempFile, modelPath, StandardCopyOption.REPLACE_EXISTING);
                     VillagesConfig config = VillagesConfig.getInstance();
                     config.getLLMSettings().setProvider("local"); // Use nested settings
-                    config.getLLMSettings().setModelType(modelType.getId()); // Set model type to the downloaded one
+                    config.getLLMSettings().setModel(modelType.getId()); // Set model to the downloaded one
                     config.save(); // Use correct save method
                     LOGGER.info("{} model downloaded successfully to: {}", modelName, modelPath);
                     progressCallback.accept(1.0);

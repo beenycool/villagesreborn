@@ -58,7 +58,7 @@ public class LLMImplementation {
             messages.add(new ChatMessage(ChatRole.SYSTEM, getSystemPrompt(context)));
             messages.add(new ChatMessage(ChatRole.USER, prompt));
             ChatCompletions completions = client.getChatCompletions(
-                settings.getModelType(),
+                settings.getModel(),
                 new ChatCompletionsOptions(messages)
                     .setTemperature(Double.valueOf(settings.getTemperature()))
                     .setMaxTokens(settings.getContextLength())

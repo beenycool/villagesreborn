@@ -44,7 +44,7 @@ public class VillagerEvents {
     }
 
     private static ActionResult onPlayerUseBlock(PlayerEntity player, World world, Hand hand, BlockHitResult hitResult) {
-        if (world.isClient() || !VillagesConfig.getInstance().isTheftDetectionEnabled()) return ActionResult.PASS;
+        if (world.isClient() || !VillagesConfig.getInstance().getGameplaySettings().isTheftDetectionEnabled()) return ActionResult.PASS;
         BlockPos pos = hitResult.getBlockPos();
         BlockState state = world.getBlockState(pos);
         if (state.getBlock() instanceof ChestBlock) {
@@ -63,7 +63,7 @@ public class VillagerEvents {
     }
 
     private static void onPlayerBreakBlock(World world, PlayerEntity player, BlockPos pos, BlockState state, BlockEntity blockEntity) {
-        if (world.isClient() || !VillagesConfig.getInstance().isTheftDetectionEnabled()) return;
+        if (world.isClient() || !VillagesConfig.getInstance().getGameplaySettings().isTheftDetectionEnabled()) return;
         if (chestOwnership.containsKey(pos)) {
             UUID ownerId = chestOwnership.get(pos);
             VillagerEntity owner = findVillagerById(ownerId, (ServerWorld)world);

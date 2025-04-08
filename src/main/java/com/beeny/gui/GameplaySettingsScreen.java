@@ -35,25 +35,25 @@ public class GameplaySettingsScreen extends Screen {
         // Villager PvP Toggle
         this.addDrawableChild(CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
             .values(true, false)
-            .initially(config.isVillagerPvPEnabled())
+            .initially(config.getGameplaySettings().isVillagerPvPEnabled())
             .tooltip(value -> Tooltip.of(Text.literal("Allows villagers to engage in combat with players or other mobs")))
             .build(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20, Text.literal("Villager PvP"),
-                (button, value) -> config.toggleVillagerPvP()) // Action on change
+                (button, value) -> config.getGameplaySettings().toggleVillagerPvP()) // Action on change
         );
         y += spacing;
 
         // Theft Detection Toggle
         this.addDrawableChild(CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
             .values(true, false)
-            .initially(config.isTheftDetectionEnabled())
+            .initially(config.getGameplaySettings().isTheftDetectionEnabled())
             .tooltip(value -> Tooltip.of(Text.literal("Villagers will react negatively if they see you stealing")))
             .build(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20, Text.literal("Theft Detection"),
-                (button, value) -> config.toggleTheftDetection()) // Action on change
+                (button, value) -> config.getGameplaySettings().toggleTheftDetection()) // Action on change
         );
         y += spacing;
 
         // Villager Memory Duration
-        int memoryDuration = config.getVillagerMemoryDuration();
+        int memoryDuration = config.getGameplaySettings().getVillagerMemoryDuration();
         SliderWidget memorySlider = new SliderWidget(
             this.width / 2 - buttonWidth / 2, y, buttonWidth, 20,
             Text.literal("Memory Duration: " + formatDuration(memoryDuration)),
@@ -67,7 +67,7 @@ public class GameplaySettingsScreen extends Screen {
             @Override
             protected void applyValue() {
                 int value = (int) (this.value * 6) + 1;
-                config.setVillagerMemoryDuration(value);
+                config.getGameplaySettings().setVillagerMemoryDuration(value);
             }
         };
         memorySlider.setTooltip(Tooltip.of(Text.literal("How long villagers remember player actions (in Minecraft days)")));
@@ -77,25 +77,25 @@ public class GameplaySettingsScreen extends Screen {
         // Villager Trading Boost
         this.addDrawableChild(CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
             .values(true, false)
-            .initially(config.isVillagerTradingBoostEnabled())
+            .initially(config.getGameplaySettings().isVillagerTradingBoostEnabled())
             .tooltip(value -> Tooltip.of(Text.literal("Better trades with villagers of cultures you have good relations with")))
             .build(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20, Text.literal("Cultural Trading Bonus"),
-                (button, value) -> config.toggleVillagerTradingBoost()) // Action on change
+                (button, value) -> config.getGameplaySettings().toggleVillagerTradingBoost()) // Action on change
         );
         y += spacing;
 
         // Unique Crafting Recipes
         this.addDrawableChild(CyclingButtonWidget.<Boolean>builder(value -> Text.literal(value ? "ON" : "OFF"))
             .values(true, false)
-            .initially(config.isUniqueCraftingRecipesEnabled())
+            .initially(config.getGameplaySettings().isUniqueCraftingRecipesEnabled())
             .tooltip(value -> Tooltip.of(Text.literal("Enable culture-specific crafting recipes")))
             .build(this.width / 2 - buttonWidth / 2, y, buttonWidth, 20, Text.literal("Cultural Crafting"),
-                (button, value) -> config.toggleUniqueCraftingRecipes()) // Action on change
+                (button, value) -> config.getGameplaySettings().toggleUniqueCraftingRecipes()) // Action on change
         );
         y += spacing;
 
         // Cultural Gift Value Modifier
-        int giftModifier = config.getCulturalGiftModifier();
+        int giftModifier = config.getGameplaySettings().getCulturalGiftModifier();
         SliderWidget giftSlider = new SliderWidget(
             this.width / 2 - buttonWidth / 2, y, buttonWidth, 20,
             Text.literal("Gift Value Modifier: " + giftModifier + "%"),
@@ -109,7 +109,7 @@ public class GameplaySettingsScreen extends Screen {
             @Override
             protected void applyValue() {
                 int value = (int) (this.value * 100) + 100;
-                config.setCulturalGiftModifier(value);
+                config.getGameplaySettings().setCulturalGiftModifier(value);
             }
         };
         giftSlider.setTooltip(Tooltip.of(Text.literal("How much cultural preferences affect gift values")));

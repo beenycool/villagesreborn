@@ -955,7 +955,7 @@ public class VillagerAI {
     }
 
     public void addPvPGoals() {
-        if (!VillagesConfig.getInstance().isVillagerPvPEnabled()) {
+        if (!VillagesConfig.getInstance().getGameplaySettings().isVillagerPvPEnabled()) {
             return;
         }
 
