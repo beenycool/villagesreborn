@@ -38,7 +38,16 @@ public class VillagerWorldTickHandler implements ServerTickEvents.EndWorldTick {
 
         VillagerManager vm = VillagerManager.getInstance();
 
-        if (tickCounter % 100 == 0) {
+        // Calculate interval for villager activity updates based on config
+        float activityMultiplier = VillagesConfig.getInstance().getGameplaySettings().getVillagerActivityFrequencyMultiplier();
+        if (activityMultiplier <= 0) activityMultiplier = 1.0f; // Prevent division by zero or negative intervals
+        int baseActivityInterval = 100; // Default: 100 ticks (5 seconds)
+        // Multiplier > 1 means less frequent (longer interval), Multiplier < 1 means more frequent (shorter interval)
+        int adjustedActivityInterval = (int) (baseActivityInterval / activityMultiplier);
+        // Clamp interval to reasonable bounds (e.g., 1 second to 1 minute)
+        adjustedActivityInterval = Math.max(20, Math.min(1200, adjustedActivityInterval));
+
+        if (tickCounter % adjustedActivityInterval == 0) {
             vm.updateVillagerActivities(world);
         }
 

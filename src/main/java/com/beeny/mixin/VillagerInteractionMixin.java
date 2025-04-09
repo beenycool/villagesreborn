@@ -210,8 +210,18 @@ public abstract class VillagerInteractionMixin {
       cir.setReturnValue(ActionResult.SUCCESS); // Prevent vanilla trading screen
 
     } else {
-      // --- Non-Workstation Interaction (Dialogue) ---
+      // --- Non-Workstation Interaction (Gift or Dialogue) ---
+      net.minecraft.item.ItemStack heldItemStack = player.getStackInHand(hand); // Get held item
+
       if (!isClient) {
+        // Check if player is holding an item (potential gift)
+        if (!heldItemStack.isEmpty()) {
+            // Handle as a gift attempt
+            handleGiftInteraction(player, thisVillager, heldItemStack, hand, cir);
+            // handleGiftInteraction should set cir.setReturnValue if it consumes the interaction
+            return; // Stop further processing in onInteract if handled as gift
+        }
+        // If hand is empty, proceed with dialogue
         if (villagerAI != null && player instanceof ServerPlayerEntity serverPlayer) {
           vr_LOGGER.debug(
               "Server handling dialogue interaction for Villager {}", thisVillager.getUuid());
@@ -385,5 +395,106 @@ public abstract class VillagerInteractionMixin {
     
     vr_LOGGER.warn("Unknown profession encountered: {}", profession.toString());
     return null;
+  }
+
+  // --- Gift Handling Logic ---
+  @Unique // Mark as unique to this mixin
+  private void handleGiftInteraction(PlayerEntity player, VillagerEntity villager, net.minecraft.item.ItemStack giftStack, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+      if (!(player instanceof ServerPlayerEntity serverPlayer)) {
+          // Should only happen on server
+          return;
+      }
+      World world = villager.getWorld();
+      if (world.isClient) return; // Double check server side
+
+      VillagerManager vm = VillagerManager.getInstance();
+      VillagerAI villagerAI = vm.getVillagerAI(villager.getUuid());
+      VillagerMemory memory = vm.getVillagerMemory(villager.getUuid());
+      SpawnRegion region = vm.getNearestSpawnRegion(villager.getBlockPos());
+      String culture = (region != null) ? region.getCultureAsString().toLowerCase() : "generic";
+
+      if (villagerAI == null) {
+          serverPlayer.sendMessage(Text.literal("This villager seems unable to accept gifts right now."), false);
+          cir.setReturnValue(ActionResult.FAIL);
+          return;
+      }
+
+      // --- Gift Evaluation ---
+      int baseValue = getGiftBaseValue(giftStack); // Determine base value (e.g., based on item rarity, type)
+      float culturalMultiplier = getCulturalGiftMultiplier(giftStack, culture); // Determine cultural relevance multiplier
+      int configModifierPercent = VillagesConfig.getInstance().getGameplaySettings().getCulturalGiftModifier(); // Get modifier from config (e.g., 150 for 150%)
+      float configMultiplier = configModifierPercent / 100.0f;
+
+      // Calculate final gift value
+      int finalValue = (int) (baseValue * culturalMultiplier * configMultiplier);
+
+      // Clamp value to reasonable bounds (e.g., 1 to 25)
+      finalValue = Math.max(1, Math.min(25, finalValue));
+
+      // --- Apply Effects ---
+      villagerAI.adjustHappiness(finalValue / 2); // Example: Adjust happiness based on value
+      // TODO: Adjust relationship with player based on finalValue
+
+      // Record memory of the gift
+      if (memory != null) {
+          memory.addMemory(VillagerMemory.Memory.MemoryType.INTERACTION,
+                           "Received a gift (" + giftStack.getName().getString() + ") from " + player.getName().getString() + ".",
+                           finalValue / 5.0f); // Importance based on value
+      }
+
+      // Consume the item from player's hand
+      if (!player.getAbilities().creativeMode) {
+          giftStack.decrement(1);
+      }
+
+      // --- Feedback ---
+      String feedback;
+      if (finalValue >= 15) {
+          feedback = "Oh, thank you! This is wonderful!";
+          VillagerFeedbackHelper.showHappyEffect(villager);
+      } else if (finalValue >= 8) {
+          feedback = "Thank you, this is very kind.";
+          VillagerFeedbackHelper.showSpeakingEffect(villager); // Neutral/positive
+      } else if (finalValue >= 3) {
+          feedback = "Oh... thank you.";
+      } else {
+          feedback = "Hmm. Thanks, I suppose.";
+      }
+
+      serverPlayer.sendMessage(Text.literal("§6" + villager.getName().getString() + ": §f" + feedback), false);
+      villager.getLookControl().lookAt(player, 30f, 30f); // Look at player
+
+      cir.setReturnValue(ActionResult.SUCCESS); // Consume the interaction
+  }
+
+  @Unique
+  private int getGiftBaseValue(net.minecraft.item.ItemStack stack) {
+      // Simple example: Assign value based on item rarity or type
+      if (stack.isFood()) return 3;
+      if (stack.getItem() == net.minecraft.item.Items.EMERALD) return 10;
+      if (stack.getItem() == net.minecraft.item.Items.DIAMOND) return 20;
+      if (stack.getRarity() == net.minecraft.util.Rarity.UNCOMMON) return 5;
+      if (stack.getRarity() == net.minecraft.util.Rarity.RARE) return 10;
+      if (stack.getRarity() == net.minecraft.util.Rarity.EPIC) return 15;
+      return 1; // Default low value
+  }
+
+  @Unique
+  private float getCulturalGiftMultiplier(net.minecraft.item.ItemStack stack, String culture) {
+      // Example: Increase multiplier for culturally relevant items
+      // This needs specific logic based on defined cultural preferences
+      Item item = stack.getItem();
+      switch (culture) {
+          case "roman":
+              if (item == net.minecraft.item.Items.IRON_SWORD || item == net.minecraft.item.Items.SHIELD) return 1.5f;
+              if (item == net.minecraft.item.Items.WHEAT || item == net.minecraft.item.Items.BREAD) return 1.2f;
+              break;
+          case "egyptian":
+              if (item == net.minecraft.item.Items.SANDSTONE || item == net.minecraft.item.Items.GOLD_INGOT) return 1.5f;
+              if (item == net.minecraft.item.Items.PAPYRUS) return 1.8f; // Assuming Papyrus item exists
+              break;
+          // Add cases for other cultures...
+      }
+      return 1.0f; // Default multiplier
   }
 }

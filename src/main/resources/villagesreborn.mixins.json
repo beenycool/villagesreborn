@@ -9,7 +9,9 @@
     "OptionsScreenMixin",
     "ChatMessageMixin",
     "CreateWorldScreenMixin",
-    "VillagerEntityMixin"
+    "VillagerEntityMixin",
+    "levelgen.RandomSpreadStructurePlacementMixin",
+    "accessor.TradeOfferAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

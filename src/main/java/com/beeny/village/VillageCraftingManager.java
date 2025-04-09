@@ -125,6 +125,12 @@ public class VillageCraftingManager {
     }
     
     public List<CraftingRecipe> getRecipesForCulture(String culture) {
+        // Check if unique crafting recipes are enabled in the config
+        if (!VillagesConfig.getInstance().getGameplaySettings().isUniqueCraftingRecipesEnabled()) {
+            // If disabled, return an empty list, effectively hiding cultural recipes
+            return Collections.emptyList();
+        }
+        // If enabled, return the recipes for the specified culture
         return culturalRecipes.getOrDefault(culture, Collections.emptyList());
     }
     

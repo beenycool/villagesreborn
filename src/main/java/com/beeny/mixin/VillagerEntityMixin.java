@@ -1,6 +1,7 @@
 package com.beeny.mixin;
 
 import com.beeny.config.VillagesConfig;
+import com.beeny.mixin.accessor.TradeOfferAccessor; // Added import
 import com.beeny.village.VillagerManager; // Placeholder import
 import com.beeny.village.VillageEconomyManager; // Placeholder import
 import net.minecraft.entity.passive.VillagerEntity;
@@ -84,6 +85,25 @@ public abstract class VillagerEntityMixin {
         for (TradeOffer offer : this.offers) {
             // Adjust offer based on economyState (demand/supply)
             modifyTradeOffer(offer, economyState);
+        }
+
+        // Apply Trading Boost if enabled
+        if (VillagesConfig.getInstance().getGameplaySettings().isVillagerTradingBoostEnabled()) {
+            for (TradeOffer offer : this.offers) {
+                try {
+                    // Use the accessor to modify maxUses
+                    TradeOfferAccessor accessor = (TradeOfferAccessor) offer;
+                    int currentMaxUses = offer.getMaxUses();
+                    int boostedMaxUses = currentMaxUses * 2; // Example: Double the max uses
+                    // Clamp the value to avoid excessively high numbers (e.g., max 999)
+                    boostedMaxUses = Math.min(999, boostedMaxUses);
+                    accessor.setMaxUses(boostedMaxUses);
+                } catch (Exception e) {
+                    // Log error if casting or modification fails
+                    // Consider adding a logger instance to the mixin class
+                    System.err.println("[VillagesReborn] Failed to apply trading boost to offer: " + e.getMessage());
+                }
+            }
         }
     }
 

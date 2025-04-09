@@ -132,8 +132,43 @@ public class VillagerMemory {
     }
 
     public void updatePlayerRelationship(UUID playerId, float interactionValue) {
+        VillagesConfig.GameplaySettings gameplaySettings = VillagesConfig.getInstance().getGameplaySettings();
+
+        // Get the relationship intensity multiplier from config
+        float intensityMultiplier = gameplaySettings.getRelationshipIntensityMultiplier();
+        // Clamp multiplier to reasonable bounds (e.g., 0.1x to 5x)
+        intensityMultiplier = Math.max(0.1f, Math.min(5.0f, intensityMultiplier));
+
+        // Apply the intensity multiplier to the interaction value
+        float adjustedInteractionValue = interactionValue * intensityMultiplier;
+
+        // Apply Cultural Bias if enabled
+        if (gameplaySettings.isCulturalBiasEnabled()) {
+            // We need the villager's culture and the player's 'culture' (or alignment)
+            // This requires access to the VillagerEntity associated with this memory instance,
+            // which isn't directly available here. This logic might be better placed where
+            // the interaction originates (e.g., VillagerInteractionMixin or VillagerAI).
+            // --- Placeholder for Bias Logic ---
+            // Example: Get villager's culture (needs access to VillagerEntity or VillagerAI)
+            // String villagerCulture = getVillagerCulture(); // Placeholder
+            // Example: Get player's cultural alignment (needs access to player data)
+            // String playerAlignment = getPlayerCulturalAlignment(playerId); // Placeholder
+            // if (villagerCulture != null && playerAlignment != null) {
+            //     if (villagerCulture.equalsIgnoreCase(playerAlignment)) {
+            //         adjustedInteractionValue *= 1.1f; // Small bonus for same culture
+            //     } else {
+            //         adjustedInteractionValue *= 0.9f; // Small penalty for different culture
+            //     }
+            // }
+            // --- End Placeholder ---
+            // For now, log that bias is enabled but not applied here due to missing context.
+            // Consider moving this logic if possible.
+             // System.out.println("[VillagesReborn] Cultural Bias enabled, but context missing in VillagerMemory.updatePlayerRelationship");
+        }
+
         float currentRelationship = playerRelationships.getOrDefault(playerId, 0.0f);
-        float newRelationship = Math.max(-1.0f, Math.min(1.0f, currentRelationship + interactionValue));
+        // Calculate new relationship using the adjusted value
+        float newRelationship = Math.max(-1.0f, Math.min(1.0f, currentRelationship + adjustedInteractionValue));
         playerRelationships.put(playerId, newRelationship);
     }
 

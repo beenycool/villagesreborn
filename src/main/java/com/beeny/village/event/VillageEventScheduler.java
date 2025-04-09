@@ -1080,6 +1080,62 @@ public class VillageEventScheduler {
                 }
             }
 
+            // --- Apply Weather Modifier ---
+            if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) { // Check baseWeight here too
+                boolean isRaining = world.isRaining();
+                boolean isThundering = world.isThundering(); // Thundering implies raining
+
+                // Reduce weight significantly for outdoor events during bad weather
+                if (template.isOutdoor && (isRaining || isThundering)) {
+                    float weatherModifier = isThundering ? 0.1f : 0.3f; // Heavy penalty for thunder
+                    adjustedWeight = (int) (adjustedWeight * weatherModifier);
+                    // System.out.println("Applying weather penalty (" + weatherModifier + ") to outdoor event " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+            // --- End Weather Modifier ---
+
+            // --- Apply Weather Modifier ---
+            if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) { // Check baseWeight here too
+                boolean isRaining = world.isRaining();
+                boolean isThundering = world.isThundering(); // Thundering implies raining
+
+                // Reduce weight significantly for outdoor events during bad weather
+                if (template.isOutdoor && (isRaining || isThundering)) {
+                    float weatherModifier = isThundering ? 0.1f : 0.3f; // Heavy penalty for thunder
+                    adjustedWeight = (int) (adjustedWeight * weatherModifier);
+                    // System.out.println("Applying weather penalty (" + weatherModifier + ") to outdoor event " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+            // --- End Weather Modifier ---
+
+            // --- Apply Weather Modifier ---
+            if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) {
+                boolean isRaining = world.isRaining();
+                boolean isThundering = world.isThundering(); // Thundering implies raining
+
+                // Reduce weight significantly for outdoor events during bad weather
+                if (template.isOutdoor && (isRaining || isThundering)) {
+                    float weatherModifier = isThundering ? 0.1f : 0.3f; // Heavy penalty for thunder
+                    adjustedWeight = (int) (adjustedWeight * weatherModifier);
+                    // System.out.println("Applying weather penalty (" + weatherModifier + ") to outdoor event " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+            // --- End Weather Modifier ---
+
+            // --- Apply Weather Modifier ---
+            if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) {
+                boolean isRaining = world.isRaining();
+                boolean isThundering = world.isThundering(); // Thundering implies raining
+
+                // Reduce weight significantly for outdoor events during bad weather
+                if (template.isOutdoor && (isRaining || isThundering)) {
+                    float weatherModifier = isThundering ? 0.1f : 0.3f; // Heavy penalty for thunder
+                    adjustedWeight = (int) (adjustedWeight * weatherModifier);
+                    adjustedWeight = Math.max(1, adjustedWeight); // Ensure it doesn't go to zero if it was positive
+                    // System.out.println("Applying weather penalty (" + weatherModifier + ") to outdoor event " + template.type + ". New weight: " + adjustedWeight);
+                }
+            }
+            // --- End Weather Modifier ---
             // Apply weather modifier if enabled
             if (VillagesConfig.getInstance().getGameplaySettings().isWeatherAffectsEvents() && baseWeight > 0) {
                 boolean isBadWeather = world.isRaining() || world.isThundering();

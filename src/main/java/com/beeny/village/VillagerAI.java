@@ -1337,6 +1337,24 @@ public class VillagerAI {
     }
     
     private void executeTradeBehavior(ServerWorld world) {
+        // Check trading frequency multiplier
+        float tradeMultiplier = VillagesConfig.getInstance().getGameplaySettings().getTradingFrequencyMultiplier();
+        if (tradeMultiplier <= 0) tradeMultiplier = 1.0f;
+
+        // Use the multiplier to determine the probability of executing the trade logic this tick
+        // Multiplier > 1 decreases frequency (lower probability)
+        // Multiplier < 1 increases frequency (higher probability)
+        // Example: If multiplier is 2.0, probability is 1/2 = 0.5. If 0.5, probability is 1/0.5 = 2.0 (clamped to 1.0)
+        double executionProbability = 1.0 / tradeMultiplier;
+
+        // Only execute trade logic based on probability
+        if (world.random.nextDouble() > executionProbability) {
+            // Skip trading logic this tick due to frequency setting
+            // Optionally, add some idle behavior here if needed, or just return
+            return;
+        }
+
+        // --- Original Trading Logic ---
         // Example: Look for players, maybe display emerald particles?
         Box checkBox = villager.getBoundingBox().expand(8.0);
         List<PlayerEntity> nearbyPlayers = world.getEntitiesByClass(PlayerEntity.class, checkBox, p -> true);
@@ -1551,10 +1569,27 @@ public class VillagerAI {
             LOGGER.trace("Applied cultural bias: {} (Culture1: {}, Culture2: {})", biasModifier, culture1, culture2);
         }
 
+// Apply adjustedChange to the numerical relationship score
+VillagerManager manager = VillagerManager.getInstance();
+UUID uuid1 = v1.getVillager().getUuid();
+UUID uuid2 = v2.getVillager().getUuid();
+Relationship relationship = manager.getRelationship(uuid1, uuid2);
 
-        // TODO: Apply adjustedChange to the numerical relationship score between v1 and v2
-        // This likely involves getting the current score and updating it via VillagerManager or Relationship class
-        LOGGER.debug("Applying relationship change: {} (Base: {}, Intensity Multiplier: {}, Bias Applied: {}) between {} and {}",
+if (relationship != null) {
+    relationship.modifyScore(adjustedChange);
+    LOGGER.debug("Updated relationship score between {} and {}: {} (Change: {})",
+                 v1.getVillager().getName().getString(), v2.getVillager().getName().getString(),
+                 relationship.getScore(), adjustedChange);
+} else {
+     // If no relationship exists yet, the code below (addRelationship) will create it.
+     // The initial score will be 0, and this change won't be applied until the next interaction.
+     // Alternatively, could modify addRelationship to take an initial score. For now, log this.
+     LOGGER.debug("No existing relationship found to apply score change between {} and {}. Will be created.",
+                  v1.getVillager().getName().getString(), v2.getVillager().getName().getString());
+}
+
+LOGGER.debug("Calculated relationship change: {} (Base: {}, Intensity Multiplier: {}, Bias Applied: {}) between {} and {}",
+    adjustedChange, baseChange, intensityMultiplier, culturalBias, v1.getVillager().getName().getString(), v2.getVillager().getName().getString());
             adjustedChange, baseChange, intensityMultiplier, culturalBias, v1.getVillager().getName().getString(), v2.getVillager().getName().getString());
 
         // Update the categorical relationship type (Friend/Rival/Neutral) based on the sentiment

@@ -9,7 +9,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap; // Added import
 import java.util.List;
+import java.util.Map; // Added import
 
 public class VillagesConfig {
     private static VillagesConfig instance;
@@ -112,7 +114,8 @@ public class VillagesConfig {
         private boolean showVillageMarkers = true;
         private int villageMarkerRange = 64;
         private boolean compactVillagerInfo = false;
-        private String colorScheme = "DEFAULT";
+        private String activeColorSchemeKey = "DEFAULT"; // Renamed from colorScheme for clarity
+        private Map<String, ColorScheme> colorSchemes = new HashMap<>();
         
         private String conversationLabelFormat = "Speaking to: {name}";
         private String conversationHudPosition = "BOTTOM_RIGHT";
@@ -120,8 +123,8 @@ public class VillagesConfig {
         private boolean showProfession = true;
         private int backgroundColor = 0x80000000;
         private int borderColor = 0x80FFFFFF;
-        private int labelColor = 0xFFFFFFFF;
-        private int nameColor = 0xFFFFFF00;
+        private int labelColor = 0xFFFFFFFF; // Keep for now, might be for other UI
+        // private int nameColor = 0xFFFFFF00; // Removed, now handled by ColorScheme.nameTag
         
         public boolean isShowVillagerNameTags() {
             return showVillagerNameTags;
@@ -163,12 +166,39 @@ public class VillagesConfig {
             this.compactVillagerInfo = compactVillagerInfo;
         }
         
-        public String getColorScheme() {
-            return colorScheme;
+        public String getActiveColorSchemeKey() {
+            return activeColorSchemeKey;
         }
-        
-        public void setColorScheme(String colorScheme) {
-            this.colorScheme = colorScheme;
+
+        public void setActiveColorSchemeKey(String key) {
+            // Optional: Validate if the key exists in the map?
+            this.activeColorSchemeKey = key;
+        }
+
+        // Method to get the currently active ColorScheme object
+        public ColorScheme getActiveColorScheme() {
+            // Ensure map is initialized (might be null after loading old config)
+            if (colorSchemes == null) {
+                initializeColorSchemes();
+            }
+            // Return the scheme for the active key, or default if not found/null
+            return colorSchemes.getOrDefault(activeColorSchemeKey, colorSchemes.get("DEFAULT"));
+        }
+
+        // Initialize default schemes (call this if map is null)
+        private void initializeColorSchemes() {
+            if (colorSchemes == null) {
+                 colorSchemes = new HashMap<>();
+            }
+            if (!colorSchemes.containsKey("DEFAULT")) {
+                colorSchemes.put("DEFAULT", new ColorScheme()); // Add default scheme
+            }
+            // Add other predefined schemes here if needed
+        }
+
+        // Constructor or initializer block to ensure schemes are set up
+        { // Initializer block
+            initializeColorSchemes();
         }
         
         public void toggleNameTags() {
@@ -243,12 +273,34 @@ public class VillagesConfig {
             this.labelColor = labelColor;
         }
         
-        public int getNameColor() {
-            return nameColor;
-        }
-        
-        public void setNameColor(int nameColor) {
-            this.nameColor = nameColor;
+        // Removed getNameColor() and setNameColor() as nameColor field is removed
+
+        // Inner class to hold specific color values for a scheme
+        public static class ColorScheme {
+            // Default values match previous hardcoded/config values
+            public int nameTag = 0xFFFFFF00; // Yellowish
+            public int healthBarBackground = 0x80303030; // Darker Gray Semi-Transparent
+            public int healthBarHigh = 0xFF00FF00; // Bright Green
+            public int healthBarMedium = 0xFFFFFF00; // Bright Yellow
+            public int healthBarLow = 0xFFFF0000; // Bright Red
+            public int compactProfession = 0xFF33FF33; // Light Green (from mixin)
+            public int compactCulture = 0xFF00FFFF; // Aqua/Cyan (from mixin)
+            public int markerTint = 0xFFFFFFFF; // Default: White (no tint)
+
+            // Default constructor uses default values
+            public ColorScheme() {}
+
+            // Optional: Constructor to set all colors
+            public ColorScheme(int nameTag, int healthBg, int healthHigh, int healthMed, int healthLow, int prof, int culture, int marker) {
+                this.nameTag = nameTag;
+                this.healthBarBackground = healthBg;
+                this.healthBarHigh = healthHigh;
+                this.healthBarMedium = healthMed;
+                this.healthBarLow = healthLow;
+                this.compactProfession = prof;
+                this.compactCulture = culture;
+                this.markerTint = marker;
+            }
         }
     }
     

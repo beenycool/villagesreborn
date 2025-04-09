@@ -1,0 +1,18 @@
+{
+  "structures": [
+    {
+      "structure": "villagesreborn:roman/forum",
+      "weight": 1
+    },
+    {
+      "structure": "villagesreborn:roman/house",
+      "weight": 5
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 48,
+    "separation": 12,
+    "salt": 10387313 
+  }
+}
