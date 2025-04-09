@@ -1,6 +1,8 @@
 package com.beeny.village.event;
 
 import com.beeny.ai.LLMService;
+import com.beeny.config.ModConfig;        // Import new config
+import com.beeny.config.ModConfigManager; // Import new config manager
 import com.beeny.village.VillagerAI;
 import com.beeny.village.VillagerManager;
 import com.beeny.village.SpawnRegion;
@@ -16,7 +18,9 @@ public class VillageEventManager {
     private final Map<String, List<VillageEvent>> activeEvents = new HashMap<>();
     private final Map<String, List<VillageEvent>> historicalEvents = new HashMap<>();
     private final Map<String, Set<String>> successfulEventTypes = new HashMap<>();
+    private final Map<String, Long> lastEventTimePerCulture = new HashMap<>(); // Track last event start time
     private final Random random = new Random();
+    private static final float BASE_EVENT_CHANCE_PER_TICK = 0.01f; // Base chance (e.g., 1%)
 
     public CompletableFuture<VillageEvent> generateRandomEvent(String culture, ServerWorld world, List<VillagerAI> participants) {
         String prompt;
@@ -87,7 +91,10 @@ public class VillageEventManager {
     }
 
     public void startEvent(VillageEvent event) {
-        activeEvents.computeIfAbsent(event.getCulture(), k -> new ArrayList<>()).add(event);
+        List<VillageEvent> cultureEvents = activeEvents.computeIfAbsent(event.getCulture(), k -> new ArrayList<>());
+        cultureEvents.add(event);
+        // Update last event time for this culture using the event's start time
+        lastEventTimePerCulture.put(event.getCulture(), event.getStartTime());
         notifyParticipants(event);
     }
 
@@ -107,13 +114,24 @@ public class VillageEventManager {
             }
         });
 
-        // Generate new events if needed
-        if (random.nextFloat() < 0.05f) { // 5% chance per tick
+        // Generate new events if needed, considering config settings
+        ModConfig config = ModConfigManager.getConfig();
+        float adjustedEventChance = BASE_EVENT_CHANCE_PER_TICK * (float) config.gameplay.eventFrequency;
+        long minInterval = config.gameplay.minEventIntervalTicks;
+
+        if (random.nextFloat() < adjustedEventChance) {
             VillagerManager.getInstance().getSpawnRegions().forEach(region -> {
-                List<VillagerAI> villagers = getVillagersInRegion(region);
-                if (!villagers.isEmpty() && getActiveEvents(region.getCultureAsString()).size() < 3) {
-                    generateRandomEvent(region.getCultureAsString(), world, villagers)
-                        .thenAccept(this::startEvent);
+                String culture = region.getCultureAsString();
+                long timeSinceLastEvent = currentTime - lastEventTimePerCulture.getOrDefault(culture, 0L);
+
+                // Check minimum interval and max concurrent events for this culture
+                if (timeSinceLastEvent >= minInterval && getActiveEvents(culture).size() < 3) { // Max 3 concurrent per culture
+                    List<VillagerAI> villagers = getVillagersInRegion(region);
+                    if (!villagers.isEmpty()) {
+                        LOGGER.info(String.format("Attempting to generate event for %s culture (Time since last: %d ticks)", culture, timeSinceLastEvent));
+                        generateRandomEvent(culture, world, villagers)
+                            .thenAccept(this::startEvent);
+                    }
                 }
             });
         }

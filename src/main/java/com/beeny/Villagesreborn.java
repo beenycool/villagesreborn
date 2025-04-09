@@ -1,5 +1,6 @@
 package com.beeny;
 
+import com.beeny.config.ModConfigManager; // Added import
 import com.beeny.village.VillagerWorldTickHandler;
 import com.beeny.village.ServerTickHandler;
 import net.fabricmc.api.ModInitializer;
@@ -24,9 +25,10 @@ import com.beeny.village.VillagerManager;
 import com.beeny.village.SpawnRegion;
 import com.beeny.village.event.CulturalEventSystem;
 import com.beeny.village.event.PlayerDataManager;
-import com.beeny.config.VillagesConfig; // Added import
+import com.beeny.config.ModConfig;        // Import new config
+import com.beeny.config.ModConfigManager; // Import new config manager
 import com.beeny.setup.SystemSpecs;
-import com.beeny.config.VillagesConfig;
+import com.beeny.config.VillagesConfig; // Keep old config for now (LLMService dependency)
 import com.beeny.ai.LLMService;
 import com.beeny.worldgen.VillagesRebornStructures;
 import com.beeny.network.VillageCraftingNetwork;
@@ -79,8 +81,9 @@ public class Villagesreborn implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Initializing Villages Reborn mod");
-        INSTANCE = this;
+    	LOGGER.info("Initializing Villages Reborn mod");
+    	INSTANCE = this;
+    	ModConfigManager.register(); // Register the new config system
         systemSpecs = new SystemSpecs();
         systemSpecs.analyzeSystem();
         villagesConfig = VillagesConfig.getInstance();
@@ -101,12 +104,9 @@ public class Villagesreborn implements ModInitializer {
             VillagerManager.getInstance().setServer(server);
             LOGGER.info("Villages Reborn detected server start. Applying config settings...");
 
-            // Apply spawn rate modification
-            try {
-                applySpawnRateFromConfig(server);
-            } catch (Exception e) {
-                LOGGER.error("Failed to apply village spawn rate from config", e);
-            }
+            // Spawn rate modification is now handled by selecting the correct StructureSet
+            // in VillagesRebornStructures based on ModConfig.
+            // No need to call applySpawnRateFromConfig here anymore.
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (serverInstance != null) {
@@ -243,10 +243,20 @@ public class Villagesreborn implements ModInitializer {
 
     private void registerCultureStructures(String vanillaType, java.util.function.Predicate<net.fabricmc.fabric.api.biome.v1.BiomeSelectionContext> selector, String cultureType, Map<Identifier, Integer> structures) {
         VillagerManager.getInstance().registerBiomeCultureAssociation(selector, cultureType);
-        // Check if the culture is enabled in the config
-        if (!VillagesConfig.getInstance().getEnabledCultures().contains(cultureType.toUpperCase())) {
-            LOGGER.info("Skipping registration for disabled culture: {}", cultureType);
-            return; // Don't register if disabled
+        // Check if the culture is enabled in the new ModConfig
+        ModConfig config = ModConfigManager.getConfig();
+        boolean enabled = switch (cultureType.toLowerCase()) {
+            case "roman" -> config.general.cultureToggles.enableRoman;
+            case "egyptian" -> config.general.cultureToggles.enableEgyptian;
+            case "victorian" -> config.general.cultureToggles.enableVictorian;
+            case "nyc" -> config.general.cultureToggles.enableNyc;
+            // Add cases for other cultures if they are registered here
+            default -> false; // Disable if cultureType doesn't match known toggles
+        };
+
+        if (!enabled) {
+            LOGGER.info("Skipping registration for disabled culture (ModConfig): {}", cultureType);
+            return; // Don't register if disabled in ModConfig
         }
 
         LOGGER.info("Registered {} culture for {} biomes", cultureType, vanillaType);
@@ -319,52 +329,6 @@ public class Villagesreborn implements ModInitializer {
     public void updateVillageEvents(BlockPos center, int eventCount) {
     }
 
-    // Method to modify structure set placement based on config
-    private void applySpawnRateFromConfig(MinecraftServer server) {
-        String spawnRateSetting = VillagesConfig.getInstance().getVillageSpawnRate();
-        int spacing;
-        int separation;
-
-        switch (spawnRateSetting.toUpperCase()) {
-            case "LOW":
-                spacing = 48;
-                separation = 12;
-                break;
-            case "HIGH":
-                spacing = 24;
-                separation = 6;
-                break;
-            case "MEDIUM":
-            default: // Default to MEDIUM if setting is invalid
-                spacing = 32;
-                separation = 8;
-                break;
-        }
-
-        LOGGER.info("Applying Village Spawn Rate: {} (Spacing: {}, Separation: {})", spawnRateSetting, spacing, separation);
-
-        Registry<StructureSet> structureSetRegistry = server.getRegistryManager().get(RegistryKeys.STRUCTURE_SET);
-
-        for (Map.Entry<RegistryKey<StructureSet>, StructureSet> entry : structureSetRegistry.getEntrySet()) {
-            Identifier id = entry.getKey().getValue();
-            StructureSet structureSet = entry.getValue();
-
-            // Check if the structure set belongs to our mod
-            if (id.getNamespace().equals(MOD_ID)) {
-                StructurePlacement placement = structureSet.placement();
-
-                // Check if it uses random spread placement
-                if (placement instanceof RandomSpreadStructurePlacement currentPlacement) {
-                    // Create a new placement object with modified values
-                    // TODO: Implement Mixin to modify Structure Placement
-                    // Directly modifying loaded registry StructureSets is complex/unreliable.
-                    // A Mixin into the relevant world generation code (e.g., ChunkGenerator)
-                    // is needed to intercept the placement logic and use the 'spacing'
-                    // and 'separation' values calculated above from the config.
-                    // Without a Mixin, the default values from the structure_set JSONs will be used.
-                    LOGGER.debug("Structure set '{}' found. Calculated config spacing: {}, separation: {}. (Mixin required to apply)", id, spacing, separation);
-                }
-            }
-        }
-    }
+    // Removed applySpawnRateFromConfig method as spawn rate is handled by selecting
+    // the appropriate StructureSet in VillagesRebornStructures based on ModConfig.
 }

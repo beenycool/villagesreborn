@@ -1,7 +1,9 @@
 package com.beeny.village;
 
 import com.beeny.ai.LLMService;
-import com.beeny.config.VillagesConfig;
+import com.beeny.config.ModConfig;        // Import new config
+import com.beeny.config.ModConfigManager; // Import new config manager
+import com.beeny.config.VillagesConfig; // Keep old config for LLM settings for now
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
@@ -189,6 +191,7 @@ public class VillagerAI {
     private long lastActivityTransition = 0;
     
     private static final long MIN_TICKS_BETWEEN_ACTIVITIES = 100; // Base cooldown (5 seconds)
+    private static final double BASE_TRADE_ATTEMPT_CHANCE = 0.1; // Base chance (e.g., 10%) per execution cycle when 'trading' activity is active
     // Track active behavior execution
     private String activeBehavior = null;
     private long behaviorStartTime = 0;
@@ -271,8 +274,9 @@ public class VillagerAI {
         long timeSinceLastTransition = currentTime - lastActivityTransition;
         
         // Apply activity frequency multiplier
-        float activityMultiplier = VillagesConfig.getInstance().getGameplaySettings().getVillagerActivityFrequencyMultiplier();
-        if (activityMultiplier <= 0) activityMultiplier = 1.0f; // Prevent issues with zero or negative values
+        // Apply activity frequency multiplier from ModConfig
+        double activityMultiplier = ModConfigManager.getConfig().gameplay.activityFrequency;
+        if (activityMultiplier <= 0) activityMultiplier = 1.0; // Prevent division by zero or negative time
         long requiredTicksBetweenActivities = (long) (MIN_TICKS_BETWEEN_ACTIVITIES / activityMultiplier);
 
         // Check cooldown before allowing any activity change logic (except LLM override)
@@ -1337,6 +1341,20 @@ public class VillagerAI {
     }
     
     private void executeTradeBehavior(ServerWorld world) {
+        // Check if villager attempts to trade based on frequency setting
+        ModConfig config = ModConfigManager.getConfig();
+        double adjustedTradeChance = BASE_TRADE_ATTEMPT_CHANCE * config.gameplay.tradingFrequency;
+        // Use villager's world random instance for consistency
+        if (villager.getWorld().random.nextDouble() >= adjustedTradeChance) {
+            // Didn't attempt trade this cycle, maybe wander instead
+            applyWanderGoals("trade_wander_failed_chance");
+            // Ensure activity reflects not actively trading if chance fails
+            if (getCurrentActivity().equals("trading")) {
+                 updateActivity("wandering"); // Or another suitable fallback
+            }
+            return;
+        }
+
         // Check trading frequency multiplier
         float tradeMultiplier = VillagesConfig.getInstance().getGameplaySettings().getTradingFrequencyMultiplier();
         if (tradeMultiplier <= 0) tradeMultiplier = 1.0f;
@@ -1528,10 +1546,11 @@ public class VillagerAI {
      */
     private void updateRelationships(VillagerAI v1, VillagerAI v2, Map<String, String> interaction) {
         // Get multipliers from config
-        VillagesConfig.GameplaySettings gameplaySettings = VillagesConfig.getInstance().getGameplaySettings();
-        float intensityMultiplier = gameplaySettings.getRelationshipIntensityMultiplier();
-        boolean culturalBias = gameplaySettings.isCulturalBiasEnabled();
-        if (intensityMultiplier <= 0) intensityMultiplier = 1.0f; // Safety check
+        // Get multipliers from the new ModConfig
+        ModConfig config = ModConfigManager.getConfig();
+        double intensityMultiplier = config.gameplay.relationshipIntensity;
+        boolean culturalBias = config.gameplay.culturalBiasMultiplier > 0; // Check if bias multiplier is enabled (>0)
+        if (intensityMultiplier <= 0) intensityMultiplier = 1.0; // Safety check
 
         String sentiment = interaction.getOrDefault("SENTIMENT", "neutral").toLowerCase();
         RelationshipType newType = RelationshipType.NEUTRAL;
@@ -1545,28 +1564,34 @@ public class VillagerAI {
             baseChange = -5; // Example base negative change
         }
 
+        // Apply intensity multiplier
         int adjustedChange = (int) (baseChange * intensityMultiplier);
 
         // Apply cultural bias if enabled
-        if (culturalBias) {
+        // Apply cultural bias if enabled and multiplier is not 1.0
+        if (culturalBias && config.gameplay.culturalBiasMultiplier != 1.0) {
             VillagerManager vm = VillagerManager.getInstance();
             SpawnRegion region1 = vm.getNearestSpawnRegion(v1.getVillager().getBlockPos());
             SpawnRegion region2 = vm.getNearestSpawnRegion(v2.getVillager().getBlockPos());
             String culture1 = (region1 != null) ? region1.getCultureAsString() : null;
             String culture2 = (region2 != null) ? region2.getCultureAsString() : null;
 
-            int biasModifier = 0;
-            final int CULTURAL_BIAS_AMOUNT = 2; // Example value
+            double biasEffect = 0;
+            final double BASE_CULTURAL_BIAS_EFFECT = 2.0; // Base effect amount
 
             if (culture1 != null && culture2 != null) {
                 if (culture1.equals(culture2)) {
-                    biasModifier = CULTURAL_BIAS_AMOUNT; // Positive bias for same culture
+                    // Positive bias for same culture, scaled by multiplier
+                    biasEffect = BASE_CULTURAL_BIAS_EFFECT * config.gameplay.culturalBiasMultiplier;
                 } else {
-                    biasModifier = -CULTURAL_BIAS_AMOUNT; // Negative bias for different cultures
+                    // Negative bias for different cultures, scaled by multiplier
+                    biasEffect = -BASE_CULTURAL_BIAS_EFFECT * config.gameplay.culturalBiasMultiplier;
                 }
             }
-            adjustedChange += biasModifier;
-            LOGGER.trace("Applied cultural bias: {} (Culture1: {}, Culture2: {})", biasModifier, culture1, culture2);
+            // Add the calculated bias effect to the change
+            adjustedChange += (int) biasEffect;
+            LOGGER.trace("Applied cultural bias effect: {} (Multiplier: {}, Culture1: {}, Culture2: {})",
+                         (int) biasEffect, config.gameplay.culturalBiasMultiplier, culture1, culture2);
         }
 
 // Apply adjustedChange to the numerical relationship score

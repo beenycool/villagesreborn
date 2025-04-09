@@ -1,6 +1,9 @@
 package com.beeny.village;
 
-import com.beeny.config.VillagesConfig; // Added import
+import com.beeny.config.ModConfig;        // Import new config
+import com.beeny.config.ModConfigManager; // Import new config manager
+// Keep old config import if needed elsewhere, otherwise remove. For now, assume not needed here.
+// import com.beeny.config.VillagesConfig;
 import net.minecraft.entity.player.PlayerEntity;
 import java.util.*;
 public class VillagerMemory {
@@ -20,7 +23,7 @@ public class VillagerMemory {
 
     public static class Memory implements Comparable<Memory> {
         private final String description;
-        private final long timestamp;
+        private final long timestampTicks; // Store game ticks instead of milliseconds
         private final MemoryType type;
         private float importance;
         private UUID associatedPlayerId;
@@ -34,13 +37,14 @@ public class VillagerMemory {
             SOCIAL_INTERACTION
         }
 
-        public Memory(String description, MemoryType type, float importance) {
+        // Constructor now takes game ticks
+        public Memory(String description, MemoryType type, float importance, long gameTickTimestamp) {
             this.description = description;
-            timestamp = System.currentTimeMillis();
+            this.timestampTicks = gameTickTimestamp; // Store game ticks
             this.type = type;
             this.importance = importance;
-            associatedPlayerId = null;
-            additionalData = new HashMap<>();
+            this.associatedPlayerId = null;
+            this.additionalData = new HashMap<>();
         }
 
         public Memory withPlayer(UUID playerId) { this.associatedPlayerId = playerId; return this; }
@@ -48,7 +52,7 @@ public class VillagerMemory {
         public Memory withData(String key, Object value) { additionalData.put(key, value); return this; }
 
         public String getDescription() { return description; }
-        public long getTimestamp() { return timestamp; }
+        public long getTimestampTicks() { return timestampTicks; } // Return game ticks
         public MemoryType getType() { return type; }
         public float getImportance() { return importance; }
         public UUID getAssociatedPlayerId() { return associatedPlayerId; }
@@ -91,11 +95,13 @@ public class VillagerMemory {
         }
     }
 
-    public void recordPlayerInteraction(PlayerEntity player, String description, float importance, boolean isPositive) {
+    // Method now requires current game tick
+    public void recordPlayerInteraction(PlayerEntity player, String description, float importance, boolean isPositive, long currentTick) {
         Memory memory = new Memory(
-            description, 
+            description,
             Memory.MemoryType.PLAYER_INTERACTION,
-            importance
+            importance,
+            currentTick // Pass current game tick
         ).withPlayer(player.getUuid());
 
         if (isPositive) {
@@ -109,62 +115,39 @@ public class VillagerMemory {
         addMemory(memory);
     }
 
-    public void recordVillageEvent(String eventName, String description, float importance) {
+    // Method now requires current game tick
+    public void recordVillageEvent(String eventName, String description, float importance, long currentTick) {
         Memory memory = new Memory(
             description,
             Memory.MemoryType.VILLAGE_EVENT,
-            importance
+            importance,
+            currentTick // Pass current game tick
         ).withData("eventName", eventName);
 
         addMemory(memory);
     }
 
-    public void learnCraftingRecipe(String recipeName) {
+    // Method now requires current game tick
+    public void learnCraftingRecipe(String recipeName, long currentTick) {
         knownCraftingRecipes.add(recipeName);
 
         Memory memory = new Memory(
             "Learned how to craft " + recipeName,
             Memory.MemoryType.PERSONAL_MILESTONE,
-            0.6f
+            0.6f,
+            currentTick // Pass current game tick
         ).withData("recipe", recipeName);
 
         addMemory(memory);
     }
 
     public void updatePlayerRelationship(UUID playerId, float interactionValue) {
-        VillagesConfig.GameplaySettings gameplaySettings = VillagesConfig.getInstance().getGameplaySettings();
-
-        // Get the relationship intensity multiplier from config
-        float intensityMultiplier = gameplaySettings.getRelationshipIntensityMultiplier();
-        // Clamp multiplier to reasonable bounds (e.g., 0.1x to 5x)
-        intensityMultiplier = Math.max(0.1f, Math.min(5.0f, intensityMultiplier));
-
-        // Apply the intensity multiplier to the interaction value
-        float adjustedInteractionValue = interactionValue * intensityMultiplier;
-
-        // Apply Cultural Bias if enabled
-        if (gameplaySettings.isCulturalBiasEnabled()) {
-            // We need the villager's culture and the player's 'culture' (or alignment)
-            // This requires access to the VillagerEntity associated with this memory instance,
-            // which isn't directly available here. This logic might be better placed where
-            // the interaction originates (e.g., VillagerInteractionMixin or VillagerAI).
-            // --- Placeholder for Bias Logic ---
-            // Example: Get villager's culture (needs access to VillagerEntity or VillagerAI)
-            // String villagerCulture = getVillagerCulture(); // Placeholder
-            // Example: Get player's cultural alignment (needs access to player data)
-            // String playerAlignment = getPlayerCulturalAlignment(playerId); // Placeholder
-            // if (villagerCulture != null && playerAlignment != null) {
-            //     if (villagerCulture.equalsIgnoreCase(playerAlignment)) {
-            //         adjustedInteractionValue *= 1.1f; // Small bonus for same culture
-            //     } else {
-            //         adjustedInteractionValue *= 0.9f; // Small penalty for different culture
-            //     }
-            // }
-            // --- End Placeholder ---
-            // For now, log that bias is enabled but not applied here due to missing context.
-            // Consider moving this logic if possible.
-             // System.out.println("[VillagesReborn] Cultural Bias enabled, but context missing in VillagerMemory.updatePlayerRelationship");
-        }
+        // This method updates relationship score based on interaction value,
+        // but the interaction value itself should be calculated where the interaction happens,
+        // considering config multipliers (intensity, bias) there.
+        // This method just applies the final calculated value.
+        // We remove the config reading from here.
+        float adjustedInteractionValue = interactionValue; // Assume value is already adjusted
 
         float currentRelationship = playerRelationships.getOrDefault(playerId, 0.0f);
         // Calculate new relationship using the adjusted value
@@ -180,15 +163,27 @@ public class VillagerMemory {
         int currentLevel = skillLevels.getOrDefault(profession, 0);
         skillLevels.put(profession, currentLevel + amount);
 
-        if ((currentLevel + amount) > currentLevel) {
-            Memory memory = new Memory(
-                "Improved " + profession.name().toLowerCase() + " skills",
-                Memory.MemoryType.PERSONAL_MILESTONE,
-                0.4f
-            ).withData("profession", profession)
-             .withData("level", currentLevel + amount);
+    // Method now requires current game tick
+    public void recordSkillIncrease(Culture.ProfessionType profession, int newLevel, long currentTick) {
+         Memory memory = new Memory(
+            "Improved " + profession.name().toLowerCase() + " skills",
+            Memory.MemoryType.PERSONAL_MILESTONE,
+            0.4f,
+            currentTick // Pass current game tick
+        ).withData("profession", profession)
+         .withData("level", newLevel);
 
-            addMemory(memory);
+        addMemory(memory);
+    }
+
+    // Refactored increaseSkill to call recordSkillIncrease
+    public void increaseSkill(Culture.ProfessionType profession, int amount, long currentTick) {
+        int currentLevel = skillLevels.getOrDefault(profession, 0);
+        int newLevel = currentLevel + amount;
+        skillLevels.put(profession, newLevel);
+
+        if (newLevel > currentLevel) { // Only record if level actually increased
+            recordSkillIncrease(profession, newLevel, currentTick);
         }
     }
 
@@ -263,17 +258,27 @@ public class VillagerMemory {
         }
     }
 
-    public void updateMemories() {
-        // Get memory duration from config (in days) and convert to milliseconds
-        int memoryDurationDays = VillagesConfig.getInstance().getGameplaySettings().getVillagerMemoryDuration();
-        long maxMemoryAgeMillis = (long)memoryDurationDays * 24 * 60 * 60 * 1000; // days * hours * mins * secs * ms
-        long currentTime = System.currentTimeMillis();
+    // Method now accepts current game tick and uses ModConfig
+    public void updateMemories(long currentGameTick) {
+        // Get memory duration in ticks from ModConfig
+        ModConfig config = ModConfigManager.getConfig();
+        long maxMemoryAgeTicks = config.gameplay.memoryDurationTicks;
 
-        for (Memory memory : memories) {
-            memory.decayImportance(MEMORY_DECAY_RATE);
+        // Decay importance first
+        // Use iterator to allow removal during iteration
+        Iterator<Memory> iterator = memories.iterator();
+        while (iterator.hasNext()) {
+             Memory memory = iterator.next();
+             memory.decayImportance(MEMORY_DECAY_RATE);
+             // Remove memories older than the configured duration in ticks
+             if ((currentGameTick - memory.getTimestampTicks()) > maxMemoryAgeTicks) {
+                 iterator.remove();
+             }
         }
-        // Remove memories older than the configured duration
-        memories.removeIf(memory -> (currentTime - memory.getTimestamp()) > maxMemoryAgeMillis);
+        // Cull memories if list is still too large after removing old ones
+        if (memories.size() > MAX_MEMORIES) {
+             cullMemories(); // cullMemories already sorts and removes the least important
+        }
     }
 
     public float getPersonalityTrait(Culture.CulturalTrait trait) {
