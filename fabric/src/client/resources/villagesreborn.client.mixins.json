@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.beeny.villagesreborn.platform.fabric.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"refmap": "villagesreborn.refmap.json",
+	"client": [
+		"ExampleClientMixin",
+		"CreateWorldScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"minVersion": "0.8"
+}

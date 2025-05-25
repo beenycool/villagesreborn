@@ -1,0 +1,50 @@
+{
+	"schemaVersion": 1,
+	"id": "villagesreborn",
+	"version": "${version}",
+	"name": "Villages Reborn",
+	"description": "A comprehensive village enhancement mod that brings dynamic AI-driven villages to life with advanced NPC behaviors, procedural generation, and immersive gameplay mechanics.",
+	"authors": [
+		"Beeny"
+	],
+	"contact": {
+		"homepage": "https://github.com/beeny/villagesreborn",
+		"sources": "https://github.com/beeny/villagesreborn",
+		"issues": "https://github.com/beeny/villagesreborn/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/villagesreborn/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.beeny.villagesreborn.platform.fabric.VillagesRebornFabric"
+		],
+		"client": [
+			"com.beeny.villagesreborn.platform.fabric.VillagesRebornFabricClient"
+		]
+	},
+	"mixins": [
+		"villagesreborn.mixins.json",
+		{
+			"config": "villagesreborn.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.16.14",
+		"minecraft": "~1.21.4",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	},
+	"custom": {
+		"modmenu": {
+			"links": {
+				"modmenu.discord": "https://discord.gg/villagesreborn"
+			},
+			"update_checker": true
+		}
+	}
+}
