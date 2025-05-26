@@ -1,5 +1,6 @@
 package com.beeny.villagesreborn.platform.fabric.spawn;
 
+import com.beeny.villagesreborn.platform.fabric.spawn.managers.SpawnBiomeStorageManager;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.BlockPos;
@@ -7,11 +8,12 @@ import net.minecraft.world.biome.Biome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Manages spawn point location search and player teleportation
- * Simplified version for testing compatibility
+ * Updated to use the new storage system for biome choices
  */
 public class SpawnPointManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(SpawnPointManager.class);
@@ -103,5 +105,32 @@ public class SpawnPointManager {
         player.setPosition(x, y, z);
         
         LOGGER.info("Teleported player to spawn location: {}, {}, {}", x, y, z);
+    }
+    
+    /**
+     * Gets the current spawn biome choice for the player's world
+     * This method would typically be used on the server side
+     * @return Optional containing the spawn biome choice, or empty if none set
+     */
+    public Optional<SpawnBiomeChoiceData> getCurrentSpawnBiome() {
+        // Note: This is a client-side class, so direct access to server storage is limited
+        // In a real implementation, this would communicate with the server
+        LOGGER.debug("getCurrentSpawnBiome called - would require server communication");
+        return Optional.empty();
+    }
+    
+    /**
+     * Sets the spawn biome choice (client-side placeholder)
+     * In a real implementation, this would send a packet to the server
+     * @param choice The spawn biome choice data
+     */
+    public void setSpawnBiome(SpawnBiomeChoiceData choice) {
+        if (choice == null) {
+            throw new IllegalArgumentException("SpawnBiomeChoiceData cannot be null");
+        }
+        
+        // Note: This is a client-side class, so direct server storage access is not possible
+        // In a real implementation, this would send a packet to the server
+        LOGGER.info("setSpawnBiome called with choice: {} - would require server communication", choice);
     }
 }

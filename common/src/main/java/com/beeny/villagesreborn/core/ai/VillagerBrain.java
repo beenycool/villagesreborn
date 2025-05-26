@@ -253,4 +253,22 @@ public class VillagerBrain {
     public RelationshipData getRelationship(UUID playerId) {
         return relationshipMap.get(playerId);
     }
+    
+    /**
+     * Add an interaction to the conversation history
+     * @param player the player in the interaction
+     * @param playerMessage the player's message
+     * @param villagerResponse the villager's response
+     */
+    public void addInteraction(Player player, String playerMessage, String villagerResponse) {
+        ConversationInteraction interaction = new ConversationInteraction(
+            System.currentTimeMillis(),
+            player.getUUID(),
+            playerMessage,
+            villagerResponse,
+            currentMood.copy(),
+            "Village" // Default location
+        );
+        shortTermMemory.addInteraction(interaction);
+    }
 }

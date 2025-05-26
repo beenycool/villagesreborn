@@ -1,6 +1,8 @@
 package com.beeny.villagesreborn.core.ai;
 
 import com.beeny.villagesreborn.core.conversation.ConversationContext;
+import com.beeny.villagesreborn.core.combat.*;
+import com.beeny.villagesreborn.core.expansion.VillageResources;
 
 import java.util.List;
 
@@ -171,6 +173,115 @@ public class PromptBuilder {
         return prompt;
     }
     
+    /**
+     * Builds a combat decision prompt for AI analysis
+     */
+    public static String buildCombatPrompt(
+        CombatSituation situation,
+        CombatPersonalityTraits traits,
+        ThreatAssessment threat,
+        RelationshipData relationships
+    ) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("You are a villager facing a combat situation. Analyze and decide:\n\n");
+        
+        // Personality
+        prompt.append("Personality:\n");
+        prompt.append("- Courage: ").append(String.format("%.1f", traits.getCourage())).append("\n");
+        prompt.append("- Aggression: ").append(String.format("%.1f", traits.getAggression())).append("\n");
+        prompt.append("- Self-Preservation: ").append(String.format("%.1f", traits.getSelfPreservation())).append("\n");
+        prompt.append("- Loyalty: ").append(String.format("%.1f", traits.getLoyalty())).append("\n\n");
+        
+        // Threat assessment
+        prompt.append("Current Threat: ").append(threat.getThreatLevel())
+               .append(" (Score: ").append(String.format("%.2f", threat.getThreatScore())).append(")\n");
+        
+        // Enemies
+        prompt.append("Enemies: ");
+        for (LivingEntity enemy : situation.getEnemies()) {
+            prompt.append("Enemy(").append(enemy.getUUID().toString().substring(0, 8)).append(") ");
+        }
+        prompt.append("\n");
+        
+        // Allies
+        prompt.append("Allies Present: ");
+        if (situation.getAllies().size() > 0) {
+            prompt.append("Yes (").append(situation.getAllies().size()).append(")");
+        } else {
+            prompt.append("None");
+        }
+        prompt.append("\n");
+        
+        // Decision options
+        prompt.append("\nDecide: ATTACK/DEFEND/FLEE/NEGOTIATE\n");
+        prompt.append("Target Priority: [enemy IDs in order]\n");
+        prompt.append("Tactical Notes: [brief reasoning]\n\n");
+        prompt.append("Keep response under 100 tokens.\n");
+        prompt.append("Format: ACTION|target1,target2|weaponType|reasoning");
+        
+        return prompt.toString();
+    }
+    
+    /**
+     * Builds an expansion planning prompt for AI analysis
+     */
+    public static String buildExpansionPrompt(
+        VillageResources resources,
+        Object terrainData,
+        Object biomeData,
+        Object populationTrends
+    ) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("Village Expansion Analysis:\n\n");
+        
+        prompt.append("Current State:\n");
+        prompt.append("- Population: ").append(resources.getPopulation()).append("\n");
+        prompt.append("- Wood: ").append(resources.getWood()).append("\n");
+        prompt.append("- Stone: ").append(resources.getStone()).append("\n");
+        prompt.append("- Food: ").append(resources.getFood()).append("\n\n");
+        
+        prompt.append("Recommend:\n");
+        prompt.append("1. Building Types: [house/workshop/farm/defense] with quantities\n");
+        prompt.append("2. Placement Strategy: [compact/distributed/linear/defensive]\n");
+        prompt.append("3. Resource Priority: [which resources to focus on]\n");
+        prompt.append("4. Timeline: [expansion phases]\n\n");
+        
+        prompt.append("Response format: JSON with buildingPlan, placementStrategy, resourceFocus");
+        
+        return prompt.toString();
+    }
+    
+    /**
+     * Builds a governance prompt for AI candidate generation
+     */
+    public static String buildGovernancePrompt(
+        Object electionContext,
+        Object needs,
+        Object candidateRequirements
+    ) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("Generate a mayoral candidate for a Minecraft village:\n\n");
+        
+        prompt.append("Village Context:\n");
+        prompt.append("- Population: [dynamic]\n");
+        prompt.append("- Primary Issues: [economic/defense/expansion]\n");
+        prompt.append("- Economic Status: [stable/growing/declining]\n\n");
+        
+        prompt.append("Create a candidate with:\n");
+        prompt.append("1. Name and Background\n");
+        prompt.append("2. Key Personality Traits (3-4 traits)\n");
+        prompt.append("3. Campaign Platform (3 main policy points)\n");
+        prompt.append("4. Speaking Style (formal/casual/passionate/practical)\n");
+        prompt.append("5. Stance on Major Issues\n\n");
+        
+        prompt.append("Format as JSON with name, background, traits, platform, speakingStyle, stances");
+        
+        return prompt.toString();
+    }
+
     /**
      * Estimates token count for a given text
      * @param text the text to estimate

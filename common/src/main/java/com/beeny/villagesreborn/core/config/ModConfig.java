@@ -149,6 +149,15 @@ public class ModConfig {
     }
     
     /**
+     * Checks if spawn biome selection is enabled
+     */
+    public boolean isSpawnBiomeSelectionEnabled() {
+        // For now, return true if world creation UI is enabled
+        // In the future, this could be a separate config option
+        return worldCreationUIEnabled;
+    }
+    
+    /**
      * Validate configuration integrity
      */
     public void validate() {

@@ -1,5 +1,6 @@
 package com.beeny.villagesreborn.platform.fabric.gui;
 
+import com.beeny.villagesreborn.core.world.WorldCreationSettingsCapture;
 import com.beeny.villagesreborn.platform.fabric.biome.BiomeDisplayInfo;
 import com.beeny.villagesreborn.platform.fabric.biome.BiomeManager;
 import com.beeny.villagesreborn.platform.fabric.spawn.SpawnBiomeChoiceData;
@@ -10,6 +11,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
@@ -17,6 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Screen for selecting spawn biome when joining a new world
@@ -26,12 +30,24 @@ import java.util.List;
 public class BiomeSelectorScreen extends Screen {
     private static final Logger LOGGER = LoggerFactory.getLogger(BiomeSelectorScreen.class);
     
+    public enum WorldCreationMode {
+        WORLD_CREATION,    // Called from Create World screen
+        POST_JOIN          // Called after joining world
+    }
+    
     private final MinecraftClient client;
     private final List<BiomeDisplayInfo> availableBiomes;
     private final List<BiomeSelectionWidget> biomeWidgets = new ArrayList<>();
     private BiomeDisplayInfo selectedBiome;
     private ButtonWidget confirmButton;
     private ButtonWidget randomButton;
+    private ButtonWidget cancelButton;
+    
+    // World creation mode fields
+    private WorldCreationMode creationMode = WorldCreationMode.POST_JOIN;
+    private CreateWorldScreen parentScreen;
+    private Function<BiomeDisplayInfo, Text[]> tooltipProvider;
+    private Consumer<BiomeDisplayInfo> previewHandler;
     
     public BiomeSelectorScreen() {
         super(Text.translatable("villagesreborn.biome_selector.title"));
@@ -39,8 +55,27 @@ public class BiomeSelectorScreen extends Screen {
         this.availableBiomes = BiomeManager.getInstance().getSelectableBiomes();
     }
     
+    private BiomeSelectorScreen(WorldCreationMode mode, CreateWorldScreen parent) {
+        super(Text.translatable("villagesreborn.biome_selector.title"));
+        this.client = MinecraftClient.getInstance();
+        this.creationMode = mode;
+        this.parentScreen = parent;
+        
+        if (mode == WorldCreationMode.WORLD_CREATION) {
+            this.availableBiomes = BiomeManager.getInstance().getSelectableBiomes();
+        } else {
+            this.availableBiomes = BiomeManager.getInstance().getSelectableBiomes();
+        }
+    }
+    
     public static BiomeSelectorScreen create() {
         return new BiomeSelectorScreen();
+    }
+    
+    public static BiomeSelectorScreen createForWorldCreation(CreateWorldScreen parentScreen) {
+        BiomeSelectorScreen screen = new BiomeSelectorScreen(WorldCreationMode.WORLD_CREATION, parentScreen);
+        LOGGER.info("Created BiomeSelectorScreen in world creation mode");
+        return screen;
     }
     
     @Override
@@ -86,26 +121,56 @@ public class BiomeSelectorScreen extends Screen {
     }
     
     private void initializeControlButtons() {
-        // Confirm button
-        this.confirmButton = ButtonWidget.builder(
-            Text.translatable("villagesreborn.biome_selector.confirm"),
-            button -> confirmBiomeSelection()
-        )
-        .position(this.width / 2 - 100, this.height - 50)
-        .size(95, 20)
-        .build();
-        
-        // Random selection button
-        this.randomButton = ButtonWidget.builder(
-            Text.translatable("villagesreborn.biome_selector.random"),
-            button -> selectRandomBiome()
-        )
-        .position(this.width / 2 + 5, this.height - 50)
-        .size(95, 20)
-        .build();
-        
-        this.addDrawableChild(confirmButton);
-        this.addDrawableChild(randomButton);
+        if (creationMode == WorldCreationMode.WORLD_CREATION) {
+            // World creation mode buttons
+            this.confirmButton = ButtonWidget.builder(
+                Text.translatable("villagesreborn.spawn_biome.confirm_for_creation"),
+                button -> confirmBiomeSelection()
+            )
+            .position(this.width / 2 - 155, this.height - 50)
+            .size(100, 20)
+            .build();
+            
+            this.cancelButton = ButtonWidget.builder(
+                Text.translatable("villagesreborn.spawn_biome.cancel_creation"),
+                button -> cancelSelection()
+            )
+            .position(this.width / 2 - 50, this.height - 50)
+            .size(100, 20)
+            .build();
+            
+            this.randomButton = ButtonWidget.builder(
+                Text.translatable("villagesreborn.biome_selector.random"),
+                button -> selectRandomBiome()
+            )
+            .position(this.width / 2 + 55, this.height - 50)
+            .size(100, 20)
+            .build();
+            
+            this.addDrawableChild(confirmButton);
+            this.addDrawableChild(cancelButton);
+            this.addDrawableChild(randomButton);
+        } else {
+            // Post-join mode buttons (existing)
+            this.confirmButton = ButtonWidget.builder(
+                Text.translatable("villagesreborn.biome_selector.confirm"),
+                button -> confirmBiomeSelection()
+            )
+            .position(this.width / 2 - 100, this.height - 50)
+            .size(95, 20)
+            .build();
+            
+            this.randomButton = ButtonWidget.builder(
+                Text.translatable("villagesreborn.biome_selector.random"),
+                button -> selectRandomBiome()
+            )
+            .position(this.width / 2 + 5, this.height - 50)
+            .size(95, 20)
+            .build();
+            
+            this.addDrawableChild(confirmButton);
+            this.addDrawableChild(randomButton);
+        }
         
         // Disable confirm until biome is selected
         this.confirmButton.active = false;
@@ -142,26 +207,68 @@ public class BiomeSelectorScreen extends Screen {
     private void confirmBiomeSelection() {
         if (selectedBiome == null) return;
         
-        LOGGER.info("Player confirmed biome selection: {}", 
+        LOGGER.info("Player confirmed biome selection: {}",
                    selectedBiome.getRegistryKey().getValue());
         
-        // Store selection in world data
-        SpawnBiomeChoiceData choiceData = new SpawnBiomeChoiceData(
-            selectedBiome.getRegistryKey(),
-            System.currentTimeMillis()
-        );
-        
-        VillagesRebornWorldSettingsExtensions.setSpawnBiomeChoice(choiceData);
-        
-        // Request teleportation (simplified for testing)
-        if (client.player != null) {
-            SpawnPointManager.getInstance().teleportToSpawnBiome(
-                client.player, selectedBiome.getRegistryKey()
+        if (creationMode == WorldCreationMode.WORLD_CREATION) {
+            // Store choice for world creation
+            SpawnBiomeChoiceData choiceData = new SpawnBiomeChoiceData(
+                selectedBiome.getRegistryKey(),
+                System.currentTimeMillis()
             );
+            
+            // Store in world creation settings capture
+            WorldCreationSettingsCapture.setSpawnBiomeChoice(selectedBiome);
+            LOGGER.info("Stored spawn biome choice for world creation: {}", selectedBiome.getRegistryKey());
+            
+            // Return to parent screen
+            if (parentScreen != null) {
+                client.setScreen(parentScreen);
+                // Reset the parent screen's biome selector open state
+                try {
+                    parentScreen.getClass().getMethod("resetBiomeSelectorState").invoke(parentScreen);
+                } catch (Exception e) {
+                    LOGGER.debug("Could not reset biome selector state on parent screen", e);
+                }
+            } else {
+                this.close();
+            }
+        } else {
+            // Post-join mode (existing logic)
+            SpawnBiomeChoiceData choiceData = new SpawnBiomeChoiceData(
+                selectedBiome.getRegistryKey(),
+                System.currentTimeMillis()
+            );
+            
+            VillagesRebornWorldSettingsExtensions.setSpawnBiomeChoice(choiceData);
+            
+            // Request teleportation (simplified for testing)
+            if (client.player != null) {
+                SpawnPointManager.getInstance().teleportToSpawnBiome(
+                    client.player, selectedBiome.getRegistryKey()
+                );
+            }
+            
+            // Close screen
+            this.close();
         }
+    }
+    
+    private void cancelSelection() {
+        LOGGER.info("Player cancelled biome selection");
         
-        // Close screen
-        this.close();
+        if (creationMode == WorldCreationMode.WORLD_CREATION && parentScreen != null) {
+            // Return to parent screen without storing choice
+            client.setScreen(parentScreen);
+            // Reset the parent screen's biome selector open state
+            try {
+                parentScreen.getClass().getMethod("resetBiomeSelectorState").invoke(parentScreen);
+            } catch (Exception e) {
+                LOGGER.debug("Could not reset biome selector state on parent screen", e);
+            }
+        } else {
+            this.close();
+        }
     }
     
     private void updateBiomeSelectionVisuals() {

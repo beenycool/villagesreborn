@@ -15,21 +15,29 @@ import org.slf4j.LoggerFactory;
 public class VillagesRebornWorldSettingsExtensions {
     private static final Logger LOGGER = LoggerFactory.getLogger(VillagesRebornWorldSettingsExtensions.class);
     
-    // Static storage for spawn biome choice (in real implementation, this would be in VillagesRebornWorldSettings)
+    // DEPRECATED: Static storage removed in favor of persistent storage
+    // This field is kept temporarily for migration purposes only
     private static SpawnBiomeChoiceData currentSpawnBiomeChoice;
     
     /**
      * Sets the spawn biome choice data
+     * @deprecated Use SpawnBiomeStorageManager instead
      */
+    @Deprecated
     public static void setSpawnBiomeChoice(SpawnBiomeChoiceData choiceData) {
         currentSpawnBiomeChoice = choiceData;
-        LOGGER.debug("Set spawn biome choice: {}", choiceData);
+        LOGGER.warn("DEPRECATED: setSpawnBiomeChoice called. Use SpawnBiomeStorageManager instead. Data: {}", choiceData);
     }
     
     /**
      * Gets the current spawn biome choice data
+     * @deprecated Use SpawnBiomeStorageManager instead
      */
+    @Deprecated
     public static SpawnBiomeChoiceData getSpawnBiomeChoice() {
+        if (currentSpawnBiomeChoice != null) {
+            LOGGER.warn("DEPRECATED: getSpawnBiomeChoice called. Use SpawnBiomeStorageManager instead. Returning legacy data: {}", currentSpawnBiomeChoice);
+        }
         return currentSpawnBiomeChoice;
     }
     
@@ -100,34 +108,35 @@ public class VillagesRebornWorldSettingsExtensions {
     
     /**
      * Saves current spawn biome choice to world data
+     * @deprecated Use SpawnBiomeStorageManager instead
      */
+    @Deprecated
     public static void saveToWorldData() {
-        try {
-            // For testing purposes, we'll just log this
-            // In real implementation, this would interact with VillagesRebornWorldData
-            LOGGER.debug("Saved spawn biome choice to world data");
-        } catch (Exception e) {
-            LOGGER.error("Failed to save spawn biome choice to world data", e);
-        }
+        LOGGER.warn("DEPRECATED: saveToWorldData called. Use SpawnBiomeStorageManager instead.");
     }
     
     /**
      * Loads spawn biome choice from world data
+     * @deprecated Use SpawnBiomeStorageManager instead
      */
+    @Deprecated
     public static void loadFromWorldData() {
-        try {
-            // For testing purposes, we'll just log this
-            // In real implementation, this would interact with VillagesRebornWorldData
-            LOGGER.debug("Loaded spawn biome choice from world data");
-        } catch (Exception e) {
-            LOGGER.error("Failed to load spawn biome choice from world data", e);
-        }
+        LOGGER.warn("DEPRECATED: loadFromWorldData called. Use SpawnBiomeStorageManager instead.");
     }
     
     /**
-     * Resets spawn biome choice (for testing)
+     * Resets spawn biome choice (for testing and migration)
      */
     public static void resetForTest() {
         currentSpawnBiomeChoice = null;
+        LOGGER.debug("Reset legacy spawn biome choice for test/migration");
+    }
+    
+    /**
+     * Checks if there is legacy data that needs migration
+     * @return true if legacy data exists, false otherwise
+     */
+    public static boolean hasLegacyData() {
+        return currentSpawnBiomeChoice != null;
     }
 }

@@ -18,6 +18,18 @@ public interface ServerChatEvent {
     String getMessage();
     
     /**
+     * Gets the timestamp when the message was sent
+     * @return timestamp in milliseconds
+     */
+    long getTimestamp();
+    
+    /**
+     * Gets the world where the message was sent
+     * @return world identifier string
+     */
+    String getWorld();
+    
+    /**
      * Cancels the chat event, preventing it from being broadcast
      */
     void cancel();

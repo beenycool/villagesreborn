@@ -1,22 +1,77 @@
 package com.beeny.villagesreborn.core.combat;
 
-import com.beeny.villagesreborn.core.ai.PersonalityProfile;
-import com.beeny.villagesreborn.core.common.NBTCompound;
-
 /**
- * Combat-specific personality traits that extend the base personality profile
- * with combat decision-making attributes
+ * Defines personality traits that affect combat behavior
  */
-public class CombatPersonalityTraits extends PersonalityProfile {
+public class CombatPersonalityTraits {
     
-    private float courage = 0.5f;
-    private float aggression = 0.5f;
-    private float loyalty = 0.5f;
-    private float selfPreservation = 0.5f;
-    private float vengefulness = 0.5f;
+    public enum AggressionLevel {
+        PACIFIST,     // Avoids combat whenever possible
+        DEFENSIVE,    // Only fights when threatened
+        BALANCED,     // Normal combat behavior
+        AGGRESSIVE,   // Seeks out conflicts
+        HOSTILE       // Attacks on sight
+    }
     
+    public enum CombatStyle {
+        CAUTIOUS,     // Careful, methodical fighting
+        BALANCED,     // Standard combat approach
+        RECKLESS,     // High-risk, high-reward tactics
+        STRATEGIC,    // Focuses on tactics and positioning
+        BERSERKER     // All-out aggressive attacks
+    }
+    
+    public enum TeamworkTendency {
+        LONE_WOLF,    // Prefers to fight alone
+        RELUCTANT,    // Will work with others if necessary
+        COOPERATIVE,  // Works well in groups
+        LEADER,       // Takes charge in group combat
+        FOLLOWER      // Follows others' lead
+    }
+    
+    private AggressionLevel aggressionLevel;
+    private CombatStyle combatStyle;
+    private TeamworkTendency teamworkTendency;
+    private float courage; // 0.0 to 1.0, affects willingness to engage
+    private float loyalty; // 0.0 to 1.0, affects protection of allies
+    private float aggression; // 0.0 to 1.0, direct aggression value
+    private float selfPreservation; // 0.0 to 1.0, self-preservation instinct
+    private float vengefulness; // 0.0 to 1.0, tendency for revenge
+    
+    // Default constructor for compatibility
     public CombatPersonalityTraits() {
-        super();
+        this.aggressionLevel = AggressionLevel.BALANCED;
+        this.combatStyle = CombatStyle.BALANCED;
+        this.teamworkTendency = TeamworkTendency.COOPERATIVE;
+        this.courage = 0.5f;
+        this.loyalty = 0.7f;
+        this.aggression = 0.5f;
+        this.selfPreservation = 0.5f;
+        this.vengefulness = 0.5f;
+    }
+    
+    public CombatPersonalityTraits(AggressionLevel aggressionLevel, CombatStyle combatStyle, 
+                                 TeamworkTendency teamworkTendency, float courage, float loyalty) {
+        this.aggressionLevel = aggressionLevel;
+        this.combatStyle = combatStyle;
+        this.teamworkTendency = teamworkTendency;
+        this.courage = Math.max(0.0f, Math.min(1.0f, courage));
+        this.loyalty = Math.max(0.0f, Math.min(1.0f, loyalty));
+        this.aggression = convertAggressionLevelToFloat(aggressionLevel);
+        this.selfPreservation = 0.5f;
+        this.vengefulness = 0.5f;
+    }
+    
+    public AggressionLevel getAggressionLevel() {
+        return aggressionLevel;
+    }
+    
+    public CombatStyle getCombatStyle() {
+        return combatStyle;
+    }
+    
+    public TeamworkTendency getTeamworkTendency() {
+        return teamworkTendency;
     }
     
     public float getCourage() {
@@ -27,20 +82,21 @@ public class CombatPersonalityTraits extends PersonalityProfile {
         this.courage = Math.max(0.0f, Math.min(1.0f, courage));
     }
     
-    public float getAggression() {
-        return aggression;
-    }
-    
-    public void setAggression(float aggression) {
-        this.aggression = Math.max(0.0f, Math.min(1.0f, aggression));
-    }
-    
     public float getLoyalty() {
         return loyalty;
     }
     
     public void setLoyalty(float loyalty) {
         this.loyalty = Math.max(0.0f, Math.min(1.0f, loyalty));
+    }
+    
+    public float getAggression() {
+        return aggression;
+    }
+    
+    public void setAggression(float aggression) {
+        this.aggression = Math.max(0.0f, Math.min(1.0f, aggression));
+        this.aggressionLevel = convertFloatToAggressionLevel(aggression);
     }
     
     public float getSelfPreservation() {
@@ -59,55 +115,112 @@ public class CombatPersonalityTraits extends PersonalityProfile {
         this.vengefulness = Math.max(0.0f, Math.min(1.0f, vengefulness));
     }
     
-    public float getCombatDecisionWeight(CombatSituation situation) {
-        // Simple implementation for tests to pass
-        return (courage + aggression - selfPreservation) / 3.0f;
+    private float convertAggressionLevelToFloat(AggressionLevel level) {
+        return switch (level) {
+            case PACIFIST -> 0.1f;
+            case DEFENSIVE -> 0.3f;
+            case BALANCED -> 0.5f;
+            case AGGRESSIVE -> 0.7f;
+            case HOSTILE -> 0.9f;
+        };
     }
     
-    public boolean shouldFlee(ThreatAssessment threat) {
-        // Simple implementation based on self-preservation vs courage
-        float fleeThreshold = selfPreservation - courage;
-        return threat.getThreatScore() > (0.5f + fleeThreshold);
+    private AggressionLevel convertFloatToAggressionLevel(float aggression) {
+        if (aggression <= 0.2f) return AggressionLevel.PACIFIST;
+        if (aggression <= 0.4f) return AggressionLevel.DEFENSIVE;
+        if (aggression <= 0.6f) return AggressionLevel.BALANCED;
+        if (aggression <= 0.8f) return AggressionLevel.AGGRESSIVE;
+        return AggressionLevel.HOSTILE;
     }
     
-    public boolean shouldDefend(LivingEntity target) {
-        // Simple implementation based on loyalty
-        return loyalty > 0.5f;
+    /**
+     * Determines if this personality would engage in combat given the threat level
+     */
+    public boolean wouldEngage(ThreatLevel threatLevel) {
+        float engagementThreshold = switch (aggressionLevel) {
+            case PACIFIST -> 0.9f;
+            case DEFENSIVE -> 0.7f;
+            case BALANCED -> 0.5f;
+            case AGGRESSIVE -> 0.3f;
+            case HOSTILE -> 0.1f;
+        };
+        
+        float threatValue = switch (threatLevel) {
+            case NONE -> 0.0f;
+            case LOW -> 0.3f;
+            case MODERATE -> 0.6f;
+            case HIGH -> 0.8f;
+            case EXTREME -> 1.0f;
+        };
+        
+        return (threatValue * courage) >= engagementThreshold;
     }
     
-    public boolean shouldAttack(LivingEntity target) {
-        // Simple implementation based on aggression and courage
-        return (aggression + courage) / 2.0f > 0.6f;
+    /**
+     * Gets the combat effectiveness modifier based on style and situation
+     */
+    public float getCombatModifier(boolean hasAllies, boolean isOutnumbered) {
+        float styleModifier = switch (combatStyle) {
+            case CAUTIOUS -> isOutnumbered ? 1.2f : 0.9f;
+            case BALANCED -> 1.0f;
+            case RECKLESS -> isOutnumbered ? 0.8f : 1.3f;
+            case STRATEGIC -> hasAllies ? 1.2f : 1.0f;
+            case BERSERKER -> isOutnumbered ? 1.4f : 1.1f;
+        };
+        
+        float teamworkModifier = switch (teamworkTendency) {
+            case LONE_WOLF -> hasAllies ? 0.9f : 1.1f;
+            case RELUCTANT -> hasAllies ? 0.95f : 1.0f;
+            case COOPERATIVE -> hasAllies ? 1.1f : 0.9f;
+            case LEADER -> hasAllies ? 1.2f : 1.0f;
+            case FOLLOWER -> hasAllies ? 1.05f : 0.8f;
+        };
+        
+        return styleModifier * teamworkModifier;
     }
     
     @Override
-    public NBTCompound toNBT() {
-        NBTCompound nbt = super.toNBT();
-        nbt.putFloat("courage", courage);
-        nbt.putFloat("aggression", aggression);
-        nbt.putFloat("loyalty", loyalty);
-        nbt.putFloat("selfPreservation", selfPreservation);
-        nbt.putFloat("vengefulness", vengefulness);
-        return nbt;
+    public String toString() {
+        return String.format("CombatPersonality{aggression=%s, style=%s, teamwork=%s, courage=%.2f, loyalty=%.2f}", 
+                           aggressionLevel, combatStyle, teamworkTendency, courage, loyalty);
     }
     
-    public static CombatPersonalityTraits fromNBT(NBTCompound nbt) {
-        CombatPersonalityTraits traits = new CombatPersonalityTraits();
-        if (nbt.contains("courage")) {
-            traits.setCourage(nbt.getFloat("courage"));
-        }
-        if (nbt.contains("aggression")) {
-            traits.setAggression(nbt.getFloat("aggression"));
-        }
-        if (nbt.contains("loyalty")) {
-            traits.setLoyalty(nbt.getFloat("loyalty"));
-        }
-        if (nbt.contains("selfPreservation")) {
-            traits.setSelfPreservation(nbt.getFloat("selfPreservation"));
-        }
-        if (nbt.contains("vengefulness")) {
-            traits.setVengefulness(nbt.getFloat("vengefulness"));
-        }
-        return traits;
+    /**
+     * Creates a default balanced personality
+     */
+    public static CombatPersonalityTraits createDefault() {
+        return new CombatPersonalityTraits(
+            AggressionLevel.BALANCED, 
+            CombatStyle.BALANCED, 
+            TeamworkTendency.COOPERATIVE, 
+            0.5f, 
+            0.7f
+        );
+    }
+    
+    /**
+     * Creates a peaceful personality that avoids combat
+     */
+    public static CombatPersonalityTraits createPacifist() {
+        return new CombatPersonalityTraits(
+            AggressionLevel.PACIFIST, 
+            CombatStyle.CAUTIOUS, 
+            TeamworkTendency.FOLLOWER, 
+            0.2f, 
+            0.8f
+        );
+    }
+    
+    /**
+     * Creates an aggressive warrior personality
+     */
+    public static CombatPersonalityTraits createWarrior() {
+        return new CombatPersonalityTraits(
+            AggressionLevel.AGGRESSIVE, 
+            CombatStyle.STRATEGIC, 
+            TeamworkTendency.LEADER, 
+            0.8f, 
+            0.6f
+        );
     }
 }

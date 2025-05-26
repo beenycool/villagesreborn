@@ -87,4 +87,19 @@ public class VillageResources {
     public void setResidentSatisfaction(int residentSatisfaction) {
         this.residentSatisfaction = Math.max(0, Math.min(100, residentSatisfaction));
     }
+    
+    /**
+     * Gets the total housing capacity (estimated from population for now)
+     */
+    public int getHousing() {
+        // Simple estimate: assume current population represents 80% housing capacity
+        return (int) (population * 1.25);
+    }
+    
+    /**
+     * Gets the total resource count
+     */
+    public int getTotalResources() {
+        return wood + stone + gold + food;
+    }
 }

@@ -1,7 +1,7 @@
 package com.beeny.villagesreborn.core.combat;
 
 /**
- * Enumeration of different item types used in combat
+ * Enum representing different types of items for combat AI
  */
 public enum ItemType {
     SWORD,
@@ -9,9 +9,11 @@ public enum ItemType {
     AXE,
     CROSSBOW,
     TRIDENT,
+    STAFF,
     HELMET,
     CHESTPLATE,
     LEGGINGS,
     BOOTS,
-    SHIELD
+    SHIELD,
+    NONE
 }

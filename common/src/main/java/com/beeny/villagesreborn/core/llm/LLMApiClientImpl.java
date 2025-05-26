@@ -303,4 +303,22 @@ public class LLMApiClientImpl implements LLMApiClient {
     public long getMinRequestInterval() {
         return minRequestInterval;
     }
+
+    /**
+     * Shutdown the executor service to prevent resource leaks.
+     * Should be called when the client is no longer needed.
+     */
+    public void shutdown() {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            scheduler.shutdown();
+            try {
+                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    scheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                scheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
 }

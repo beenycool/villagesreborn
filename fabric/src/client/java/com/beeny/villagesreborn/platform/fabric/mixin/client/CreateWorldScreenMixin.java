@@ -2,8 +2,12 @@ package com.beeny.villagesreborn.platform.fabric.mixin.client;
 
 import com.beeny.villagesreborn.core.config.ModConfig;
 import com.beeny.villagesreborn.core.world.WorldCreationSettingsCapture;
+import com.beeny.villagesreborn.platform.fabric.gui.BiomeSelectorScreen;
 import com.beeny.villagesreborn.platform.fabric.gui.world.VillagesRebornTab;
+import com.beeny.villagesreborn.platform.fabric.spawn.BiomeSelectorEventHandler;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.GridWidget;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
@@ -25,6 +29,12 @@ public abstract class CreateWorldScreenMixin {
     @Unique
     private VillagesRebornTab villagesRebornTab;
     
+    @Unique
+    private ButtonWidget spawnBiomeButton;
+    
+    @Unique
+    private boolean biomeSelectorOpen = false;
+    
     /**
      * Injects our custom tab after the screen has been initialized
      */
@@ -42,6 +52,12 @@ public abstract class CreateWorldScreenMixin {
             this.villagesRebornTab = new VillagesRebornTab(self.width - 50, self.height - 100);
             
             LOGGER.info("Successfully created Villages Reborn tab widget for Create World screen");
+            
+            // Add spawn biome button if enabled
+            if (shouldInjectSpawnBiomeButton()) {
+                createSpawnBiomeButton();
+                LOGGER.info("Successfully created Spawn Biome button for Create World screen");
+            }
             
         } catch (Exception e) {
             LOGGER.error("Failed to create Villages Reborn tab widget", e);
@@ -119,5 +135,112 @@ public abstract class CreateWorldScreenMixin {
     @Unique
     public boolean isTabInjected() {
         return this.villagesRebornTab != null;
+    }
+    
+    /**
+     * Determines whether the spawn biome button should be injected
+     */
+    @Unique
+    private boolean shouldInjectSpawnBiomeButton() {
+        try {
+            return ModConfig.getInstance().isSpawnBiomeSelectionEnabled()
+                && !isCreativeMode()
+                && isOverworldGeneration();
+        } catch (Exception e) {
+            LOGGER.error("Failed to check spawn biome button injection config", e);
+            return false;
+        }
+    }
+    
+    /**
+     * Creates and positions the spawn biome button
+     */
+    @Unique
+    private void createSpawnBiomeButton() {
+        if (this.spawnBiomeButton != null) {
+            // Prevent duplicate button creation
+            return;
+        }
+        
+        CreateWorldScreen self = (CreateWorldScreen) (Object) this;
+        
+        // Calculate button position
+        int baseY = (this.villagesRebornTab != null)
+            ? 80  // Position after tab
+            : self.height - 150; // Fallback position
+        int buttonX = self.width / 2 - 60;
+        
+        this.spawnBiomeButton = ButtonWidget.builder(
+            Text.translatable("villagesreborn.spawn_biome.button"),
+            this::onSpawnBiomeButtonClick
+        )
+        .position(buttonX, baseY)
+        .size(120, 20)
+        .build();
+        
+        // Add to screen using reflection to access protected method
+        try {
+            self.getClass().getMethod("addDrawableChild", Object.class).invoke(self, this.spawnBiomeButton);
+        } catch (Exception e) {
+            LOGGER.error("Failed to add spawn biome button to screen", e);
+        }
+    }
+    
+    /**
+     * Handles spawn biome button click
+     */
+    @Unique
+    private void onSpawnBiomeButtonClick(ButtonWidget button) {
+        if (!biomeSelectorOpen) {
+            biomeSelectorOpen = true;
+            CreateWorldScreen self = (CreateWorldScreen) (Object) this;
+            BiomeSelectorScreen screen = BiomeSelectorScreen.createForWorldCreation(self);
+            MinecraftClient.getInstance().setScreen(screen);
+            LOGGER.info("Opened biome selector from world creation screen");
+        }
+    }
+    
+    /**
+     * Checks if we're in creative mode
+     */
+    @Unique
+    private boolean isCreativeMode() {
+        // For simplicity, always return false for now
+        // In a full implementation, this would check the game mode setting
+        return false;
+    }
+    
+    /**
+     * Checks if we're generating an overworld
+     */
+    @Unique
+    private boolean isOverworldGeneration() {
+        // For simplicity, always return true for now
+        // In a full implementation, this would check the dimension type
+        return true;
+    }
+    
+    /**
+     * Gets the spawn biome button for testing
+     */
+    @Unique
+    public ButtonWidget getSpawnBiomeButton() {
+        return this.spawnBiomeButton;
+    }
+    
+    /**
+     * Checks if biome selector is open
+     */
+    @Unique
+    public boolean isBiomeSelectorOpen() {
+        return this.biomeSelectorOpen;
+    }
+    
+    /**
+     * Resets biome selector open state (called when returning from selector)
+     */
+    @Unique
+    public void resetBiomeSelectorState() {
+        this.biomeSelectorOpen = false;
     }
 }

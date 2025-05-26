@@ -101,6 +101,79 @@ public class LLMProviderManager {
     }
 
     /**
+     * Get all available LLM providers
+     */
+    public List<LLMProvider> getAllProviders() {
+        return Arrays.asList(LLMProvider.values());
+    }
+
+    /**
+     * Get models for a specific provider
+     */
+    public List<String> getModels(String providerId) {
+        try {
+            LLMProvider provider = LLMProvider.valueOf(providerId.toUpperCase());
+            return getAvailableModels(provider);
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("Unknown provider ID: {}", providerId);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Get recommended models with reasoning based on hardware tier
+     */
+    public ModelRecommendation getRecommendedModelsWithReasoning(LLMProvider provider, HardwareTier hardwareTier) {
+        List<String> models = getRecommendedModels(provider, hardwareTier);
+        
+        return switch (hardwareTier) {
+            case HIGH -> new ModelRecommendation(
+                models,
+                "Your hardware can handle all available models",
+                "Excellent",
+                Collections.emptyList()
+            );
+            case MEDIUM -> new ModelRecommendation(
+                models,
+                "Optimized for your hardware configuration",
+                "Good",
+                Arrays.asList("Some heavy models may run slower")
+            );
+            case LOW -> new ModelRecommendation(
+                models,
+                "Lightweight models recommended for your hardware",
+                "Basic",
+                Arrays.asList("Limited to efficient models", "Consider using local providers for better performance")
+            );
+            case UNKNOWN -> new ModelRecommendation(
+                models,
+                "Conservative selection due to unknown hardware",
+                "Basic",
+                Arrays.asList("Hardware detection failed", "Using safe model selection")
+            );
+        };
+    }
+
+    /**
+     * Validate provider compatibility with hardware
+     */
+    public ValidationResult validateProviderCompatibility(LLMProvider provider, HardwareTier hardwareTier) {
+        return switch (provider) {
+            case LOCAL -> hardwareTier != HardwareTier.LOW ?
+                ValidationResult.compatible() :
+                ValidationResult.warning("Local models may be slow on low-tier hardware");
+                
+            case OPENAI, ANTHROPIC -> ValidationResult.compatible();
+            
+            case GROQ -> hardwareTier == HardwareTier.HIGH ?
+                ValidationResult.optimal() :
+                ValidationResult.compatible();
+                
+            case OPENROUTER -> ValidationResult.compatible();
+        };
+    }
+
+    /**
      * Clear the model cache
      */
     public void clearModelCache() {
@@ -206,5 +279,61 @@ public class LLMProviderManager {
                modelLower.contains("7b") ||
                modelLower.contains("gemma") ||
                modelLower.contains("mistral");
+    }
+
+    /**
+     * Model recommendation result with reasoning
+     */
+    public static class ModelRecommendation {
+        private final List<String> models;
+        private final String reason;
+        private final String performance;
+        private final List<String> warnings;
+
+        public ModelRecommendation(List<String> models, String reason, String performance, List<String> warnings) {
+            this.models = models;
+            this.reason = reason;
+            this.performance = performance;
+            this.warnings = warnings;
+        }
+
+        public List<String> getModels() { return models; }
+        public String getReason() { return reason; }
+        public String getPerformance() { return performance; }
+        public List<String> getWarnings() { return warnings; }
+    }
+
+    /**
+     * Validation result for provider compatibility
+     */
+    public static class ValidationResult {
+        public enum Type { COMPATIBLE, OPTIMAL, WARNING, INCOMPATIBLE }
+        
+        private final Type type;
+        private final String message;
+
+        private ValidationResult(Type type, String message) {
+            this.type = type;
+            this.message = message;
+        }
+
+        public static ValidationResult compatible() {
+            return new ValidationResult(Type.COMPATIBLE, "Compatible");
+        }
+
+        public static ValidationResult optimal() {
+            return new ValidationResult(Type.OPTIMAL, "Optimal for this hardware");
+        }
+
+        public static ValidationResult warning(String message) {
+            return new ValidationResult(Type.WARNING, message);
+        }
+
+        public static ValidationResult incompatible(String reason) {
+            return new ValidationResult(Type.INCOMPATIBLE, reason);
+        }
+
+        public Type getType() { return type; }
+        public String getMessage() { return message; }
     }
 }

@@ -26,7 +26,15 @@ public class WelcomeScreenHandler {
         this.llmManager = new LLMProviderManager(new MockLLMApiClient());
         loadSetupConfig();
         
-        LOGGER.debug("WelcomeScreenHandler initialized");
+        LOGGER.debug("WelcomeScreenHandler initialized with default dependencies");
+    }
+
+    public WelcomeScreenHandler(HardwareInfoManager hardwareManager, LLMProviderManager llmManager, FirstTimeSetupConfig setupConfig) {
+        this.hardwareManager = hardwareManager;
+        this.llmManager = llmManager;
+        this.setupConfig = setupConfig;
+        
+        LOGGER.debug("WelcomeScreenHandler initialized with injected dependencies");
     }
     
     /**
@@ -108,12 +116,12 @@ public class WelcomeScreenHandler {
     
     private void loadSetupConfig() {
         try {
-            setupConfig = FirstTimeSetupConfig.load();
-            LOGGER.debug("Setup configuration loaded");
+            setupConfig = FirstTimeSetupConfig.loadWithMigration();
+            LOGGER.debug("Setup configuration loaded with migration support");
         } catch (Exception e) {
             LOGGER.error("Failed to load setup configuration", e);
             // Create a default config if loading fails
-            setupConfig = FirstTimeSetupConfig.load(); // This will create defaults
+            setupConfig = FirstTimeSetupConfig.loadWithMigration(); // This will create defaults
         }
     }
     
@@ -163,5 +171,20 @@ public class WelcomeScreenHandler {
      */
     public LLMProviderManager getLLMManager() {
         return llmManager;
+    }
+
+    /**
+     * Handle client started event
+     */
+    public void onClientStarted() {
+        LOGGER.debug("Minecraft client started - WelcomeScreenHandler ready");
+    }
+
+    /**
+     * Handle client stopping event
+     */
+    public void onClientStopping() {
+        LOGGER.debug("Minecraft client stopping - cleaning up WelcomeScreenHandler");
+        // Cleanup any resources if needed
     }
 }

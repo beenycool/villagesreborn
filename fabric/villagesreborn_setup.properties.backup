@@ -1,0 +1,8 @@
+#Villages Reborn First-Time Setup Configuration
+#Mon May 26 18:56:14 BST 2025
+config.version=3
+hardware.detection.completed=true
+llm.model=gpt-3.5-turbo
+llm.provider=OPENAI
+setup.completed=true
+setup.timestamp=1748282174496

@@ -17,6 +17,12 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
     private SliderWidget maxVillageSizeSlider;
     private SliderWidget expansionRateSlider;
     
+    // Phase 2 controls
+    private CyclingButtonWidget<Boolean> biomeSpecificToggle;
+    private SliderWidget caravanDistanceSlider;
+    private CyclingButtonWidget<Boolean> interdimensionalToggle;
+    private SliderWidget villagesDensitySlider;
+    
     public VillageExpansionSection(VillagesRebornWorldSettings settings, Runnable changeListener) {
         super(settings, changeListener);
     }
@@ -78,6 +84,75 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
             }
         };
         widgets.add(expansionRateSlider);
+        
+        // Phase 2: Biome Specific Expansion Toggle
+        this.biomeSpecificToggle = CyclingButtonWidget.onOffBuilder(
+            safeTranslatable("villagesreborn.config.on"),
+            safeTranslatable("villagesreborn.config.off")
+        ).initially(settings.isBiomeSpecificExpansion())
+         .build(0, 0, 200, 20,
+               safeTranslatable("villagesreborn.config.expansion.biome_specific"),
+               (button, value) -> {
+                   settings.setBiomeSpecificExpansion(value);
+                   notifyChange();
+               });
+        widgets.add(biomeSpecificToggle);
+        
+        // Phase 2: Max Caravan Distance Slider (500-5000)
+        this.caravanDistanceSlider = new SliderWidget(
+            0, 0, 200, 20,
+            safeTranslatable("villagesreborn.config.expansion.caravan_distance"),
+            normalizeCaravanDistance(settings.getMaxCaravanDistance())
+        ) {
+            @Override
+            protected void updateMessage() {
+                int value = denormalizeCaravanDistance(this.value);
+                this.setMessage(safeTranslatable("villagesreborn.config.expansion.caravan_distance.value", value));
+            }
+            
+            @Override
+            protected void applyValue() {
+                int value = denormalizeCaravanDistance(this.value);
+                settings.setMaxCaravanDistance(value);
+                notifyChange();
+            }
+        };
+        widgets.add(caravanDistanceSlider);
+        
+        // Phase 2: Interdimensional Villages Toggle
+        this.interdimensionalToggle = CyclingButtonWidget.onOffBuilder(
+            safeTranslatable("villagesreborn.config.on"),
+            safeTranslatable("villagesreborn.config.off")
+        ).initially(settings.isInterdimensionalVillages())
+         .build(0, 0, 200, 20,
+               safeTranslatable("villagesreborn.config.expansion.interdimensional"),
+               (button, value) -> {
+                   settings.setInterdimensionalVillages(value);
+                   notifyChange();
+               });
+        widgets.add(interdimensionalToggle);
+        
+        // Phase 2: Village Generation Density Slider (1-5)
+        this.villagesDensitySlider = new SliderWidget(
+            0, 0, 200, 20,
+            safeTranslatable("villagesreborn.config.expansion.village_density"),
+            normalizeVillageDensity(settings.getVillageGenerationDensity())
+        ) {
+            @Override
+            protected void updateMessage() {
+                int value = denormalizeVillageDensity(this.value);
+                String densityText = getVillageDensityText(value);
+                this.setMessage(safeTranslatable("villagesreborn.config.expansion.village_density.level", densityText));
+            }
+            
+            @Override
+            protected void applyValue() {
+                int value = denormalizeVillageDensity(this.value);
+                settings.setVillageGenerationDensity(value);
+                notifyChange();
+            }
+        };
+        widgets.add(villagesDensitySlider);
     }
     
     @Override
@@ -87,8 +162,17 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
             updateExpansionControlsEnabled(settings.isAutoExpansionEnabled());
         }
         
+        // Phase 2: Update new toggles
+        if (biomeSpecificToggle != null) {
+            biomeSpecificToggle.setValue(settings.isBiomeSpecificExpansion());
+        }
+        if (interdimensionalToggle != null) {
+            interdimensionalToggle.setValue(settings.isInterdimensionalVillages());
+        }
+        
         // Recreate sliders since setValue is not accessible in 1.21.4
-        if (maxVillageSizeSlider != null || expansionRateSlider != null) {
+        if (maxVillageSizeSlider != null || expansionRateSlider != null ||
+            caravanDistanceSlider != null || villagesDensitySlider != null) {
             createWidgets();
         }
     }
@@ -142,6 +226,48 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         if (value < 1.2f) return "Normal";
         if (value < 1.5f) return "Fast";
         return "Very Fast";
+    }
+    
+    /**
+     * Phase 2: Normalizes caravan distance value to 0-1 range for slider
+     */
+    private double normalizeCaravanDistance(int value) {
+        return (value - 500) / 4500.0; // Range: 500-5000 -> 0-1
+    }
+    
+    /**
+     * Phase 2: Denormalizes slider value back to caravan distance range
+     */
+    private int denormalizeCaravanDistance(double normalized) {
+        return (int) (normalized * 4500 + 500);
+    }
+    
+    /**
+     * Phase 2: Normalizes village density value to 0-1 range for slider
+     */
+    private double normalizeVillageDensity(int value) {
+        return (value - 1) / 4.0; // Range: 1-5 -> 0-1
+    }
+    
+    /**
+     * Phase 2: Denormalizes slider value back to village density range
+     */
+    private int denormalizeVillageDensity(double normalized) {
+        return (int) (normalized * 4 + 1);
+    }
+    
+    /**
+     * Phase 2: Gets human-readable village density text
+     */
+    private String getVillageDensityText(int value) {
+        return switch (value) {
+            case 1 -> "Sparse";
+            case 2 -> "Low";
+            case 3 -> "Normal";
+            case 4 -> "High";
+            case 5 -> "Dense";
+            default -> "Normal";
+        };
     }
     
     /**

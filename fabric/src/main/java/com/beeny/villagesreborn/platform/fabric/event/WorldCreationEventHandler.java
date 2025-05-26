@@ -3,6 +3,7 @@ package com.beeny.villagesreborn.platform.fabric.event;
 import com.beeny.villagesreborn.core.hardware.HardwareInfoManager;
 import com.beeny.villagesreborn.core.world.VillagesRebornWorldDataPersistent;
 import com.beeny.villagesreborn.core.world.VillagesRebornWorldSettings;
+import com.beeny.villagesreborn.core.world.WorldCreationSettingsCapture;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.minecraft.server.MinecraftServer;
@@ -38,19 +39,27 @@ public class WorldCreationEventHandler {
             
             // Initialize with default settings if this is a new world
             if (!worldData.hasSettings()) {
-                LOGGER.info("Initializing new world with default settings");
+                LOGGER.info("Initializing new world - checking for captured settings");
                 
-                try {
-                    // Get hardware info for optimization
-                    var hardwareInfo = HardwareInfoManager.getInstance().getHardwareInfo();
-                    var defaultSettings = VillagesRebornWorldSettings.createDefaults(hardwareInfo);
-                    
-                    worldData.setSettings(defaultSettings);
-                    LOGGER.info("Applied default settings based on hardware tier: {}", 
-                               hardwareInfo.getHardwareTier());
-                } catch (Exception e) {
-                    LOGGER.error("Failed to get hardware info, using fallback defaults", e);
-                    worldData.setSettings(new VillagesRebornWorldSettings());
+                // First try to get captured settings from world creation UI
+                VillagesRebornWorldSettings capturedSettings = WorldCreationSettingsCapture.retrieve();
+                if (capturedSettings != null) {
+                    LOGGER.info("Applying captured settings from world creation UI: {}", capturedSettings);
+                    worldData.setSettings(capturedSettings);
+                } else {
+                    // Fall back to hardware-based defaults
+                    LOGGER.info("No captured settings found, using hardware-based defaults");
+                    try {
+                        var hardwareInfo = HardwareInfoManager.getInstance().getHardwareInfo();
+                        var defaultSettings = VillagesRebornWorldSettings.createDefaults(hardwareInfo);
+                        
+                        worldData.setSettings(defaultSettings);
+                        LOGGER.info("Applied default settings based on hardware tier: {}",
+                                   hardwareInfo.getHardwareTier());
+                    } catch (Exception e) {
+                        LOGGER.error("Failed to get hardware info, using fallback defaults", e);
+                        worldData.setSettings(new VillagesRebornWorldSettings());
+                    }
                 }
             } else {
                 LOGGER.debug("Loaded existing world settings: {}", worldData.getSettings());

@@ -157,6 +157,27 @@ public class VillagesRebornWorldDataPersistent extends PersistentState {
                         settings.setEnableAdvancedAI((Boolean) value);
                     }
                     break;
+                // Phase 2 fields
+                case "biome_specific_expansion":
+                    if (value instanceof Boolean) {
+                        settings.setBiomeSpecificExpansion((Boolean) value);
+                    }
+                    break;
+                case "max_caravan_distance":
+                    if (value instanceof Number) {
+                        settings.setMaxCaravanDistance(((Number) value).intValue());
+                    }
+                    break;
+                case "interdimensional_villages":
+                    if (value instanceof Boolean) {
+                        settings.setInterdimensionalVillages((Boolean) value);
+                    }
+                    break;
+                case "village_generation_density":
+                    if (value instanceof Number) {
+                        settings.setVillageGenerationDensity(((Number) value).intValue());
+                    }
+                    break;
                 // Add more cases as needed
                 default:
                     LOGGER.warn("Unknown setting name: {}", settingName);

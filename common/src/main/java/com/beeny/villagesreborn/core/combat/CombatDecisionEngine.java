@@ -177,7 +177,7 @@ public class CombatDecisionEngine {
         
         float healthFactor = enemy.getHealth() / 20.0f; // Assume max health of 20
         float damageFactor = enemy.getAttackDamage() / 10.0f; // Normalize damage
-        float distanceFactor = Math.max(0.1f, 1.0f - (enemy.getDistanceTo(villager) / 20.0f));
+        float distanceFactor = (float) Math.max(0.1f, 1.0f - (enemy.getDistanceTo(villager) / 20.0f));
         
         float threatScore = (healthFactor * 0.3f) + (damageFactor * 0.5f) + (distanceFactor * 0.2f);
         

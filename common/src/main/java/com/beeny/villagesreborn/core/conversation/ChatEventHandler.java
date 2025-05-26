@@ -8,72 +8,112 @@ import com.beeny.villagesreborn.core.common.ServerChatEvent;
 import com.beeny.villagesreborn.core.common.VillagerEntity;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.regex.Pattern;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Handles chat events to intercept player messages and route them to villagers
- * when addressed with @villager prefix or overheard by proximity
+ * Enhanced ChatEventHandler with configurable regex patterns and asynchronous routing
+ * Filters AI-triggering chat via configurable regex and routes matching messages asynchronously
  */
 public class ChatEventHandler {
     
     public static final int CHAT_RADIUS = 16;
+    public static final double CONVERSATION_RANGE = 8.0;
     
-    private static final Pattern VILLAGER_ADDRESS_PATTERN = Pattern.compile(
-        "(?i)^@villager\\b|\\b(?:farmer|librarian|blacksmith|cleric|butcher|fletcher|leatherworker|stone)\\b",
-        Pattern.CASE_INSENSITIVE
+    // Default AI trigger patterns
+    private static final List<String> DEFAULT_PATTERNS = List.of(
+        "(?i)hello|hi|hey",
+        "(?i)@villager",
+        "\\?$",  // Questions ending with ?
+        "(?i)help",
+        "(?i)\\b(?:farmer|librarian|blacksmith|cleric|butcher|fletcher|leatherworker|stone)\\b"
     );
     
     private final VillagerProximityDetector proximityDetector;
     private final VillagerBrainManager brainManager;
     private final ConversationRouter conversationRouter;
+    private List<Pattern> aiTriggerPatterns;
     
-    public ChatEventHandler(VillagerProximityDetector proximityDetector, 
+    public ChatEventHandler(VillagerProximityDetector proximityDetector,
                            VillagerBrainManager brainManager,
                            ConversationRouter conversationRouter) {
         this.proximityDetector = proximityDetector;
         this.brainManager = brainManager;
         this.conversationRouter = conversationRouter;
+        this.aiTriggerPatterns = compilePatterns(DEFAULT_PATTERNS);
     }
     
     /**
-     * Processes server chat events to detect villager interactions
+     * Compiles a list of regex patterns
      */
-    public void onServerChatReceived(ServerChatEvent event) {
-        Player player = event.getPlayer();
+    private List<Pattern> compilePatterns(List<String> patterns) {
+        List<Pattern> compiledPatterns = new ArrayList<>();
+        for (String pattern : patterns) {
+            try {
+                compiledPatterns.add(Pattern.compile(pattern));
+            } catch (Exception e) {
+                // Log error and skip invalid pattern
+                System.err.println("Invalid regex pattern: " + pattern + " - " + e.getMessage());
+            }
+        }
+        return compiledPatterns;
+    }
+    
+    /**
+     * Updates AI trigger patterns dynamically
+     */
+    public void updateTriggerPatterns(List<String> patterns) {
+        this.aiTriggerPatterns = compilePatterns(patterns);
+    }
+    
+    /**
+     * Enhanced onServerChatEvent with async routing and improved filtering
+     */
+    public void onServerChatEvent(ServerChatEvent event) {
+        Player sender = event.getPlayer();
         String message = event.getMessage();
         
-        // Find nearby villagers
-        List<VillagerEntity> nearbyVillagers = findNearbyVillagers(player);
-        
-        if (nearbyVillagers.isEmpty()) {
-            return; // No villagers nearby, let chat proceed normally
-        }
-        
-        if (isDirectedAtVillager(message)) {
-            // Message is directed at villagers
-            VillagerEntity targetVillager = selectTargetVillager(nearbyVillagers, player, message);
-            if (targetVillager != null) {
-                conversationRouter.routeMessage(player, targetVillager, message);
-                event.cancel(); // Cancel the chat event to prevent broadcast
-            }
-        } else {
-            // Normal chat - process as overheard by nearby villagers
-            for (VillagerEntity villager : nearbyVillagers) {
-                brainManager.processOverheardMessage(villager, player, message);
-            }
-            // Don't cancel event - let normal chat proceed
+        if (shouldTriggerAI(message)) {
+            ConversationContext context = new ConversationContext(
+                sender, message, event.getTimestamp(), event.getWorld()
+            );
+            
+            // Route conversation asynchronously to prevent blocking
+            CompletableFuture.runAsync(() -> {
+                try {
+                    conversationRouter.routeConversation(context);
+                } catch (Exception e) {
+                    System.err.println("Error routing conversation: " + e.getMessage());
+                }
+            });
         }
     }
     
     /**
-     * Checks if a message is directed at villagers
+     * Legacy method for backward compatibility
      */
-    public boolean isDirectedAtVillager(String message) {
-        if (message == null || message.isEmpty()) {
+    public void onServerChatReceived(ServerChatEvent event) {
+        onServerChatEvent(event);
+    }
+    
+    /**
+     * Checks if a message should trigger AI based on configured patterns
+     */
+    public boolean shouldTriggerAI(String message) {
+        if (message == null || message.trim().isEmpty()) {
             return false;
         }
         
-        return VILLAGER_ADDRESS_PATTERN.matcher(message).find();
+        return aiTriggerPatterns.stream()
+            .anyMatch(pattern -> pattern.matcher(message).find());
+    }
+    
+    /**
+     * Checks if a message is directed at villagers (legacy method)
+     */
+    public boolean isDirectedAtVillager(String message) {
+        return shouldTriggerAI(message);
     }
     
     /**

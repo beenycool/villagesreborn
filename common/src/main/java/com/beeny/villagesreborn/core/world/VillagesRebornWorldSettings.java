@@ -26,6 +26,12 @@ public class VillagesRebornWorldSettings {
     private int maxVillageSize = 50;             // Range: 10-200
     private float expansionRate = 1.0f;          // Range: 0.1-2.0
     
+    // Phase 2: Enhanced Village Expansion
+    private boolean biomeSpecificExpansion = true;
+    private int maxCaravanDistance = 1000;      // Range: 500-5000
+    private boolean interdimensionalVillages = false;
+    private int villageGenerationDensity = 2;   // Range: 1-5
+    
     // Feature Toggles
     private boolean electionsEnabled = true;
     private boolean assistantVillagersEnabled = true;
@@ -40,13 +46,18 @@ public class VillagesRebornWorldSettings {
     private String version = "2.0";
     private long createdTimestamp = System.currentTimeMillis();
     
+    // Custom data storage for extensions
+    private Map<String, Object> customData = new HashMap<>();
+    
     // Default constructor
     public VillagesRebornWorldSettings() {}
     
     // Full constructor
     public VillagesRebornWorldSettings(int villagerMemoryLimit, float aiAggressionLevel, boolean enableAdvancedAI,
                                      boolean autoExpansionEnabled, int maxVillageSize, float expansionRate,
-                                     boolean electionsEnabled, boolean assistantVillagersEnabled, 
+                                     boolean biomeSpecificExpansion, int maxCaravanDistance,
+                                     boolean interdimensionalVillages, int villageGenerationDensity,
+                                     boolean electionsEnabled, boolean assistantVillagersEnabled,
                                      boolean dynamicTradingEnabled, boolean villagerRelationships,
                                      boolean adaptivePerformance, int tickOptimizationLevel,
                                      String version, long createdTimestamp) {
@@ -56,6 +67,10 @@ public class VillagesRebornWorldSettings {
         this.autoExpansionEnabled = autoExpansionEnabled;
         this.maxVillageSize = maxVillageSize;
         this.expansionRate = expansionRate;
+        this.biomeSpecificExpansion = biomeSpecificExpansion;
+        this.maxCaravanDistance = maxCaravanDistance;
+        this.interdimensionalVillages = interdimensionalVillages;
+        this.villageGenerationDensity = villageGenerationDensity;
         this.electionsEnabled = electionsEnabled;
         this.assistantVillagersEnabled = assistantVillagersEnabled;
         this.dynamicTradingEnabled = dynamicTradingEnabled;
@@ -120,6 +135,11 @@ public class VillagesRebornWorldSettings {
         map.put("auto_expansion_enabled", autoExpansionEnabled);
         map.put("max_village_size", maxVillageSize);
         map.put("expansion_rate", expansionRate);
+        // Phase 2 fields
+        map.put("biome_specific_expansion", biomeSpecificExpansion);
+        map.put("max_caravan_distance", maxCaravanDistance);
+        map.put("interdimensional_villages", interdimensionalVillages);
+        map.put("village_generation_density", villageGenerationDensity);
         map.put("elections_enabled", electionsEnabled);
         map.put("assistant_villagers_enabled", assistantVillagersEnabled);
         map.put("dynamic_trading_enabled", dynamicTradingEnabled);
@@ -128,6 +148,7 @@ public class VillagesRebornWorldSettings {
         map.put("tick_optimization_level", tickOptimizationLevel);
         map.put("version", version);
         map.put("created_timestamp", createdTimestamp);
+        map.put("custom_data", new HashMap<>(customData));
         return map;
     }
     
@@ -156,6 +177,19 @@ public class VillagesRebornWorldSettings {
             if (map.containsKey("expansion_rate")) {
                 settings.expansionRate = ((Number) map.get("expansion_rate")).floatValue();
             }
+            // Phase 2 fields
+            if (map.containsKey("biome_specific_expansion")) {
+                settings.biomeSpecificExpansion = (Boolean) map.get("biome_specific_expansion");
+            }
+            if (map.containsKey("max_caravan_distance")) {
+                settings.maxCaravanDistance = ((Number) map.get("max_caravan_distance")).intValue();
+            }
+            if (map.containsKey("interdimensional_villages")) {
+                settings.interdimensionalVillages = (Boolean) map.get("interdimensional_villages");
+            }
+            if (map.containsKey("village_generation_density")) {
+                settings.villageGenerationDensity = ((Number) map.get("village_generation_density")).intValue();
+            }
             if (map.containsKey("elections_enabled")) {
                 settings.electionsEnabled = (Boolean) map.get("elections_enabled");
             }
@@ -180,6 +214,13 @@ public class VillagesRebornWorldSettings {
             if (map.containsKey("created_timestamp")) {
                 settings.createdTimestamp = ((Number) map.get("created_timestamp")).longValue();
             }
+            if (map.containsKey("custom_data")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> customDataMap = (Map<String, Object>) map.get("custom_data");
+                if (customDataMap != null) {
+                    settings.customData = new HashMap<>(customDataMap);
+                }
+            }
             
             return settings;
         } catch (Exception e) {
@@ -195,6 +236,7 @@ public class VillagesRebornWorldSettings {
         return new VillagesRebornWorldSettings(
             villagerMemoryLimit, aiAggressionLevel, enableAdvancedAI,
             autoExpansionEnabled, maxVillageSize, expansionRate,
+            biomeSpecificExpansion, maxCaravanDistance, interdimensionalVillages, villageGenerationDensity,
             electionsEnabled, assistantVillagersEnabled, dynamicTradingEnabled,
             villagerRelationships, adaptivePerformance, tickOptimizationLevel,
             version, createdTimestamp
@@ -209,6 +251,9 @@ public class VillagesRebornWorldSettings {
         aiAggressionLevel = Math.max(0.0f, Math.min(1.0f, aiAggressionLevel));
         maxVillageSize = Math.max(10, Math.min(200, maxVillageSize));
         expansionRate = Math.max(0.1f, Math.min(2.0f, expansionRate));
+        // Phase 2 validation
+        maxCaravanDistance = Math.max(500, Math.min(5000, maxCaravanDistance));
+        villageGenerationDensity = Math.max(1, Math.min(5, villageGenerationDensity));
         tickOptimizationLevel = Math.max(0, Math.min(3, tickOptimizationLevel));
     }
     
@@ -231,6 +276,19 @@ public class VillagesRebornWorldSettings {
     public float getExpansionRate() { return expansionRate; }
     public void setExpansionRate(float expansionRate) { this.expansionRate = expansionRate; }
     
+    // Phase 2 getters and setters
+    public boolean isBiomeSpecificExpansion() { return biomeSpecificExpansion; }
+    public void setBiomeSpecificExpansion(boolean biomeSpecificExpansion) { this.biomeSpecificExpansion = biomeSpecificExpansion; }
+    
+    public int getMaxCaravanDistance() { return maxCaravanDistance; }
+    public void setMaxCaravanDistance(int maxCaravanDistance) { this.maxCaravanDistance = maxCaravanDistance; }
+    
+    public boolean isInterdimensionalVillages() { return interdimensionalVillages; }
+    public void setInterdimensionalVillages(boolean interdimensionalVillages) { this.interdimensionalVillages = interdimensionalVillages; }
+    
+    public int getVillageGenerationDensity() { return villageGenerationDensity; }
+    public void setVillageGenerationDensity(int villageGenerationDensity) { this.villageGenerationDensity = villageGenerationDensity; }
+    
     public boolean isElectionsEnabled() { return electionsEnabled; }
     public void setElectionsEnabled(boolean electionsEnabled) { this.electionsEnabled = electionsEnabled; }
     
@@ -251,6 +309,9 @@ public class VillagesRebornWorldSettings {
     
     public String getVersion() { return version; }
     public long getCreatedTimestamp() { return createdTimestamp; }
+    
+    public Map<String, Object> getCustomData() { return customData; }
+    public void setCustomData(Map<String, Object> customData) { this.customData = customData != null ? customData : new HashMap<>(); }
     
     @Override
     public String toString() {

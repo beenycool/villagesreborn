@@ -5,6 +5,8 @@ import net.minecraft.world.biome.Biome;
 
 /**
  * Data class representing a player's spawn biome choice
+ * NOTE: Static field currentSpawnBiomeChoice has been completely removed
+ * Use SpawnBiomeStorage implementations instead
  */
 public class SpawnBiomeChoiceData {
     private final RegistryKey<Biome> biomeKey;
@@ -28,6 +30,21 @@ public class SpawnBiomeChoiceData {
     
     public long getSelectionTimestamp() {
         return selectionTimestamp;
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        
+        SpawnBiomeChoiceData that = (SpawnBiomeChoiceData) obj;
+        return selectionTimestamp == that.selectionTimestamp &&
+               biomeKey.equals(that.biomeKey);
+    }
+    
+    @Override
+    public int hashCode() {
+        return biomeKey.hashCode() * 31 + Long.hashCode(selectionTimestamp);
     }
     
     @Override

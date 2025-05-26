@@ -70,11 +70,35 @@ public class HardwareInfoManager {
         if (cachedHardwareInfo == null) {
             synchronized (this) {
                 if (cachedHardwareInfo == null) {
-                    cachedHardwareInfo = detectHardwareInfo();
+                    cachedHardwareInfo = getHardwareInfoWithFallback();
                 }
             }
         }
         return cachedHardwareInfo;
+    }
+
+    /**
+     * Get hardware information with fallback on detection failure
+     */
+    public HardwareInfo getHardwareInfoWithFallback() {
+        try {
+            if (cachedHardwareInfo != null) {
+                return cachedHardwareInfo;
+            }
+            
+            HardwareInfo detectedInfo = detectHardwareInfoWithRetry();
+            
+            // Validate detection results
+            if (!isValidHardwareInfo(detectedInfo)) {
+                throw new RuntimeException("Invalid hardware detection results");
+            }
+            
+            return detectedInfo;
+            
+        } catch (Exception e) {
+            LOGGER.warn("Hardware detection failed, using fallback configuration: {}", e.getMessage());
+            return HardwareInfo.createFallback();
+        }
     }
 
     /**
@@ -86,35 +110,117 @@ public class HardwareInfoManager {
         }
     }
 
+    /**
+     * Detect hardware information with retry logic
+     */
+    private HardwareInfo detectHardwareInfoWithRetry() {
+        int maxRetries = 3;
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                HardwareAbstractionLayer hardware = systemInfo.getHardware();
+                
+                // Detect RAM
+                GlobalMemory memory = hardware.getMemory();
+                long ramBytes = memory.getTotal();
+                int ramGB = (int) (ramBytes / (1024L * 1024L * 1024L));
+                
+                // Detect CPU cores
+                CentralProcessor processor = hardware.getProcessor();
+                int cpuCores = processor.getLogicalProcessorCount();
+                
+                // Detect AVX2 support
+                boolean hasAvx2 = detectAvx2Support(processor);
+                
+                // Enhanced tier classification with performance scoring
+                double performanceScore = calculatePerformanceScore(ramGB, cpuCores, hasAvx2);
+                HardwareTier tier = classifyHardwareTier(performanceScore);
+                
+                HardwareInfo info = new HardwareInfo(ramGB, cpuCores, hasAvx2, tier);
+                
+                // Validate minimum requirements
+                validateMinimumRequirements(info);
+                
+                LOGGER.info("Hardware detected: {} (Performance Score: {:.1f})", info, performanceScore);
+                return info;
+                
+            } catch (Exception e) {
+                if (attempt == maxRetries) {
+                    throw new RuntimeException("Failed after " + maxRetries + " attempts", e);
+                }
+                
+                LOGGER.debug("Hardware detection attempt {} failed, retrying...", attempt);
+                try {
+                    Thread.sleep(1000L * attempt); // Exponential backoff
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Hardware detection interrupted", ie);
+                }
+            }
+        }
+        
+        throw new RuntimeException("Hardware detection failed after all retries");
+    }
+
     private HardwareInfo detectHardwareInfo() {
-        try {
-            HardwareAbstractionLayer hardware = systemInfo.getHardware();
-            
-            // Detect RAM
-            GlobalMemory memory = hardware.getMemory();
-            long ramBytes = memory.getTotal();
-            int ramGB = (int) (ramBytes / (1024L * 1024L * 1024L));
-            
-            // Detect CPU cores
-            CentralProcessor processor = hardware.getProcessor();
-            int cpuCores = processor.getLogicalProcessorCount();
-            
-            // Detect AVX2 support
-            // Note: OSHI doesn't provide direct feature flag access in all versions
-            // We'll use a fallback approach checking processor identifiers
-            boolean hasAvx2 = detectAvx2Support(processor);
-            
-            // Classify hardware tier
-            HardwareTier tier = HardwareTier.classify(ramGB, cpuCores, hasAvx2);
-            
-            HardwareInfo info = new HardwareInfo(ramGB, cpuCores, hasAvx2, tier);
-            LOGGER.info("Hardware detected: {}", info);
-            
-            return info;
-            
-        } catch (Exception e) {
-            LOGGER.warn("Failed to detect hardware information", e);
-            return HardwareInfo.createFallback();
+        return detectHardwareInfoWithRetry();
+    }
+
+    /**
+     * Calculate performance score based on hardware specifications
+     */
+    public static double calculatePerformanceScore(int ramGB, int cpuCores, boolean hasAvx2) {
+        double score = 0;
+        
+        // RAM scoring (40% weight)
+        double ramScore = Math.min(ramGB / 32.0, 1.0) * 40;
+        score += ramScore;
+        
+        // CPU cores scoring (40% weight)
+        double coreScore = Math.min(cpuCores / 16.0, 1.0) * 40;
+        score += coreScore;
+        
+        // AVX2 support (20% weight)
+        double avxScore = hasAvx2 ? 20 : 0;
+        score += avxScore;
+        
+        return score;
+    }
+
+    /**
+     * Classify hardware tier based on performance score
+     */
+    private HardwareTier classifyHardwareTier(double performanceScore) {
+        if (performanceScore >= 80) {
+            return HardwareTier.HIGH;
+        } else if (performanceScore >= 50) {
+            return HardwareTier.MEDIUM;
+        } else if (performanceScore >= 25) {
+            return HardwareTier.LOW;
+        } else {
+            return HardwareTier.UNKNOWN;
+        }
+    }
+
+    /**
+     * Validate that hardware info contains reasonable values
+     */
+    private boolean isValidHardwareInfo(HardwareInfo info) {
+        return info != null &&
+               info.getRamGB() > 0 &&
+               info.getCpuCores() > 0 &&
+               info.getHardwareTier() != null;
+    }
+
+    /**
+     * Validate minimum system requirements
+     */
+    private void validateMinimumRequirements(HardwareInfo info) {
+        if (info.getRamGB() < 2) {
+            LOGGER.warn("System has less than 2GB RAM, performance may be poor");
+        }
+        if (info.getCpuCores() < 2) {
+            LOGGER.warn("System has less than 2 CPU cores, performance may be poor");
         }
     }
 

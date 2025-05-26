@@ -22,4 +22,11 @@ public interface VillagerBrainManager {
      * @return the villager's brain
      */
     VillagerBrain getBrain(VillagerEntity villager);
+    
+    /**
+     * Saves a villager's brain data to persistent storage
+     * @param villager the villager entity
+     * @param brain the brain to save
+     */
+    void saveBrain(VillagerEntity villager, VillagerBrain brain);
 }

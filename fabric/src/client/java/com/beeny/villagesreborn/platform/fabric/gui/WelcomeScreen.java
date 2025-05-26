@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Welcome screen for first-time setup of Villages Reborn
@@ -40,6 +41,10 @@ public class WelcomeScreen extends Screen {
     private CyclingButtonWidget<String> modelButton;
     private ButtonWidget saveButton;
     private ButtonWidget skipButton;
+    
+    // Validation and state
+    private final List<String> validationErrors = new ArrayList<>();
+    private boolean isProviderValidated = false;
     
     public WelcomeScreen(HardwareInfoManager hardwareManager, LLMProviderManager llmManager, 
                         FirstTimeSetupConfig setupConfig) {
@@ -63,8 +68,8 @@ public class WelcomeScreen extends Screen {
         int currentY = startY;
         
         // Welcome title
-        TextWidget titleWidget = new TextWidget(centerX - 150, currentY, 300, 20, 
-            Text.literal("Welcome to Villages Reborn!").formatted(Formatting.GOLD, Formatting.BOLD), 
+        TextWidget titleWidget = new TextWidget(centerX - 150, currentY, 300, 20,
+            Text.literal("Welcome to Villages Reborn!").formatted(Formatting.GOLD, Formatting.BOLD),
             this.textRenderer);
         this.addDrawableChild(titleWidget);
         currentY += spacing + 10;
@@ -79,6 +84,9 @@ public class WelcomeScreen extends Screen {
         
         // Action buttons
         addActionButtons(centerX, currentY);
+        
+        // Initialize with validation
+        validateConfiguration();
     }
     
     private void addHardwareSection(int centerX, int startY) {
@@ -146,6 +154,7 @@ public class WelcomeScreen extends Screen {
             .build(centerX - 100, currentY, 200, 20, Text.literal("LLM Provider"), (button, provider) -> {
                 this.selectedProvider = provider;
                 updateModelOptions();
+                validateConfiguration();
                 LOGGER.debug("Selected provider: {}", provider);
             });
         this.addDrawableChild(providerButton);
@@ -157,6 +166,7 @@ public class WelcomeScreen extends Screen {
             .initially(selectedModel)
             .build(centerX - 100, currentY, 200, 20, Text.literal("Model"), (button, model) -> {
                 this.selectedModel = model;
+                validateConfiguration();
                 LOGGER.debug("Selected model: {}", model);
             });
         this.addDrawableChild(modelButton);
@@ -209,19 +219,59 @@ public class WelcomeScreen extends Screen {
             .initially(selectedModel)
             .build(centerX - 100, modelButtonY, 200, 20, Text.literal("Model"), (button, model) -> {
                 this.selectedModel = model;
+                validateConfiguration();
                 LOGGER.debug("Selected model: {}", model);
             });
         this.addDrawableChild(modelButton);
     }
     
+    private void validateConfiguration() {
+        validationErrors.clear();
+        
+        // Validate provider selection
+        if (selectedProvider == null) {
+            validationErrors.add("Provider must be selected");
+        }
+        
+        // Validate model selection
+        if (selectedModel == null || selectedModel.isEmpty()) {
+            validationErrors.add("Model must be selected");
+        }
+        
+        // Hardware compatibility check
+        if (selectedProvider != null && selectedModel != null && detectedHardware != null) {
+            var compatibilityResult = llmManager.validateProviderCompatibility(selectedProvider, detectedHardware.getHardwareTier());
+            if (compatibilityResult.getType() == LLMProviderManager.ValidationResult.Type.WARNING) {
+                // Don't add as error, just log warning
+                LOGGER.warn("Provider compatibility warning: {}", compatibilityResult.getMessage());
+            }
+        }
+        
+        updateUIValidationState();
+    }
+    
+    private void updateUIValidationState() {
+        boolean isValid = validationErrors.isEmpty();
+        saveButton.active = isValid;
+        
+        if (!isValid) {
+            LOGGER.debug("Validation errors: {}", validationErrors);
+        }
+    }
+    
     private void saveConfiguration() {
+        if (!validationErrors.isEmpty()) {
+            LOGGER.warn("Cannot save configuration with validation errors: {}", validationErrors);
+            return;
+        }
+        
         try {
             setupConfig.completeSetup(selectedProvider, selectedModel);
             LOGGER.info("Setup completed with provider: {}, model: {}", selectedProvider, selectedModel);
             closeScreen();
         } catch (Exception e) {
             LOGGER.error("Failed to save configuration", e);
-            // Could add error dialog here in future
+            // In a real implementation, we'd show an error dialog to the user
         }
     }
     
@@ -250,5 +300,41 @@ public class WelcomeScreen extends Screen {
     @Override
     public boolean shouldCloseOnEsc() {
         return false; // Prevent accidental closure
+    }
+    
+    // Getter methods for testing
+    public List<String> getValidationErrors() {
+        return new ArrayList<>(validationErrors);
+    }
+    
+    public List<String> getAvailableModels() {
+        return getRecommendedModels();
+    }
+    
+    public String getSelectedModel() {
+        return selectedModel;
+    }
+    
+    public LLMProvider getSelectedProvider() {
+        return selectedProvider;
+    }
+    
+    public ButtonWidget getContinueButton() {
+        return saveButton;
+    }
+    
+    public HardwareInfo getHardwareInfo() {
+        return detectedHardware;
+    }
+    
+    // Setter methods for testing
+    public void setSelectedProvider(LLMProvider provider) {
+        this.selectedProvider = provider;
+        validateConfiguration();
+    }
+    
+    public void setSelectedModel(String model) {
+        this.selectedModel = model;
+        validateConfiguration();
     }
 }

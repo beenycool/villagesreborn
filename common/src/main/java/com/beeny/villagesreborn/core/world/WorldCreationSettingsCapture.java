@@ -21,6 +21,12 @@ public class WorldCreationSettingsCapture {
     // Global cache with session IDs for multi-thread scenarios
     private static final Map<String, VillagesRebornWorldSettings> WORLD_SETTINGS_CACHE = new ConcurrentHashMap<>();
     
+    // Thread-local storage for spawn biome choices
+    private static final ThreadLocal<Object> SPAWN_BIOME_CHOICE = new ThreadLocal<>();
+    
+    // Global cache for spawn biome choices with session IDs
+    private static final Map<String, Object> SPAWN_BIOME_CACHE = new ConcurrentHashMap<>();
+    
     // Cleanup timeout (5 minutes)
     private static final int CLEANUP_TIMEOUT_MINUTES = 5;
     
@@ -100,14 +106,69 @@ public class WorldCreationSettingsCapture {
     }
     
     /**
+     * Sets the spawn biome choice for world creation
+     * @param biomeChoice The biome choice (BiomeDisplayInfo or similar)
+     */
+    public static void setSpawnBiomeChoice(Object biomeChoice) {
+        if (biomeChoice == null) {
+            LOGGER.warn("Attempted to set null spawn biome choice");
+            return;
+        }
+        
+        // Store in thread-local for immediate access
+        SPAWN_BIOME_CHOICE.set(biomeChoice);
+        
+        // Generate session ID and cache for cross-thread access
+        String sessionId = generateSessionId();
+        SPAWN_BIOME_CACHE.put(sessionId, biomeChoice);
+        
+        LOGGER.info("Set spawn biome choice for session: {} - {}", sessionId, biomeChoice);
+        
+        // Schedule cleanup to prevent memory leaks
+        scheduleSpawnBiomeCleanup(sessionId);
+    }
+    
+    /**
+     * Retrieves the spawn biome choice
+     * @return The spawn biome choice, or null if none available
+     */
+    public static Object getSpawnBiomeChoice() {
+        // Try thread-local first
+        Object choice = SPAWN_BIOME_CHOICE.get();
+        if (choice != null) {
+            SPAWN_BIOME_CHOICE.remove(); // Clean up after retrieval
+            LOGGER.debug("Retrieved spawn biome choice from thread-local storage");
+            return choice;
+        }
+        
+        // Fallback to most recent cached choice
+        if (!SPAWN_BIOME_CACHE.isEmpty()) {
+            choice = SPAWN_BIOME_CACHE.values().stream()
+                                     .findFirst()
+                                     .orElse(null);
+            if (choice != null) {
+                LOGGER.debug("Retrieved spawn biome choice from global cache");
+                return choice;
+            }
+        }
+        
+        LOGGER.debug("No spawn biome choice found");
+        return null;
+    }
+    
+    /**
      * Clears all captured settings
      * Used for cleanup and testing
      */
     public static void clearAll() {
         CAPTURED_SETTINGS.remove();
+        SPAWN_BIOME_CHOICE.remove();
         int cacheSize = WORLD_SETTINGS_CACHE.size();
+        int biomesCacheSize = SPAWN_BIOME_CACHE.size();
         WORLD_SETTINGS_CACHE.clear();
-        LOGGER.debug("Cleared all captured settings (cache had {} entries)", cacheSize);
+        SPAWN_BIOME_CACHE.clear();
+        LOGGER.debug("Cleared all captured settings (cache had {} entries, biomes cache had {} entries)",
+                    cacheSize, biomesCacheSize);
     }
     
     /**
@@ -170,5 +231,18 @@ public class WorldCreationSettingsCapture {
             }
             return false;
         });
+    }
+    
+    /**
+     * Schedules cleanup of cached spawn biome choices to prevent memory leaks
+     */
+    private static void scheduleSpawnBiomeCleanup(String sessionId) {
+        CompletableFuture.delayedExecutor(CLEANUP_TIMEOUT_MINUTES, TimeUnit.MINUTES)
+                        .execute(() -> {
+                            Object removed = SPAWN_BIOME_CACHE.remove(sessionId);
+                            if (removed != null) {
+                                LOGGER.debug("Cleaned up expired spawn biome choice for session: {}", sessionId);
+                            }
+                        });
     }
 }

@@ -77,14 +77,14 @@ class CombatDecisionLogicTests {
         when(mockEnemy1.isHostile()).thenReturn(true);
         when(mockEnemy1.getHealth()).thenReturn(20.0f);
         when(mockEnemy1.getAttackDamage()).thenReturn(6.0f);
-        when(mockEnemy1.getDistanceTo(mockVillager)).thenReturn(5.0f);
+        when(mockEnemy1.getDistanceTo(mockVillager)).thenReturn(5.0);
         
         when(mockEnemy2.getUUID()).thenReturn(UUID.randomUUID());
         when(mockEnemy2.isAlive()).thenReturn(true);
         when(mockEnemy2.isHostile()).thenReturn(true);
         when(mockEnemy2.getHealth()).thenReturn(10.0f);
         when(mockEnemy2.getAttackDamage()).thenReturn(4.0f);
-        when(mockEnemy2.getDistanceTo(mockVillager)).thenReturn(8.0f);
+        when(mockEnemy2.getDistanceTo(mockVillager)).thenReturn(8.0);
         
         // Mock friend setup
         when(mockFriend.getUUID()).thenReturn(friendUUID);
@@ -332,7 +332,7 @@ class CombatDecisionLogicTests {
         // Given: Enemy with known stats
         when(mockEnemy1.getHealth()).thenReturn(20.0f);
         when(mockEnemy1.getAttackDamage()).thenReturn(8.0f);
-        when(mockEnemy1.getDistanceTo(mockVillager)).thenReturn(5.0f);
+        when(mockEnemy1.getDistanceTo(mockVillager)).thenReturn(5.0);
         
         // When: Calculating threat score
         float threatScore = combatEngine.calculateThreatScore(

@@ -15,4 +15,10 @@ public interface ConversationRouter {
      * @param message the message content
      */
     void routeMessage(Player player, VillagerEntity villager, String message);
+    
+    /**
+     * Routes a conversation with full context to nearby villagers
+     * @param context the conversation context including sender, message, and environment data
+     */
+    void routeConversation(ConversationContext context);
 }

@@ -208,6 +208,11 @@ public class VillagesRebornTab extends ScrollableWidget {
         settings.setAutoExpansionEnabled(other.isAutoExpansionEnabled());
         settings.setMaxVillageSize(other.getMaxVillageSize());
         settings.setExpansionRate(other.getExpansionRate());
+        // Phase 2 fields
+        settings.setBiomeSpecificExpansion(other.isBiomeSpecificExpansion());
+        settings.setMaxCaravanDistance(other.getMaxCaravanDistance());
+        settings.setInterdimensionalVillages(other.isInterdimensionalVillages());
+        settings.setVillageGenerationDensity(other.getVillageGenerationDensity());
         settings.setElectionsEnabled(other.isElectionsEnabled());
         settings.setAssistantVillagersEnabled(other.isAssistantVillagersEnabled());
         settings.setDynamicTradingEnabled(other.isDynamicTradingEnabled());
