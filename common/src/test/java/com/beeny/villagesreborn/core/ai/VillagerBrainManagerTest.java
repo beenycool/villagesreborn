@@ -100,7 +100,8 @@ class VillagerBrainManagerTest {
         
         brainManager.processOverheardMessage(villager, player, "That's awesome!");
         
-        verify(persistence).saveBrain(eq(villagerUUID), any(VillagerBrain.class));
+        // Expects 2 saves: 1 for new brain creation, 1 for updated brain
+        verify(persistence, times(2)).saveBrain(eq(villagerUUID), any(VillagerBrain.class));
     }
 
     @Test
@@ -110,7 +111,8 @@ class VillagerBrainManagerTest {
         
         brainManager.processOverheardMessage(villager, player, "That's terrible!");
         
-        verify(persistence).saveBrain(eq(villagerUUID), any(VillagerBrain.class));
+        // Expects 2 saves: 1 for new brain creation, 1 for updated brain
+        verify(persistence, times(2)).saveBrain(eq(villagerUUID), any(VillagerBrain.class));
     }
 
     @Test

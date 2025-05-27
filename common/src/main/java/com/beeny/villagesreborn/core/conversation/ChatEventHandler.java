@@ -23,10 +23,10 @@ public class ChatEventHandler {
     
     // Default AI trigger patterns
     private static final List<String> DEFAULT_PATTERNS = List.of(
-        "(?i)hello|hi|hey",
+        "(?i)\\b(?:hello|hi|hey)\\b",
         "(?i)@villager",
         "\\?$",  // Questions ending with ?
-        "(?i)help",
+        "(?i)\\bhelp\\b",
         "(?i)\\b(?:farmer|librarian|blacksmith|cleric|butcher|fletcher|leatherworker|stone)\\b"
     );
     
@@ -75,18 +75,25 @@ public class ChatEventHandler {
         String message = event.getMessage();
         
         if (shouldTriggerAI(message)) {
-            ConversationContext context = new ConversationContext(
-                sender, message, event.getTimestamp(), event.getWorld()
-            );
+            // Find nearby villagers
+            List<VillagerEntity> nearbyVillagers = findNearbyVillagers(sender);
             
-            // Route conversation asynchronously to prevent blocking
-            CompletableFuture.runAsync(() -> {
-                try {
-                    conversationRouter.routeConversation(context);
-                } catch (Exception e) {
-                    System.err.println("Error routing conversation: " + e.getMessage());
+            if (!nearbyVillagers.isEmpty()) {
+                // Cancel the event for directed messages
+                event.cancel();
+                
+                // Select target villager and route message
+                VillagerEntity targetVillager = selectTargetVillager(nearbyVillagers, sender, message);
+                if (targetVillager != null) {
+                    // Route conversation synchronously for tests
+                    conversationRouter.routeMessage(sender, targetVillager, message);
                 }
-            });
+            }
+            
+            // Process as overheard message for all nearby villagers
+            for (VillagerEntity villager : nearbyVillagers) {
+                brainManager.processOverheardMessage(villager, sender, message);
+            }
         }
     }
     

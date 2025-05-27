@@ -12,6 +12,8 @@ import java.util.List;
  */
 public class PromptBuilder {
     
+    public static final int CONTEXT_WINDOW_SIZE = 10;
+    public static final int MAX_PROMPT_LENGTH = 32000; // Conservative estimate for character limits
     private static final int DEFAULT_CONTEXT_WINDOW_SIZE = 10;
     private static final int MAX_TOKEN_ESTIMATE = 8000; // Conservative estimate for token limits
     private static final int CHARS_PER_TOKEN_ESTIMATE = 4; // Rough estimate
@@ -37,7 +39,7 @@ public class PromptBuilder {
      * @param context the current conversation context
      * @return assembled prompt string
      */
-    public static String buildPrompt(VillagerBrain villagerBrain, ConversationContext context) {
+    public String buildPrompt(VillagerBrain villagerBrain, ConversationContext context) {
         StringBuilder prompt = new StringBuilder();
         
         // System prompt with villager identity
@@ -68,9 +70,17 @@ public class PromptBuilder {
      * @param villagerBrain the villager's brain
      * @return system prompt string
      */
-    public static String buildSystemPrompt(VillagerBrain villagerBrain) {
-        String personalityDesc = villagerBrain.getPersonalityTraits().generateDescription();
-        String moodDesc = villagerBrain.getCurrentMood().getOverallMood().toString();
+    public String buildSystemPrompt(VillagerBrain villagerBrain) {
+        String personalityDesc = "Unknown personality";
+        String moodDesc = "NEUTRAL";
+        
+        if (villagerBrain.getPersonalityTraits() != null) {
+            personalityDesc = villagerBrain.getPersonalityTraits().generateDescription();
+        }
+        
+        if (villagerBrain.getCurrentMood() != null && villagerBrain.getCurrentMood().getOverallMood() != null) {
+            moodDesc = villagerBrain.getCurrentMood().getOverallMood().toString();
+        }
         
         return String.format(SYSTEM_PROMPT_TEMPLATE, personalityDesc, moodDesc);
     }
@@ -80,7 +90,7 @@ public class PromptBuilder {
      * @param shortTermMemory the conversation history
      * @return formatted conversation history
      */
-    public static String buildConversationHistory(ConversationHistory shortTermMemory) {
+    public String buildConversationHistory(ConversationHistory shortTermMemory) {
         List<ConversationInteraction> recentInteractions = 
             shortTermMemory.getRecent(DEFAULT_CONTEXT_WINDOW_SIZE);
         
@@ -104,7 +114,7 @@ public class PromptBuilder {
      * @param context the conversation context
      * @return formatted context section
      */
-    public static String buildCurrentContext(ConversationContext context) {
+    public String buildCurrentContext(ConversationContext context) {
         StringBuilder contextBuilder = new StringBuilder();
         contextBuilder.append("Current Situation:\n");
         
@@ -128,16 +138,14 @@ public class PromptBuilder {
      * @param shortTermMemory the conversation history for truncation
      * @return prompt within token limits
      */
-    private static String enforceTokenLimits(String prompt, ConversationHistory shortTermMemory) {
-        int estimatedTokens = estimateTokenCount(prompt);
-        
-        if (estimatedTokens <= MAX_TOKEN_ESTIMATE) {
+    private String enforceTokenLimits(String prompt, ConversationHistory shortTermMemory) {
+        if (prompt.length() <= MAX_PROMPT_LENGTH) {
             return prompt;
         }
         
         // If prompt is too long, rebuild with fewer history entries
         int maxHistoryEntries = DEFAULT_CONTEXT_WINDOW_SIZE;
-        while (estimatedTokens > MAX_TOKEN_ESTIMATE && maxHistoryEntries > 0) {
+        while (prompt.length() > MAX_PROMPT_LENGTH && maxHistoryEntries > 0) {
             maxHistoryEntries--;
             
             // Rebuild prompt with fewer history entries
@@ -167,7 +175,6 @@ public class PromptBuilder {
             truncatedPrompt.append("Your Response: ");
             
             prompt = truncatedPrompt.toString();
-            estimatedTokens = estimateTokenCount(prompt);
         }
         
         return prompt;

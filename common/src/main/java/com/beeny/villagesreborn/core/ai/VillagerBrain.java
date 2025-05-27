@@ -27,6 +27,10 @@ public class VillagerBrain {
     private MemoryBank longTermMemory;
     private Map<UUID, RelationshipData> relationshipMap;
     private LLMApiClient llmApiClient;
+    private PromptBuilder promptBuilder;
+    private String villagerName = "Unknown";
+    private String profession = "Unemployed";
+    private String villageName = "Unknown Village";
     private long lastInteractionTime = 0;
     private long conversationCooldown = 0;
 
@@ -37,6 +41,7 @@ public class VillagerBrain {
         this.shortTermMemory = new ConversationHistory();
         this.longTermMemory = new MemoryBank();
         this.relationshipMap = new HashMap<>();
+        this.promptBuilder = new PromptBuilder();
     }
 
     public UUID getVillagerUUID() { return villagerUUID; }
@@ -45,6 +50,13 @@ public class VillagerBrain {
     public ConversationHistory getShortTermMemory() { return shortTermMemory; }
     public MemoryBank getLongTermMemory() { return longTermMemory; }
     public Map<UUID, RelationshipData> getRelationshipMap() { return relationshipMap; }
+    public String getVillagerName() { return villagerName; }
+    public String getProfession() { return profession; }
+    public String getVillageName() { return villageName; }
+
+    public void setVillagerName(String name) { this.villagerName = name; }
+    public void setProfession(String profession) { this.profession = profession; }
+    public void setVillageName(String villageName) { this.villageName = villageName; }
 
     public void setLLMApiClient(LLMApiClient apiClient) {
         this.llmApiClient = apiClient;
@@ -70,7 +82,7 @@ public class VillagerBrain {
 
         try {
             // Build comprehensive prompt using PromptBuilder
-            String fullPrompt = PromptBuilder.buildPrompt(this, context);
+            String fullPrompt = promptBuilder.buildPrompt(this, context);
             
             // Add the current player message to the prompt
             String finalPrompt = fullPrompt.replace("[Waiting for input]", message);

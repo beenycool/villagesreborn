@@ -24,6 +24,9 @@ public class IntProvider {
      * Get a specific range integer
      */
     public static synchronized int range(int min, int max) {
-        return min + (next() % (max - min + 1));
+        if (max <= min) {
+            return min;
+        }
+        return min + (Math.abs(next()) % (max - min + 1));
     }
 }

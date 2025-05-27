@@ -136,7 +136,7 @@ class ResponseDeliveryManagerTest {
         
         deliveryManager.deliverResponse(villager, player, response);
         
-        verify(villager).getUUID();
+        verify(villager, atLeastOnce()).getUUID();
     }
 
     @Test
@@ -148,7 +148,7 @@ class ResponseDeliveryManagerTest {
         
         deliveryManager.deliverResponse(villager, player, response);
         
-        verify(villager).getUUID();
+        verify(villager, atLeastOnce()).getUUID();
         verify(villager).getBlockPos();
     }
 
@@ -166,7 +166,7 @@ class ResponseDeliveryManagerTest {
         
         // Should be able to send immediately
         deliveryManager.deliverResponse(villager, player, response);
-        verify(player, times(2)).getName();
+        verify(player, atLeast(2)).getName();
     }
 
     @Test

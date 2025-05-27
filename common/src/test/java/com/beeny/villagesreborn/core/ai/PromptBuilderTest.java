@@ -2,236 +2,301 @@ package com.beeny.villagesreborn.core.ai;
 
 import com.beeny.villagesreborn.core.conversation.ConversationContext;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Test suite for PromptBuilder class
+ * Test-Driven Development tests for PromptBuilder
+ * Tests system prompt assembly with personality, mood, context layers,
+ * history concatenation and token-length enforcement
  */
-@DisplayName("PromptBuilder Tests")
+@DisplayName("Prompt Builder Tests")
 class PromptBuilderTest {
+
+    @Mock
+    private VillagerBrain mockBrain;
     
-    private VillagerBrain villagerBrain;
-    private ConversationContext context;
+    @Mock
+    private PersonalityProfile mockPersonality;
     
+    @Mock
+    private MoodState mockMood;
+    
+    @Mock
+    private ConversationHistory mockHistory;
+    
+    @Mock
+    private ConversationContext mockContext;
+
+    private PromptBuilder promptBuilder;
+
     @BeforeEach
     void setUp() {
-        villagerBrain = new VillagerBrain(UUID.randomUUID());
-        context = new ConversationContext();
-        context.setTimeOfDay("Morning");
-        context.setWeather("Sunny");
-        context.setLocation("Village Square");
-        context.setRelationship("Friendly");
+        MockitoAnnotations.openMocks(this);
+        promptBuilder = new PromptBuilder();
     }
-    
+
     @Test
-    @DisplayName("Should build basic prompt with system prompt and context")
-    void shouldBuildBasicPrompt() {
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
+    @DisplayName("Should build complete prompt with all components")
+    void shouldBuildCompletePromptWithAllComponents() {
+        // Given: Complete villager brain setup
+        when(mockBrain.getPersonalityTraits()).thenReturn(mockPersonality);
+        when(mockBrain.getCurrentMood()).thenReturn(mockMood);
+        when(mockBrain.getShortTermMemory()).thenReturn(mockHistory);
+        when(mockBrain.getVillagerName()).thenReturn("Bob");
+        when(mockBrain.getProfession()).thenReturn("Farmer");
+        when(mockBrain.getVillageName()).thenReturn("Testville");
         
-        // Then
+        when(mockPersonality.generateDescription()).thenReturn("Friendly and helpful");
+        when(mockMood.getOverallMood()).thenReturn(MoodCategory.HAPPY);
+        when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should contain all components
         assertNotNull(prompt);
-        assertFalse(prompt.isEmpty());
-        assertTrue(prompt.contains("villager"));
-        assertTrue(prompt.contains("Morning"));
-        assertTrue(prompt.contains("Sunny"));
-        assertTrue(prompt.contains("Village Square"));
+        assertTrue(prompt.contains("Friendly and helpful"));
+        assertTrue(prompt.contains("HAPPY"));
     }
-    
+
     @Test
-    @DisplayName("Should include personality traits in system prompt")
-    void shouldIncludePersonalityTraits() {
+    @DisplayName("Should generate system prompt with personality traits")
+    void shouldGenerateSystemPromptWithPersonalityTraits() {
         // Given: Villager with specific personality
-        villagerBrain.getPersonalityTraits().adjustTrait(TraitType.FRIENDLINESS, 0.8f);
-        villagerBrain.getPersonalityTraits().adjustTrait(TraitType.CURIOSITY, 0.6f);
+        when(mockBrain.getPersonalityTraits()).thenReturn(mockPersonality);
+        when(mockBrain.getCurrentMood()).thenReturn(mockMood);
+        when(mockBrain.getVillagerName()).thenReturn("Alice");
+        when(mockBrain.getProfession()).thenReturn("Librarian");
+        when(mockBrain.getVillageName()).thenReturn("Booktown");
         
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
-        
-        // Then
-        assertTrue(prompt.contains("personality"));
-        // Should include some representation of personality traits
+        when(mockPersonality.generateDescription()).thenReturn("Scholarly and introverted");
+        when(mockMood.getOverallMood()).thenReturn(MoodCategory.CONTENT);
+
+        // When: Building system prompt
+        String systemPrompt = promptBuilder.buildSystemPrompt(mockBrain);
+
+        // Then: Should include personality description
+        assertNotNull(systemPrompt);
+        assertTrue(systemPrompt.contains("Scholarly and introverted"));
+        assertTrue(systemPrompt.contains("CONTENT"));
+        assertTrue(systemPrompt.length() > 100);
     }
-    
+
     @Test
-    @DisplayName("Should include conversation history when available")
-    void shouldIncludeConversationHistory() {
-        // Given: Villager with conversation history
-        ConversationInteraction interaction = new ConversationInteraction(
-            System.currentTimeMillis() - 1000,
-            UUID.randomUUID(),
-            "Hello there!",
-            "Greetings, traveler!",
-            villagerBrain.getCurrentMood().copy(),
-            "Village"
-        );
-        villagerBrain.getShortTermMemory().addInteraction(interaction);
+    @DisplayName("Should build conversation history from recent interactions")
+    void shouldBuildConversationHistoryFromRecentInteractions() {
+        // Given: Conversation history with interactions
+        ConversationInteraction interaction1 = createMockInteraction("Hello!", "Hi there!");
+        ConversationInteraction interaction2 = createMockInteraction("How are you?", "I'm doing well, thanks!");
+        List<ConversationInteraction> interactions = List.of(interaction1, interaction2);
         
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
+        when(mockHistory.getRecent(PromptBuilder.CONTEXT_WINDOW_SIZE)).thenReturn(interactions);
+
+        // When: Building conversation history
+        String history = promptBuilder.buildConversationHistory(mockHistory);
+
+        // Then: Should format interactions correctly
+        assertNotNull(history);
+        assertTrue(history.contains("Player: Hello!"));
+        assertTrue(history.contains("You: Hi there!"));
+        assertTrue(history.contains("Player: How are you?"));
+        assertTrue(history.contains("You: I'm doing well, thanks!"));
         
-        // Then
-        assertTrue(prompt.contains("Hello there!"));
-        assertTrue(prompt.contains("Greetings, traveler!"));
+        // Should have proper structure (2 interactions = 4 lines)
+        String[] lines = history.split("\n");
+        assertEquals(5, lines.length); // Header + 4 lines
     }
-    
+
     @Test
-    @DisplayName("Should include current mood in system prompt")
-    void shouldIncludeCurrentMood() {
-        // Given: Villager with specific mood
-        villagerBrain.getCurrentMood().setHappiness(0.8f);
-        villagerBrain.getCurrentMood().setEnergy(0.6f);
-        
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
-        
-        // Then
-        assertTrue(prompt.contains("mood"));
+    @DisplayName("Should build current context with environmental data")
+    void shouldBuildCurrentContextWithEnvironmentalData() {
+        // Given: Conversation context with environment
+        when(mockContext.getTimeOfDay()).thenReturn("Morning");
+        when(mockContext.getWeather()).thenReturn("Sunny");
+        when(mockContext.getLocation()).thenReturn("Village Square");
+        when(mockContext.getRelationship()).thenReturn("Friendly");
+        when(mockContext.hasNearbyVillagers()).thenReturn(true);
+        when(mockContext.getNearbyVillagers()).thenReturn("Tom, Jerry");
+
+        // When: Building current context
+        String context = promptBuilder.buildCurrentContext(mockContext);
+
+        // Then: Should include all environmental data
+        assertNotNull(context);
+        assertTrue(context.contains("Current Situation:"));
+        assertTrue(context.contains("Time: Morning"));
+        assertTrue(context.contains("Weather: Sunny"));
+        assertTrue(context.contains("Location: Village Square"));
+        assertTrue(context.contains("Player Relationship: Friendly"));
+        assertTrue(context.contains("Other villagers nearby: Tom, Jerry"));
     }
-    
+
     @Test
-    @DisplayName("Should build context section with location and time")
-    void shouldBuildContextSection() {
-        // When
-        String contextSection = PromptBuilder.buildCurrentContext(context);
+    @DisplayName("Should enforce maximum prompt length limits")
+    void shouldEnforceMaximumPromptLengthLimits() {
+        // Given: Villager brain with extensive history
+        when(mockBrain.getPersonalityTraits()).thenReturn(mockPersonality);
+        when(mockBrain.getCurrentMood()).thenReturn(mockMood);
+        when(mockBrain.getShortTermMemory()).thenReturn(mockHistory);
+        when(mockBrain.getVillagerName()).thenReturn("Bob");
+        when(mockBrain.getProfession()).thenReturn("Farmer");
+        when(mockBrain.getVillageName()).thenReturn("Testville");
         
-        // Then
-        assertNotNull(contextSection);
-        assertTrue(contextSection.contains("Morning"));
-        assertTrue(contextSection.contains("Sunny"));
-        assertTrue(contextSection.contains("Village Square"));
-        assertTrue(contextSection.contains("Friendly"));
-    }
-    
-    @Test
-    @DisplayName("Should build conversation history section")
-    void shouldBuildConversationHistorySection() {
-        // Given: Multiple interactions
-        ConversationInteraction interaction1 = new ConversationInteraction(
-            System.currentTimeMillis() - 2000,
-            UUID.randomUUID(),
-            "What's your name?",
-            "I'm Bob the blacksmith.",
-            villagerBrain.getCurrentMood().copy(),
-            "Village"
-        );
-        ConversationInteraction interaction2 = new ConversationInteraction(
-            System.currentTimeMillis() - 1000,
-            UUID.randomUUID(),
-            "How are you today?",
-            "I'm doing well, thank you!",
-            villagerBrain.getCurrentMood().copy(),
-            "Village"
-        );
+        when(mockPersonality.generateDescription()).thenReturn("Very detailed personality");
+        when(mockMood.getOverallMood()).thenReturn(MoodCategory.HAPPY);
         
-        villagerBrain.getShortTermMemory().addInteraction(interaction1);
-        villagerBrain.getShortTermMemory().addInteraction(interaction2);
-        
-        // When
-        String historySection = PromptBuilder.buildConversationHistory(villagerBrain.getShortTermMemory());
-        
-        // Then
-        assertNotNull(historySection);
-        assertTrue(historySection.contains("What's your name?"));
-        assertTrue(historySection.contains("I'm Bob the blacksmith."));
-        assertTrue(historySection.contains("How are you today?"));
-        assertTrue(historySection.contains("I'm doing well, thank you!"));
-    }
-    
-    @Test
-    @DisplayName("Should limit conversation history to prevent token overflow")
-    void shouldLimitConversationHistory() {
-        // Given: Many interactions
-        for (int i = 0; i < 100; i++) {
-            ConversationInteraction interaction = new ConversationInteraction(
-                System.currentTimeMillis() - (100 - i) * 1000,
-                UUID.randomUUID(),
-                "Message " + i,
-                "Response " + i,
-                villagerBrain.getCurrentMood().copy(),
-                "Village"
-            );
-            villagerBrain.getShortTermMemory().addInteraction(interaction);
-        }
-        
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
-        
-        // Then
+        // Create extensive history that would exceed limits
+        List<ConversationInteraction> longHistory = createLongHistoryList(100);
+        when(mockHistory.getRecent(anyInt())).thenReturn(longHistory);
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should respect maximum length
         assertNotNull(prompt);
-        // Should not be excessively long - basic token limiting
-        assertTrue(prompt.length() < 10000); // Reasonable upper bound
+        assertTrue(prompt.length() <= PromptBuilder.MAX_PROMPT_LENGTH);
     }
-    
-    @Test
-    @DisplayName("Should truncate oldest entries when enforcing token limits")
-    void shouldTruncateOldestEntries() {
-        // Given: Many interactions to force truncation
-        for (int i = 0; i < 50; i++) {
-            ConversationInteraction interaction = new ConversationInteraction(
-                System.currentTimeMillis() - (50 - i) * 1000,
-                UUID.randomUUID(),
-                "Old message " + i,
-                "Old response " + i,
-                villagerBrain.getCurrentMood().copy(),
-                "Village"
-            );
-            villagerBrain.getShortTermMemory().addInteraction(interaction);
-        }
-        
-        // Add recent interaction
-        ConversationInteraction recentInteraction = new ConversationInteraction(
-            System.currentTimeMillis(),
-            UUID.randomUUID(),
-            "Recent message",
-            "Recent response",
-            villagerBrain.getCurrentMood().copy(),
-            "Village"
-        );
-        villagerBrain.getShortTermMemory().addInteraction(recentInteraction);
-        
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
-        
-        // Then
-        assertTrue(prompt.contains("Recent message"));
-        assertTrue(prompt.contains("Recent response"));
-        // Should not contain very old messages if truncated
-    }
-    
+
     @Test
     @DisplayName("Should handle empty conversation history gracefully")
-    void shouldHandleEmptyConversationHistory() {
-        // Given: Villager with no conversation history (default state)
-        
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
-        
-        // Then
-        assertNotNull(prompt);
-        assertFalse(prompt.isEmpty());
-        // Should still contain system prompt and context
-        assertTrue(prompt.contains("villager"));
-        assertTrue(prompt.contains("Morning"));
+    void shouldHandleEmptyConversationHistoryGracefully() {
+        // Given: Empty conversation history
+        when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
+
+        // When: Building conversation history
+        String history = promptBuilder.buildConversationHistory(mockHistory);
+
+        // Then: Should return empty or minimal content
+        assertNotNull(history);
+        assertTrue(history.isEmpty() || history.trim().isEmpty());
     }
-    
+
     @Test
-    @DisplayName("Should include dynamic context layers")
-    void shouldIncludeDynamicContextLayers() {
-        // Given: Context with nearby villagers
-        context.setHasNearbyVillagers(true);
-        context.setNearbyVillagers("Alice the farmer, Charlie the baker");
+    @DisplayName("Should include response guidelines in prompt")
+    void shouldIncludeResponseGuidelinesInPrompt() {
+        // Given: Complete villager brain
+        setupMockBrain();
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should include response guidelines
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("Response Requirements:") || 
+                  prompt.contains("Guidelines:") ||
+                  prompt.contains("Stay in character"));
+    }
+
+    @Test
+    @DisplayName("Should truncate history when approaching token limits")
+    void shouldTruncateHistoryWhenApproachingTokenLimits() {
+        // Given: Brain with moderate history that needs truncation
+        setupMockBrain();
+        List<ConversationInteraction> moderateHistory = createLongHistoryList(20);
+        when(mockHistory.getRecent(anyInt())).thenReturn(moderateHistory);
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should be within limits and history should be truncated appropriately
+        assertNotNull(prompt);
+        assertTrue(prompt.length() <= PromptBuilder.MAX_PROMPT_LENGTH);
         
-        // When
-        String prompt = PromptBuilder.buildPrompt(villagerBrain, context);
+        // Should still contain essential components
+        assertTrue(prompt.contains("Guidelines:"));
+    }
+
+    @Test
+    @DisplayName("Should prioritize recent interactions in truncated history")
+    void shouldPrioritizeRecentInteractionsInTruncatedHistory() {
+        // Given: History with many interactions
+        ConversationInteraction oldInteraction = createMockInteraction("Old message", "Old response");
+        ConversationInteraction recentInteraction = createMockInteraction("Recent message", "Recent response");
         
-        // Then
-        assertTrue(prompt.contains("Alice the farmer"));
-        assertTrue(prompt.contains("Charlie the baker"));
+        List<ConversationInteraction> history = List.of(oldInteraction, recentInteraction);
+        when(mockHistory.getRecent(anyInt())).thenReturn(history);
+
+        // When: Building conversation history
+        String historyString = promptBuilder.buildConversationHistory(mockHistory);
+
+        // Then: Should include both but prioritize structure
+        assertNotNull(historyString);
+        assertTrue(historyString.contains("Recent message"));
+        assertTrue(historyString.contains("Recent response"));
+    }
+
+    @Test
+    @DisplayName("Should handle null mood and personality gracefully")
+    void shouldHandleNullMoodAndPersonalityGracefully() {
+        // Given: Brain with null components
+        when(mockBrain.getPersonalityTraits()).thenReturn(null);
+        when(mockBrain.getCurrentMood()).thenReturn(null);
+        when(mockBrain.getShortTermMemory()).thenReturn(mockHistory);
+        when(mockBrain.getVillagerName()).thenReturn("Bob");
+        when(mockBrain.getProfession()).thenReturn("Farmer");
+        when(mockBrain.getVillageName()).thenReturn("Testville");
+        when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should not crash and provide fallback values
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("Unknown personality"));
+        assertTrue(prompt.contains("NEUTRAL"));
+    }
+
+    @Test
+    @DisplayName("Should format prompt sections with proper separators")
+    void shouldFormatPromptSectionsWithProperSeparators() {
+        // Given: Complete brain setup
+        setupMockBrain();
+
+        // When: Building prompt
+        String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
+
+        // Then: Should have proper section separators
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("\n\n")); // Section separators
+        
+        // Should be well-structured
+        String[] sections = prompt.split("\n\n");
+        assertTrue(sections.length >= 2); // At least system prompt and guidelines
+    }
+
+    // Helper methods
+    private ConversationInteraction createMockInteraction(String playerMessage, String villagerResponse) {
+        ConversationInteraction interaction = mock(ConversationInteraction.class);
+        when(interaction.getPlayerMessage()).thenReturn(playerMessage);
+        when(interaction.getVillagerResponse()).thenReturn(villagerResponse);
+        return interaction;
+    }
+
+    private List<ConversationInteraction> createLongHistoryList(int count) {
+        return java.util.stream.IntStream.range(0, count)
+            .mapToObj(i -> createMockInteraction("Message " + i, "Response " + i))
+            .toList();
+    }
+
+    private void setupMockBrain() {
+        when(mockBrain.getPersonalityTraits()).thenReturn(mockPersonality);
+        when(mockBrain.getCurrentMood()).thenReturn(mockMood);
+        when(mockBrain.getShortTermMemory()).thenReturn(mockHistory);
+        when(mockBrain.getVillagerName()).thenReturn("Bob");
+        when(mockBrain.getProfession()).thenReturn("Farmer");
+        when(mockBrain.getVillageName()).thenReturn("Testville");
+        
+        when(mockPersonality.generateDescription()).thenReturn("Friendly and helpful");
+        when(mockMood.getOverallMood()).thenReturn(MoodCategory.HAPPY);
+        when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
     }
 }

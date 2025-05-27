@@ -91,15 +91,26 @@ class ChatEventHandlerEnhancedTest {
     @Test
     @DisplayName("Should handle async conversation routing")
     void shouldHandleAsyncConversationRouting() {
-        when(chatEvent.getMessage()).thenReturn("hello villager");
+        // Given: Chat event with AI trigger message and nearby villagers
+        String triggerMessage = "hello villager";
+        BlockPos playerPos = new BlockPos(0, 64, 0);
+        BlockPos villagerPos = new BlockPos(5, 64, 0);
+        List<VillagerEntity> nearbyVillagers = List.of(villager);
         
+        when(chatEvent.getMessage()).thenReturn(triggerMessage);
+        when(chatEvent.getPlayer()).thenReturn(player);
+        when(player.getBlockPos()).thenReturn(playerPos);
+        when(villager.getBlockPos()).thenReturn(villagerPos);
+        when(proximityDetector.findNearbyVillagers(playerPos, ChatEventHandler.CHAT_RADIUS))
+            .thenReturn(nearbyVillagers);
+        
+        // When: Processing chat event
         chatEventHandler.onServerChatEvent(chatEvent);
         
-        // Verify that the conversation router is set up for async call
+        // Then: Verify that the conversation router is called for async routing
         verify(chatEvent).getPlayer();
         verify(chatEvent).getMessage();
-        verify(chatEvent).getTimestamp();
-        verify(chatEvent).getWorld();
+        verify(conversationRouter).routeMessage(player, villager, triggerMessage);
     }
 
     @Test
@@ -168,9 +179,17 @@ class ChatEventHandlerEnhancedTest {
     @Test
     @DisplayName("Should handle question patterns")
     void shouldHandleQuestionPatterns() {
+        // Test question mark pattern (\\?$)
         assertTrue(chatEventHandler.shouldTriggerAI("What time is it?"));
-        assertTrue(chatEventHandler.shouldTriggerAI("Can you help me?"));
         assertTrue(chatEventHandler.shouldTriggerAI("How are you?"));
-        assertFalse(chatEventHandler.shouldTriggerAI("This is a statement."));
+        assertTrue(chatEventHandler.shouldTriggerAI("Where?"));
+        
+        // Test help pattern
+        assertTrue(chatEventHandler.shouldTriggerAI("Can you help me?"));
+        assertTrue(chatEventHandler.shouldTriggerAI("I need help"));
+        
+        // Should not trigger for statements without question patterns
+        assertFalse(chatEventHandler.shouldTriggerAI("This is a statement"));
+        assertFalse(chatEventHandler.shouldTriggerAI("Just talking"));
     }
 }

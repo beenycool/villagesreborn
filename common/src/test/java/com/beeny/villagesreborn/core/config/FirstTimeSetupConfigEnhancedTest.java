@@ -11,8 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Enhanced unit tests for FirstTimeSetupConfig
@@ -24,19 +23,31 @@ class FirstTimeSetupConfigEnhancedTest {
     Path tempDir;
     
     private Path configFile;
+    private ConfigPathResolver originalResolver;
     
     @BeforeEach
     void setUp() {
         configFile = tempDir.resolve("villagesreborn_setup.properties");
+        
+        // Setup test config path resolver
+        originalResolver = new ConfigPathResolver();
+        TestConfigPathProvider testProvider = new TestConfigPathProvider(tempDir);
+        java.util.List<ConfigPathStrategy> providers = new java.util.ArrayList<>();
+        providers.add(testProvider);
+        ConfigPathResolver testResolver = new ConfigPathResolver(providers);
+        FirstTimeSetupConfig.setConfigPathResolver(testResolver);
     }
     
     @AfterEach
     void tearDown() {
+        // Restore original resolver
+        FirstTimeSetupConfig.setConfigPathResolver(originalResolver);
+        
         // Clean up any test files
         try {
             Files.deleteIfExists(configFile);
-            Files.deleteIfExists(Path.of(configFile + ".backup"));
-            Files.deleteIfExists(Path.of(configFile + ".tmp"));
+            Files.deleteIfExists(configFile.resolveSibling(configFile.getFileName() + ".backup"));
+            Files.deleteIfExists(configFile.resolveSibling(configFile.getFileName() + ".tmp"));
         } catch (IOException e) {
             // Ignore cleanup errors
         }
@@ -52,11 +63,11 @@ class FirstTimeSetupConfigEnhancedTest {
         
         // THEN: Configuration can be loaded and values match
         FirstTimeSetupConfig loaded = FirstTimeSetupConfig.load();
-        assertThat(loaded.isSetupCompleted()).isTrue();
-        assertThat(loaded.getSelectedProvider()).isEqualTo(LLMProvider.OPENAI);
-        assertThat(loaded.getSelectedModel()).isEqualTo("gpt-3.5-turbo");
-        assertThat(loaded.isHardwareDetectionCompleted()).isTrue();
-        assertThat(loaded.getConfigVersion()).isEqualTo(3);
+        assertTrue(loaded.isSetupCompleted());
+        assertEquals(LLMProvider.OPENAI, loaded.getSelectedProvider());
+        assertEquals("gpt-3.5-turbo", loaded.getSelectedModel());
+        assertTrue(loaded.isHardwareDetectionCompleted());
+        assertEquals(3, loaded.getConfigVersion());
     }
     
     @Test
@@ -69,8 +80,8 @@ class FirstTimeSetupConfigEnhancedTest {
         
         // THEN: Save succeeds and config is persisted
         FirstTimeSetupConfig loaded = FirstTimeSetupConfig.load();
-        assertThat(loaded.getSelectedProvider()).isEqualTo(LLMProvider.ANTHROPIC);
-        assertThat(loaded.getSelectedModel()).isEqualTo("claude-3-haiku");
+        assertEquals(LLMProvider.ANTHROPIC, loaded.getSelectedProvider());
+        assertEquals("claude-3-haiku", loaded.getSelectedModel());
     }
     
     @Test
@@ -82,9 +93,9 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.loadWithMigration();
         
         // THEN: Config is migrated to current version
-        assertThat(config.getConfigVersion()).isEqualTo(3);
-        assertThat(config.isSetupCompleted()).isTrue();
-        assertThat(config.getSetupTimestamp()).isGreaterThan(0); // Added in migration
+        assertEquals(3, config.getConfigVersion());
+        assertTrue(config.isSetupCompleted());
+        assertTrue(config.getSetupTimestamp() > 0); // Added in migration
     }
     
     @Test
@@ -96,8 +107,8 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.loadWithMigration();
         
         // THEN: Config is migrated to current version
-        assertThat(config.getConfigVersion()).isEqualTo(3);
-        assertThat(config.isHardwareDetectionCompleted()).isFalse(); // Added in v3 migration
+        assertEquals(3, config.getConfigVersion());
+        assertFalse(config.isHardwareDetectionCompleted()); // Added in v3 migration
     }
     
     @Test
@@ -106,10 +117,10 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.loadWithMigration();
         
         // THEN: Default config is returned
-        assertThat(config.isSetupCompleted()).isFalse();
-        assertThat(config.getSelectedProvider()).isNull();
-        assertThat(config.getSelectedModel()).isNull();
-        assertThat(config.getConfigVersion()).isEqualTo(3);
+        assertFalse(config.isSetupCompleted());
+        assertNull(config.getSelectedProvider());
+        assertNull(config.getSelectedModel());
+        assertEquals(3, config.getConfigVersion());
     }
     
     @Test
@@ -121,8 +132,8 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.loadWithMigration();
         
         // THEN: Default config is returned (graceful degradation)
-        assertThat(config.isSetupCompleted()).isFalse();
-        assertThat(config.getConfigVersion()).isEqualTo(3);
+        assertFalse(config.isSetupCompleted());
+        assertEquals(3, config.getConfigVersion());
     }
     
     @Test
@@ -134,11 +145,11 @@ class FirstTimeSetupConfigEnhancedTest {
         config.completeSetup(LLMProvider.LOCAL, "llama2:7b");
         
         // THEN: All fields are properly set
-        assertThat(config.isSetupCompleted()).isTrue();
-        assertThat(config.getSelectedProvider()).isEqualTo(LLMProvider.LOCAL);
-        assertThat(config.getSelectedModel()).isEqualTo("llama2:7b");
-        assertThat(config.isHardwareDetectionCompleted()).isTrue();
-        assertThat(config.getSetupTimestamp()).isGreaterThan(0);
+        assertTrue(config.isSetupCompleted());
+        assertEquals(LLMProvider.LOCAL, config.getSelectedProvider());
+        assertEquals("llama2:7b", config.getSelectedModel());
+        assertTrue(config.isHardwareDetectionCompleted());
+        assertTrue(config.getSetupTimestamp() > 0);
     }
     
     @Test
@@ -148,9 +159,9 @@ class FirstTimeSetupConfigEnhancedTest {
         
         // WHEN: Setup is attempted with null provider
         // THEN: IllegalArgumentException is thrown
-        assertThatThrownBy(() -> config.completeSetup(null, "gpt-3.5-turbo"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Provider cannot be null");
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> config.completeSetup(null, "gpt-3.5-turbo"));
+        assertTrue(exception.getMessage().contains("Provider cannot be null"));
     }
     
     @Test
@@ -160,9 +171,9 @@ class FirstTimeSetupConfigEnhancedTest {
         
         // WHEN: Setup is attempted with null model
         // THEN: IllegalArgumentException is thrown
-        assertThatThrownBy(() -> config.completeSetup(LLMProvider.OPENAI, null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Model cannot be null or empty");
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> config.completeSetup(LLMProvider.OPENAI, null));
+        assertTrue(exception.getMessage().contains("Model cannot be null or empty"));
     }
     
     @Test
@@ -172,9 +183,9 @@ class FirstTimeSetupConfigEnhancedTest {
         
         // WHEN: Setup is attempted with empty model
         // THEN: IllegalArgumentException is thrown
-        assertThatThrownBy(() -> config.completeSetup(LLMProvider.OPENAI, ""))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Model cannot be null or empty");
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> config.completeSetup(LLMProvider.OPENAI, ""));
+        assertTrue(exception.getMessage().contains("Model cannot be null or empty"));
     }
     
     @Test
@@ -187,10 +198,10 @@ class FirstTimeSetupConfigEnhancedTest {
         config.reset();
         
         // THEN: All values are cleared
-        assertThat(config.isSetupCompleted()).isFalse();
-        assertThat(config.getSelectedProvider()).isNull();
-        assertThat(config.getSelectedModel()).isNull();
-        assertThat(config.isHardwareDetectionCompleted()).isFalse();
+        assertFalse(config.isSetupCompleted());
+        assertNull(config.getSelectedProvider());
+        assertNull(config.getSelectedModel());
+        assertFalse(config.isHardwareDetectionCompleted());
     }
     
     @Test
@@ -199,10 +210,10 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.create();
         
         // THEN: Default values are set
-        assertThat(config.isSetupCompleted()).isFalse();
-        assertThat(config.getSelectedProvider()).isNull();
-        assertThat(config.getSelectedModel()).isNull();
-        assertThat(config.getConfigVersion()).isEqualTo(3);
+        assertFalse(config.isSetupCompleted());
+        assertNull(config.getSelectedProvider());
+        assertNull(config.getSelectedModel());
+        assertEquals(3, config.getConfigVersion());
     }
     
     @Test
@@ -216,7 +227,7 @@ class FirstTimeSetupConfigEnhancedTest {
         long afterSetup = System.currentTimeMillis();
         
         // THEN: Timestamp is set within the expected range
-        assertThat(config.getSetupTimestamp()).isBetween(beforeSetup, afterSetup);
+        assertTrue(config.getSetupTimestamp() >= beforeSetup && config.getSetupTimestamp() <= afterSetup);
     }
     
     @Test
@@ -236,9 +247,9 @@ class FirstTimeSetupConfigEnhancedTest {
         FirstTimeSetupConfig config = FirstTimeSetupConfig.loadWithMigration();
         
         // THEN: Unknown provider is handled gracefully
-        assertThat(config.isSetupCompleted()).isTrue();
-        assertThat(config.getSelectedProvider()).isNull(); // Unknown provider becomes null
-        assertThat(config.getSelectedModel()).isEqualTo("some-model");
+        assertTrue(config.isSetupCompleted());
+        assertNull(config.getSelectedProvider()); // Unknown provider becomes null
+        assertEquals("some-model", config.getSelectedModel());
     }
     
     private void createOldVersionConfig(int version) throws IOException {

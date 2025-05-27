@@ -37,6 +37,11 @@ class LLMApiClientIntegrationTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        
+        // Ensure mocks are properly initialized
+        assertNotNull(mockHttpClient);
+        assertNotNull(mockHttpResponse);
+        
         apiClient = new LLMApiClientImpl(mockHttpClient);
         
         testRequest = ConversationRequest.builder()
@@ -70,8 +75,10 @@ class LLMApiClientIntegrationTest {
         
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn(successResponse);
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        
+        // Mock sendAsync instead of send for async operations
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating conversation response
         CompletableFuture<ConversationResponse> future = 
@@ -92,8 +99,8 @@ class LLMApiClientIntegrationTest {
         // Given: Valid API key response
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{\"object\":\"list\",\"data\":[]}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Validating API key
         CompletableFuture<Boolean> future = 
@@ -116,8 +123,8 @@ class LLMApiClientIntegrationTest {
             .thenReturn("{\"error\":{\"message\":\"Rate limit exceeded\"}}")
             .thenReturn("{\"choices\":[{\"message\":{\"content\":\"Success after retry\"}}],\"usage\":{\"total_tokens\":20}}");
         
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response with retry
         CompletableFuture<ConversationResponse> future = 
@@ -136,8 +143,8 @@ class LLMApiClientIntegrationTest {
     @DisplayName("Should handle timeout gracefully")
     void shouldHandleTimeoutGracefully() throws Exception {
         // Given: HTTP client that times out
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenThrow(new TimeoutException("Request timed out"));
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.failedFuture(new TimeoutException("Request timed out")));
 
         // When: Generating response with timeout
         CompletableFuture<ConversationResponse> future = 
@@ -157,8 +164,8 @@ class LLMApiClientIntegrationTest {
         // Given: HTTP error response
         when(mockHttpResponse.statusCode()).thenReturn(500);
         when(mockHttpResponse.body()).thenReturn("{\"error\":{\"message\":\"Internal server error\"}}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response
         CompletableFuture<ConversationResponse> future = 
@@ -186,8 +193,8 @@ class LLMApiClientIntegrationTest {
             .thenReturn("{\"error\":{\"message\":\"Rate limit\"}}")
             .thenReturn("{\"choices\":[{\"message\":{\"content\":\"Final success\"}}],\"usage\":{\"total_tokens\":30}}");
         
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response with retries
         long startTime = System.currentTimeMillis();
@@ -213,8 +220,8 @@ class LLMApiClientIntegrationTest {
         // Given: Continuous failures
         when(mockHttpResponse.statusCode()).thenReturn(429);
         when(mockHttpResponse.body()).thenReturn("{\"error\":{\"message\":\"Rate limit exceeded\"}}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response with limited retries
         CompletableFuture<ConversationResponse> future = 
@@ -244,8 +251,8 @@ class LLMApiClientIntegrationTest {
 
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{\"choices\":[{\"message\":{\"content\":\"Response\"}}],\"usage\":{\"total_tokens\":25}}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response
         apiClient.generateConversationResponse(openAIRequest).get();
@@ -271,8 +278,8 @@ class LLMApiClientIntegrationTest {
         // Given: Malformed JSON response
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{ invalid json structure");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Generating response
         CompletableFuture<ConversationResponse> future = 
@@ -292,8 +299,8 @@ class LLMApiClientIntegrationTest {
         // Given: Successful responses
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{\"choices\":[{\"message\":{\"content\":\"Response\"}}],\"usage\":{\"total_tokens\":20}}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Making multiple rapid requests
         long startTime = System.currentTimeMillis();
@@ -326,8 +333,8 @@ class LLMApiClientIntegrationTest {
 
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{\"choices\":[{\"message\":{\"content\":\"Response\"}}]}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenReturn(mockHttpResponse);
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.completedFuture(mockHttpResponse));
 
         // When: Making requests to different providers
         apiClient.generateConversationResponse(anthropicRequest).get();
@@ -345,8 +352,8 @@ class LLMApiClientIntegrationTest {
     @DisplayName("Should handle network connectivity issues")
     void shouldHandleNetworkConnectivityIssues() throws Exception {
         // Given: Network connectivity error
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-            .thenThrow(new RuntimeException("Connection refused"));
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+            .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Connection refused")));
 
         // When: Generating response
         CompletableFuture<ConversationResponse> future = 
@@ -366,10 +373,17 @@ class LLMApiClientIntegrationTest {
         // Given: Successful response with known delay
         when(mockHttpResponse.statusCode()).thenReturn(200);
         when(mockHttpResponse.body()).thenReturn("{\"choices\":[{\"message\":{\"content\":\"Response\"}}],\"usage\":{\"total_tokens\":15}}");
-        when(mockHttpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        when(mockHttpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
             .thenAnswer(invocation -> {
-                Thread.sleep(100); // Simulate 100ms delay
-                return mockHttpResponse;
+                return CompletableFuture.supplyAsync(() -> {
+                    try {
+                        Thread.sleep(100); // Simulate 100ms delay
+                        return mockHttpResponse;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                });
             });
 
         // When: Generating response

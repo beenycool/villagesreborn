@@ -3,46 +3,60 @@ package com.beeny.villagesreborn.core.combat;
 import com.beeny.villagesreborn.core.ai.RelationshipData;
 
 /**
- * Minimal HagglingEngine implementation for price calculation with relationship and reputation modifiers
+ * Engine for calculating prices during trade negotiations
+ * Factors in relationship, reputation, and haggling dynamics
  */
 public class HagglingEngine {
     
-    public HagglingEngine() {}
+    private static final double MIN_PRICE_FLOOR = 0.1; // 10% minimum price
+    private static final double MAX_PRICE_CEILING = 2.0; // 200% maximum price
+    private static final double TRUST_MODIFIER_WEIGHT = 0.3;
+    private static final double FRIENDSHIP_MODIFIER_WEIGHT = 0.2;
+    private static final double REPUTATION_MODIFIER_WEIGHT = 0.25;
     
+    /**
+     * Calculates the final price based on relationship and reputation modifiers
+     */
     public double calculatePrice(double basePrice, RelationshipData relationship, ReputationData reputation) {
+        if (basePrice <= 0) {
+            throw new IllegalArgumentException("Base price must be positive");
+        }
+        
         double modifier = 1.0;
         
-        // Trust modifier: 0.0 is neutral, positive reduces price, negative increases price
-        float trustLevel = relationship.getTrustLevel();
-        modifier -= trustLevel * 0.3; // Max 30% reduction/increase from trust
+        // Apply trust modifier (negative trust increases price, positive decreases)
+        if (relationship != null) {
+            modifier -= relationship.getTrustLevel() * TRUST_MODIFIER_WEIGHT;
+            modifier -= relationship.getFriendshipLevel() * FRIENDSHIP_MODIFIER_WEIGHT;
+        }
         
-        // Friendship modifier: 0.0 is neutral, positive reduces price, negative increases price
-        float friendshipLevel = relationship.getFriendshipLevel();
-        modifier -= friendshipLevel * 0.2; // Max 20% reduction/increase from friendship
+        // Apply reputation modifier (positive reputation decreases price)
+        if (reputation != null) {
+            modifier -= reputation.getReputation() * REPUTATION_MODIFIER_WEIGHT;
+        }
         
-        // Reputation modifier: 0.0 is neutral, positive reduces price, negative increases price
-        float reputationLevel = reputation.getReputationLevel();
-        modifier -= reputationLevel * 0.1; // Max 10% reduction from reputation
+        double finalPrice = basePrice * modifier;
         
-        double calculatedPrice = basePrice * modifier;
+        // Apply floor and ceiling constraints
+        finalPrice = Math.max(finalPrice, basePrice * MIN_PRICE_FLOOR);
+        finalPrice = Math.min(finalPrice, basePrice * MAX_PRICE_CEILING);
         
-        // Enforce floor: minimum 10% of base price
-        calculatedPrice = Math.max(calculatedPrice, basePrice * 0.1);
-        
-        // Enforce ceiling: maximum 200% of base price
-        calculatedPrice = Math.min(calculatedPrice, basePrice * 2.0);
-        
-        return calculatedPrice;
+        return finalPrice;
     }
     
+    /**
+     * Updates relationship rapport after a negotiation round
+     */
     public void updateRapportAfterRound(RelationshipData relationship, boolean successful) {
+        if (relationship == null) return;
+        
         if (successful) {
+            // Improve trust and friendship slightly on successful negotiation
             relationship.adjustTrust(0.05f);
-            relationship.adjustFriendship(0.02f);
+            relationship.adjustFriendship(0.03f);
         } else {
+            // Decrease trust slightly on failed negotiation
             relationship.adjustTrust(-0.03f);
-            relationship.adjustFriendship(-0.01f);
         }
-        relationship.incrementInteractionCount();
     }
 }

@@ -19,7 +19,7 @@ public class FirstTimeSetupConfig {
     private static final String SETUP_CONFIG_FILE = "villagesreborn_setup.properties";
     private static final int CURRENT_CONFIG_VERSION = 3;
     
-    private static final ConfigPathResolver configPathResolver = new ConfigPathResolver();
+    private static ConfigPathResolver configPathResolver = new ConfigPathResolver();
     
     private boolean setupCompleted;
     private LLMProvider selectedProvider;
@@ -49,8 +49,7 @@ public class FirstTimeSetupConfig {
     
     // Package-private method for testing with custom resolver
     static void setConfigPathResolver(ConfigPathResolver resolver) {
-        // This would require making configPathResolver non-final, but for now we'll keep it simple
-        // Tests can use reflection or we can add this later if needed
+        configPathResolver = resolver;
     }
     
     /**

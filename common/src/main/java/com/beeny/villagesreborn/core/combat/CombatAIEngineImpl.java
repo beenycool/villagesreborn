@@ -23,7 +23,7 @@ public class CombatAIEngineImpl implements CombatAIEngine {
     private static final Logger LOGGER = LoggerFactory.getLogger(CombatAIEngineImpl.class);
     
     private final LLMApiClient llmClient;
-    private final CombatDecisionEngine fallbackEngine;
+    // No fallback engine needed - use internal logic
     
     // Patterns for parsing AI responses
     private static final Pattern ACTION_PATTERN = Pattern.compile("(?i)decide:\\s*(ATTACK|DEFEND|FLEE|NEGOTIATE)");
@@ -33,7 +33,6 @@ public class CombatAIEngineImpl implements CombatAIEngine {
     
     public CombatAIEngineImpl(LLMApiClient llmClient) {
         this.llmClient = llmClient;
-        this.fallbackEngine = new CombatDecisionEngine();
     }
     
     @Override
@@ -98,13 +97,15 @@ public class CombatAIEngineImpl implements CombatAIEngine {
         
         // Default attack decision
         LivingEntity firstEnemy = situation.getEnemies().get(0);
-        return new CombatDecision(
+        CombatDecision decision = new CombatDecision(
             CombatDecision.CombatAction.ATTACK,
             List.of(firstEnemy.getUUID()),
             null,
             "Rule-based attack decision",
             0.5f
         );
+        // Mark as fallback by using the fallback constructor
+        return new CombatDecision(CombatDecision.CombatAction.ATTACK, List.of(firstEnemy.getUUID()), null);
     }
     
     @Override
