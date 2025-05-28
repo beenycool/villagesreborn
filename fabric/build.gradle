@@ -52,14 +52,6 @@ processResources {
 test {
 	useJUnitPlatform()
 	finalizedBy jacocoTestReport
-	
-	// Skip problematic tests for now to make build pass
-	exclude '**/WelcomeScreenHandlerIntegrationTest.class'
-	exclude '**/WelcomeScreenTest.class'
-	exclude '**/SpawnBiomeStorageIntegrationTest.class'
-	exclude '**/SpawnBiomeStorageManagerTest.class'
-	exclude '**/WorldSpawnBiomeStorageTest.class'
-	exclude '**/SpawnBiomeNBTHandlerTest.class'
 }
 
 jacocoTestReport {

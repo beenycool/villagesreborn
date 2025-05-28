@@ -252,7 +252,11 @@ public class WelcomeScreen extends Screen {
     
     private void updateUIValidationState() {
         boolean isValid = validationErrors.isEmpty();
-        saveButton.active = isValid;
+        
+        // Only update UI components if they've been initialized (not in tests)
+        if (saveButton != null) {
+            saveButton.active = isValid;
+        }
         
         if (!isValid) {
             LOGGER.debug("Validation errors: {}", validationErrors);
@@ -320,7 +324,7 @@ public class WelcomeScreen extends Screen {
     }
     
     public ButtonWidget getContinueButton() {
-        return saveButton;
+        return saveButton; // May be null in tests - that's expected
     }
     
     public HardwareInfo getHardwareInfo() {

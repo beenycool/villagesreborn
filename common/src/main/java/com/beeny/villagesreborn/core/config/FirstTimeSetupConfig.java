@@ -127,7 +127,7 @@ public class FirstTimeSetupConfig {
                 props.store(Files.newOutputStream(tempPath), "Villages Reborn First-Time Setup Configuration");
                 
                 // Atomic move to final location
-                Files.move(tempPath, configPath);
+                Files.move(tempPath, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 
                 LOGGER.info("Saved setup configuration to {} (attempt {})", configPath, attempt);
                 return; // Success
@@ -215,7 +215,7 @@ public class FirstTimeSetupConfig {
     private void createConfigBackup(Path configPath) {
         try {
             Path backupPath = Paths.get(configPath.toString() + ".backup");
-            Files.copy(configPath, backupPath);
+            Files.copy(configPath, backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             LOGGER.debug("Created config backup at {}", backupPath);
         } catch (IOException e) {
             LOGGER.warn("Failed to create config backup", e);
@@ -226,7 +226,7 @@ public class FirstTimeSetupConfig {
         try {
             Path backupPath = Paths.get(configPath.toString() + ".backup");
             if (Files.exists(backupPath)) {
-                Files.copy(backupPath, configPath);
+                Files.copy(backupPath, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 LOGGER.info("Restored config from backup");
             }
         } catch (IOException e) {

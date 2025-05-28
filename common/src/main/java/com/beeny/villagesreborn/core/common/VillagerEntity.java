@@ -30,4 +30,10 @@ public interface VillagerEntity {
      * @return the display name
      */
     String getName();
+    
+    /**
+     * Gets the persistent NBT data for this villager
+     * @return the NBT compound containing persistent data
+     */
+    NBTCompound getPersistentData();
 }
