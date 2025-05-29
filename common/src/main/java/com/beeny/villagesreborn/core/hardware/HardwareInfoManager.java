@@ -141,7 +141,7 @@ public class HardwareInfoManager {
                 // Validate minimum requirements
                 validateMinimumRequirements(info);
                 
-                LOGGER.info("Hardware detected: {} (Performance Score: {:.1f})", info, performanceScore);
+                LOGGER.info("Hardware detected: {} (Performance Score: {})", info, performanceScore);
                 return info;
                 
             } catch (Exception e) {
