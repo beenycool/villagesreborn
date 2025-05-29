@@ -27,6 +27,7 @@ dependencies {
 	testImplementation 'org.assertj:assertj-core:3.24.2'
 	testImplementation 'org.mockito:mockito-core:5.6.0'
 	testImplementation 'org.mockito:mockito-junit-jupiter:5.6.0'
+	testImplementation gradleTestKit()
 	testRuntimeOnly 'ch.qos.logback:logback-classic:1.4.11'
 }
 
@@ -36,7 +37,6 @@ test {
 	
 	// Skip problematic tests for now to make build pass
 	exclude '**/ResponseDeliveryManagerTest.class'  // Still has verification issues
-	exclude '**/TestMetaTest.class'
 	exclude '**/HardwareInfoManagerEnhancedTest.class'
 	exclude '**/HardwareInfoManagerTest.class'
 	exclude '**/LLMApiClientIntegrationTest.class'

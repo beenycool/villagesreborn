@@ -37,4 +37,13 @@ public class Player {
     public void setPosition(BlockPos position) {
         this.position = position;
     }
+    
+    /**
+     * Sends a message to the player
+     * Platform implementations should override this method
+     */
+    public void sendMessage(String message) {
+        // Default implementation - platform implementations should override
+        System.out.println("To " + name + ": " + message);
+    }
 }

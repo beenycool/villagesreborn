@@ -7,13 +7,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,8 +35,30 @@ public class TestMetaTest {
         "fabric:test"
     );
     
+    private static File PROJECT_DIR;
+    
+    private static File findProjectRoot() {
+        try {
+            File current = new File(System.getProperty("user.dir"));
+            while (current != null) {
+                if (new File(current, "gradlew").exists() || new File(current, "gradlew.bat").exists()) {
+                    return current;
+                }
+                current = current.getParentFile();
+            }
+            // Fallback to current directory if gradle wrapper not found
+            return new File(System.getProperty("user.dir"));
+        } catch (Exception e) {
+            // Fallback to current directory
+            return new File(System.getProperty("user.dir"));
+        }
+    }
+    
     @BeforeAll
     static void setupTestEnvironment() {
+        // Initialize project directory
+        PROJECT_DIR = findProjectRoot();
+        
         // Setup logging for test debugging
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
         System.setProperty("villagesreborn.test.mode", "true");
@@ -158,6 +186,97 @@ public class TestMetaTest {
     }
     
     /**
+     * Executes all test suites using Gradle and collects execution metrics.
+     * Replaces the static TEST_SUITES approach with dynamic execution.
+     * DISABLED: This test causes circular dependency during build.
+     */
+    @Test
+    @org.junit.jupiter.api.Disabled("Disabled to prevent circular test execution during build")
+    void executeTestSuitesWithMetrics() {
+        List<TestSuiteResult> results = new ArrayList<>();
+        
+        for (String suite : TEST_SUITES) {
+            TestSuiteResult result = executeTestSuite(suite);
+            results.add(result);
+        }
+        
+        // Assert that all test suites passed (zero failures)
+        for (TestSuiteResult result : results) {
+            assertEquals(0, result.failures,
+                String.format("Test suite '%s' had %d failures. Output: %s",
+                    result.suiteName, result.failures, result.output));
+        }
+        
+        // Log execution metrics
+        long totalDuration = results.stream().mapToLong(r -> r.duration).sum();
+        int totalTests = results.stream().mapToInt(r -> r.testCount).sum();
+        
+        System.out.printf("Test suite execution summary:%n");
+        System.out.printf("Total test suites: %d%n", results.size());
+        System.out.printf("Total tests executed: %d%n", totalTests);
+        System.out.printf("Total execution time: %d ms%n", totalDuration);
+        
+        for (TestSuiteResult result : results) {
+            System.out.printf("Suite '%s': %d tests, %d failures, %d ms%n",
+                result.suiteName, result.testCount, result.failures, result.duration);
+        }
+    }
+    
+    private TestSuiteResult executeTestSuite(String suiteName) {
+        Instant start = Instant.now();
+        
+        try {
+            String gradleCommand = System.getProperty("os.name").toLowerCase().contains("windows")
+                ? "gradlew.bat" : "./gradlew";
+                
+            ProcessBuilder pb = new ProcessBuilder(gradleCommand, suiteName, "--quiet");
+            pb.directory(PROJECT_DIR);
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            boolean success = process.waitFor(300, TimeUnit.SECONDS) && process.exitValue() == 0;
+            long duration = Duration.between(start, Instant.now()).toMillis();
+            
+            return parseTestResults(suiteName, output.toString(), duration, success);
+            
+        } catch (Exception e) {
+            long duration = Duration.between(start, Instant.now()).toMillis();
+            return new TestSuiteResult(suiteName, 0, 1, duration,
+                "Exception during test execution: " + e.getMessage());
+        }
+    }
+    
+    private TestSuiteResult parseTestResults(String suiteName, String output, long duration, boolean success) {
+        int testCount = 0;
+        int failures = success ? 0 : 1;
+        
+        // Parse test output for test counts and failures
+        Pattern testPattern = Pattern.compile("(\\d+) tests? completed");
+        Pattern failurePattern = Pattern.compile("(\\d+) failures?");
+        
+        Matcher testMatcher = testPattern.matcher(output);
+        if (testMatcher.find()) {
+            testCount = Integer.parseInt(testMatcher.group(1));
+        }
+        
+        Matcher failureMatcher = failurePattern.matcher(output);
+        if (failureMatcher.find()) {
+            failures = Integer.parseInt(failureMatcher.group(1));
+        }
+        
+        return new TestSuiteResult(suiteName, testCount, failures, duration, output);
+    }
+    
+    /**
      * Validates that the CI environment can execute basic operations
      */
     @Test
@@ -178,5 +297,24 @@ public class TestMetaTest {
             assertTrue(Files.exists(tempDir));
             Files.deleteIfExists(tempDir);
         }, "CI should be able to create temporary directories");
+    }
+    
+    /**
+     * Data class to hold test suite execution results
+     */
+    private static class TestSuiteResult {
+        final String suiteName;
+        final int testCount;
+        final int failures;
+        final long duration;
+        final String output;
+        
+        TestSuiteResult(String suiteName, int testCount, int failures, long duration, String output) {
+            this.suiteName = suiteName;
+            this.testCount = testCount;
+            this.failures = failures;
+            this.duration = duration;
+            this.output = output;
+        }
     }
 }

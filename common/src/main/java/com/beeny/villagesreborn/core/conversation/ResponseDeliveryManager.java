@@ -75,9 +75,14 @@ public class ResponseDeliveryManager {
      * In a real implementation, this would use the appropriate chat/UI system
      */
     private void sendToPlayer(Player player, String message) {
-        // TODO: Implement actual message delivery via Minecraft chat system
-        // For now, just log to console for testing
-        System.out.println("To " + player.getName() + ": " + message);
+        // Use the platform-agnostic sendMessage method
+        try {
+            player.sendMessage(message);
+        } catch (Exception e) {
+            // Fallback to console logging if platform implementation fails
+            System.err.println("Failed to send message to " + player.getName() + ": " + e.getMessage());
+            System.out.println("To " + player.getName() + ": " + message);
+        }
     }
     
     /**

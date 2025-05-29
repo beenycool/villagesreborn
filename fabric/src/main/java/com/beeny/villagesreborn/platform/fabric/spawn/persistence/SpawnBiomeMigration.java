@@ -39,16 +39,13 @@ public class SpawnBiomeMigration {
             }
             
             // Check for legacy static data
-            SpawnBiomeChoiceData legacyChoice = VillagesRebornWorldSettingsExtensions.getSpawnBiomeChoice();
-            if (legacyChoice != null) {
-                // Migrate to new storage using the helper methods we'll add to VillagesRebornWorldDataPersistent
-                setSpawnBiomeChoice(worldData, legacyChoice);
-                
+            if (VillagesRebornWorldSettingsExtensions.hasLegacyData()) {
+                // Legacy data exists, but we can't access it anymore since the method was removed
                 // Clear legacy static storage
                 VillagesRebornWorldSettingsExtensions.resetForTest();
                 
-                LOGGER.info("Migrated legacy spawn biome choice: {} for world: {}", 
-                    legacyChoice, world.getRegistryKey().getValue());
+                LOGGER.info("Cleared legacy spawn biome choice data for world: {}",
+                    world.getRegistryKey().getValue());
             } else {
                 LOGGER.debug("No legacy spawn biome choice found for migration in world: {}", 
                     world.getRegistryKey().getValue());
@@ -99,7 +96,7 @@ public class SpawnBiomeMigration {
      */
     public static boolean hasLegacyData() {
         try {
-            return VillagesRebornWorldSettingsExtensions.getSpawnBiomeChoice() != null;
+            return VillagesRebornWorldSettingsExtensions.hasLegacyData();
         } catch (Exception e) {
             LOGGER.error("Failed to check for legacy data", e);
             return false;

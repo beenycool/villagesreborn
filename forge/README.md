@@ -1,6 +1,8 @@
-# Forge Compatibility Module
+# Forge Compatibility Module - v1.0.0
 
 This module will provide Forge compatibility for Villages Reborn in future releases.
+
+**Current Status**: Planned for v1.1.0 (Q3 2025)
 
 ## Planned Features
 

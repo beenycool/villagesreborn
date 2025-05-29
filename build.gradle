@@ -78,6 +78,12 @@ tasks.register('testReport', JacocoReport) {
 	}
 }
 
+// Test counting and README update task using custom plugin
+tasks.register('countTestClasses', com.beeny.villagesreborn.gradle.CountTestClassesTask) {
+	group = 'verification'
+	description = 'Counts test classes annotated with @Test and updates README.md'
+}
+
 // Clean task for all modules
 tasks.register('cleanAll') {
 	group = 'build'

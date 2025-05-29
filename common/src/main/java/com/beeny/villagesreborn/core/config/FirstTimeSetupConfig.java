@@ -214,7 +214,7 @@ public class FirstTimeSetupConfig {
 
     private void createConfigBackup(Path configPath) {
         try {
-            Path backupPath = Paths.get(configPath.toString() + ".backup");
+            Path backupPath = configPath.resolveSibling(configPath.getFileName() + ".backup");
             Files.copy(configPath, backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             LOGGER.debug("Created config backup at {}", backupPath);
         } catch (IOException e) {
@@ -224,7 +224,7 @@ public class FirstTimeSetupConfig {
 
     private void restoreConfigBackup(Path configPath) {
         try {
-            Path backupPath = Paths.get(configPath.toString() + ".backup");
+            Path backupPath = configPath.resolveSibling(configPath.getFileName() + ".backup");
             if (Files.exists(backupPath)) {
                 Files.copy(backupPath, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 LOGGER.info("Restored config from backup");

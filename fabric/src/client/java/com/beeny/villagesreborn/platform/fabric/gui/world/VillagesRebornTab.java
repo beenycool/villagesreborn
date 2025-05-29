@@ -23,12 +23,31 @@ import java.util.function.Consumer;
 public class VillagesRebornTab extends ScrollableWidget {
     private static final Logger LOGGER = LoggerFactory.getLogger(VillagesRebornTab.class);
     
-    // UI Constants
-    private static final int SECTION_SPACING = 25;
-    private static final int WIDGET_HEIGHT = 20;
-    private static final int WIDGET_WIDTH = 200;
-    private static final int SLIDER_WIDTH = 180;
-    private static final int LABEL_HEIGHT = 15;
+    // UI scaling helpers
+    private int getScaledSectionSpacing() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(20, 25 / guiScale * 2);
+    }
+    
+    private int getScaledWidgetHeight() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(16, 20 / guiScale * 2);
+    }
+    
+    private int getScaledWidgetWidth() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return Math.min(200, (int) Math.max(150, 200 / guiScale * 2));
+    }
+    
+    private int getScaledSliderWidth() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return Math.min(180, (int) Math.max(120, 180 / guiScale * 2));
+    }
+    
+    private int getScaledLabelHeight() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(12, 15 / guiScale * 2);
+    }
     
     // Configuration
     private VillagesRebornWorldSettings settings;
@@ -75,13 +94,13 @@ public class VillagesRebornTab extends ScrollableWidget {
         if (textRenderer != null) {
             var titleText = safeTranslatableFormatted("villagesreborn.world_creation.title", Formatting.GOLD, Formatting.BOLD);
             TextWidget titleWidget = new TextWidget(
-                0, yPos, WIDGET_WIDTH, LABEL_HEIGHT,
+                0, yPos, getScaledWidgetWidth(), getScaledLabelHeight(),
                 titleText,
                 textRenderer
             );
             allWidgets.add(titleWidget);
         }
-        yPos += LABEL_HEIGHT + 10;
+        yPos += getScaledLabelHeight() + 10;
         
         // Initialize sections
         this.aiSection = new VillagerAISection(settings, this::onSettingChanged);
@@ -102,7 +121,7 @@ public class VillagesRebornTab extends ScrollableWidget {
             ButtonWidget resetButton = ButtonWidget.builder(
                 resetText,
                 button -> resetToDefaults()
-            ).dimensions(0, yPos, WIDGET_WIDTH, WIDGET_HEIGHT).build();
+            ).dimensions(0, yPos, getScaledWidgetWidth(), getScaledWidgetHeight()).build();
             allWidgets.add(resetButton);
             configWidgets.add(resetButton);
         }
@@ -145,24 +164,24 @@ public class VillagesRebornTab extends ScrollableWidget {
             var sectionText = safeTranslatableFormatted("villagesreborn.world_creation.section." + titleKey.toLowerCase().replace(" ", "_"), Formatting.AQUA, Formatting.UNDERLINE);
             if (sectionText != null) {
                 TextWidget sectionHeader = new TextWidget(
-                    0, yPos, WIDGET_WIDTH, LABEL_HEIGHT,
+                    0, yPos, getScaledWidgetWidth(), getScaledLabelHeight(),
                     sectionText,
                     textRenderer
                 );
                 allWidgets.add(sectionHeader);
             }
         }
-        yPos += LABEL_HEIGHT + 5;
+        yPos += getScaledLabelHeight() + 5;
         
         // Section widgets
         for (ClickableWidget widget : section.getWidgets()) {
             widget.setY(yPos);
             allWidgets.add(widget);
             configWidgets.add(widget);
-            yPos += WIDGET_HEIGHT + 5;
+            yPos += getScaledWidgetHeight() + 5;
         }
         
-        return yPos + SECTION_SPACING;
+        return yPos + getScaledSectionSpacing();
     }
     
     /**
@@ -263,8 +282,8 @@ public class VillagesRebornTab extends ScrollableWidget {
     protected int getContentsHeightWithPadding() {
         // Calculate total height of all widgets plus spacing
         int totalHeight = 20; // Top padding
-        totalHeight += allWidgets.size() * (WIDGET_HEIGHT + 5); // Widgets with spacing
-        totalHeight += 4 * SECTION_SPACING; // Section spacing
+        totalHeight += allWidgets.size() * (getScaledWidgetHeight() + 5); // Widgets with spacing
+        totalHeight += 4 * getScaledSectionSpacing(); // Section spacing
         totalHeight += 50; // Bottom padding
         return totalHeight;
     }

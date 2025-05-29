@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.platform.fabric.gui.world;
 
 import com.beeny.villagesreborn.core.world.VillagesRebornWorldSettings;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
@@ -27,6 +28,17 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         super(settings, changeListener);
     }
     
+    // GUI scaling helpers
+    private int getScaledSliderWidth() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return Math.min(200, (int) Math.max(120, 200 / guiScale * 2));
+    }
+    
+    private int getScaledWidgetHeight() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(16, 20 / guiScale * 2);
+    }
+    
     @Override
     protected void createWidgets() {
         // Auto Expansion Toggle
@@ -34,7 +46,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
             safeTranslatable("villagesreborn.config.on"),
             safeTranslatable("villagesreborn.config.off")
         ).initially(settings.isAutoExpansionEnabled())
-         .build(0, 0, 200, 20,
+         .build(0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
                safeTranslatable("villagesreborn.config.expansion.auto_expansion"),
                (button, value) -> {
                    settings.setAutoExpansionEnabled(value);
@@ -44,7 +56,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         
         // Max Village Size Slider (10-100)
         this.maxVillageSizeSlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
             safeTranslatable("villagesreborn.config.expansion.max_village_size"),
             normalizeVillageSize(settings.getMaxVillageSize())
         ) {
@@ -65,7 +77,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         
         // Expansion Rate Slider (0.1-2.0)
         this.expansionRateSlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
             safeTranslatable("villagesreborn.config.expansion.expansion_rate"),
             normalizeExpansionRate(settings.getExpansionRate())
         ) {
@@ -90,7 +102,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
             safeTranslatable("villagesreborn.config.on"),
             safeTranslatable("villagesreborn.config.off")
         ).initially(settings.isBiomeSpecificExpansion())
-         .build(0, 0, 200, 20,
+         .build(0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
                safeTranslatable("villagesreborn.config.expansion.biome_specific"),
                (button, value) -> {
                    settings.setBiomeSpecificExpansion(value);
@@ -100,7 +112,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         
         // Phase 2: Max Caravan Distance Slider (500-5000)
         this.caravanDistanceSlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
             safeTranslatable("villagesreborn.config.expansion.caravan_distance"),
             normalizeCaravanDistance(settings.getMaxCaravanDistance())
         ) {
@@ -124,7 +136,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
             safeTranslatable("villagesreborn.config.on"),
             safeTranslatable("villagesreborn.config.off")
         ).initially(settings.isInterdimensionalVillages())
-         .build(0, 0, 200, 20,
+         .build(0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
                safeTranslatable("villagesreborn.config.expansion.interdimensional"),
                (button, value) -> {
                    settings.setInterdimensionalVillages(value);
@@ -134,7 +146,7 @@ public class VillageExpansionSection extends VillagesRebornTab.ConfigurationSect
         
         // Phase 2: Village Generation Density Slider (1-5)
         this.villagesDensitySlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
             safeTranslatable("villagesreborn.config.expansion.village_density"),
             normalizeVillageDensity(settings.getVillageGenerationDensity())
         ) {

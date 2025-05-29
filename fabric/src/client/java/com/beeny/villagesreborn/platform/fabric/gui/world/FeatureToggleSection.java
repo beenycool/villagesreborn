@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.platform.fabric.gui.world;
 
 import com.beeny.villagesreborn.core.world.VillagesRebornWorldSettings;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.text.Text;
 import org.slf4j.Logger;
@@ -19,6 +20,17 @@ public class FeatureToggleSection extends VillagesRebornTab.ConfigurationSection
     
     public FeatureToggleSection(VillagesRebornWorldSettings settings, Runnable changeListener) {
         super(settings, changeListener);
+    }
+    
+    // GUI scaling helpers
+    private int getScaledSliderWidth() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return Math.min(200, (int) Math.max(120, 200 / guiScale * 2));
+    }
+    
+    private int getScaledWidgetHeight() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(16, 20 / guiScale * 2);
     }
     
     @Override
@@ -95,7 +107,7 @@ public class FeatureToggleSection extends VillagesRebornTab.ConfigurationSection
             safeTranslatable("villagesreborn.config.enabled"),
             safeTranslatable("villagesreborn.config.disabled")
         ).initially(initialValue)
-         .build(0, 0, 200, 20,
+         .build(0, 0, getScaledSliderWidth(), getScaledWidgetHeight(),
                safeTranslatable("villagesreborn.config.features." + featureKey),
                (button, value) -> {
                    valueConsumer.accept(value);

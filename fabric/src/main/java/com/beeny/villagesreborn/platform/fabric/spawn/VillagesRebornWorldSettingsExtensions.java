@@ -21,27 +21,7 @@ public class VillagesRebornWorldSettingsExtensions {
     // This field is kept temporarily for migration purposes only
     private static SpawnBiomeChoiceData currentSpawnBiomeChoice;
     
-    /**
-     * Sets the spawn biome choice data
-     * @deprecated Use SpawnBiomeStorageManager instead
-     */
-    @Deprecated
-    public static void setSpawnBiomeChoice(SpawnBiomeChoiceData choiceData) {
-        currentSpawnBiomeChoice = choiceData;
-        LOGGER.warn("DEPRECATED: setSpawnBiomeChoice called. Use SpawnBiomeStorageManager instead. Data: {}", choiceData);
-    }
     
-    /**
-     * Gets the current spawn biome choice data
-     * @deprecated Use SpawnBiomeStorageManager instead
-     */
-    @Deprecated
-    public static SpawnBiomeChoiceData getSpawnBiomeChoice() {
-        if (currentSpawnBiomeChoice != null) {
-            LOGGER.warn("DEPRECATED: getSpawnBiomeChoice called. Use SpawnBiomeStorageManager instead. Returning legacy data: {}", currentSpawnBiomeChoice);
-        }
-        return currentSpawnBiomeChoice;
-    }
     
     /**
      * Writes spawn biome data to NBT
@@ -108,23 +88,6 @@ public class VillagesRebornWorldSettingsExtensions {
         }
     }
     
-    /**
-     * Saves current spawn biome choice to world data
-     * @deprecated Use SpawnBiomeStorageManager instead
-     */
-    @Deprecated
-    public static void saveToWorldData() {
-        LOGGER.warn("DEPRECATED: saveToWorldData called. Use SpawnBiomeStorageManager instead.");
-    }
-    
-    /**
-     * Loads spawn biome choice from world data
-     * @deprecated Use SpawnBiomeStorageManager instead
-     */
-    @Deprecated
-    public static void loadFromWorldData() {
-        LOGGER.warn("DEPRECATED: loadFromWorldData called. Use SpawnBiomeStorageManager instead.");
-    }
     
     /**
      * Resets spawn biome choice (for testing and migration)

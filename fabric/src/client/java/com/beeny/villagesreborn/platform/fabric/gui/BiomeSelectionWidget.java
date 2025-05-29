@@ -144,8 +144,8 @@ public class BiomeSelectionWidget extends ClickableWidget {
      */
     private void renderHoverEffects(DrawContext context) {
         if (hoverAnimationProgress > 0.0f) {
-            // Animated border highlight
-            int alpha = (int)(hoverAnimationProgress * 100);
+            // Animated border highlight with improved opacity
+            int alpha = Math.min(255, (int)(hoverAnimationProgress * 150));
             int highlightColor = 0x64FFFFFF | (alpha << 24);
             context.drawBorder(getX() - 1, getY() - 1, width + 2, height + 2, highlightColor);
         }

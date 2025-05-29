@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.platform.fabric.gui.world;
 
 import com.beeny.villagesreborn.core.world.VillagesRebornWorldSettings;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
@@ -21,11 +22,25 @@ public class VillagerAISection extends VillagesRebornTab.ConfigurationSection {
         super(settings, changeListener);
     }
     
+    // GUI scaling helpers
+    private int getScaledSliderWidth() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return Math.min(200, (int) Math.max(120, 200 / guiScale * 2));
+    }
+    
+    private int getScaledWidgetHeight() {
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Math.max(16, 20 / guiScale * 2);
+    }
+    
     @Override
     protected void createWidgets() {
+        int sliderWidth = getScaledSliderWidth();
+        int widgetHeight = getScaledWidgetHeight();
+        
         // Memory Limit Slider (50-500)
         this.memoryLimitSlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, sliderWidth, widgetHeight,
             safeTranslatable("villagesreborn.config.ai.memory_limit"),
             normalizeMemoryLimit(settings.getVillagerMemoryLimit())
         ) {
@@ -46,7 +61,7 @@ public class VillagerAISection extends VillagesRebornTab.ConfigurationSection {
         
         // AI Aggression Slider (0.0-1.0)
         this.aggressionSlider = new SliderWidget(
-            0, 0, 200, 20,
+            0, 0, sliderWidth, widgetHeight,
             safeTranslatable("villagesreborn.config.ai.aggression"),
             settings.getAiAggressionLevel()
         ) {
@@ -71,7 +86,7 @@ public class VillagerAISection extends VillagesRebornTab.ConfigurationSection {
             safeTranslatable("villagesreborn.config.on"),
             safeTranslatable("villagesreborn.config.off")
         ).initially(settings.isEnableAdvancedAI())
-         .build(0, 0, 200, 20,
+         .build(0, 0, sliderWidth, widgetHeight,
                safeTranslatable("villagesreborn.config.ai.advanced_ai"),
                (button, value) -> {
                    settings.setEnableAdvancedAI(value);
