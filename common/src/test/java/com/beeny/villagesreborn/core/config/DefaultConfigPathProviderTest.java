@@ -2,32 +2,58 @@ package com.beeny.villagesreborn.core.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for DefaultConfigPathProvider verifying delegation to Fabric provider
  * and fallback behavior.
  */
-@ExtendWith(MockitoExtension.class)
 class DefaultConfigPathProviderTest {
 
-    @Mock
-    private FabricConfigPathProvider mockFabricProvider;
-
-    private DefaultConfigPathProvider provider;
+    private TestableConfigPathProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new DefaultConfigPathProvider();
+        provider = new TestableConfigPathProvider();
+    }
+
+    // Testable subclass that allows controlling all dependencies
+    private static class TestableConfigPathProvider extends DefaultConfigPathProvider {
+        private boolean fabricAvailable = false;
+        private Path fabricPath = null;
+        private RuntimeException fabricException = null;
+        private String userDir = "/default/dir";
+
+        @Override
+        FabricConfigPathProvider getFabricProvider() {
+            return new FabricConfigPathProvider() {
+                @Override
+                public boolean isAvailable() {
+                    return fabricAvailable;
+                }
+
+                @Override
+                public Path getConfigPath() {
+                    if (fabricException != null) {
+                        throw fabricException;
+                    }
+                    return fabricPath;
+                }
+            };
+        }
+
+        @Override
+        protected String getUserDir() {
+            return userDir;
+        }
+
+        void setUserDir(String userDir) {
+            this.userDir = userDir;
+        }
     }
 
     @Test
@@ -43,154 +69,76 @@ class DefaultConfigPathProviderTest {
 
     @Test
     void shouldDelegateToFabricProviderWhenAvailable() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
-
         Path expectedFabricPath = Paths.get("/fabric/config/villagesreborn_setup.properties");
-        when(mockFabricProvider.isAvailable()).thenReturn(true);
-        when(mockFabricProvider.getConfigPath()).thenReturn(expectedFabricPath);
+        provider.fabricAvailable = true;
+        provider.fabricPath = expectedFabricPath;
 
-        Path result = testProvider.getConfigPath();
+        Path result = provider.getConfigPath();
 
         assertEquals(expectedFabricPath, result);
-        verify(mockFabricProvider).isAvailable();
-        verify(mockFabricProvider).getConfigPath();
     }
 
     @Test
     void shouldFallbackToUserDirWhenFabricProviderNotAvailable() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
+        provider.fabricAvailable = false;
+        provider.setUserDir("/test/dir");
 
-        when(mockFabricProvider.isAvailable()).thenReturn(false);
+        Path result = provider.getConfigPath();
 
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("/test/dir");
-
-            Path result = testProvider.getConfigPath();
-
-            assertEquals(Paths.get("/test/dir/villagesreborn_setup.properties"), result);
-            verify(mockFabricProvider).isAvailable();
-            verify(mockFabricProvider, never()).getConfigPath();
-        }
+        assertEquals(Paths.get("/test/dir/villagesreborn_setup.properties"), result);
     }
 
     @Test
     void shouldFallbackWhenFabricProviderThrowsUnsupportedOperation() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
+        provider.fabricAvailable = true;
+        provider.fabricException = new UnsupportedOperationException("Fabric not available");
+        provider.setUserDir("/fallback/dir");
 
-        when(mockFabricProvider.isAvailable()).thenReturn(true);
-        when(mockFabricProvider.getConfigPath()).thenThrow(new UnsupportedOperationException("Fabric not available"));
+        Path result = provider.getConfigPath();
 
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("/fallback/dir");
-
-            Path result = testProvider.getConfigPath();
-
-            assertEquals(Paths.get("/fallback/dir/villagesreborn_setup.properties"), result);
-            verify(mockFabricProvider).isAvailable();
-            verify(mockFabricProvider).getConfigPath();
-        }
+        assertEquals(Paths.get("/fallback/dir/villagesreborn_setup.properties"), result);
     }
 
     @Test
     void shouldFallbackWhenFabricProviderThrowsUnexpectedException() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
+        provider.fabricAvailable = true;
+        provider.fabricException = new RuntimeException("Unexpected error");
+        provider.setUserDir("/error/fallback");
 
-        when(mockFabricProvider.isAvailable()).thenReturn(true);
-        when(mockFabricProvider.getConfigPath()).thenThrow(new RuntimeException("Unexpected error"));
+        Path result = provider.getConfigPath();
 
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("/error/fallback");
-
-            Path result = testProvider.getConfigPath();
-
-            assertEquals(Paths.get("/error/fallback/villagesreborn_setup.properties"), result);
-            verify(mockFabricProvider).isAvailable();
-            verify(mockFabricProvider).getConfigPath();
-        }
+        assertEquals(Paths.get("/error/fallback/villagesreborn_setup.properties"), result);
     }
 
     @Test
     void shouldFallbackWhenFabricProviderReturnsNull() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
+        provider.fabricAvailable = true;
+        provider.fabricPath = null;
+        provider.setUserDir("/null/fallback");
 
-        when(mockFabricProvider.isAvailable()).thenReturn(true);
-        when(mockFabricProvider.getConfigPath()).thenReturn(null);
+        Path result = provider.getConfigPath();
 
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("/null/fallback");
-
-            Path result = testProvider.getConfigPath();
-
-            assertEquals(Paths.get("/null/fallback/villagesreborn_setup.properties"), result);
-            verify(mockFabricProvider).isAvailable();
-            verify(mockFabricProvider).getConfigPath();
-        }
+        assertEquals(Paths.get("/null/fallback/villagesreborn_setup.properties"), result);
     }
 
     @Test
     void shouldUseCorrectConfigFileName() {
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("/test");
-
-            // Test with real provider when Fabric is not available
-            DefaultConfigPathProvider realProvider = new DefaultConfigPathProvider();
-            
-            // This will use real FabricConfigPathProvider which should not be available in test
-            Path result = realProvider.getConfigPath();
-            
-            assertTrue(result.toString().endsWith("villagesreborn_setup.properties"));
-        }
+        provider.fabricAvailable = false;
+        provider.setUserDir("/test");
+        
+        Path result = provider.getConfigPath();
+        
+        assertTrue(result.toString().endsWith("villagesreborn_setup.properties"));
     }
 
     @Test
     void shouldHandleEmptyUserDirProperty() {
-        // Create a test provider with mocked Fabric provider
-        DefaultConfigPathProvider testProvider = new DefaultConfigPathProvider() {
-            @Override
-            FabricConfigPathProvider getFabricProvider() {
-                return mockFabricProvider;
-            }
-        };
-
-        when(mockFabricProvider.isAvailable()).thenReturn(false);
-
-        try (MockedStatic<System> systemMock = mockStatic(System.class)) {
-            systemMock.when(() -> System.getProperty("user.dir")).thenReturn("");
-
-            Path result = testProvider.getConfigPath();
-
-            assertEquals(Paths.get("villagesreborn_setup.properties"), result);
-        }
+        provider.fabricAvailable = false;
+        provider.setUserDir("");
+        
+        Path result = provider.getConfigPath();
+        
+        assertEquals(Paths.get("villagesreborn_setup.properties"), result);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.beeny.villagesreborn.core.config;
 
 import com.beeny.villagesreborn.core.llm.LLMProvider;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,6 +32,12 @@ class FirstTimeSetupConfigSecurityTest {
         Files.deleteIfExists(configFile);
         Path backupPath = configFile.resolveSibling(configFile.getFileName() + ".backup");
         Files.deleteIfExists(backupPath);
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Reset to default resolver to avoid affecting other tests
+        FirstTimeSetupConfig.resetConfigPathResolver();
     }
     
     @Test

@@ -34,7 +34,7 @@ class QuirkExecutionIntegrationTest {
 
     @Test
     void quirkExecution_integrationTest() {
-        when(tickSupplier.get()).thenReturn(100L, 200L);
+        when(tickSupplier.get()).thenReturn(100L, 700L); // Second call is beyond interval
         when(villager.getPersistentData()).thenReturn(nbtCompound);
         
         // Schedule and execute quirk

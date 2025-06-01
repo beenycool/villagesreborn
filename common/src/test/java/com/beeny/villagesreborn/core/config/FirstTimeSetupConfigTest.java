@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.core.config;
 
 import com.beeny.villagesreborn.core.llm.LLMProvider;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,10 +20,27 @@ class FirstTimeSetupConfigTest {
     @TempDir
     Path tempDir;
     
+    private String originalUserDir;
+    
     @BeforeEach
     void setUp() {
-        // Set working directory to temp directory for isolated tests
+        // Save original user.dir and set to temp directory for isolated tests
+        originalUserDir = System.getProperty("user.dir");
         System.setProperty("user.dir", tempDir.toString());
+        
+        // Reset to default resolver to ensure clean state
+        FirstTimeSetupConfig.resetConfigPathResolver();
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Restore original user.dir
+        if (originalUserDir != null) {
+            System.setProperty("user.dir", originalUserDir);
+        }
+        
+        // Reset to default resolver to avoid affecting other tests
+        FirstTimeSetupConfig.resetConfigPathResolver();
     }
     
     @Test

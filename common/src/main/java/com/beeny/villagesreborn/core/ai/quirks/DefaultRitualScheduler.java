@@ -5,6 +5,9 @@ import com.beeny.villagesreborn.core.config.AIConfig;
 import java.util.PriorityQueue;
 import java.util.Comparator;
 import java.util.function.Supplier;
+import java.util.List;
+import com.beeny.villagesreborn.core.ai.quirks.QuirkDefinition;
+import com.beeny.villagesreborn.core.ai.quirks.QuirkRegistry;
 
 public class DefaultRitualScheduler implements RitualScheduler {
     private final PriorityQueue<ScheduledTask> taskQueue = new PriorityQueue<>(
@@ -32,7 +35,10 @@ public class DefaultRitualScheduler implements RitualScheduler {
             VillagerEntity villager = task.villager();
             
             if (villager != null) {
-                // Quirk execution logic will be added later
+                List<QuirkDefinition> quirks = QuirkRegistry.getApplicableQuirks(villager);
+                for (QuirkDefinition quirk : quirks) {
+                    quirk.apply(villager);
+                }
             }
         }
     }

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -23,7 +24,7 @@ public class ConfigPathResolver {
     
     // Package-private constructor for testing
     ConfigPathResolver(List<ConfigPathStrategy> providers) {
-        this.providers = providers;
+        this.providers = new ArrayList<>(providers);
         // Sort by priority (higher priority first)
         this.providers.sort(Comparator.comparingInt(ConfigPathStrategy::getPriority).reversed());
     }

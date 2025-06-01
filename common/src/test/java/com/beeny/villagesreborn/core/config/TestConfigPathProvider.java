@@ -19,6 +19,11 @@ public class TestConfigPathProvider implements ConfigPathStrategy {
     
     @Override
     public Path getConfigPath() {
+        // If testPath already ends with the config file name, return it directly
+        // Otherwise, resolve the config file name within the testPath directory
+        if (testPath.getFileName().toString().endsWith(".properties")) {
+            return testPath;
+        }
         return testPath.resolve("villagesreborn_setup.properties");
     }
     

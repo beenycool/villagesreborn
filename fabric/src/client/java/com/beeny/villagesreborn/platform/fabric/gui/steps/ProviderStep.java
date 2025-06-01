@@ -63,4 +63,16 @@ public class ProviderStep implements WizardStep {
     public LLMProvider getSelectedProvider() {
         return selectedProvider;
     }
+    
+    public void setSelectedProvider(String providerName) {
+        for (LLMProvider provider : LLMProvider.values()) {
+            if (provider.getDisplayName().equals(providerName) || provider.name().equals(providerName)) {
+                this.selectedProvider = provider;
+                if (providerButton != null) {
+                    providerButton.setValue(provider);
+                }
+                break;
+            }
+        }
+    }
 }

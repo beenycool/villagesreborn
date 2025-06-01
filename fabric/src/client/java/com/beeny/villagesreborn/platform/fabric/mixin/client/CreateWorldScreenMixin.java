@@ -180,7 +180,7 @@ public abstract class CreateWorldScreenMixin {
         
         // Add to screen using reflection to access protected method
         try {
-            self.getClass().getMethod("addDrawableChild", Object.class).invoke(self, this.spawnBiomeButton);
+            self.getClass().getMethod("addDrawableChild", net.minecraft.client.gui.Element.class).invoke(self, this.spawnBiomeButton);
         } catch (Exception e) {
             LOGGER.error("Failed to add spawn biome button to screen", e);
         }

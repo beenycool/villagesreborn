@@ -33,9 +33,10 @@ public class DefaultConfigPathProvider implements ConfigPathStrategy {
     @Override
     public Path getConfigPath() {
         // First try to delegate to Fabric provider
-        if (fabricProvider.isAvailable()) {
+        FabricConfigPathProvider fabric = getFabricProvider();
+        if (fabric.isAvailable()) {
             try {
-                Path fabricPath = fabricProvider.getConfigPath();
+                Path fabricPath = fabric.getConfigPath();
                 if (fabricPath != null) {
                     LOGGER.debug("Using Fabric config path: {}", fabricPath);
                     return fabricPath;
@@ -48,10 +49,17 @@ public class DefaultConfigPathProvider implements ConfigPathStrategy {
         }
         
         // Fall back to user.dir if Fabric provider is not available or returns empty
-        String userDir = System.getProperty("user.dir");
+        String userDir = getUserDir();
         Path fallbackPath = Paths.get(userDir, SETUP_CONFIG_FILE);
         LOGGER.debug("Using fallback config path: {}", fallbackPath);
         return fallbackPath;
+    }
+    
+    /**
+     * Get the user.dir system property. Protected for testing.
+     */
+    protected String getUserDir() {
+        return System.getProperty("user.dir");
     }
     
     /**

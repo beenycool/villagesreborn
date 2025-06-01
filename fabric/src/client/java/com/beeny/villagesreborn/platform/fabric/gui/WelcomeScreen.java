@@ -164,4 +164,55 @@ public class WelcomeScreen extends Screen {
         wizardManager.setCurrentStepIndex(step);
         init();
     }
+    
+    // Methods expected by WelcomeScreenSimpleTest
+    public void setSelectedProvider(String provider) {
+        // Delegate to appropriate step
+        for (WizardStep step : wizardManager.getSteps()) {
+            if (step instanceof com.beeny.villagesreborn.platform.fabric.gui.steps.ProviderStep) {
+                ((com.beeny.villagesreborn.platform.fabric.gui.steps.ProviderStep) step).setSelectedProvider(provider);
+                break;
+            }
+        }
+    }
+    
+    public void setSelectedModel(String model) {
+        // Delegate to appropriate step
+        for (WizardStep step : wizardManager.getSteps()) {
+            if (step instanceof com.beeny.villagesreborn.platform.fabric.gui.steps.ModelStep) {
+                ((com.beeny.villagesreborn.platform.fabric.gui.steps.ModelStep) step).setSelectedModel(model);
+                break;
+            }
+        }
+    }
+    
+    public String getSelectedProvider() {
+        // Delegate to appropriate step
+        for (WizardStep step : wizardManager.getSteps()) {
+            if (step instanceof com.beeny.villagesreborn.platform.fabric.gui.steps.ProviderStep) {
+                return ((com.beeny.villagesreborn.platform.fabric.gui.steps.ProviderStep) step).getSelectedProvider().toString();
+            }
+        }
+        return null;
+    }
+    
+    public String getSelectedModel() {
+        // Delegate to appropriate step
+        for (WizardStep step : wizardManager.getSteps()) {
+            if (step instanceof com.beeny.villagesreborn.platform.fabric.gui.steps.ModelStep) {
+                return ((com.beeny.villagesreborn.platform.fabric.gui.steps.ModelStep) step).getSelectedModel();
+            }
+        }
+        return null;
+    }
+    
+    public java.util.List<String> getValidationErrors() {
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        for (WizardStep step : wizardManager.getSteps()) {
+            if (!step.isValid()) {
+                errors.add("Step " + step.getClass().getSimpleName() + " is invalid");
+            }
+        }
+        return errors;
+    }
 }

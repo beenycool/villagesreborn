@@ -109,24 +109,27 @@ public class TestMetaTest {
     @Test
     void testGradleConfigurationExists() {
         // Verify gradle configuration files exist
-        assertTrue(Files.exists(Paths.get("gradlew")), "Gradle wrapper should exist");
-        assertTrue(Files.exists(Paths.get("gradlew.bat")), "Gradle wrapper batch file should exist");
-        assertTrue(Files.exists(Paths.get("settings.gradle")), "Settings.gradle should exist");
-        assertTrue(Files.exists(Paths.get("common/build.gradle")), "Common build.gradle should exist");
-        assertTrue(Files.exists(Paths.get("fabric/build.gradle")), "Fabric build.gradle should exist");
+        Path projectRoot = PROJECT_DIR.toPath();
+        assertTrue(Files.exists(projectRoot.resolve("gradlew")), "Gradle wrapper should exist");
+        assertTrue(Files.exists(projectRoot.resolve("gradlew.bat")), "Gradle wrapper batch file should exist");
+        assertTrue(Files.exists(projectRoot.resolve("settings.gradle")), "Settings.gradle should exist");
+        assertTrue(Files.exists(projectRoot.resolve("common/build.gradle")), "Common build.gradle should exist");
+        assertTrue(Files.exists(projectRoot.resolve("fabric/build.gradle")), "Fabric build.gradle should exist");
     }
     
     @Test
     void testTestDependenciesConfiguration() throws IOException {
+        Path projectRoot = PROJECT_DIR.toPath();
+        
         // Verify common module has required test dependencies
-        String commonBuild = Files.readString(Paths.get("common/build.gradle"));
+        String commonBuild = Files.readString(projectRoot.resolve("common/build.gradle"));
         assertTrue(commonBuild.contains("junit-jupiter"), "Common should have JUnit 5");
         assertTrue(commonBuild.contains("assertj-core"), "Common should have AssertJ");
         assertTrue(commonBuild.contains("mockito-core"), "Common should have Mockito");
         assertTrue(commonBuild.contains("useJUnitPlatform()"), "Common should use JUnit platform");
         
         // Verify fabric module has required test dependencies
-        String fabricBuild = Files.readString(Paths.get("fabric/build.gradle"));
+        String fabricBuild = Files.readString(projectRoot.resolve("fabric/build.gradle"));
         assertTrue(fabricBuild.contains("junit-jupiter"), "Fabric should have JUnit 5");
         assertTrue(fabricBuild.contains("assertj-core"), "Fabric should have AssertJ");
         assertTrue(fabricBuild.contains("mockito-core"), "Fabric should have Mockito");
@@ -135,14 +138,16 @@ public class TestMetaTest {
     
     @Test
     void testProjectStructureIntegrity() {
+        Path projectRoot = PROJECT_DIR.toPath();
+        
         // Verify key project structure elements exist
-        assertTrue(Files.exists(Paths.get("common/src/main/java")), "Common main source should exist");
-        assertTrue(Files.exists(Paths.get("common/src/test/java")), "Common test source should exist");
-        assertTrue(Files.exists(Paths.get("fabric/src/main/java")), "Fabric main source should exist");
-        assertTrue(Files.exists(Paths.get("fabric/src/test/java")), "Fabric test source should exist");
+        assertTrue(Files.exists(projectRoot.resolve("common/src/main/java")), "Common main source should exist");
+        assertTrue(Files.exists(projectRoot.resolve("common/src/test/java")), "Common test source should exist");
+        assertTrue(Files.exists(projectRoot.resolve("fabric/src/main/java")), "Fabric main source should exist");
+        assertTrue(Files.exists(projectRoot.resolve("fabric/src/test/java")), "Fabric test source should exist");
         
         // Verify enhanced mock utilities exist
-        assertTrue(Files.exists(Paths.get("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtilsEnhanced.java")), 
+        assertTrue(Files.exists(projectRoot.resolve("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtilsEnhanced.java")),
                   "Enhanced mock utilities should exist");
     }
     
@@ -157,21 +162,22 @@ public class TestMetaTest {
         // If core infrastructure is broken, this test should catch it
         
         List<String> issues = new ArrayList<>();
+        Path projectRoot = PROJECT_DIR.toPath();
         
         // Check for common test configuration issues
-        if (!Files.exists(Paths.get("common/src/test/java"))) {
+        if (!Files.exists(projectRoot.resolve("common/src/test/java"))) {
             issues.add("Common test source directory missing");
         }
         
-        if (!Files.exists(Paths.get("fabric/src/test/java"))) {
+        if (!Files.exists(projectRoot.resolve("fabric/src/test/java"))) {
             issues.add("Fabric test source directory missing");
         }
         
         // Check for critical missing classes that would cause widespread failures
         Path[] criticalFiles = {
-            Paths.get("common/src/main/java/com/beeny/villagesreborn/core/VillagesRebornCommon.java"),
-            Paths.get("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtils.java"),
-            Paths.get("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtilsEnhanced.java")
+            projectRoot.resolve("common/src/main/java/com/beeny/villagesreborn/core/VillagesRebornCommon.java"),
+            projectRoot.resolve("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtils.java"),
+            projectRoot.resolve("common/src/test/java/com/beeny/villagesreborn/core/config/FabricLoaderMockUtilsEnhanced.java")
         };
         
         for (Path file : criticalFiles) {

@@ -169,12 +169,20 @@ class ConversationRouterTest {
         
         conversationRouter.routeMessage(player, villager, testMessage);
         
-        // Give async operation time to complete
-        Thread.sleep(100);
-        
-        verify(responseManager).deliverResponse(villager, player, responseText);
-        verify(villagerBrain).addInteraction(player, testMessage, responseText);
-        verify(brainManager).saveBrain(villager, villagerBrain);
+        // Give async operation time to complete with retry logic
+        int retries = 0;
+        while (retries < 10) {
+            try {
+                verify(responseManager).deliverResponse(villager, player, responseText);
+                verify(villagerBrain).addInteraction(player, testMessage, responseText);
+                verify(brainManager).saveBrain(villager, villagerBrain);
+                break;
+            } catch (org.mockito.exceptions.verification.WantedButNotInvoked e) {
+                if (retries == 9) throw e;
+                Thread.sleep(50);
+                retries++;
+            }
+        }
     }
 
     @Test

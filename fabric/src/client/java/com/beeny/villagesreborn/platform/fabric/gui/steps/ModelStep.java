@@ -64,4 +64,13 @@ public class ModelStep implements WizardStep {
     public String getSelectedModel() {
         return selectedModel;
     }
+    
+    public void setSelectedModel(String model) {
+        if (model != null) {
+            this.selectedModel = InputValidator.sanitizeInput(model);
+            if (modelButton != null) {
+                modelButton.setValue(model);
+            }
+        }
+    }
 }

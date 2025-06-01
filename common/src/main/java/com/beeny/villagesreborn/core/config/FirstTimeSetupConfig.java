@@ -20,6 +20,7 @@ public class FirstTimeSetupConfig {
     private static final int CURRENT_CONFIG_VERSION = 3;
     
     private static ConfigPathResolver configPathResolver = new ConfigPathResolver();
+    private static final Object SAVE_LOCK = new Object();
     
     private boolean setupCompleted;
     private LLMProvider selectedProvider;
@@ -50,6 +51,11 @@ public class FirstTimeSetupConfig {
     // Package-private method for testing with custom resolver
     static void setConfigPathResolver(ConfigPathResolver resolver) {
         configPathResolver = resolver;
+    }
+    
+    // Package-private method for testing to reset to default resolver
+    static void resetConfigPathResolver() {
+        configPathResolver = new ConfigPathResolver();
     }
     
     /**
@@ -99,16 +105,49 @@ public class FirstTimeSetupConfig {
             }
             
         } catch (Exception e) {
-            LOGGER.error("Failed to load configuration, using defaults", e);
-            return createDefaultConfig();
+            LOGGER.error("Failed to load configuration, attempting backup restoration", e);
+            return attemptBackupRestoration(configPath);
         }
+    }
+    
+    /**
+     * Attempts to restore configuration from backup when main config is corrupt
+     */
+    private static FirstTimeSetupConfig attemptBackupRestoration(Path configPath) {
+        try {
+            Path backupPath = createStaticSecureBackupPath(configPath);
+            if (Files.exists(backupPath)) {
+                LOGGER.info("Attempting to restore from backup: {}", backupPath);
+                Properties backupConfig = loadRawConfig(backupPath);
+                
+                // Restore the backup to main config
+                Files.copy(backupPath, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                LOGGER.info("Successfully restored config from backup");
+                
+                return createFromProperties(backupConfig);
+            }
+        } catch (Exception backupException) {
+            LOGGER.warn("Failed to restore from backup", backupException);
+        }
+        
+        LOGGER.info("No valid backup found, creating default configuration");
+        return createDefaultConfig();
+    }
+    
+    /**
+     * Static version of createSecureBackupPath for use in static methods
+     */
+    private static Path createStaticSecureBackupPath(Path configPath) {
+        return SecureBackupPath.createBackupPath(configPath);
     }
 
     /**
      * Save the current configuration to file with retry logic
      */
     public void save() {
-        saveWithRetry();
+        synchronized (SAVE_LOCK) {
+            saveWithRetry();
+        }
     }
 
     private void saveWithRetry() {
@@ -119,8 +158,11 @@ public class FirstTimeSetupConfig {
                 Properties props = createPropertiesFromConfig();
                 Path configPath = getConfigPath();
                 
-                // Ensure parent directory exists
-                Files.createDirectories(configPath.getParent());
+                // Ensure parent directory exists (only if configPath has a parent)
+                Path parentDir = configPath.getParent();
+                if (parentDir != null) {
+                    Files.createDirectories(parentDir);
+                }
                 
                 // Write to temporary file first
                 Path tempPath = Paths.get(configPath.toString() + ".tmp");
@@ -214,7 +256,7 @@ public class FirstTimeSetupConfig {
 
     private void createConfigBackup(Path configPath) {
         try {
-            Path backupPath = configPath.resolveSibling(configPath.getFileName() + ".backup");
+            Path backupPath = createSecureBackupPath(configPath);
             Files.copy(configPath, backupPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             LOGGER.debug("Created config backup at {}", backupPath);
         } catch (IOException e) {
@@ -224,7 +266,7 @@ public class FirstTimeSetupConfig {
 
     private void restoreConfigBackup(Path configPath) {
         try {
-            Path backupPath = configPath.resolveSibling(configPath.getFileName() + ".backup");
+            Path backupPath = createSecureBackupPath(configPath);
             if (Files.exists(backupPath)) {
                 Files.copy(backupPath, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 LOGGER.info("Restored config from backup");
@@ -232,6 +274,14 @@ public class FirstTimeSetupConfig {
         } catch (IOException e) {
             LOGGER.error("Failed to restore config backup", e);
         }
+    }
+
+    /**
+     * Creates a secure backup path that prevents directory traversal attacks
+     * and handles special characters safely.
+     */
+    private Path createSecureBackupPath(Path configPath) {
+        return SecureBackupPath.createBackupPath(configPath);
     }
 
     private void verifyConfigSaved() {
@@ -245,17 +295,19 @@ public class FirstTimeSetupConfig {
      * Reset the setup configuration (for testing or re-setup)
      */
     public void reset() {
-        this.setupCompleted = false;
-        this.selectedProvider = null;
-        this.selectedModel = null;
-        this.hardwareDetectionCompleted = false;
-        
-        Path configPath = getConfigPath();
-        try {
-            Files.deleteIfExists(configPath);
-            LOGGER.info("Reset first-time setup configuration");
-        } catch (IOException e) {
-            LOGGER.warn("Failed to delete setup config file during reset", e);
+        synchronized (SAVE_LOCK) {
+            this.setupCompleted = false;
+            this.selectedProvider = null;
+            this.selectedModel = null;
+            this.hardwareDetectionCompleted = false;
+            
+            Path configPath = getConfigPath();
+            try {
+                Files.deleteIfExists(configPath);
+                LOGGER.info("Reset first-time setup configuration");
+            } catch (IOException e) {
+                LOGGER.warn("Failed to delete setup config file during reset", e);
+            }
         }
     }
     
@@ -301,12 +353,14 @@ public class FirstTimeSetupConfig {
     private static FirstTimeSetupConfig createFromProperties(Properties props) {
         boolean setupCompleted = Boolean.parseBoolean(props.getProperty("setup.completed", "false"));
         boolean hardwareDetectionCompleted = Boolean.parseBoolean(props.getProperty("hardware.detection.completed", "false"));
-        long setupTimestamp = Long.parseLong(props.getProperty("setup.timestamp", "0"));
-        int configVersion = Integer.parseInt(props.getProperty("config.version", "1"));
+        
+        // Parse numeric values with safe fallbacks for invalid inputs
+        long setupTimestamp = parseTimestampSafely(props.getProperty("setup.timestamp", "0"));
+        int configVersion = parseVersionSafely(props.getProperty("config.version", "1"));
         
         LLMProvider selectedProvider = null;
         String providerName = props.getProperty("llm.provider");
-        if (providerName != null) {
+        if (providerName != null && !providerName.trim().isEmpty()) {
             try {
                 selectedProvider = LLMProvider.valueOf(providerName);
             } catch (IllegalArgumentException e) {
@@ -318,6 +372,30 @@ public class FirstTimeSetupConfig {
         
         return new FirstTimeSetupConfig(setupCompleted, selectedProvider, selectedModel,
             hardwareDetectionCompleted, setupTimestamp, configVersion);
+    }
+    
+    /**
+     * Safely parse timestamp value, returning 0 for invalid inputs
+     */
+    private static long parseTimestampSafely(String timestampStr) {
+        try {
+            return Long.parseLong(timestampStr);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid timestamp value in config: {}, using default", timestampStr);
+            return 0L;
+        }
+    }
+    
+    /**
+     * Safely parse config version, returning 1 for invalid inputs
+     */
+    private static int parseVersionSafely(String versionStr) {
+        try {
+            return Integer.parseInt(versionStr);
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Invalid config version in config: {}, using default", versionStr);
+            return 1;
+        }
     }
     
     // Getters

@@ -21,10 +21,10 @@ public class FabricLoaderMockUtils {
      * This is used instead of complex static mocking.
      *
      * @param configDir the config directory to return
-     * @return a FabricConfigPathProvider that returns the specified directory
+     * @return a ConfigPathStrategy that returns the specified directory
      */
-    public static FabricConfigPathProvider createMockFabricProvider(Path configDir) {
-        return new FabricConfigPathProvider() {
+    public static ConfigPathStrategy createMockFabricProvider(Path configDir) {
+        return new ConfigPathStrategy() {
             @Override
             public boolean isAvailable() {
                 return true;
@@ -34,16 +34,21 @@ public class FabricLoaderMockUtils {
             public Path getConfigPath() {
                 return configDir.resolve("villagesreborn_setup.properties");
             }
+            
+            @Override
+            public int getPriority() {
+                return 100;
+            }
         };
     }
     
     /**
      * Create a mock config path provider that simulates FabricLoader being unavailable.
      *
-     * @return a FabricConfigPathProvider that reports as unavailable
+     * @return a ConfigPathStrategy that reports as unavailable
      */
-    public static FabricConfigPathProvider createUnavailableFabricProvider() {
-        return new FabricConfigPathProvider() {
+    public static ConfigPathStrategy createUnavailableFabricProvider() {
+        return new ConfigPathStrategy() {
             @Override
             public boolean isAvailable() {
                 return false;
@@ -53,6 +58,11 @@ public class FabricLoaderMockUtils {
             public Path getConfigPath() {
                 throw new UnsupportedOperationException("FabricLoader not available");
             }
+            
+            @Override
+            public int getPriority() {
+                return 100;
+            }
         };
     }
     
@@ -60,10 +70,10 @@ public class FabricLoaderMockUtils {
      * Create a mock config path provider that throws exceptions.
      *
      * @param exception the exception to throw
-     * @return a FabricConfigPathProvider that throws the specified exception
+     * @return a ConfigPathStrategy that throws the specified exception
      */
-    public static FabricConfigPathProvider createFaultyFabricProvider(RuntimeException exception) {
-        return new FabricConfigPathProvider() {
+    public static ConfigPathStrategy createFaultyFabricProvider(RuntimeException exception) {
+        return new ConfigPathStrategy() {
             @Override
             public boolean isAvailable() {
                 return true; // Claims to be available but fails
@@ -72,6 +82,11 @@ public class FabricLoaderMockUtils {
             @Override
             public Path getConfigPath() {
                 throw exception;
+            }
+            
+            @Override
+            public int getPriority() {
+                return 100;
             }
         };
     }

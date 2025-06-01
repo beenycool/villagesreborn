@@ -88,7 +88,7 @@ class ConfigPathResolverTest {
     @Test
     void testFabricConfigPathProvider() {
         // GIVEN: Mock Fabric provider
-        FabricConfigPathProvider provider = FabricLoaderMockUtils.createMockFabricProvider(tempDir);
+        ConfigPathStrategy provider = FabricLoaderMockUtils.createMockFabricProvider(tempDir);
         
         // WHEN: Getting config path
         Path path = provider.getConfigPath();
