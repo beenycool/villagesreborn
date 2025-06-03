@@ -12,12 +12,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of LLMApiClient for handling async requests to LLM providers
  * with retry logic and timeout handling
  */
 public class LLMApiClientImpl implements LLMApiClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(LLMApiClientImpl.class);
     
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -41,12 +44,83 @@ public class LLMApiClientImpl implements LLMApiClient {
 
     @Override
     public CompletableFuture<String> fetchModels(LLMProvider provider) {
-        return CompletableFuture.completedFuture("[]");
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                String endpoint = getModelsEndpoint(provider);
+                
+                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(10))
+                    .GET();
+                
+                // Add authorization header for non-local providers
+                if (provider != LLMProvider.LOCAL) {
+                    // For model fetching, we need to handle the case where API key might not be set yet
+                    // This is called during setup, so we return basic model list if no key available
+                    requestBuilder.header("Authorization", "Bearer " + "dummy-key-for-model-fetch");
+                }
+                
+                // Provider-specific headers
+                if (provider == LLMProvider.ANTHROPIC) {
+                    requestBuilder.header("anthropic-version", "2023-06-01");
+                }
+                
+                HttpRequest request = requestBuilder.build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                if (response.statusCode() == 200) {
+                    return parseModelsResponse(response.body(), provider);
+                } else {
+                    LOGGER.warn("Failed to fetch models for {}: HTTP {}", provider, response.statusCode());
+                    return getDefaultModels(provider);
+                }
+                
+            } catch (Exception e) {
+                LOGGER.error("Error fetching models for provider {}", provider, e);
+                return getDefaultModels(provider);
+            }
+        });
     }
 
     @Override
     public CompletableFuture<Boolean> validateKey(LLMProvider provider, String apiKey) {
-        return CompletableFuture.completedFuture(true);
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // For local providers, always return true
+                if (provider == LLMProvider.LOCAL) {
+                    return true;
+                }
+                
+                String endpoint = getValidationEndpoint(provider);
+                
+                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(10))
+                    .GET();
+                
+                // Provider-specific headers
+                if (provider == LLMProvider.ANTHROPIC) {
+                    requestBuilder.header("anthropic-version", "2023-06-01");
+                }
+                
+                HttpRequest request = requestBuilder.build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                // API key is valid if we get a 200 response or if it's a recognizable response format
+                return response.statusCode() == 200 || response.statusCode() == 401; // 401 means key format is recognized but invalid
+                
+            } catch (Exception e) {
+                LOGGER.error("Error validating API key for provider {}", provider, e);
+                return false;
+            }
+        });
     }
 
     @Override
@@ -302,6 +376,89 @@ public class LLMApiClientImpl implements LLMApiClient {
 
     public long getMinRequestInterval() {
         return minRequestInterval;
+    }
+
+    /**
+     * Get models endpoint for different providers
+     */
+    private String getModelsEndpoint(LLMProvider provider) {
+        return switch (provider) {
+            case OPENAI -> "https://api.openai.com/v1/models";
+            case ANTHROPIC -> "https://api.anthropic.com/v1/models";
+            case GROQ -> "https://api.groq.com/openai/v1/models";
+            case OPENROUTER -> "https://openrouter.ai/api/v1/models";
+            case LOCAL -> "http://localhost:11434/api/tags";
+        };
+    }
+    
+    /**
+     * Get validation endpoint for different providers
+     */
+    private String getValidationEndpoint(LLMProvider provider) {
+        return switch (provider) {
+            case OPENAI -> "https://api.openai.com/v1/models";
+            case ANTHROPIC -> "https://api.anthropic.com/v1/models";
+            case GROQ -> "https://api.groq.com/openai/v1/models";
+            case OPENROUTER -> "https://openrouter.ai/api/v1/models";
+            case LOCAL -> "http://localhost:11434/api/tags";
+        };
+    }
+    
+    /**
+     * Parse models response from different providers
+     */
+    private String parseModelsResponse(String responseBody, LLMProvider provider) {
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            
+            if (provider == LLMProvider.LOCAL) {
+                // Ollama format: {"models": [{"name": "modelname", ...}]}
+                if (root.has("models")) {
+                    JsonNode models = root.get("models");
+                    StringBuilder modelList = new StringBuilder("[");
+                    for (int i = 0; i < models.size(); i++) {
+                        if (i > 0) modelList.append(",");
+                        JsonNode model = models.get(i);
+                        String modelName = model.has("name") ? model.get("name").asText() : "unknown";
+                        modelList.append("\"").append(modelName).append("\"");
+                    }
+                    modelList.append("]");
+                    return modelList.toString();
+                }
+            } else {
+                // OpenAI/Anthropic format: {"data": [{"id": "model-id", ...}]}
+                if (root.has("data")) {
+                    JsonNode data = root.get("data");
+                    StringBuilder modelList = new StringBuilder("[");
+                    for (int i = 0; i < data.size(); i++) {
+                        if (i > 0) modelList.append(",");
+                        JsonNode model = data.get(i);
+                        String modelId = model.has("id") ? model.get("id").asText() : "unknown";
+                        modelList.append("\"").append(modelId).append("\"");
+                    }
+                    modelList.append("]");
+                    return modelList.toString();
+                }
+            }
+            
+            return getDefaultModels(provider);
+        } catch (Exception e) {
+            LOGGER.error("Failed to parse models response", e);
+            return getDefaultModels(provider);
+        }
+    }
+    
+    /**
+     * Get default models for providers when API call fails
+     */
+    private String getDefaultModels(LLMProvider provider) {
+        return switch (provider) {
+            case OPENAI -> "[\"gpt-3.5-turbo\", \"gpt-4\", \"gpt-4-turbo\"]";
+            case ANTHROPIC -> "[\"claude-3-haiku-20240307\", \"claude-3-sonnet-20240229\", \"claude-3-opus-20240229\"]";
+            case GROQ -> "[\"llama2-70b-4096\", \"mixtral-8x7b-32768\", \"gemma-7b-it\"]";
+            case OPENROUTER -> "[\"openrouter/auto\", \"anthropic/claude-3-haiku\", \"openai/gpt-3.5-turbo\"]";
+            case LOCAL -> "[\"llama2\", \"codellama\", \"mistral\"]";
+        };
     }
 
     /**

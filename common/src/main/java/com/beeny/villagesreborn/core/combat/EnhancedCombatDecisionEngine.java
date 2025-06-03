@@ -292,8 +292,144 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
     }
     
     private boolean executeNegotiate(CombatCapableVillager villager, CombatDecision decision, CombatSituation situation) {
-        // Placeholder for negotiation logic
-        return villager.attemptNegotiation();
+        // AI-powered negotiation system
+        try {
+            // Assess negotiation viability based on threat levels and relationships
+            double negotiationChance = calculateNegotiationSuccess(villager, situation);
+            
+            // Use AI to determine negotiation strategy
+            NegotiationStrategy strategy = determineNegotiationStrategy(villager, situation);
+            
+            // Execute the negotiation attempt
+            boolean basicAttempt = villager.attemptNegotiation();
+            
+            // Enhanced AI logic modifies the base result
+            if (basicAttempt) {
+                // Apply strategy-specific modifiers
+                return applyNegotiationStrategy(strategy, negotiationChance, situation);
+            } else {
+                // Fallback: AI might still find alternative negotiation paths
+                return negotiationChance > 0.8 && strategy == NegotiationStrategy.DIPLOMATIC;
+            }
+            
+        } catch (Exception e) {
+            LOGGER.warn("AI negotiation failed, falling back to basic attempt", e);
+            return villager.attemptNegotiation();
+        }
+    }
+    
+    /**
+     * Calculates the success probability of negotiation based on various factors
+     */
+    private double calculateNegotiationSuccess(CombatCapableVillager villager, CombatSituation situation) {
+        double baseChance = 0.3; // 30% base success rate
+        
+        // Factor in threat level - lower threats are easier to negotiate with
+        ThreatLevel threatLevel = situation.getOverallThreatLevel();
+        baseChance += switch (threatLevel) {
+            case NONE -> 0.5;
+            case LOW -> 0.4;
+            case MODERATE -> 0.2;
+            case HIGH -> -0.1;
+            case EXTREME -> -0.3;
+        };
+        
+        // Factor in villager's social skills and reputation (simplified check)
+        try {
+            // Attempt to call if method exists, otherwise skip
+            if (villager.getClass().getMethod("hasHighReputation") != null) {
+                if ((Boolean) villager.getClass().getMethod("hasHighReputation").invoke(villager)) {
+                    baseChance += 0.2;
+                }
+            }
+        } catch (Exception e) {
+            // Method doesn't exist, use default behavior
+            baseChance += 0.1; // Small default social bonus
+        }
+        
+        // Environmental factors based on available data
+        if (situation.isDefensive()) {
+            baseChance += 0.15; // Defensive situations allow better negotiation
+        }
+        
+        if (situation.getEnemyCount() > 3) {
+            baseChance -= 0.25; // Harder to negotiate with multiple hostiles
+        }
+        
+        return Math.max(0.0, Math.min(1.0, baseChance));
+    }
+    
+    /**
+     * AI determines the optimal negotiation strategy
+     */
+    private NegotiationStrategy determineNegotiationStrategy(CombatCapableVillager villager, CombatSituation situation) {
+        // Analyze situation context using available data
+        
+        // Use threat level and defensive posture to determine strategy
+        ThreatLevel threatLevel = situation.getOverallThreatLevel();
+        
+        if (threatLevel == ThreatLevel.LOW || threatLevel == ThreatLevel.NONE) {
+            return NegotiationStrategy.DIPLOMATIC;
+        }
+        
+        // If outnumbered, try bribery
+        if (situation.getEnemyCount() > situation.getAllyCount() + 1) {
+            return NegotiationStrategy.BRIBERY;
+        }
+        
+        // If we have ally advantage, use intimidation
+        if (situation.getAllyCount() > situation.getEnemyCount()) {
+            return NegotiationStrategy.INTIMIDATION;
+        }
+        
+        // If defensive situation (likely in village), use authority
+        if (situation.isDefensive()) {
+            return NegotiationStrategy.AUTHORITY;
+        }
+        
+        return NegotiationStrategy.BASIC; // Default fallback
+    }
+    
+    /**
+     * Applies the chosen negotiation strategy
+     */
+    private boolean applyNegotiationStrategy(NegotiationStrategy strategy, double baseChance, CombatSituation situation) {
+        double modifiedChance = baseChance;
+        
+        switch (strategy) {
+            case DIPLOMATIC -> {
+                modifiedChance += 0.2;
+                // Diplomatic approach takes longer but has higher success rate
+            }
+            case BRIBERY -> {
+                modifiedChance += 0.3;
+                // Costs resources but very effective
+            }
+            case INTIMIDATION -> {
+                modifiedChance += 0.15;
+                // Risky but can be effective with backup
+            }
+            case AUTHORITY -> {
+                modifiedChance += 0.25;
+                // Village leaders have significant influence
+            }
+            case BASIC -> {
+                // No modifier, uses base chance
+            }
+        }
+        
+        return Math.random() < modifiedChance;
+    }
+    
+    /**
+     * Negotiation strategies available to the AI
+     */
+    private enum NegotiationStrategy {
+        BASIC,       // Simple request to cease hostilities
+        DIPLOMATIC,  // Sophisticated verbal negotiation
+        BRIBERY,     // Offer resources or trade
+        INTIMIDATION,// Show of force or threat
+        AUTHORITY    // Invoke village leadership status
     }
     
     /**

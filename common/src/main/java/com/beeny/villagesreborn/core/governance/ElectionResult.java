@@ -1,46 +1,53 @@
 package com.beeny.villagesreborn.core.governance;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Result of an election including winner and outcome type
+ * Represents the results of a village election
  */
 public class ElectionResult {
-    private UUID winnerId;
-    private double winningVoteCount;
-    private ElectionOutcome outcome;
+    private final UUID winner;
+    private final Map<UUID, List<Vote>> candidateVotes;
+    private final List<VotingDecision> votingDecisions;
+    private final ElectionType electionType;
+    private final long timestamp;
     
-    public ElectionResult() {
-        // Default constructor for stub
+    public ElectionResult(UUID winner, Map<UUID, List<Vote>> candidateVotes, 
+                         List<VotingDecision> votingDecisions, ElectionType electionType) {
+        this.winner = winner;
+        this.candidateVotes = candidateVotes;
+        this.votingDecisions = votingDecisions;
+        this.electionType = electionType;
+        this.timestamp = System.currentTimeMillis();
     }
     
-    public ElectionResult(UUID winnerId, double winningVoteCount, ElectionOutcome outcome) {
-        this.winnerId = winnerId;
-        this.winningVoteCount = winningVoteCount;
-        this.outcome = outcome;
+    public UUID getWinner() { return winner; }
+    public Map<UUID, List<Vote>> getCandidateVotes() { return candidateVotes; }
+    public List<VotingDecision> getVotingDecisions() { return votingDecisions; }
+    public ElectionType getElectionType() { return electionType; }
+    public long getTimestamp() { return timestamp; }
+    
+    public int getTotalVotes() {
+        return candidateVotes.values().stream()
+            .mapToInt(List::size)
+            .sum();
     }
     
-    public UUID getWinnerId() {
-        return winnerId;
-    }
-    
-    public void setWinnerId(UUID winnerId) {
-        this.winnerId = winnerId;
-    }
-    
-    public double getWinningVoteCount() {
-        return winningVoteCount;
-    }
-    
-    public void setWinningVoteCount(double winningVoteCount) {
-        this.winningVoteCount = winningVoteCount;
-    }
-    
-    public ElectionOutcome getOutcome() {
-        return outcome;
-    }
-    
-    public void setOutcome(ElectionOutcome outcome) {
-        this.outcome = outcome;
+    public float getWinnerSupport() {
+        if (winner == null || !candidateVotes.containsKey(winner)) {
+            return 0.0f;
+        }
+        
+        List<Vote> winnerVotes = candidateVotes.get(winner);
+        if (winnerVotes.isEmpty()) {
+            return 0.0f;
+        }
+        
+        return (float) winnerVotes.stream()
+            .mapToDouble(Vote::getSupportLevel)
+            .average()
+            .orElse(0.0);
     }
 }

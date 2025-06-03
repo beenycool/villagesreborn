@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Enhanced VillagerBrain implementation with PromptBuilder integration
+ * Enhanced VillagerBrain implementation with PromptBuilder integration and rich memory support
  */
 public class VillagerBrain {
     public static final int MAX_SHORT_TERM_MEMORY = 50;
@@ -24,7 +24,7 @@ public class VillagerBrain {
     private PersonalityProfile personalityTraits;
     private MoodState currentMood;
     private ConversationHistory shortTermMemory;
-    private MemoryBank longTermMemory;
+    private MemoryBank longTermMemory; // Enhanced MemoryBank with rich narratives
     private Map<UUID, RelationshipData> relationshipMap;
     private LLMApiClient llmApiClient;
     private PromptBuilder promptBuilder;
@@ -49,6 +49,7 @@ public class VillagerBrain {
     public MoodState getCurrentMood() { return currentMood; }
     public ConversationHistory getShortTermMemory() { return shortTermMemory; }
     public MemoryBank getLongTermMemory() { return longTermMemory; }
+    public MemoryBank getMemoryBank() { return longTermMemory; } // Enhanced access method
     public Map<UUID, RelationshipData> getRelationshipMap() { return relationshipMap; }
     public String getVillagerName() { return villagerName; }
     public String getProfession() { return profession; }
@@ -81,7 +82,7 @@ public class VillagerBrain {
         }
 
         try {
-            // Build comprehensive prompt using PromptBuilder
+            // Build comprehensive prompt using enhanced PromptBuilder
             String fullPrompt = promptBuilder.buildPrompt(this, context);
             
             // Add the current player message to the prompt
@@ -100,7 +101,7 @@ public class VillagerBrain {
                 return null;
             }
 
-            // Store interaction
+            // Store interaction in both short-term memory and enhanced long-term memory
             ConversationInteraction interaction = new ConversationInteraction(
                 System.currentTimeMillis(),
                 player.getUUID(),
@@ -110,6 +111,9 @@ public class VillagerBrain {
                 context.getLocation()
             );
             shortTermMemory.addInteraction(interaction);
+            
+            // Record detailed interaction in enhanced memory bank
+            recordDetailedPlayerInteraction(player, message, response.getResponse(), context);
 
             // Update relationship
             updateRelationship(player, message);
@@ -123,6 +127,61 @@ public class VillagerBrain {
             return null;
         }
     }
+    
+    /**
+     * Records a detailed player interaction in the enhanced memory bank
+     */
+    private void recordDetailedPlayerInteraction(Player player, String message, String response, ConversationContext context) {
+        // Determine sentiment change based on message content and current mood
+        float sentimentChange = calculateSentimentChange(message);
+        
+        // Record the detailed interaction
+        longTermMemory.recordPlayerInteraction(
+            player.getUUID(),
+            player.getName(),
+            determineInteractionType(message),
+            message,
+            response,
+            sentimentChange
+        );
+    }
+    
+    /**
+     * Calculates sentiment change from player interaction
+     */
+    private float calculateSentimentChange(String message) {
+        // Simple sentiment analysis - could be enhanced with more sophisticated methods
+        String lowerMessage = message.toLowerCase();
+        
+        if (lowerMessage.contains("thank") || lowerMessage.contains("please") || lowerMessage.contains("help")) {
+            return 0.2f; // Positive
+        } else if (lowerMessage.contains("stupid") || lowerMessage.contains("hate") || lowerMessage.contains("bad")) {
+            return -0.3f; // Negative
+        } else if (lowerMessage.contains("hello") || lowerMessage.contains("hi") || lowerMessage.contains("good")) {
+            return 0.1f; // Slightly positive
+        }
+        
+        return 0.0f; // Neutral
+    }
+    
+    /**
+     * Determines the type of interaction based on message content
+     */
+    private String determineInteractionType(String message) {
+        String lowerMessage = message.toLowerCase();
+        
+        if (lowerMessage.contains("trade") || lowerMessage.contains("buy") || lowerMessage.contains("sell")) {
+            return "trade";
+        } else if (lowerMessage.contains("help") || lowerMessage.contains("quest")) {
+            return "request_help";
+        } else if (lowerMessage.contains("hello") || lowerMessage.contains("hi")) {
+            return "greeting";
+        } else if (lowerMessage.contains("?")) {
+            return "question";
+        } else {
+            return "conversation";
+        }
+    }
 
     public RelationshipData getRelationship(Player player) {
         return relationshipMap.computeIfAbsent(player.getUUID(), uuid -> new RelationshipData(uuid));
@@ -131,13 +190,17 @@ public class VillagerBrain {
     public void updateRelationship(Player player, String message) {
         RelationshipData relationship = getRelationship(player);
         relationship.incrementInteractionCount();
-        // Simplified relationship update
-        relationship.adjustTrust(0.1f);
-        relationship.adjustFriendship(0.1f);
+        
+        // Enhanced relationship update based on sentiment
+        float sentimentChange = calculateSentimentChange(message);
+        relationship.adjustTrust(sentimentChange * 0.5f);
+        relationship.adjustFriendship(sentimentChange);
     }
 
     public void updateMood(Player player, String message) {
-        // Simplified mood update
+        // Enhanced mood update based on interaction
+        float sentimentChange = calculateSentimentChange(message);
+        // Simple mood adjustment - could be more sophisticated
         currentMood.setLastUpdated(System.currentTimeMillis());
     }
 
@@ -180,7 +243,65 @@ public class VillagerBrain {
         return brain;
     }
 
-    // New methods required by task specification
+    // Enhanced memory methods
+    
+    /**
+     * Record a personal story in the villager's memory
+     */
+    public void recordPersonalStory(String title, String narrative, List<String> keyCharacters, String emotionalTone, boolean isOngoing) {
+        com.beeny.villagesreborn.core.ai.memory.EmotionalTone tone;
+        try {
+            tone = com.beeny.villagesreborn.core.ai.memory.EmotionalTone.valueOf(emotionalTone.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            tone = com.beeny.villagesreborn.core.ai.memory.EmotionalTone.NEUTRAL;
+        }
+        
+        longTermMemory.addPersonalStory(title, narrative, keyCharacters, tone, isOngoing);
+    }
+    
+    /**
+     * Record a village event that this villager witnessed or participated in
+     */
+    public void recordVillageEvent(String eventType, String description, List<UUID> participants, String impactLevel) {
+        com.beeny.villagesreborn.core.ai.memory.EventImpact impact;
+        try {
+            impact = com.beeny.villagesreborn.core.ai.memory.EventImpact.valueOf(impactLevel.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            impact = com.beeny.villagesreborn.core.ai.memory.EventImpact.NEUTRAL;
+        }
+        
+        longTermMemory.recordVillageEvent(eventType, description, participants, impact);
+    }
+    
+    /**
+     * Record a traumatic event that may affect future behavior
+     */
+    public void recordTrauma(String description, String trigger, float severity, List<UUID> involvedEntities) {
+        longTermMemory.recordTrauma(description, trigger, severity, involvedEntities);
+    }
+    
+    /**
+     * Record a joyful memory that can improve mood
+     */
+    public void recordJoy(String description, List<UUID> sharedWith, float happinessLevel) {
+        longTermMemory.recordJoyfulMemory(description, sharedWith, happinessLevel);
+    }
+    
+    /**
+     * Generate a life story summary for this villager
+     */
+    public String generateLifeStory() {
+        return longTermMemory.generateLifeStorySummary();
+    }
+    
+    /**
+     * Check if this villager holds a grudge against a specific entity
+     */
+    public boolean holdsGrudgeAgainst(UUID entityUUID) {
+        return longTermMemory.holdsGrudge(entityUUID);
+    }
+
+    // Legacy methods (maintained for backward compatibility)
     
     /**
      * Handle message from PlayerEntity (alias for processMessage)
@@ -210,6 +331,9 @@ public class VillagerBrain {
             null  // No specific location
         );
         shortTermMemory.addInteraction(interaction);
+        
+        // Also add to long-term memory as a significant memory
+        longTermMemory.addSignificantMemory(entry);
     }
     
     /**
@@ -282,5 +406,8 @@ public class VillagerBrain {
             "Village" // Default location
         );
         shortTermMemory.addInteraction(interaction);
+        
+        // Also record in enhanced memory bank
+        recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, new ConversationContext());
     }
 }

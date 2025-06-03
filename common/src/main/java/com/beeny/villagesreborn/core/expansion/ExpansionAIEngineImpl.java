@@ -222,9 +222,12 @@ public class ExpansionAIEngineImpl implements ExpansionAIEngine {
             ResourceCost cost = calculateBuildingCost(request.getBuildingType(), request.getQuantity());
             
             for (int i = 0; i < request.getQuantity(); i++) {
+                // Calculate AI-powered position based on building type and strategy
+                BlockPos position = calculateOptimalPosition(request, i, buildingPlans.size());
+                
                 BuildingPlan plan = new BuildingPlan(
                     type,
-                    new BlockPos(0, 0, 0), // Placeholder position
+                    position,
                     request.getPriority().ordinal(),
                     cost
                 );
@@ -466,5 +469,71 @@ public class ExpansionAIEngineImpl implements ExpansionAIEngine {
     private boolean isValidBuildingType(String buildingType) {
         List<String> validTypes = Arrays.asList("house", "farm", "workshop", "watchtower", "market", "library", "tavern");
         return validTypes.contains(buildingType.toLowerCase());
+    }
+    
+    /**
+     * Calculates optimal AI-powered position for building placement
+     */
+    private BlockPos calculateOptimalPosition(BuildingRequest request, int buildingIndex, int totalBuildings) {
+        // Base village center coordinates
+        int centerX = 0;
+        int centerZ = 0;
+        int baseY = 64; // Standard ground level
+        
+        String buildingType = request.getBuildingType().toLowerCase();
+        
+        // AI-powered placement logic based on building type and function
+        switch (buildingType) {
+            case "house" -> {
+                // Houses form residential clusters around the village center
+                double angle = (buildingIndex * 2.0 * Math.PI) / Math.max(1, request.getQuantity());
+                int radius = 20 + (buildingIndex / 4) * 10; // Expanding rings
+                int x = centerX + (int)(Math.cos(angle) * radius);
+                int z = centerZ + (int)(Math.sin(angle) * radius);
+                return new BlockPos(x, baseY, z);
+            }
+            case "farm" -> {
+                // Farms placed in fertile areas, slightly outside residential zones
+                int farmRadius = 35 + buildingIndex * 15;
+                // Prefer cardinal directions for easier access
+                int direction = buildingIndex % 4;
+                return switch (direction) {
+                    case 0 -> new BlockPos(centerX + farmRadius, baseY, centerZ);
+                    case 1 -> new BlockPos(centerX, baseY, centerZ + farmRadius);
+                    case 2 -> new BlockPos(centerX - farmRadius, baseY, centerZ);
+                    default -> new BlockPos(centerX, baseY, centerZ - farmRadius);
+                };
+            }
+            case "workshop" -> {
+                // Workshops clustered in an industrial district
+                int workshopX = centerX + 25 + (buildingIndex % 3) * 12;
+                int workshopZ = centerZ - 15 + (buildingIndex / 3) * 12;
+                return new BlockPos(workshopX, baseY, workshopZ);
+            }
+            case "watchtower" -> {
+                // Watchtowers positioned for optimal surveillance coverage
+                int towerRadius = 50 + buildingIndex * 20;
+                double angle = buildingIndex * Math.PI / 2; // 90-degree intervals
+                int x = centerX + (int)(Math.cos(angle) * towerRadius);
+                int z = centerZ + (int)(Math.sin(angle) * towerRadius);
+                int y = baseY + 10; // Elevated for better vision
+                return new BlockPos(x, y, z);
+            }
+            case "market" -> {
+                // Markets positioned centrally for easy access
+                int marketX = centerX + (buildingIndex % 2) * 15 - 7;
+                int marketZ = centerZ + (buildingIndex / 2) * 15 - 7;
+                return new BlockPos(marketX, baseY, marketZ);
+            }
+            default -> {
+                // Default placement in a grid pattern
+                int gridSize = (int)Math.ceil(Math.sqrt(totalBuildings));
+                int row = totalBuildings / gridSize;
+                int col = totalBuildings % gridSize;
+                int x = centerX + (col - gridSize/2) * 15;
+                int z = centerZ + (row - gridSize/2) * 15;
+                return new BlockPos(x, baseY, z);
+            }
+        }
     }
 }
