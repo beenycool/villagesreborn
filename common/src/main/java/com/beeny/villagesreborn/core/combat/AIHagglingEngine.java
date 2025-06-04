@@ -58,19 +58,15 @@ public class AIHagglingEngine extends HagglingEngine {
             CompletableFuture<ConversationResponse> responseFuture = llmClient.generateConversationResponse(request)
                 .orTimeout(5, TimeUnit.SECONDS);
             
-            responseFuture.thenApply(response -> {
-                if (response != null && response.isSuccess()) {
-                    double aiPrice = parseAIPrice(response.getResponse(), basePrice);
-                    if (aiPrice > 0) {
-                        return validateAndClampPrice(aiPrice, basePrice);
-                    }
+            // Wait for the future to complete and get the result
+            ConversationResponse response = responseFuture.get(5, TimeUnit.SECONDS);
+            
+            if (response != null && response.isSuccess()) {
+                double aiPrice = parseAIPrice(response.getResponse(), basePrice);
+                if (aiPrice > 0) {
+                    return validateAndClampPrice(aiPrice, basePrice);
                 }
-                LOGGER.warn("AI pricing failed, using fallback for item: {}", itemName);
-                return fallbackEngine.calculatePrice(basePrice, relationship, reputation);
-            }).exceptionally(e -> {
-                LOGGER.error("Error in AI price calculation", e);
-                return fallbackEngine.calculatePrice(basePrice, relationship, reputation);
-            });
+            }
             
             LOGGER.warn("AI pricing failed, using fallback for item: {}", itemName);
             return fallbackEngine.calculatePrice(basePrice, relationship, reputation);
