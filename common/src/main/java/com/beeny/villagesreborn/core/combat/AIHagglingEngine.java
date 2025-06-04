@@ -56,6 +56,8 @@ public class AIHagglingEngine extends HagglingEngine {
                 .build();
             
             CompletableFuture<ConversationResponse> responseFuture = llmClient.generateConversationResponse(request);
+            
+            // Wait for the response with a timeout
             ConversationResponse response = responseFuture.get(5, TimeUnit.SECONDS);
             
             if (response != null && response.isSuccess()) {

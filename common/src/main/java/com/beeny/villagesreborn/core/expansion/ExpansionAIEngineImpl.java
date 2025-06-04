@@ -527,9 +527,9 @@ public class ExpansionAIEngineImpl implements ExpansionAIEngine {
             }
             default -> {
                 // Default placement in a grid pattern
-                int gridSize = (int)Math.ceil(Math.sqrt(totalBuildings));
-                int row = totalBuildings / gridSize;
-                int col = totalBuildings % gridSize;
+                int gridSize = Math.max(1, (int)Math.ceil(Math.sqrt(totalBuildings)));
+                int row = buildingIndex / gridSize;
+                int col = buildingIndex % gridSize;
                 int x = centerX + (col - gridSize/2) * 15;
                 int z = centerZ + (row - gridSize/2) * 15;
                 return new BlockPos(x, baseY, z);
