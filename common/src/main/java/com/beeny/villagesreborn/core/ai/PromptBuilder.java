@@ -8,7 +8,10 @@ import com.beeny.villagesreborn.core.expansion.VillageResources;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 /**
  * Enhanced PromptBuilder for LLM-powered villager conversations
@@ -200,24 +203,35 @@ public class PromptBuilder {
      */
     private String generateBackgroundNarrative(MemoryBank memoryBank) {
         StringBuilder background = new StringBuilder();
-        
-        List<PersonalStory> stories = memoryBank.getPersonalStories();
-        if (!stories.isEmpty()) {
-            PersonalStory primaryStory = stories.get(stories.size() - 1); // Most recent
-            background.append(truncateForContext(primaryStory.getNarrative(), 150));
+
+        if (memoryBank != null) {
+            List<PersonalStory> stories = memoryBank.getPersonalStories();
+            if (stories != null && !stories.isEmpty()) {
+                PersonalStory primaryStory = stories.get(stories.size() - 1); // Most recent
+                if (primaryStory != null && primaryStory.getNarrative() != null) {
+                    background.append(truncateForContext(primaryStory.getNarrative(), 150));
+                } else {
+                    background.append("A villager with an unrecorded story.");
+                }
+            } else {
+                background.append("A villager with their own story yet to be fully discovered.");
+            }
+
+            Map<UUID, VillagerRelationshipMemory> relationships = memoryBank.getVillagerRelationships();
+            if (relationships != null) {
+                long positiveRelationships = relationships.values().stream()
+                    .filter(Objects::nonNull)
+                    .filter(rel -> rel.getRelationshipStrength() > 0.3f)
+                    .count();
+
+                if (positiveRelationships > 0) {
+                    background.append(" Well-connected in the village community.");
+                }
+            }
         } else {
-            background.append("A villager with their own story yet to be fully discovered.");
+            background.append("A villager with no recorded memories.");
         }
-        
-        // Add relationship summary
-        long positiveRelationships = memoryBank.getVillagerRelationships().values().stream()
-            .mapToLong(rel -> rel.getRelationshipStrength() > 0.3f ? 1 : 0)
-            .sum();
-        
-        if (positiveRelationships > 0) {
-            background.append(" Well-connected in the village community.");
-        }
-        
+
         return background.toString();
     }
     

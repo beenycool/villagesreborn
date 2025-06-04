@@ -65,7 +65,7 @@ public class VillagerJournal {
             entryDate,
             theme,
             content,
-            villagerBrain.getCurrentMood().getOverallMood().toString(),
+            getSafelyFormattedMood(),
             generateEntryTitle(theme, entryDate)
         );
         
@@ -73,7 +73,7 @@ public class VillagerJournal {
         addEntry(entry);
         
         // Update narrative theme tracking
-        narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
+        narrativeThemes.put(theme, narrativeThemes.get(theme) + 1);
         
         return entry;
     }
@@ -86,10 +86,11 @@ public class VillagerJournal {
             LocalDateTime.now(),
             theme,
             content,
-            villagerBrain.getCurrentMood().getOverallMood().toString(),
+            getSafelyFormattedMood(),
             title
         );
         addEntry(entry);
+        narrativeThemes.put(theme, narrativeThemes.get(theme) + 1);
     }
     
     private void addEntry(JournalEntry entry) {
@@ -141,8 +142,8 @@ public class VillagerJournal {
         }
         
         // Mood influence
-        MoodState mood = villagerBrain.getCurrentMood();
-        if (mood.getOverallMood().toString().contains("SAD") || mood.getOverallMood().toString().contains("ANXIOUS")) {
+        String currentMoodStr = getSafelyFormattedMood();
+        if (currentMoodStr.contains("SAD") || currentMoodStr.contains("ANXIOUS")) {
             themeWeights.put("fears_hopes", themeWeights.getOrDefault("fears_hopes", 0.0f) + 1.0f);
         }
         
@@ -291,12 +292,15 @@ public class VillagerJournal {
         StringBuilder reflection = new StringBuilder();
         
         MoodState mood = villagerBrain.getCurrentMood();
-        if (mood.getOverallMood().toString().contains("SAD")) {
-            reflection.append("I've been feeling melancholy lately. Sometimes I worry about what the future holds for our village and for me.");
-        } else if (mood.getOverallMood().toString().contains("ANXIOUS")) {
-            reflection.append("There's been a lot on my mind recently. Change can be frightening, but I try to remind myself that it often brings opportunities.");
-        } else {
-            reflection.append("I've been thinking about my dreams and aspirations. There's so much I hope to accomplish in this life.");
+        if (mood != null && mood.getOverallMood() != null) {
+            String overallMoodStr = mood.getOverallMood().toString();
+            if (overallMoodStr.contains("SAD")) {
+                reflection.append("I've been feeling melancholy lately. Sometimes I worry about what the future holds for our village and for me.");
+            } else if (overallMoodStr.contains("ANXIOUS")) {
+                reflection.append("There's been a lot on my mind recently. Change can be frightening, but I try to remind myself that it often brings opportunities.");
+            } else {
+                reflection.append("I've been thinking about my dreams and aspirations. There's so much I hope to accomplish in this life.");
+            }
         }
         
         return reflection.toString();
@@ -462,6 +466,14 @@ public class VillagerJournal {
     
     public void setAutoGenerateEntries(boolean autoGenerate) { this.autoGenerateEntries = autoGenerate; }
     public void setMaxEntries(int maxEntries) { this.maxEntries = maxEntries; }
+    
+    private String getSafelyFormattedMood() {
+        MoodState mood = villagerBrain.getCurrentMood();
+        if (mood != null && mood.getOverallMood() != null) {
+            return mood.getOverallMood().toString();
+        }
+        return "NEUTRAL"; // Default mood if not available
+    }
     
     /**
      * Journal entry class

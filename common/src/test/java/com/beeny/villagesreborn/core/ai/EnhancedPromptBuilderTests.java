@@ -357,6 +357,7 @@ public class EnhancedPromptBuilderTests {
     @DisplayName("Should handle context with nearby villagers")
     void testNearbyVillagersContext() {
         // Given
+        context.setHasNearbyVillagers(true); // Ensure the context knows there are nearby villagers
         context.setNearbyVillagers("Alice, Bob, Charlie");
         
         // When

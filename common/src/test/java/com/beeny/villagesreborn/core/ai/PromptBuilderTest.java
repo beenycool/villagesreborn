@@ -59,6 +59,8 @@ class PromptBuilderTest {
         when(mockMood.getOverallMood()).thenReturn(MoodCategory.HAPPY);
         when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
 
+        setupMockContext();
+
         // When: Building prompt
         String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
 
@@ -158,6 +160,8 @@ class PromptBuilderTest {
         List<ConversationInteraction> longHistory = createLongHistoryList(100);
         when(mockHistory.getRecent(anyInt())).thenReturn(longHistory);
 
+        setupMockContext();
+
         // When: Building prompt
         String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
 
@@ -185,6 +189,7 @@ class PromptBuilderTest {
     void shouldIncludeResponseGuidelinesInPrompt() {
         // Given: Complete villager brain
         setupMockBrain();
+        setupMockContext();
 
         // When: Building prompt
         String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
@@ -201,6 +206,7 @@ class PromptBuilderTest {
     void shouldTruncateHistoryWhenApproachingTokenLimits() {
         // Given: Brain with moderate history that needs truncation
         setupMockBrain();
+        setupMockContext();
         List<ConversationInteraction> moderateHistory = createLongHistoryList(20);
         when(mockHistory.getRecent(anyInt())).thenReturn(moderateHistory);
 
@@ -246,6 +252,8 @@ class PromptBuilderTest {
         when(mockBrain.getVillageName()).thenReturn("Testville");
         when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
 
+        setupMockContext();
+
         // When: Building prompt
         String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
 
@@ -260,6 +268,7 @@ class PromptBuilderTest {
     void shouldFormatPromptSectionsWithProperSeparators() {
         // Given: Complete brain setup
         setupMockBrain();
+        setupMockContext();
 
         // When: Building prompt
         String prompt = promptBuilder.buildPrompt(mockBrain, mockContext);
@@ -298,5 +307,14 @@ class PromptBuilderTest {
         when(mockPersonality.generateDescription()).thenReturn("Friendly and helpful");
         when(mockMood.getOverallMood()).thenReturn(MoodCategory.HAPPY);
         when(mockHistory.getRecent(anyInt())).thenReturn(List.of());
+    }
+
+    private void setupMockContext() {
+        when(mockContext.getTimeOfDay()).thenReturn("Noon");
+        when(mockContext.getWeather()).thenReturn("Clear");
+        when(mockContext.getLocation()).thenReturn("Village Square");
+        when(mockContext.getRelationship()).thenReturn("Neutral");
+        when(mockContext.hasNearbyVillagers()).thenReturn(false);
+        when(mockContext.getNearbyVillagers()).thenReturn("");
     }
 }

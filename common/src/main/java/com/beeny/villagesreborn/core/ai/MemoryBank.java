@@ -182,7 +182,7 @@ public class MemoryBank {
         List<DetailedInteraction> interactions = playerInteractions.get(entityUUID);
         if (interactions != null) {
             memories.addAll(interactions.stream()
-                .map(i -> new Memory("interaction", i.getContext(), i.getTimestamp(), Math.abs(i.getSentimentChange())))
+                .map(i -> new Memory("interaction", i.getContext(), i.getTimestamp(), i.getSentimentChange()))
                 .collect(Collectors.toList()));
         }
         
