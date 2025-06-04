@@ -211,7 +211,7 @@ public class AIHagglingEngine extends HagglingEngine {
     /**
      * Parses AI price response
      */
-    private double parseAIPrice(String response, double basePrice) {
+    private double parseAIPrice(String response) {
         Matcher matcher = PRICE_PATTERN.matcher(response);
         if (matcher.find()) {
             try {
