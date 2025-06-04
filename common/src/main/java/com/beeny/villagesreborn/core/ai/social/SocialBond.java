@@ -58,16 +58,16 @@ public class SocialBond {
      * Processes time-based decay of the bond
      */
     public void processTimeDecay(long daysPassed) {
+        // Some bond types are exempt from decay
+        if (bondType == RelationshipType.FAMILY || bondType == RelationshipType.SPOUSE) {
+            // Family and spouse bonds do not decay
+            return;
+        }
+        
         if (daysPassed > 14) {
             // Bonds weaken slightly over time without interaction
             float decayAmount = -0.01f * (daysPassed - 14);
             adjustStrength(decayAmount);
-        }
-        
-        // Some bond types are more resistant to decay
-        if (bondType == RelationshipType.FAMILY || bondType == RelationshipType.SPOUSE) {
-            // Family bonds decay much slower
-            return;
         }
     }
     
