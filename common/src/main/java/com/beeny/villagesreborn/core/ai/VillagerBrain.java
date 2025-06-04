@@ -408,6 +408,17 @@ public class VillagerBrain {
         shortTermMemory.addInteraction(interaction);
         
         // Also record in enhanced memory bank
-        recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, new ConversationContext());
+        recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, getCurrentConversationContext());
     }
+}
+
+/**
+ * Retrieve the current conversation context.
+ * @return the current ConversationContext
+ */
+private ConversationContext getCurrentConversationContext() {
+    if (currentConversationContext == null) {
+        currentConversationContext = new ConversationContext();
+    }
+    return currentConversationContext;
 }
