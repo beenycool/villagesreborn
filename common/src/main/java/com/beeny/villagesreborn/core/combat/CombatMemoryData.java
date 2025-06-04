@@ -11,6 +11,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Stores AI memory data for combat decisions and learning.
@@ -223,19 +225,33 @@ public class CombatMemoryData {
      */
     private void parseMigrationResponse(String aiResponse) {
         try {
-            // Simple JSON parsing (in real implementation use a JSON library)
-            // This is simplified for example purposes
-            if (aiResponse.contains("\"totalCombatEncounters\":")) {
-                String countStr = aiResponse.split("\"totalCombatEncounters\":")[1].split(",")[0];
-                this.totalCombatEncounters = Integer.parseInt(countStr.trim());
+            // Extract data using regex patterns - more robust than simple string splitting
+            Pattern intPattern = Pattern.compile("\"totalCombatEncounters\"\\s*:\\s*(\\d+)");
+            Matcher intMatcher = intPattern.matcher(aiResponse);
+            if (intMatcher.find()) {
+                this.totalCombatEncounters = Integer.parseInt(intMatcher.group(1));
             }
             
-            if (aiResponse.contains("\"averageSuccessRate\":")) {
-                String rateStr = aiResponse.split("\"averageSuccessRate\":")[1].split(",")[0];
-                this.averageSuccessRate = Float.parseFloat(rateStr.trim());
+            Pattern floatPattern = Pattern.compile("\"averageSuccessRate\"\\s*:\\s*(\\d+\\.?\\d*)");
+            Matcher floatMatcher = floatPattern.matcher(aiResponse);
+            if (floatMatcher.find()) {
+                this.averageSuccessRate = Float.parseFloat(floatMatcher.group(1));
             }
             
-            // More robust parsing would be needed for the map
+            // Extract enemy encounter history entries
+            // Format: "UUID": number
+            Pattern uuidEntryPattern = Pattern.compile("\"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\"\\s*:\\s*(\\d+)");
+            Matcher entryMatcher = uuidEntryPattern.matcher(aiResponse);
+            
+            while (entryMatcher.find()) {
+                try {
+                    UUID enemyId = UUID.fromString(entryMatcher.group(1));
+                    int count = Integer.parseInt(entryMatcher.group(2));
+                    this.enemyEncounterHistory.put(enemyId, count);
+                } catch (IllegalArgumentException e) {
+                    // Skip invalid UUIDs or number formats
+                }
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse AI response: " + e.getMessage());
         }
