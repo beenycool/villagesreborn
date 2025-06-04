@@ -101,8 +101,9 @@ public class AIHagglingEngine extends HagglingEngine {
                 .timeout(Duration.ofSeconds(5))
                 .build();
             
-            CompletableFuture<ConversationResponse> responseFuture = llmClient.generateConversationResponse(request);
-            ConversationResponse response = responseFuture.get(5, TimeUnit.SECONDS);
+            CompletableFuture<ConversationResponse> responseFuture = llmClient.generateConversationResponse(request)
+                .orTimeout(5, TimeUnit.SECONDS);
+            ConversationResponse response = responseFuture.join();
             
             if (response != null && response.isSuccess()) {
                 return parseNegotiationDecision(response.getResponse(), offer, basePrice);
