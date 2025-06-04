@@ -3,16 +3,27 @@ package com.beeny.villagesreborn.core.governance;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 /**
  * Represents the results of a village election
  */
 public class ElectionResult {
-    private final UUID winner;
-    private final Map<UUID, List<Vote>> candidateVotes;
-    private final List<VotingDecision> votingDecisions;
-    private final ElectionType electionType;
-    private final long timestamp;
+    private UUID winner;
+    private Map<UUID, List<Vote>> candidateVotes;
+    private List<VotingDecision> votingDecisions;
+    private ElectionType electionType;
+    private long timestamp;
+    private double winningVoteCount;
+    private ElectionOutcome outcome;
+    
+    public ElectionResult() {
+        this.candidateVotes = new HashMap<>();
+        this.votingDecisions = new ArrayList<>();
+        this.electionType = ElectionType.MAYOR;
+        this.timestamp = System.currentTimeMillis();
+    }
     
     public ElectionResult(UUID winner, Map<UUID, List<Vote>> candidateVotes, 
                          List<VotingDecision> votingDecisions, ElectionType electionType) {
@@ -24,10 +35,17 @@ public class ElectionResult {
     }
     
     public UUID getWinner() { return winner; }
+    public UUID getWinnerId() { return winner; }
     public Map<UUID, List<Vote>> getCandidateVotes() { return candidateVotes; }
     public List<VotingDecision> getVotingDecisions() { return votingDecisions; }
     public ElectionType getElectionType() { return electionType; }
     public long getTimestamp() { return timestamp; }
+    public double getWinningVoteCount() { return winningVoteCount; }
+    public ElectionOutcome getOutcome() { return outcome; }
+    
+    public void setWinnerId(UUID winner) { this.winner = winner; }
+    public void setWinningVoteCount(double count) { this.winningVoteCount = count; }
+    public void setOutcome(ElectionOutcome outcome) { this.outcome = outcome; }
     
     public int getTotalVotes() {
         return candidateVotes.values().stream()

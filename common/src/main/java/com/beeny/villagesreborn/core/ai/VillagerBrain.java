@@ -410,15 +410,14 @@ public class VillagerBrain {
         // Also record in enhanced memory bank
         recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, getCurrentConversationContext());
     }
-}
-
-/**
- * Retrieve the current conversation context.
- * @return the current ConversationContext
- */
-private ConversationContext getCurrentConversationContext() {
-    if (currentConversationContext == null) {
-        currentConversationContext = new ConversationContext();
+    
+    /**
+     * Retrieve the current conversation context.
+     * @return the current ConversationContext
+     */
+    private ConversationContext getCurrentConversationContext() {
+        ConversationContext context = new ConversationContext();
+        context.setLocation("Village");
+        return context;
     }
-    return currentConversationContext;
 }
