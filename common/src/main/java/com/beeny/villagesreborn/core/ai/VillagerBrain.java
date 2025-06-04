@@ -49,7 +49,11 @@ public class VillagerBrain {
     public MoodState getCurrentMood() { return currentMood; }
     public ConversationHistory getShortTermMemory() { return shortTermMemory; }
     public MemoryBank getLongTermMemory() { return longTermMemory; }
-    public MemoryBank getMemoryBank() { return longTermMemory; } // Enhanced access method
+    /**
+     * @deprecated Use {@link #getLongTermMemory()} instead.
+     */
+    @Deprecated
+    public MemoryBank getMemoryBank() { return longTermMemory; }
     public Map<UUID, RelationshipData> getRelationshipMap() { return relationshipMap; }
     public String getVillagerName() { return villagerName; }
     public String getProfession() { return profession; }
