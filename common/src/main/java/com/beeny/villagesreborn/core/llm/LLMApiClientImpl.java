@@ -114,7 +114,7 @@ public class LLMApiClientImpl implements LLMApiClient {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 
                 // API key is valid if we get a 200 response or if it's a recognizable response format
-                return response.statusCode() == 200 || response.statusCode() == 401; // 401 means key format is recognized but invalid
+                return response.statusCode() == 200; // 401 means key format is recognized but invalid
                 
             } catch (Exception e) {
                 LOGGER.error("Error validating API key for provider {}", provider, e);
