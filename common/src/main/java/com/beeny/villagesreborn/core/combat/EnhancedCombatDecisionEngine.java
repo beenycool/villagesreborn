@@ -337,13 +337,16 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
         // Factor in villager's social skills and reputation (simplified check)
         try {
             // Attempt to call if method exists, otherwise skip
-            if (villager.getClass().getMethod("hasHighReputation") != null) {
-                if ((Boolean) villager.getClass().getMethod("hasHighReputation").invoke(villager)) {
-                    baseChance += 0.2;
-                }
+            java.lang.reflect.Method hasHighReputationMethod = villager.getClass().getMethod("hasHighReputation");
+            if ((Boolean) hasHighReputationMethod.invoke(villager)) {
+                baseChance += 0.2;
             }
-        } catch (Exception e) {
+        } catch (NoSuchMethodException e) {
             // Method doesn't exist, use default behavior
+            baseChance += 0.1; // Small default social bonus
+        } catch (Exception e) {
+            // Catch other reflection-related exceptions or issues during invocation
+            LOGGER.warn("Error checking villager reputation, applying default social bonus.", e);
             baseChance += 0.1; // Small default social bonus
         }
         

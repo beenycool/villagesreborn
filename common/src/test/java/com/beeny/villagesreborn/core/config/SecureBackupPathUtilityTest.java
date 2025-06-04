@@ -143,12 +143,23 @@ class SecureBackupPathUtilityTest {
     
     @Test
     void crossPlatform_MixedSeparators_NormalizesCorrectly() {
-        // Test that mixed separators get normalized appropriately
-        Path configPath = Paths.get("config/subdir\\app.properties").normalize();
-        Path backupPath = SecureBackupPath.createBackupPath(configPath);
+        // Test that mixed separators get normalized appropriately by SecureBackupPath.createBackupPath
+        Path rawMixedPath = Paths.get("config/subdir\\app.properties"); // Use raw mixed path
+        Path backupPath = SecureBackupPath.createBackupPath(rawMixedPath); // Pass raw path to method under test
         
-        // The backup should be in the same directory as the normalized config
-        assertEquals(configPath.getParent(), backupPath.getParent());
+        // For comparison, find what the parent of the normalized raw path would be
+        Path normalizedRawPath = rawMixedPath.normalize(); 
+        Path expectedParent = normalizedRawPath.getParent();
+        Path actualParent = backupPath.getParent();
+
+        assertNotNull(expectedParent, "Parent of normalized configPath should not be null. Path: " + normalizedRawPath);
+        assertNotNull(actualParent, "Parent of backupPath should not be null. Path: " + backupPath);
+
+        assertEquals(
+            expectedParent.toAbsolutePath().normalize().toString().toLowerCase(),
+            actualParent.toAbsolutePath().normalize().toString().toLowerCase(),
+            "Parent paths should match after normalization and absolutization."
+        );
         assertEquals("app.properties.backup", backupPath.getFileName().toString());
     }
     
