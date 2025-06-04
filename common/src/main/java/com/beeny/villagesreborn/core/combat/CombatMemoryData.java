@@ -13,6 +13,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Stores AI memory data for combat decisions and learning.
@@ -195,15 +201,30 @@ public class CombatMemoryData {
             .timeout(Duration.ofSeconds(30))
             .build();
         
-        // Get AI response (blocking call for migration)
-        ConversationResponse response = client.generateConversationResponse(request).get();
-        
-        if (!response.isSuccess()) {
-            throw new RuntimeException("LLM migration failed: " + response.getErrorMessage());
+        try {
+            // Get AI response (blocking call for migration)
+            ConversationResponse response = client.generateConversationResponse(request).get(30, TimeUnit.SECONDS);
+            
+            if (!response.isSuccess()) {
+                throw new RuntimeException("LLM migration failed: " + response.getErrorMessage());
+            }
+            
+            // Parse AI response and update data
+            parseMigrationResponse(response.getResponse());
+        } catch (InterruptedException e) {
+            // Log specific interruption
+            // Consider how to handle this - rethrow, fallback, etc.
+            Thread.currentThread().interrupt(); // Preserve interrupt status
+            throw new RuntimeException("LLM migration interrupted: " + e.getMessage(), e);
+        } catch (ExecutionException e) {
+            // Log error during execution of the task
+            throw new RuntimeException("LLM migration execution error: " + e.getCause().getMessage(), e.getCause());
+        } catch (TimeoutException e) {
+            // Log timeout specifically
+            throw new RuntimeException("LLM migration timed out after 30 seconds: " + e.getMessage(), e);
         }
-        
-        // Parse AI response and update data
-        parseMigrationResponse(response.getResponse());
+        // No general 'catch (Exception e)' here if we want specific handling above
+        // and let other exceptions propagate if not caught by 'throws Exception' in method signature.
     }
     
     /**
