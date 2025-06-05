@@ -73,7 +73,7 @@ public class VillagerJournal {
         addEntry(entry);
         
         // Update narrative theme tracking
-        narrativeThemes.put(theme, narrativeThemes.get(theme) + 1);
+        narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
         
         return entry;
     }
@@ -90,7 +90,7 @@ public class VillagerJournal {
             title
         );
         addEntry(entry);
-        narrativeThemes.put(theme, narrativeThemes.get(theme) + 1);
+        narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
     }
     
     private void addEntry(JournalEntry entry) {
