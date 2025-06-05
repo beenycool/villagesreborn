@@ -350,8 +350,7 @@ public class VillagerJournal {
     }
     
     private String generateMoodReflection() {
-        MoodState mood = villagerBrain.getCurrentMood();
-        String moodString = mood.getOverallMood().toString();
+        String moodString = getSafelyFormattedMood();
         
         if (moodString.contains("HAPPY")) {
             return "Overall, I'm feeling quite content with life right now.";
