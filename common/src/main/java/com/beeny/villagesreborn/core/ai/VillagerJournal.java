@@ -88,13 +88,11 @@ public class VillagerJournal {
      * @param theme The theme of the entry.
      */
     public void addEntry(String title, String content, String theme) {
-        if (entries.size() >= maxEntries) {
-            entries.remove(0); // Remove the oldest entry
-        }
         JournalEntry entry = new JournalEntry(
             title, content, theme, getSafelyFormattedMood(), LocalDateTime.now()
         );
         addEntry(entry);
+        narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
     }
     
     /**
