@@ -77,9 +77,18 @@ class SecureBackupPathTest {
     @Test
     void resolveSibling_HandlesWindowsPaths() {
         Path configPath = Paths.get("C:\\config\\dir\\config.properties");
-        Path backupPath = configPath.resolveSibling(configPath.getFileName() + ".backup");
+        // Use the actual utility method being tested
+        Path backupPath = SecureBackupPath.createBackupPath(configPath);
         
-        assertEquals(configPath.getParent(), backupPath.getParent());
+        Path parent1 = configPath.getParent();
+        Path parent2 = backupPath.getParent();
+
+        assertNotNull(parent1, "Parent of configPath should not be null for C:\\config\\dir\\config.properties");
+        assertNotNull(parent2, "Parent of backupPath should not be null");
+
+        // Compare normalized, absolute, lowercase string representations for robustness on Windows
+        assertEquals(parent1.toAbsolutePath().normalize().toString().toLowerCase(), 
+                     parent2.toAbsolutePath().normalize().toString().toLowerCase());
         assertEquals("config.properties.backup", backupPath.getFileName().toString());
     }
     
