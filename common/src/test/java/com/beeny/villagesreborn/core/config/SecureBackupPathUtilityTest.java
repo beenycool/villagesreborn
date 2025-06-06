@@ -1,6 +1,8 @@
 package com.beeny.villagesreborn.core.config;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -146,13 +148,21 @@ class SecureBackupPathUtilityTest {
         // Test that mixed separators get normalized appropriately by SecureBackupPath.createBackupPath
         Path rawMixedPath = Paths.get("config/subdir\\app.properties"); // Use raw mixed path
         Path backupPath = SecureBackupPath.createBackupPath(rawMixedPath); // Pass raw path to method under test
-        
-        // For comparison, find what the parent of the normalized raw path would be
-        Path normalizedRawPath = rawMixedPath.normalize(); 
-        Path expectedParent = normalizedRawPath.getParent();
-        Path actualParent = backupPath.getParent();
 
-        assertNotNull(expectedParent, "Parent of normalized configPath should not be null. Path: " + normalizedRawPath);
+        Path expectedParent;
+        String expectedFilename;
+
+        if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+            // On Windows, '\' is a separator
+            expectedParent = Paths.get("config/subdir");
+            expectedFilename = "app.properties.backup";
+        } else {
+            // On Linux/macOS, '\' is a valid filename character
+            expectedParent = Paths.get("config");
+            expectedFilename = "subdir\\app.properties.backup";
+        }
+
+        Path actualParent = backupPath.getParent();
         assertNotNull(actualParent, "Parent of backupPath should not be null. Path: " + backupPath);
 
         assertEquals(
@@ -160,7 +170,7 @@ class SecureBackupPathUtilityTest {
             actualParent.toAbsolutePath().normalize().toString().toLowerCase(),
             "Parent paths should match after normalization and absolutization."
         );
-        assertEquals("app.properties.backup", backupPath.getFileName().toString());
+        assertEquals(expectedFilename, backupPath.getFileName().toString());
     }
     
     @Test

@@ -104,7 +104,10 @@ public class PromptBuilder {
     public String buildEnhancedSystemPrompt(VillagerBrain villagerBrain) {
         String personalityDesc = "Unknown personality";
         String moodDesc = "NEUTRAL";
-        String backgroundStory = generateBackgroundNarrative(villagerBrain.getMemoryBank());
+        String backgroundStory = "";
+        if (villagerBrain.getMemoryBank() != null) {
+            backgroundStory = generateBackgroundNarrative(villagerBrain.getMemoryBank());
+        }
         
         if (villagerBrain.getPersonalityTraits() != null) {
             personalityDesc = villagerBrain.getPersonalityTraits().generateDescription();
@@ -120,7 +123,7 @@ public class PromptBuilder {
     /**
      * Builds the legacy system prompt for backward compatibility
      */
-    public String buildSystemPrompt(VillagerBrain villagerBrain) {
+    public static String buildSystemPrompt(VillagerBrain villagerBrain) {
         String personalityDesc = "Unknown personality";
         String moodDesc = "NEUTRAL";
         

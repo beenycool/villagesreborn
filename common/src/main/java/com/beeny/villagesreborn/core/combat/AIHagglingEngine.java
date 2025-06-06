@@ -62,7 +62,7 @@ public class AIHagglingEngine extends HagglingEngine {
             ConversationResponse response = responseFuture.get(5, TimeUnit.SECONDS);
             
             if (response != null && response.isSuccess()) {
-                double aiPrice = parseAIPrice(response.getResponse(), basePrice);
+                double aiPrice = parseAIPrice(response.getResponse());
                 if (aiPrice > 0) {
                     return validateAndClampPrice(aiPrice, basePrice);
                 }
@@ -239,7 +239,7 @@ public class AIHagglingEngine extends HagglingEngine {
                     return new NegotiationDecision(NegotiationOutcome.REJECTED, 0, "AI rejected offer");
                     
                 case "counter":
-                    double counterPrice = parseAIPrice(response, basePrice); // Now matches the overloaded method
+                    double counterPrice = parseAIPrice(response);
                     if (counterPrice > 0) {
                         return new NegotiationDecision(NegotiationOutcome.COUNTER_OFFERED, counterPrice, "AI counter-offer");
                     }
