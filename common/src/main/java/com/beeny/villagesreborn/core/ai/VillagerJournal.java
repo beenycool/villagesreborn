@@ -62,15 +62,17 @@ public class VillagerJournal {
         
         // Create entry
         JournalEntry entry = new JournalEntry(
-            entryDate,
-            theme,
+            generateEntryTitle(theme, entryDate),
             content,
+            theme,
             getSafelyFormattedMood(),
-            generateEntryTitle(theme, entryDate)
+            entryDate
         );
         
-        // Add to journal
-        addEntry(entry);
+        // Add to journal if auto-generation is enabled
+        if (autoGenerateEntries) {
+            addEntry(entry);
+        }
         
         // Update narrative theme tracking
         narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
@@ -79,21 +81,26 @@ public class VillagerJournal {
     }
     
     /**
-     * Manually adds a journal entry (for special events)
+     * Adds a new journal entry.
+     * 
+     * @param title The title of the entry.
+     * @param content The main content of the entry.
+     * @param theme The theme of the entry.
      */
     public void addEntry(String title, String content, String theme) {
+        if (entries.size() >= maxEntries) {
+            entries.remove(0); // Remove the oldest entry
+        }
         JournalEntry entry = new JournalEntry(
-            LocalDateTime.now(),
-            theme,
-            content,
-            getSafelyFormattedMood(),
-            title
+            title, content, theme, getSafelyFormattedMood(), LocalDateTime.now()
         );
         addEntry(entry);
-        narrativeThemes.put(theme, narrativeThemes.getOrDefault(theme, 0) + 1);
     }
     
-    private void addEntry(JournalEntry entry) {
+    /**
+     * Manually adds a journal entry (for special events)
+     */
+    public void addEntry(JournalEntry entry) {
         entries.add(entry);
         lastEntryTime = System.currentTimeMillis();
         
@@ -484,12 +491,12 @@ public class VillagerJournal {
         private final String mood;
         private final String title;
         
-        public JournalEntry(LocalDateTime date, String theme, String content, String mood, String title) {
-            this.date = date;
-            this.theme = theme;
-            this.content = content;
-            this.mood = mood;
+        public JournalEntry(String title, String content, String theme, String mood, LocalDateTime date) {
             this.title = title;
+            this.content = content;
+            this.theme = theme;
+            this.mood = mood;
+            this.date = date;
         }
         
         public LocalDateTime getDate() { return date; }
