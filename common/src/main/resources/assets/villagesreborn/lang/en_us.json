@@ -1,0 +1,13 @@
+{
+  "villagesreborn.spawn_biome.button": "Choose Spawn Biome",
+  "villagesreborn.spawn_biome.confirm_for_creation": "Confirm",
+  "villagesreborn.spawn_biome.cancel_creation": "Cancel",
+  "villagesreborn.biome_selector.title": "Select Spawn Biome",
+  "villagesreborn.biome_selector.confirm": "Confirm Selection",
+  "villagesreborn.biome_selector.random": "Random",
+  "villagesreborn.biome_selector.description": "Choose where you want to spawn in your new world",
+  "villagesreborn.biome_selector.no_biomes": "No biomes available",
+  "villagesreborn.biome_selector.loading": "Loading biomes...",
+  "villagesreborn.world_creation.tab.title": "Villages Reborn",
+  "villagesreborn.world_creation.tab.description": "Configure Villages Reborn settings for your world"
+} 

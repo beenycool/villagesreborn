@@ -15,17 +15,25 @@ import org.slf4j.LoggerFactory;
 public class VillagesRebornFabric implements ModInitializer {
     private static final Logger LOGGER = LoggerFactory.getLogger("villagesreborn-fabric");
     private static FabricPlatform platform;
-    
+
     @Override
     public void onInitialize() {
         LOGGER.info("Initializing Villages Reborn for Fabric");
-        
+
         try {
             // Initialize platform implementation
             platform = new FabricPlatform();
-            
+
+            // Register blocks and items
+            ModContent.register();
+
             // Initialize common module
             VillagesRebornCommon.initialize();
+
+            // Register event handlers
+            if (FabricLoader.getInstance().isModLoaded("fabric-lifecycle-events-v1")) {
+                WorldCreationEventHandler.register();
+            }
             
             // Setup Fabric-specific features
             setupFabricFeatures();

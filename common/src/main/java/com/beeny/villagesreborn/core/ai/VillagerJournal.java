@@ -471,6 +471,10 @@ public class VillagerJournal {
     public void setAutoGenerateEntries(boolean autoGenerate) { this.autoGenerateEntries = autoGenerate; }
     public void setMaxEntries(int maxEntries) { this.maxEntries = maxEntries; }
     
+    public VillagerBrain getVillagerBrain() {
+        return villagerBrain;
+    }
+    
     private String getSafelyFormattedMood() {
         MoodState mood = villagerBrain.getCurrentMood();
         if (mood != null && mood.getOverallMood() != null) {

@@ -56,7 +56,19 @@ public class HardwareStep implements WizardStep {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {}
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Additional rendering for hardware detection status
+        if (this.context != null) {
+            int centerX = this.context.getWidth() / 2;
+            int statusY = this.context.getHeight() - 40;
+            
+            // Show hardware detection status
+            String statusText = "Hardware detection complete";
+            int textWidth = this.context.getTextRenderer().getWidth(statusText);
+            context.drawText(this.context.getTextRenderer(), statusText, 
+                centerX - textWidth / 2, statusY, 0x888888, false);
+        }
+    }
 
     @Override
     public boolean isValid() {

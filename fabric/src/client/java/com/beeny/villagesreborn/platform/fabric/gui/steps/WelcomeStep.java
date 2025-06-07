@@ -25,7 +25,19 @@ public class WelcomeStep implements WizardStep {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {}
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Render additional welcome screen elements
+        if (this.context != null) {
+            int centerX = this.context.getWidth() / 2;
+            int bottomY = this.context.getHeight() - 30;
+            
+            // Show progress indicator
+            String progressText = "Step 1 of 5";
+            int textWidth = this.context.getTextRenderer().getWidth(progressText);
+            context.drawText(this.context.getTextRenderer(), progressText, 
+                centerX - textWidth / 2, bottomY, 0xAAAAAA, false);
+        }
+    }
 
     @Override
     public boolean isValid() {
