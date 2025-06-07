@@ -28,8 +28,8 @@ public class VillageResidents {
             }
             
             // Set default values
-            resident.setReputation(50 + (int)(Math.random() * 50)); // 50-100 reputation
-            resident.setAge(18 + (int)(Math.random() * 62)); // 18-80 years old
+            resident.setReputation(50 + random.nextInt(50)); // 50-100 reputation
+            resident.setAge(18 + random.nextInt(62)); // 18-80 years old
             
             residents.put(residentId, resident);
         }
