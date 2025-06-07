@@ -10,8 +10,7 @@ public class VillageResidents {
     private final Map<UUID, String> residentNames = new HashMap<>();
     
     public VillageResidents() {
-        // Initialize with some default residents for testing
-        initializeDefaultResidents();
+        // Constructor without default residents initialization
     }
     
     public ResidentData getResident(UUID residentId) {
