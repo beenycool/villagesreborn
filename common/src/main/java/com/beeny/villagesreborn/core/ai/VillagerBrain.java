@@ -19,8 +19,10 @@ import java.util.concurrent.CompletableFuture;
  */
 public class VillagerBrain {
     public static final int MAX_SHORT_TERM_MEMORY = 50;
+    public static final int DEFAULT_MEMORY_LIMIT = 150;
     
     private final UUID villagerUUID;
+    private int memoryLimit = DEFAULT_MEMORY_LIMIT;
     private PersonalityProfile personalityTraits;
     private MoodState currentMood;
     private ConversationHistory shortTermMemory;
@@ -62,6 +64,15 @@ public class VillagerBrain {
     public void setVillagerName(String name) { this.villagerName = name; }
     public void setProfession(String profession) { this.profession = profession; }
     public void setVillageName(String villageName) { this.villageName = villageName; }
+    
+    public int getMemoryLimit() { return memoryLimit; }
+    public void setMemoryLimit(int memoryLimit) { 
+        this.memoryLimit = Math.max(50, Math.min(500, memoryLimit)); // Clamp to valid range
+        // Apply memory limit to memory bank
+        if (longTermMemory != null) {
+            longTermMemory.setMemoryLimit(memoryLimit);
+        }
+    }
 
     public void setLLMApiClient(LLMApiClient apiClient) {
         this.llmApiClient = apiClient;

@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_21",
 	"refmap": "villagesreborn.refmap.json",
 	"mixins": [
-		"ExampleMixin"
+		"ExampleMixin",
+		"SpawnLocationMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
