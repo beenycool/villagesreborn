@@ -138,9 +138,9 @@ public class BiomeSelectionWidget extends ClickableWidget {
     private int calculateDifficultyFromTemperature(float temperature) {
         if (temperature >= 0.4f && temperature <= 0.8f) {
             return 1; // Easy - temperate
-        } else if (temperature >= 0.2f && temperature <= 1.0f) {
+        } else if ((temperature >= 0.2f && temperature < 0.4f) || (temperature > 0.8f && temperature <= 1.0f)) {
             return 2; // Normal - slightly off temperate
-        } else if (temperature >= 0.0f && temperature <= 1.5f) {
+        } else if ((temperature >= 0.0f && temperature < 0.2f) || (temperature > 1.0f && temperature <= 1.5f)) {
             return 3; // Hard - cold or hot
         } else {
             return 4; // Expert - extreme temperatures
