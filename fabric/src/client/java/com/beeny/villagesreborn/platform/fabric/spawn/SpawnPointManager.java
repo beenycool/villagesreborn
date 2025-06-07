@@ -113,15 +113,34 @@ public class SpawnPointManager {
      * @return Optional containing the spawn biome choice, or empty if none set
      */
     public Optional<SpawnBiomeChoiceData> getCurrentSpawnBiome() {
-        // Note: This is a client-side class, so direct access to server storage is limited
-        // In a real implementation, this would communicate with the server
-        LOGGER.debug("getCurrentSpawnBiome called - would require server communication");
-        return Optional.empty();
+        try {
+            // Note: This is a client-side class, so direct access to server storage is limited
+            // In a real implementation, this would communicate with the server via packets
+            
+            // For now, we'll simulate the behavior by checking if we have access to server world
+            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+            if (client.world != null && client.getServer() != null) {
+                // We're in a single-player world, so we can access server storage
+                SpawnBiomeStorageManager storageManager = SpawnBiomeStorageManager.getInstance();
+                net.minecraft.server.world.ServerWorld serverWorld = client.getServer().getWorld(client.world.getRegistryKey());
+                
+                if (serverWorld != null) {
+                    return storageManager.getWorldSpawnBiome(serverWorld);
+                }
+            }
+            
+            LOGGER.debug("No server world available for getCurrentSpawnBiome - would require packet communication");
+            return Optional.empty();
+            
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get current spawn biome choice: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
     
     /**
-     * Sets the spawn biome choice (client-side placeholder)
-     * In a real implementation, this would send a packet to the server
+     * Sets the spawn biome choice
+     * In a real implementation, this would send a packet to the server for persistence
      * @param choice The spawn biome choice data
      */
     public void setSpawnBiome(SpawnBiomeChoiceData choice) {
@@ -129,8 +148,31 @@ public class SpawnPointManager {
             throw new IllegalArgumentException("SpawnBiomeChoiceData cannot be null");
         }
         
-        // Note: This is a client-side class, so direct server storage access is not possible
-        // In a real implementation, this would send a packet to the server
-        LOGGER.info("setSpawnBiome called with choice: {} - would require server communication", choice);
+        try {
+            // Note: This is a client-side class, so direct access to server storage is limited
+            // In a real implementation, this would send a packet to the server
+            
+            // For now, we'll simulate the behavior by checking if we have access to server world
+            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+            if (client.world != null && client.getServer() != null) {
+                // We're in a single-player world, so we can access server storage
+                SpawnBiomeStorageManager storageManager = SpawnBiomeStorageManager.getInstance();
+                net.minecraft.server.world.ServerWorld serverWorld = client.getServer().getWorld(client.world.getRegistryKey());
+                
+                if (serverWorld != null) {
+                    storageManager.setWorldSpawnBiome(serverWorld, choice);
+                    LOGGER.info("Set spawn biome choice: {}", choice);
+                    return;
+                }
+            }
+            
+            LOGGER.warn("No server world available for setSpawnBiome - would require packet communication");
+            // In a real multiplayer implementation, this would send a packet to the server
+            
+        } catch (Exception e) {
+            LOGGER.error("Failed to set spawn biome choice: {}", e.getMessage(), e);
+            // In a real implementation, this would send a packet to the server
+            throw new RuntimeException("Failed to set spawn biome choice", e);
+        }
     }
 }

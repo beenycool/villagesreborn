@@ -247,7 +247,24 @@ public class BiomeSelectorScreen extends Screen {
                 client.setScreen(parentScreen);
                 // Reset the parent screen's biome selector open state
                 try {
-                    parentScreen.getClass().getMethod("resetBiomeSelectorState").invoke(parentScreen);
+                    // Try to find and call the resetBiomeSelectorState method
+                    java.lang.reflect.Method resetMethod = null;
+                    Class<?> currentClass = parentScreen.getClass();
+                    while (currentClass != null && resetMethod == null) {
+                        try {
+                            resetMethod = currentClass.getDeclaredMethod("resetBiomeSelectorState");
+                            resetMethod.setAccessible(true);
+                            break;
+                        } catch (NoSuchMethodException e) {
+                            currentClass = currentClass.getSuperclass();
+                        }
+                    }
+                    if (resetMethod != null) {
+                        resetMethod.invoke(parentScreen);
+                        LOGGER.debug("Successfully reset biome selector state on parent screen");
+                    } else {
+                        LOGGER.debug("Could not find resetBiomeSelectorState method on parent screen");
+                    }
                 } catch (Exception e) {
                     LOGGER.debug("Could not reset biome selector state on parent screen", e);
                 }
