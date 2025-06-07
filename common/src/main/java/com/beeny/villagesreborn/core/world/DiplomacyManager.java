@@ -23,10 +23,10 @@ public class DiplomacyManager {
         Village village1 = villageManager.getVillage(village1Id);
         Village village2 = villageManager.getVillage(village2Id);
         if (village1 != null && village2 != null) {
-            village1.getAllies().remove(village2Id);
-            village1.getEnemies().remove(village2Id);
-            village2.getAllies().remove(village1Id);
-            village2.getEnemies().remove(village1Id);
+            village1.removeAlly(village2Id);
+            village1.removeEnemy(village2Id);
+            village2.removeAlly(village1Id);
+            village2.removeEnemy(village1Id);
         }
     }
 
