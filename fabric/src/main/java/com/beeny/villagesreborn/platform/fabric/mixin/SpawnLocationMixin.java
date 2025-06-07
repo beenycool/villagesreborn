@@ -51,14 +51,25 @@ public class SpawnLocationMixin {
 
                 // First, try to find a village
                 ImprovedVillageSpawnManager villageSpawnManager = ImprovedVillageSpawnManager.getInstance();
-                Optional<BlockPos> villageSpawnLocation = villageSpawnManager.findVillageSpawnLocation(world, chosenBiome).join();
-
-                if (villageSpawnLocation.isPresent()) {
-                    BlockPos newPos = villageSpawnLocation.get();
-                    LOGGER.info("Found village-aware spawn location: {}. World loading will continue.", newPos);
-                    return newPos;
-                }
-
+                villageSpawnManager.findVillageSpawnLocation(world, chosenBiome).thenAccept(villageSpawnLocation -> {
+                    if (villageSpawnLocation.isPresent()) {
+                        BlockPos newPos = villageSpawnLocation.get();
+                        LOGGER.info("Found village-aware spawn location: {}. World loading will continue.", newPos);
+                        world.getServer().execute(() -> world.setSpawnPos(newPos, 0.0F));
+                    } else {
+                        LOGGER.info("No village found, starting fallback search in biome: {}", chosenBiome.getValue());
+                        VillageAwareSpawnManager fallbackManager = VillageAwareSpawnManager.getInstance();
+                        fallbackManager.findFallbackSpawnLocation(world, chosenBiome).thenAccept(fallbackSpawnLocation -> {
+                            if (fallbackSpawnLocation.isPresent()) {
+                                BlockPos newPos = fallbackSpawnLocation.get();
+                                LOGGER.info("Found fallback spawn location: {}. World loading will continue.", newPos);
+                                world.getServer().execute(() -> world.setSpawnPos(newPos, 0.0F));
+                            } else {
+                                LOGGER.warn("Could not find any suitable spawn location in {}. Using original location.", chosenBiome.getValue());
+                            }
+                        });
+                    }
+                });
                 // If no village, find a fallback location
                 LOGGER.info("No village found, starting synchronous fallback search in biome: {}", chosenBiome.getValue());
                 VillageAwareSpawnManager fallbackManager = VillageAwareSpawnManager.getInstance();
