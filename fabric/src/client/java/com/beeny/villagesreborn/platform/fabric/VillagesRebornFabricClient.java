@@ -17,6 +17,7 @@ public class VillagesRebornFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // Register the UseBlockCallback for the Village Chronicle Block
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (world.getBlockState(hitResult.getBlockPos()).isOf(ModContent.VILLAGE_CHRONICLE_BLOCK)) {
                 VillageChronicleBlockClient.onUseClient(world, hitResult.getBlockPos());
