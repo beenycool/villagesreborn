@@ -219,10 +219,12 @@ public class WorldSettingsManager {
     /**
      * Generates a unique key for a world object
      */
+    private final Map<Object, String> worldKeyMap = new ConcurrentHashMap<>();
+    
     private String getWorldKey(Object world) {
         if (world == null) {
             return "default";
         }
-        return world.getClass().getSimpleName() + "_" + world.hashCode();
+        return worldKeyMap.computeIfAbsent(world, w -> w.getClass().getSimpleName() + "_" + UUID.randomUUID());
     }
 } 
