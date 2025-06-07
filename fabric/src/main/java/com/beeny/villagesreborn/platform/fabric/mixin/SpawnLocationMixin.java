@@ -17,6 +17,9 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
+import java.util.Collections;
 import net.minecraft.world.World;
 
 /**
@@ -25,17 +28,18 @@ import net.minecraft.world.World;
 @Mixin(ServerWorld.class)
 public class SpawnLocationMixin {
     private static final Logger LOGGER = LoggerFactory.getLogger(SpawnLocationMixin.class);
-    private static boolean isProcessingSpawn = false;
+    // Use a thread-safe set to track which ServerWorld instances are currently processing spawn
+    private static final Set<ServerWorld> processingSpawnWorlds = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @ModifyVariable(method = "setSpawnPos", at = @At("HEAD"), argsOnly = true)
     private BlockPos onSetSpawnPos(BlockPos originalPos) {
-        // Prevent recursion if we call setSpawnPos again
-        if (isProcessingSpawn) {
+        ServerWorld world = (ServerWorld) (Object) this;
+        
+        // Prevent recursion if this specific world instance is already processing spawn
+        if (processingSpawnWorlds.contains(world)) {
             return originalPos;
         }
 
-        ServerWorld world = (ServerWorld) (Object) this;
-        
         // Only apply this logic for the Overworld during initial world creation
         if (!world.getRegistryKey().equals(World.OVERWORLD)) {
             return originalPos;
@@ -44,41 +48,59 @@ public class SpawnLocationMixin {
         Optional<SpawnBiomeChoiceData> spawnChoice = SpawnBiomeStorageManager.getInstance().getWorldSpawnBiome(world);
 
         if (spawnChoice.isPresent()) {
-            isProcessingSpawn = true;
-            try {
-                RegistryKey<Biome> chosenBiome = spawnChoice.get().getBiomeKey();
-                LOGGER.info("Starting synchronous search for spawn location in biome: {}", chosenBiome.getValue());
-
-                // First, try to find a village
-                ImprovedVillageSpawnManager villageSpawnManager = ImprovedVillageSpawnManager.getInstance();
-                Optional<BlockPos> villageSpawnLocation = villageSpawnManager.findVillageSpawnLocation(world, chosenBiome).join();
-
-                if (villageSpawnLocation.isPresent()) {
-                    BlockPos newPos = villageSpawnLocation.get();
-                    LOGGER.info("Found village-aware spawn location: {}. World loading will continue.", newPos);
-                    return newPos;
+            RegistryKey<Biome> chosenBiome = spawnChoice.get().getBiomeKey();
+            LOGGER.info("Spawn biome choice detected: {}. Starting asynchronous spawn search.", chosenBiome.getValue());
+            
+            // Instead of blocking world generation, schedule the spawn search for later
+            // and let the world generation continue with the original spawn point
+            CompletableFuture.runAsync(() -> {
+                try {
+                    LOGGER.info("Searching for better spawn location in background for biome: {}", chosenBiome.getValue());
+                    
+                    // Search for village spawn location
+                    ImprovedVillageSpawnManager villageSpawnManager = ImprovedVillageSpawnManager.getInstance();
+                    Optional<BlockPos> villageSpawnLocation = villageSpawnManager.findVillageSpawnLocation(world, chosenBiome).join();
+                    
+                    if (villageSpawnLocation.isPresent()) {
+                        BlockPos newPos = villageSpawnLocation.get();
+                        LOGGER.info("Found village-aware spawn location: {}. Updating spawn point.", newPos);
+                        
+                        // Update spawn point after world generation is complete
+                        processingSpawnWorlds.add(world);
+                        try {
+                            world.setSpawnPos(newPos, 0.0f);
+                        } finally {
+                            processingSpawnWorlds.remove(world);
+                        }
+                        return;
+                    }
+                    
+                    // Try fallback location
+                    VillageAwareSpawnManager fallbackManager = VillageAwareSpawnManager.getInstance();
+                    Optional<BlockPos> fallbackSpawnLocation = fallbackManager.findFallbackSpawnLocation(world, chosenBiome).join();
+                    
+                    if (fallbackSpawnLocation.isPresent()) {
+                        BlockPos newPos = fallbackSpawnLocation.get();
+                        LOGGER.info("Found fallback spawn location: {}. Updating spawn point.", newPos);
+                        
+                        // Update spawn point after world generation is complete
+                        processingSpawnWorlds.add(world);
+                        try {
+                            world.setSpawnPos(newPos, 0.0f);
+                        } finally {
+                            processingSpawnWorlds.remove(world);
+                        }
+                        return;
+                    }
+                    
+                    LOGGER.info("No suitable spawn location found in {}. Keeping original spawn.", chosenBiome.getValue());
+                    
+                } catch (Exception e) {
+                    LOGGER.error("Error during asynchronous spawn search", e);
                 }
-
-                // If no village, find a fallback location
-                LOGGER.info("No village found, starting synchronous fallback search in biome: {}", chosenBiome.getValue());
-                VillageAwareSpawnManager fallbackManager = VillageAwareSpawnManager.getInstance();
-                Optional<BlockPos> fallbackSpawnLocation = fallbackManager.findFallbackSpawnLocation(world, chosenBiome).join();
-
-                if (fallbackSpawnLocation.isPresent()) {
-                    BlockPos newPos = fallbackSpawnLocation.get();
-                    LOGGER.info("Found fallback spawn location: {}. World loading will continue.", newPos);
-                    return newPos;
-                }
-
-                LOGGER.warn("Could not find any suitable spawn location in {}. Using original location.", chosenBiome.getValue());
-                return originalPos;
-
-            } catch (Exception e) {
-                LOGGER.error("Error during synchronous spawn search. Using original location.", e);
-                return originalPos;
-            } finally {
-                isProcessingSpawn = false;
-            }
+            });
+            
+            LOGGER.info("World generation continuing with original spawn point. Better spawn will be set asynchronously.");
         }
         
         return originalPos;
