@@ -25,12 +25,12 @@ import net.minecraft.world.World;
 @Mixin(ServerWorld.class)
 public class SpawnLocationMixin {
     private static final Logger LOGGER = LoggerFactory.getLogger(SpawnLocationMixin.class);
-    private static boolean isProcessingSpawn = false;
+    private static final ThreadLocal<Boolean> isProcessingSpawn = ThreadLocal.withInitial(() -> false);
 
     @ModifyVariable(method = "setSpawnPos", at = @At("HEAD"), argsOnly = true)
     private BlockPos onSetSpawnPos(BlockPos originalPos) {
         // Prevent recursion if we call setSpawnPos again
-        if (isProcessingSpawn) {
+        if (isProcessingSpawn.get()) {
             return originalPos;
         }
 
