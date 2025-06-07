@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.registry.Registry;
 
 public class VillageAwareSpawnManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(VillageAwareSpawnManager.class);
@@ -125,32 +128,61 @@ public class VillageAwareSpawnManager {
     }
     
     private boolean isVillageStructure(Structure structure) {
-        StructureType<?> type = structure.getType();
-        String typeName = type.toString().toLowerCase();
-        return typeName.contains("village") || 
-               typeName.contains("plains_village") ||
-               typeName.contains("desert_village") ||
-               typeName.contains("savanna_village") ||
-               typeName.contains("taiga_village") ||
-               typeName.contains("snowy_village");
-    }
-    
-    private boolean isInTargetBiome(ServerWorld world, BlockPos pos, RegistryKey<Biome> biomeKey) {
         try {
-            RegistryKey<Biome> actualBiome = world.getBiome(pos).getKey().orElse(null);
+            StructureType<?> type = structure.getType();
+            String typeName = type.toString().toLowerCase();
+            String className = structure.getClass().getSimpleName().toLowerCase();
             
-            if (actualBiome == null) {
-                LOGGER.debug("Could not determine biome at {}", pos);
-                return false;
+            // More comprehensive village detection
+            boolean isVillage = typeName.contains("village") || 
+                               className.contains("village") ||
+                               typeName.contains("plains_village") ||
+                               typeName.contains("desert_village") ||
+                               typeName.contains("savanna_village") ||
+                               typeName.contains("taiga_village") ||
+                               typeName.contains("snowy_village") ||
+                               (typeName.contains("jigsaw") && (
+                                   typeName.contains("village") || 
+                                   className.contains("village")
+                               ));
+            
+            // Add debug logging to understand what structures we're finding
+            if (isVillage) {
+                LOGGER.info("Detected village structure: type={}, class={}", typeName, className);
+            } else {
+                LOGGER.debug("Non-village structure: type={}, class={}", typeName, className);
             }
             
-            boolean isMatch = actualBiome.equals(biomeKey);
-            LOGGER.debug("Biome check at {}: expected {}, found {}, match: {}", 
-                        pos, biomeKey.getValue(), actualBiome.getValue(), isMatch);
+            return isVillage;
+        } catch (Exception e) {
+            LOGGER.debug("Error checking structure type: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    private boolean isGenericTag(TagKey<Biome> tag) {
+        String path = tag.id().getPath();
+        return path.contains("overworld") ||
+               path.contains("common") ||
+               path.startsWith("has_structure") ||
+               path.contains("spawns_");
+    }
+
+    private boolean isInTargetBiome(ServerWorld world, BlockPos pos, RegistryKey<Biome> biomeKey) {
+        try {
+            var actualBiome = world.getBiome(pos);
+            boolean isMatch = actualBiome.matchesKey(biomeKey);
+            
+            if (isMatch) {
+                LOGGER.info("Found matching biome at {}: {}", pos, biomeKey.getValue());
+            } else {
+                LOGGER.trace("Biome mismatch at {}: expected {}, found {}", 
+                            pos, biomeKey.getValue(), actualBiome.getKey().map(RegistryKey::getValue).orElse(null));
+            }
             
             return isMatch;
         } catch (Exception e) {
-            LOGGER.debug("Error checking biome at {}: {}", pos, e.getMessage());
+            LOGGER.error("Error checking biome at {}: {}", pos, e.getMessage());
             return false;
         }
     }
@@ -176,7 +208,8 @@ public class VillageAwareSpawnManager {
     }
     
     private BlockPos findSafeYLevel(ServerWorld world, BlockPos pos) {
-        for (int y = 100; y >= 60; y--) {
+        // Try a wider Y range and be more lenient about what's "safe"
+        for (int y = 120; y >= 50; y--) {
             BlockPos testPos = new BlockPos(pos.getX(), y, pos.getZ());
             
             if (isSafeSpawnLocation(world, testPos)) {
@@ -184,21 +217,52 @@ public class VillageAwareSpawnManager {
             }
         }
         
+        // If no "perfect" safe location found, try to find any solid ground
+        for (int y = 120; y >= 50; y--) {
+            BlockPos testPos = new BlockPos(pos.getX(), y, pos.getZ());
+            BlockPos groundPos = testPos.down();
+            
+            try {
+                // More lenient check - just need solid ground and air above
+                if (world.getBlockState(groundPos).isSolidBlock(world, groundPos) && 
+                    world.getBlockState(testPos).isAir()) {
+                    LOGGER.info("Found suitable spawn location (lenient check) at {}", testPos);
+                    return testPos;
+                }
+            } catch (Exception e) {
+                LOGGER.debug("Error checking lenient spawn at {}: {}", testPos, e.getMessage());
+            }
+        }
+        
+        LOGGER.warn("Could not find any spawn location at X={}, Z={}", pos.getX(), pos.getZ());
         return null;
     }
     
     private boolean isSafeSpawnLocation(ServerWorld world, BlockPos pos) {
         try {
-            if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) {
+            BlockPos groundPos = pos.down();
+            
+            // Check if there's solid ground below
+            if (!world.getBlockState(groundPos).isSolidBlock(world, groundPos)) {
                 return false;
             }
             
-            if (!world.getBlockState(pos).isAir() || !world.getBlockState(pos.up()).isAir()) {
+            // Check if spawn position is clear (air or replaceable)
+            var spawnState = world.getBlockState(pos);
+            if (!spawnState.isAir() && !spawnState.canReplace(null)) {
                 return false;
             }
             
-            if (world.getBlockState(pos).getFluidState().isStill()) {
+            // Check if space above is clear
+            var aboveState = world.getBlockState(pos.up());
+            if (!aboveState.isAir() && !aboveState.canReplace(null)) {
                 return false;
+            }
+            
+            // Check for dangerous fluids (but allow water - players can swim)
+            var fluidState = spawnState.getFluidState();
+            if (!fluidState.isEmpty() && !fluidState.isIn(net.minecraft.registry.tag.FluidTags.WATER)) {
+                return false; // Avoid lava and other dangerous fluids
             }
             
             return true;
@@ -216,9 +280,24 @@ public class VillageAwareSpawnManager {
             BlockPos worldSpawn = world.getSpawnPos();
             int worldSpawnChunkX = worldSpawn.getX() >> 4;
             int worldSpawnChunkZ = worldSpawn.getZ() >> 4;
+            
+            long startTime = System.currentTimeMillis();
+            final long MAX_SEARCH_TIME = 10000; // Reduced to 10 seconds since spawn detection is now more lenient
+            
+            int chunksChecked = 0;
+            int biomesChecked = 0;
 
-            // Search in expanding circles of chunks, which is much faster
-            for (int radius = 5; radius <= 150; radius += 5) { // 150 chunks is ~2400 blocks
+            // Search in expanding circles of chunks, with controlled chunk loading
+            for (int radius = 1; radius <= 40; radius += 2) { // Increased radius to 40 chunks (~640 blocks)
+                // Check timeout to prevent hanging
+                if (System.currentTimeMillis() - startTime > MAX_SEARCH_TIME) {
+                    LOGGER.warn("Fallback search timeout reached after {}ms, checked {} chunks, {} biomes", 
+                               MAX_SEARCH_TIME, chunksChecked, biomesChecked);
+                    break;
+                }
+                
+                LOGGER.debug("Searching fallback at radius {} chunks", radius);
+                
                 for (int dx = -radius; dx <= radius; dx++) {
                     for (int dz = -radius; dz <= radius; dz++) {
                         // Only check the edge of the circle to be efficient
@@ -227,23 +306,54 @@ public class VillageAwareSpawnManager {
                         }
 
                         ChunkPos chunkPos = new ChunkPos(worldSpawnChunkX + dx, worldSpawnChunkZ + dz);
-                        // Get the center of the chunk at a reasonable height for biome checking
-                        BlockPos chunkSamplePos = new BlockPos(chunkPos.getStartX() + 8, SAFE_SPAWN_Y, chunkPos.getStartZ() + 8);
-
-                        // Check the biome at the center of the chunk
-                        if (isInTargetBiome(world, chunkSamplePos, biomeKey)) {
-                            // Found a chunk in the right biome, now find a safe spot in it
-                            BlockPos safePos = findSafeYLevel(world, chunkSamplePos);
-                            if (safePos != null) {
-                                LOGGER.info("Found fallback spawn location at {} in chunk {}", safePos, chunkPos);
-                                return Optional.of(safePos);
+                        chunksChecked++;
+                        
+                        try {
+                            // For fallback search, we need to load some chunks to find biomes
+                            // but we do it more aggressively than the village search
+                            WorldChunk chunk;
+                            if (world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) {
+                                chunk = world.getChunk(chunkPos.x, chunkPos.z);
+                            } else if (radius <= 20) {
+                                // Increased force-load radius to 20 chunks (~320 blocks) for biome searching
+                                LOGGER.trace("Force loading chunk {} for biome search", chunkPos);
+                                chunk = world.getChunk(chunkPos.x, chunkPos.z);
+                            } else {
+                                // For very distant chunks, skip to avoid excessive loading
+                                continue;
                             }
+                            
+                            // Get the center of the chunk at a reasonable height for biome checking
+                            BlockPos chunkSamplePos = new BlockPos(chunkPos.getStartX() + 8, SAFE_SPAWN_Y, chunkPos.getStartZ() + 8);
+                            biomesChecked++;
+
+                            // Check the biome at the center of the chunk
+                            if (isInTargetBiome(world, chunkSamplePos, biomeKey)) {
+                                // Found a chunk in the right biome, now find a safe spot in it
+                                BlockPos safePos = findSafeYLevel(world, chunkSamplePos);
+                                if (safePos != null) {
+                                    LOGGER.info("Found fallback spawn location at {} in chunk {} after {}ms", 
+                                               safePos, chunkPos, System.currentTimeMillis() - startTime);
+                                    return Optional.of(safePos);
+                                } else {
+                                    LOGGER.debug("Found target biome but no safe spawn location in chunk {}", chunkPos);
+                                }
+                            }
+                        } catch (Exception e) {
+                            LOGGER.warn("Error checking chunk {} for fallback spawn: {}", chunkPos, e.getMessage());
                         }
                     }
                 }
+                
+                // Log progress every few radii
+                if (radius % 10 == 1) { // Log progress at radius 1, 11, 21, etc.
+                    LOGGER.debug("Fallback search progress: radius {}, checked {} chunks, {} biomes, {}ms elapsed", 
+                                radius, chunksChecked, biomesChecked, System.currentTimeMillis() - startTime);
+                }
             }
 
-            LOGGER.warn("Could not find fallback spawn location in biome: {}", biomeKey.getValue());
+            LOGGER.warn("Could not find fallback spawn location in biome: {} after {}ms (checked {} chunks, {} biomes)", 
+                       biomeKey.getValue(), System.currentTimeMillis() - startTime, chunksChecked, biomesChecked);
             return Optional.empty();
         });
     }

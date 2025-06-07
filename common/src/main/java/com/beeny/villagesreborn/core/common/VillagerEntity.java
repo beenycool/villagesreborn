@@ -36,4 +36,10 @@ public interface VillagerEntity {
      * @return the NBT compound containing persistent data
      */
     NBTCompound getPersistentData();
+    
+    /**
+     * Gets the world this villager is in
+     * @return the world object
+     */
+    Object getWorld();
 }

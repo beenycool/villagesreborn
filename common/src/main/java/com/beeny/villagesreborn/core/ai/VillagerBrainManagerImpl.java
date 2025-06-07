@@ -3,6 +3,7 @@ package com.beeny.villagesreborn.core.ai;
 import com.beeny.villagesreborn.core.common.Player;
 import com.beeny.villagesreborn.core.common.VillagerEntity;
 import com.beeny.villagesreborn.core.common.NBTCompound;
+import com.beeny.villagesreborn.core.config.WorldSettingsManager;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
@@ -78,6 +79,13 @@ public class VillagerBrainManagerImpl implements VillagerBrainManager {
      */
     private VillagerBrain createNewBrain(VillagerEntity villager) {
         VillagerBrain brain = new VillagerBrain(villager.getUUID());
+        
+        // Apply world-specific memory limit
+        Object world = villager.getWorld();
+        if (world != null) {
+            int memoryLimit = WorldSettingsManager.getInstance().getVillagerMemoryLimit(world);
+            brain.setMemoryLimit(memoryLimit);
+        }
         
         // Generate random personality based on profession
         PersonalityProfile personality = generatePersonality(villager.getProfession());

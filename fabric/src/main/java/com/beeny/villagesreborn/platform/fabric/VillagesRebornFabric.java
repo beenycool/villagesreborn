@@ -3,6 +3,8 @@ package com.beeny.villagesreborn.platform.fabric;
 import com.beeny.villagesreborn.core.VillagesRebornCommon;
 import com.beeny.villagesreborn.core.api.Platform;
 import com.beeny.villagesreborn.platform.fabric.event.WorldCreationEventHandler;
+import com.beeny.villagesreborn.platform.fabric.config.FabricWorldSettingsManager;
+import com.beeny.villagesreborn.platform.fabric.config.CommandRegistry;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
@@ -24,6 +26,9 @@ public class VillagesRebornFabric implements ModInitializer {
             // Initialize platform implementation
             platform = new FabricPlatform();
 
+            // Initialize Fabric-specific settings manager
+            FabricWorldSettingsManager.initialize();
+
             // Register blocks and items
             ModContent.register();
 
@@ -34,6 +39,9 @@ public class VillagesRebornFabric implements ModInitializer {
             if (FabricLoader.getInstance().isModLoaded("fabric-lifecycle-events-v1")) {
                 WorldCreationEventHandler.register();
             }
+            
+            // Register commands
+            CommandRegistry.register();
             
             // Setup Fabric-specific features
             setupFabricFeatures();

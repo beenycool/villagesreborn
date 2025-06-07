@@ -15,6 +15,9 @@ public class MemoryBank {
     private static final int MAX_SIGNIFICANT_MEMORIES = 50;
     private static final int MAX_VILLAGE_EVENTS = 30;
     private static final int MAX_PERSONAL_STORIES = 20;
+    private static final int DEFAULT_MEMORY_LIMIT = 150;
+    
+    private int memoryLimit = DEFAULT_MEMORY_LIMIT;
     
     // Basic memory storage (legacy support)
     private final List<String> significantMemories = new ArrayList<>();
@@ -308,4 +311,43 @@ public class MemoryBank {
     public List<PersonalStory> getPersonalStories() { return new ArrayList<>(personalStories); }
     public List<TraumaticEvent> getTraumaticEvents() { return new ArrayList<>(traumaticEvents); }
     public List<JoyfulMemory> getJoyfulMemories() { return new ArrayList<>(joyfulMemories); }
+    
+    /**
+     * Gets the current memory limit
+     */
+    public int getMemoryLimit() { 
+        return memoryLimit; 
+    }
+    
+    /**
+     * Sets the memory limit and trims memories if necessary
+     */
+    public void setMemoryLimit(int memoryLimit) {
+        this.memoryLimit = Math.max(50, Math.min(500, memoryLimit)); // Clamp to valid range
+        trimMemoriesToLimit();
+    }
+    
+    /**
+     * Trims memories to stay within the memory limit
+     */
+    private void trimMemoriesToLimit() {
+        // Calculate total memory usage (simplified approach)
+        int totalMemories = significantMemories.size() + villageEvents.size() + personalStories.size();
+        
+        // If over limit, remove oldest memories first
+        while (totalMemories > memoryLimit && !significantMemories.isEmpty()) {
+            significantMemories.remove(0);
+            totalMemories--;
+        }
+        
+        while (totalMemories > memoryLimit && villageEvents.size() > 10) { // Keep at least 10 village events
+            villageEvents.remove(0);
+            totalMemories--;
+        }
+        
+        while (totalMemories > memoryLimit && personalStories.size() > 5) { // Keep at least 5 personal stories
+            personalStories.remove(0);
+            totalMemories--;
+        }
+    }
 }

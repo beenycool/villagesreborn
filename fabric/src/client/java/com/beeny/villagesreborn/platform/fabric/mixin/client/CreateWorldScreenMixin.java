@@ -175,14 +175,16 @@ public abstract class CreateWorldScreenMixin {
         
         CreateWorldScreen self = (CreateWorldScreen) (Object) this;
         
-        // Calculate better button position - place it in a more visible location
-        int buttonWidth = 200;
-        int buttonHeight = 24;
+        // Calculate GUI scaling for better responsiveness
+        double guiScale = MinecraftClient.getInstance().getWindow().getScaleFactor();
+        int buttonWidth = Math.min(200, (int) Math.max(150, 200 / guiScale * 2));
+        int buttonHeight = (int) Math.max(20, 24 / guiScale * 2);
         int buttonX = self.width / 2 - buttonWidth / 2;
-        int buttonY = self.height - 100; // Position well above the Create/Cancel buttons for visibility
+        int bottomPadding = (int) Math.max(80, 100 / guiScale * 2);
+        int buttonY = self.height - bottomPadding; // Position with scaled padding
         
-        LOGGER.info("Creating spawn biome button at position ({}, {}) with size {}x{}", 
-                   buttonX, buttonY, buttonWidth, buttonHeight);
+        LOGGER.info("Creating spawn biome button at position ({}, {}) with size {}x{} (GUI scale: {})", 
+                   buttonX, buttonY, buttonWidth, buttonHeight, guiScale);
         
         this.spawnBiomeButton = ButtonWidget.builder(
             Text.translatable("villagesreborn.spawn_biome.button"),

@@ -8,6 +8,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.gen.structure.Structure;
 import net.minecraft.world.gen.structure.StructureType;
+import net.minecraft.world.chunk.WorldChunk;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,12 +25,12 @@ import java.util.concurrent.CompletableFuture;
 public class ImprovedVillageSpawnManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImprovedVillageSpawnManager.class);
     
-    private static final int SEARCH_RADIUS_CHUNKS = 10; // Much smaller to avoid hanging during world gen
+    private static final int SEARCH_RADIUS_CHUNKS = 25; // Increased from 10 to 25 chunks (~400 blocks)
     private static final int MIN_DISTANCE_FROM_VILLAGE = 15; // Very close to village
     private static final int MAX_DISTANCE_FROM_VILLAGE = 50; // Still quite close
     private static final int SAFE_SPAWN_Y_MIN = 60;
     private static final int SAFE_SPAWN_Y_MAX = 120;
-    private static final int MAX_SEARCH_TIME_MS = 8000; // 8 second timeout
+    private static final int MAX_SEARCH_TIME_MS = 20000; // Increased to 20 seconds for a more thorough async search
     
     private static ImprovedVillageSpawnManager instance;
     
@@ -97,7 +98,10 @@ public class ImprovedVillageSpawnManager {
         
         long startTime = System.currentTimeMillis();
         
-        // Scan chunks in a much smaller radius to avoid hanging
+        LOGGER.info("Starting village search from chunk ({}, {}) with radius {} chunks", 
+                   centerChunkX, centerChunkZ, SEARCH_RADIUS_CHUNKS);
+        
+        // Scan chunks in a reasonable radius with controlled chunk loading
         for (int radius = 0; radius < SEARCH_RADIUS_CHUNKS; radius++) {
             // Check timeout to prevent hanging during world generation
             if (System.currentTimeMillis() - startTime > MAX_SEARCH_TIME_MS) {
@@ -105,30 +109,46 @@ public class ImprovedVillageSpawnManager {
                 break;
             }
             
+            int chunksChecked = 0;
+            int structuresFound = 0;
+            
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     // Only check the edge of the current radius to avoid duplicates
                     if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
                     
                     ChunkPos chunkPos = new ChunkPos(centerChunkX + dx, centerChunkZ + dz);
+                    chunksChecked++;
                     
                     try {
-                        // More robust check to see if chunk is loaded AND accessible without forcing generation
-                        if (!world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) {
-                            continue; // Skip unloaded chunks to avoid blocking world generation
+                        // For village searching, we need to load chunks to find structures
+                        // but we do it carefully and limit the scope
+                        WorldChunk chunk;
+                        if (world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) {
+                            chunk = world.getChunk(chunkPos.x, chunkPos.z);
+                        } else if (radius <= 10) {
+                            // Increased force-load radius from 3 to 10 chunks (~160 blocks)
+                            LOGGER.debug("Force loading chunk {} for village search", chunkPos);
+                            chunk = world.getChunk(chunkPos.x, chunkPos.z);
+                        } else {
+                            // Skip unloaded chunks beyond the aggressive search radius
+                            continue;
                         }
                         
-                        var chunk = world.getChunk(chunkPos.x, chunkPos.z);
                         var structureStarts = chunk.getStructureStarts();
+                        structuresFound += structureStarts.size();
                         
                         for (var entry : structureStarts.entrySet()) {
                             Structure structure = entry.getKey();
                             StructureStart structureStart = entry.getValue();
                             
+                            LOGGER.debug("Found structure in chunk {}: type={}, hasChildren={}", 
+                                        chunkPos, structure.getType(), structureStart.hasChildren());
+                            
                             if (isVillageStructure(structure) && structureStart.hasChildren()) {
                                 BlockPos villageCenter = structureStart.getBoundingBox().getCenter();
                                 villages.add(villageCenter);
-                                LOGGER.info("Found village at: {}", villageCenter);
+                                LOGGER.info("Found village at: {} in chunk {}", villageCenter, chunkPos);
                             }
                         }
                     } catch (Exception e) {
@@ -136,6 +156,9 @@ public class ImprovedVillageSpawnManager {
                     }
                 }
             }
+            
+            LOGGER.debug("Radius {} complete: checked {} chunks, found {} structures, {} villages total", 
+                        radius, chunksChecked, structuresFound, villages.size());
             
             // If we found villages, we can stop searching early
             if (!villages.isEmpty() && radius > 3) {
@@ -153,9 +176,37 @@ public class ImprovedVillageSpawnManager {
      * Improved village structure detection
      */
     private boolean isVillageStructure(Structure structure) {
-        // Use string checking for village detection
-        String typeName = structure.getType().toString().toLowerCase();
-        return typeName.contains("village");
+        try {
+            // Get the structure type and convert to string for analysis
+            StructureType<?> type = structure.getType();
+            String typeName = type.toString().toLowerCase();
+            String className = structure.getClass().getSimpleName().toLowerCase();
+            
+            // More comprehensive village detection
+            boolean isVillage = typeName.contains("village") ||
+                               className.contains("village") ||
+                               typeName.contains("plains_village") ||
+                               typeName.contains("desert_village") ||
+                               typeName.contains("savanna_village") ||
+                               typeName.contains("taiga_village") ||
+                               typeName.contains("snowy_village") ||
+                               typeName.contains("jigsaw") && (
+                                   typeName.contains("village") || 
+                                   className.contains("village")
+                               );
+            
+            // Add debug logging to understand what structures we're finding
+            if (isVillage) {
+                LOGGER.info("Detected village structure: type={}, class={}", typeName, className);
+            } else {
+                LOGGER.debug("Non-village structure: type={}, class={}", typeName, className);
+            }
+            
+            return isVillage;
+        } catch (Exception e) {
+            LOGGER.debug("Error checking structure type: {}", e.getMessage());
+            return false;
+        }
     }
     
     /**
