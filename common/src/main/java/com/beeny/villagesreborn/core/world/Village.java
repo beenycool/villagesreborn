@@ -54,4 +54,16 @@ public class Village {
     public void addTradePartner(UUID villageId) {
         tradePartners.add(villageId);
     }
+
+    public void removeAlly(UUID villageId) {
+        allies.remove(villageId);
+    }
+
+    public void removeEnemy(UUID villageId) {
+        enemies.remove(villageId);
+    }
+
+    public void removeTradePartner(UUID villageId) {
+        tradePartners.remove(villageId);
+    }
 } 

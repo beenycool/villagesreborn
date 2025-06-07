@@ -121,8 +121,8 @@ public class BiomeSelectionWidget extends ClickableWidget {
      * Renders creation mode indicators
      */
     private void renderCreationModeIndicators(DrawContext context) {
-        // Render difficulty indicator using actual difficulty rating
-        int difficultyColor = getDifficultyColor(biome.getDifficultyRating());
+        // Render difficulty indicator using temperature-based difficulty calculation
+        int difficultyColor = getDifficultyColor(calculateDifficultyFromTemperature(biome.getTemperature()));
         context.fill(getX() + width - 8, getY() + 2, getX() + width - 2, getY() + 8, difficultyColor);
         
         // Render resource indicator
@@ -130,6 +130,23 @@ public class BiomeSelectionWidget extends ClickableWidget {
         context.fill(getX() + width - 16, getY() + 2, getX() + width - 10, getY() + 8, resourceColor);
     }
     
+
+    
+    /**
+     * Calculates difficulty rating based on temperature (fallback method)
+     */
+    private int calculateDifficultyFromTemperature(float temperature) {
+        if (temperature >= 0.4f && temperature <= 0.8f) {
+            return 1; // Easy - temperate
+        } else if (temperature >= 0.2f && temperature <= 1.0f) {
+            return 2; // Normal - slightly off temperate
+        } else if (temperature >= 0.0f && temperature <= 1.5f) {
+            return 3; // Hard - cold or hot
+        } else {
+            return 4; // Expert - extreme temperatures
+        }
+    }
+
     /**
      * Gets difficulty color based on difficulty rating
      */
@@ -428,7 +445,7 @@ public class BiomeSelectionWidget extends ClickableWidget {
         tooltip.add(Text.literal("Humidity: " + humidityDesc).formatted(net.minecraft.util.Formatting.GRAY));
         
         // Difficulty info
-        String difficultyDesc = getDifficultyDescription(biome.getDifficultyRating());
+        String difficultyDesc = getDifficultyDescription(calculateDifficultyFromTemperature(biome.getTemperature()));
         tooltip.add(Text.literal("Difficulty: " + difficultyDesc).formatted(net.minecraft.util.Formatting.YELLOW));
         
         // Description
