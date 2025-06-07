@@ -151,10 +151,20 @@ class ConversationRouterTest {
         conversationRouter.routeMessage(player, villager, testMessage);
         
         // Give async operation time to complete
-        Thread.sleep(100);
-        
-        verify(llmApiClient).generateConversationResponse(any(ConversationRequest.class));
-        verifyNoInteractions(responseManager);
+        // Thread.sleep(100);
+
+        int retries = 0;
+        while (retries < 10) {
+            try {
+                verify(llmApiClient).generateConversationResponse(any(ConversationRequest.class));
+                verifyNoInteractions(responseManager);
+                break;
+            } catch (org.mockito.exceptions.verification.WantedButNotInvoked | org.mockito.exceptions.verification.NoInteractionsWanted e) {
+                if (retries == 9) throw e;
+                Thread.sleep(50);
+                retries++;
+            }
+        }
     }
 
     @Test
@@ -213,11 +223,21 @@ class ConversationRouterTest {
         conversationRouter.routeConversation(context);
         
         // Give async operations time to complete
-        Thread.sleep(200);
-        
-        verify(brainManager).getBrain(villager);
-        verify(brainManager).getBrain(villager2);
-        verify(llmApiClient, times(2)).generateConversationResponse(any(ConversationRequest.class));
+        // Thread.sleep(200);
+
+        int retries = 0;
+        while (retries < 10) {
+            try {
+                verify(brainManager).getBrain(villager);
+                verify(brainManager).getBrain(villager2);
+                verify(llmApiClient, times(2)).generateConversationResponse(any(ConversationRequest.class));
+                break;
+            } catch (org.mockito.exceptions.verification.TooFewActualInvocations | org.mockito.exceptions.verification.WantedButNotInvoked e) {
+                if (retries == 9) throw e;
+                Thread.sleep(50);
+                retries++;
+            }
+        }
     }
 
     @Test

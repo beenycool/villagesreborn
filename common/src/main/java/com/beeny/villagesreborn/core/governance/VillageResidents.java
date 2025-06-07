@@ -8,6 +8,7 @@ import java.util.*;
 public class VillageResidents {
     private final Map<UUID, ResidentData> residents = new HashMap<>();
     private final Map<UUID, String> residentNames = new HashMap<>();
+    private final Random random = new Random();
     
     public VillageResidents() {
         // Constructor without default residents initialization
