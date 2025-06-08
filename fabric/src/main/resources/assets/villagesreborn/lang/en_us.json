@@ -28,7 +28,8 @@
   "villagesreborn.config.ai.memory_limit.value": "Memory Limit: %d",
   "villagesreborn.config.ai.aggression": "AI Aggression",
   "villagesreborn.config.ai.aggression.tooltip": "Controls how aggressive villagers are in combat and interactions",
-  "villagesreborn.config.ai.aggression.value": "Aggression Level: %d",
+  "villagesreborn.config.ai.aggression.value": "Aggression Level: %s",
+  "villagesreborn.config.ai.aggression.level": "Aggression Level: %s",
   "villagesreborn.config.ai.advanced_ai": "Advanced AI",
   "villagesreborn.config.ai.advanced_ai.tooltip": "Enable advanced AI behaviors and decision making",
   
@@ -59,5 +60,11 @@
   "villagesreborn.config.performance.adaptive_performance.tooltip": "Automatically adjust performance based on server load",
   "villagesreborn.config.performance.tick_optimization": "Tick Optimization",
   "villagesreborn.config.performance.tick_optimization.tooltip": "Optimize game tick processing for better performance",
-  "villagesreborn.config.performance.tick_optimization.value": "Optimization Level: %d"
+  "villagesreborn.config.performance.tick_optimization.value": "Optimization Level: %d",
+  
+  "villagesreborn.world_creation.reset_defaults": "Reset to Defaults",
+  "villagesreborn.world_creation.section.ai_configuration": "AI Configuration", 
+  "villagesreborn.world_creation.section.village_expansion": "Village Expansion",
+  "villagesreborn.world_creation.section.feature_toggles": "Feature Toggles",
+  "villagesreborn.world_creation.section.performance": "Performance"
 } 

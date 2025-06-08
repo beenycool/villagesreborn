@@ -15,15 +15,22 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
- * Implementation of CombatAIEngine using LLM for intelligent combat decisions
+ * Implementation of CombatAIEngine using LLM for intelligent combat decisions.
+ * Optimized to reduce performance impact by caching responses and limiting AI calls.
  */
 public class CombatAIEngineImpl implements CombatAIEngine {
     private static final Logger LOGGER = LoggerFactory.getLogger(CombatAIEngineImpl.class);
+    private static final long AI_RESPONSE_CACHE_DURATION_MS = 3000; // Cache AI responses for 3 seconds
+    private static final int MAX_CACHE_SIZE = 50;
     
     private final LLMApiClient llmClient;
-    // No fallback engine needed - use internal logic
+    
+    // Performance optimization caches
+    private final Map<String, CachedAIResponse> responseCache = new ConcurrentHashMap<>();
     
     // Patterns for parsing AI responses
     private static final Pattern ACTION_PATTERN = Pattern.compile("(?i)decide:\\s*(ATTACK|DEFEND|FLEE|NEGOTIATE)");
@@ -44,6 +51,16 @@ public class CombatAIEngineImpl implements CombatAIEngine {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
+                // Generate cache key based on situation characteristics
+                String cacheKey = generateCacheKey(situation, traits, threatData);
+                
+                // Check for cached response
+                CachedAIResponse cached = responseCache.get(cacheKey);
+                if (cached != null && System.currentTimeMillis() - cached.timestamp < AI_RESPONSE_CACHE_DURATION_MS) {
+                    LOGGER.debug("Using cached AI combat response");
+                    return cached.decision;
+                }
+                
                 // Build combat prompt
                 String prompt = buildCombatPrompt(situation, traits, threatData, relationships);
                 
@@ -59,7 +76,14 @@ public class CombatAIEngineImpl implements CombatAIEngine {
                 ConversationResponse response = responseFuture.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
                 
                 if (response != null && response.isSuccess() && response.getResponse() != null) {
-                    return parseAIResponse(response.getResponse(), situation, traits);
+                    CombatDecision decision = parseAIResponse(response.getResponse(), situation, traits);
+                    
+                    // Cache the successful response
+                    if (decision != null) {
+                        cacheResponse(cacheKey, decision);
+                    }
+                    
+                    return decision;
                 } else {
                     LOGGER.warn("Empty or failed AI response, using fallback");
                     return fallbackDecision(situation, traits);
@@ -72,8 +96,49 @@ public class CombatAIEngineImpl implements CombatAIEngine {
         });
     }
     
+    /**
+     * Generates a cache key based on situation characteristics.
+     */
+    private String generateCacheKey(CombatSituation situation, CombatPersonalityTraits traits, ThreatAssessment threatData) {
+        return String.format("%d_%d_%s_%.1f_%.1f", 
+            situation.getEnemyCount(),
+            situation.getAllyCount(),
+            threatData.getThreatLevel().name(),
+            traits.getAggression(),
+            traits.getCourage());
+    }
+    
+    /**
+     * Caches an AI response to avoid repeated expensive API calls.
+     */
+    private void cacheResponse(String cacheKey, CombatDecision decision) {
+        responseCache.put(cacheKey, new CachedAIResponse(decision, System.currentTimeMillis()));
+        
+        // Clean up cache periodically
+        if (responseCache.size() > MAX_CACHE_SIZE) {
+            cleanupResponseCache();
+        }
+    }
+    
+    /**
+     * Removes expired entries from the response cache.
+     */
+    private void cleanupResponseCache() {
+        long currentTime = System.currentTimeMillis();
+        responseCache.entrySet().removeIf(entry -> 
+            currentTime - entry.getValue().timestamp > AI_RESPONSE_CACHE_DURATION_MS);
+    }
+    
     @Override
     public boolean shouldUseAI(VillagerEntity villager, CombatSituation situation) {
+        // More conservative AI usage to reduce performance impact
+        
+        // Don't use AI for very simple situations
+        if (situation.getEnemyCount() == 1 && situation.getAllyCount() == 0 && 
+            situation.getOverallThreatLevel().ordinal() <= ThreatLevel.LOW.ordinal()) {
+            return false;
+        }
+        
         // Use AI for complex situations
         if (situation.getEnemyCount() > 3) return true;
         if (situation.getOverallThreatLevel().ordinal() >= ThreatLevel.HIGH.ordinal()) return true;
@@ -355,5 +420,25 @@ public class CombatAIEngineImpl implements CombatAIEngine {
             }
         }
         return true;
+    }
+    
+    /**
+     * Clears all cached data (e.g., on world unload).
+     */
+    public void clearAllCaches() {
+        responseCache.clear();
+    }
+    
+    /**
+     * Cache entry for AI responses.
+     */
+    private static class CachedAIResponse {
+        final CombatDecision decision;
+        final long timestamp;
+        
+        CachedAIResponse(CombatDecision decision, long timestamp) {
+            this.decision = decision;
+            this.timestamp = timestamp;
+        }
     }
 }

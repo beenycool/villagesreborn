@@ -1,6 +1,8 @@
 package com.beeny.villagesreborn.platform.fabric.spawn;
 
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.tag.StructureTags;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.structure.StructureStart;
 import net.minecraft.util.math.BlockPos;
@@ -14,9 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+
+import com.mojang.datafixers.util.Pair;
 
 /**
  * Improved village-aware spawn manager with better village detection
@@ -25,12 +31,12 @@ import java.util.concurrent.CompletableFuture;
 public class ImprovedVillageSpawnManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImprovedVillageSpawnManager.class);
     
-    private static final int SEARCH_RADIUS_CHUNKS = 25; // Increased from 10 to 25 chunks (~400 blocks)
+    private static final int SEARCH_RADIUS_CHUNKS = 50; // Increased from 25 to 50 chunks (~800 blocks) for rarer biomes
     private static final int MIN_DISTANCE_FROM_VILLAGE = 15; // Very close to village
     private static final int MAX_DISTANCE_FROM_VILLAGE = 50; // Still quite close
     private static final int SAFE_SPAWN_Y_MIN = 60;
     private static final int SAFE_SPAWN_Y_MAX = 120;
-    private static final int MAX_SEARCH_TIME_MS = 20000; // Increased to 20 seconds for a more thorough async search
+    private static final int MAX_SEARCH_TIME_MS = 60000; // Increased to 60 seconds for a more thorough async search
     
     private static ImprovedVillageSpawnManager instance;
     
@@ -44,132 +50,299 @@ public class ImprovedVillageSpawnManager {
     }
     
     /**
-     * Finds a spawn location near a village in the specified biome
+     * Finds a spawn location using a hybrid, multi-strategy engine for maximum efficiency and reliability.
      */
     public CompletableFuture<Optional<BlockPos>> findVillageSpawnLocation(ServerWorld world, RegistryKey<Biome> biomeKey) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                LOGGER.info("Searching for villages in biome: {} with improved detection", biomeKey.getValue());
-                
-                // Add a small delay to ensure world generation has progressed
-                try {
-                    Thread.sleep(500); // 0.5 second delay
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return Optional.empty();
+                LOGGER.info("🚀 Hybrid Search Engine starting for biome: {}", biomeKey.getValue());
+
+                // Strategy 1: The "Fast Path". Find the biome, then do a quick village search.
+                LOGGER.info("[Phase 1/2] Attempting quick Biome-First scan...");
+                Optional<BlockPos> biomeCenter = findNearestBiome(world, biomeKey);
+                if (biomeCenter.isPresent()) {
+                    Optional<BlockPos> villagePos = findVillageNear(world, biomeCenter.get(), biomeKey);
+                    if (villagePos.isPresent()) {
+                        LOGGER.info("✓ Fast Path SUCCESS: Found village at {} after locating biome.", villagePos.get());
+                        return findSpawnNearVillage(world, villagePos.get(), biomeKey);
+                    }
+                    LOGGER.info("...Fast Path miss: Biome found, but no village nearby. Proceeding to Phase 2.");
+                } else {
+                    LOGGER.info("...Fast Path miss: Could not locate biome nearby. Proceeding to Phase 2.");
                 }
                 
-                List<BlockPos> villagePositions = findAllVillages(world);
-                LOGGER.info("Found {} total villages in world", villagePositions.size());
-                
-                if (villagePositions.isEmpty()) {
-                    LOGGER.info("No villages found in world yet - this is normal for a new world");
-                    return Optional.empty();
+                // Strategy 2: The "Power Search". If the fast path fails, use a more exhaustive, progressive search.
+                LOGGER.info("[Phase 2/2] Attempting exhaustive Progressive Structure Scan...");
+                Optional<BlockPos> villagePos = findVillageWithProgressiveSearch(world, biomeKey);
+                if (villagePos.isPresent()) {
+                    LOGGER.info("✓ Power Search SUCCESS: Found village via progressive scanning.");
+                    return findSpawnNearVillage(world, villagePos.get(), biomeKey);
                 }
-                
-                // Use the closest village regardless of biome for now
-                BlockPos worldSpawn = world.getSpawnPos();
-                BlockPos closestVillage = villagePositions.stream()
-                    .min((v1, v2) -> Double.compare(
-                        worldSpawn.getSquaredDistance(v1),
-                        worldSpawn.getSquaredDistance(v2)
-                    ))
-                    .orElse(villagePositions.get(0));
-                
-                LOGGER.info("Selected closest village at {}", closestVillage);
-                return findSpawnNearVillage(world, closestVillage);
+
+                LOGGER.warn("✗ Hybrid Search Engine failed. No village found in biome {}. Will use fallback manager.", biomeKey.getValue());
+                return Optional.empty();
                 
             } catch (Exception e) {
-                LOGGER.error("Error in improved village spawn detection", e);
+                LOGGER.error("Error during Hybrid Search Engine execution", e);
                 return Optional.empty();
             }
         });
     }
     
     /**
-     * Finds all villages in the world using chunk scanning with timeout
+     * [HYBRID-HELPER] Uses vanilla's optimized locator to find the nearest biome instance.
      */
-    private List<BlockPos> findAllVillages(ServerWorld world) {
-        List<BlockPos> villages = new ArrayList<>();
-        BlockPos worldCenter = world.getSpawnPos();
-        
-        int centerChunkX = worldCenter.getX() >> 4;
-        int centerChunkZ = worldCenter.getZ() >> 4;
-        
-        long startTime = System.currentTimeMillis();
-        
-        LOGGER.info("Starting village search from chunk ({}, {}) with radius {} chunks", 
-                   centerChunkX, centerChunkZ, SEARCH_RADIUS_CHUNKS);
-        
-        // Scan chunks in a reasonable radius with controlled chunk loading
-        for (int radius = 0; radius < SEARCH_RADIUS_CHUNKS; radius++) {
-            // Check timeout to prevent hanging during world generation
-            if (System.currentTimeMillis() - startTime > MAX_SEARCH_TIME_MS) {
-                LOGGER.info("Village search completed after {}ms timeout, found {} villages", MAX_SEARCH_TIME_MS, villages.size());
-                break;
+    private Optional<BlockPos> findNearestBiome(ServerWorld world, RegistryKey<Biome> biomeKey) {
+        try {
+            Predicate<RegistryEntry<Biome>> biomePredicate = entry -> entry.matchesKey(biomeKey);
+            Pair<BlockPos, RegistryEntry<Biome>> result = world.locateBiome(biomePredicate, world.getSpawnPos(), 6400, 64, 64);
+            return Optional.ofNullable(result).map(Pair::getFirst);
+        } catch (Exception e) {
+            LOGGER.error("Error in findNearestBiome: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * [HYBRID-HELPER] Searches for a village in a targeted area around a known biome location.
+     */
+    private Optional<BlockPos> findVillageNear(ServerWorld world, BlockPos center, RegistryKey<Biome> biomeKey) {
+        // Search a 1280-block radius. This is our quick, targeted search.
+        BlockPos villagePos = world.locateStructure(StructureTags.VILLAGE, center, 1280, false);
+        if (villagePos != null && isInTargetBiome(world, villagePos, biomeKey)) {
+            return Optional.of(villagePos);
+        }
+        return Optional.empty();
+    }
+    
+    /**
+     * [HYBRID-HELPER] Exhaustive search that expands its radius until a village in the correct biome is found.
+     */
+    private Optional<BlockPos> findVillageWithProgressiveSearch(ServerWorld world, RegistryKey<Biome> biomeKey) {
+        String biomeType = getBiomeType(biomeKey);
+        int[] searchRadii = getSearchRadiiForBiome(biomeType);
+        BlockPos center = world.getSpawnPos();
+
+        LOGGER.info("...Starting progressive search for '{}' villages with radii: {}", biomeType, searchRadii);
+
+        for (int radius : searchRadii) {
+            LOGGER.debug("......Searching radius: {} blocks", radius);
+            BlockPos villagePos = world.locateStructure(StructureTags.VILLAGE, center, radius, false);
+            if (villagePos != null && isInTargetBiome(world, villagePos, biomeKey)) {
+                 LOGGER.info("......SUCCESS: Found village at {} within {} block radius.", villagePos, radius);
+                return Optional.of(villagePos);
+            }
+        }
+        LOGGER.warn("......Progressive search completed. No '{}' village found.", biomeType);
+        return Optional.empty();
+    }
+    
+    private String getBiomeType(RegistryKey<Biome> biomeKey) {
+        String biomeName = biomeKey.getValue().getPath().toLowerCase();
+        if (biomeName.contains("desert")) return "desert";
+        if (biomeName.contains("savanna")) return "savanna";
+        if (biomeName.contains("taiga")) return "taiga";
+        if (biomeName.contains("snowy") || biomeName.contains("ice")) return "snowy";
+        if (biomeName.contains("plains")) return "plains";
+        return "generic";
+    }
+
+    private int[] getSearchRadiiForBiome(String biomeType) {
+        switch (biomeType) {
+            case "desert":
+            case "savanna":
+                return new int[]{800, 1600, 2400, 3200};
+            case "taiga":
+            case "snowy":
+                return new int[]{1000, 2000, 3000};
+            case "plains":
+                return new int[]{400, 800, 1200};
+            default:
+                return new int[]{500, 1000, 1500};
+        }
+    }
+    
+    /**
+     * Checks if a position is in the target biome
+     */
+    private boolean isInTargetBiome(ServerWorld world, BlockPos pos, RegistryKey<Biome> biomeKey) {
+        try {
+            var actualBiome = world.getBiome(pos);
+            boolean isMatch = actualBiome.matchesKey(biomeKey);
+            
+            if (isMatch) {
+                LOGGER.info("Confirmed biome match at {}: {}", pos, biomeKey.getValue());
+            } else {
+                String actualBiomeName = actualBiome.getKey()
+                    .map(k -> k.getValue().toString())
+                    .orElse("unknown");
+                LOGGER.debug("Biome mismatch at {}: expected {}, found {}", 
+                            pos, biomeKey.getValue(), actualBiomeName);
             }
             
-            int chunksChecked = 0;
-            int structuresFound = 0;
+            return isMatch;
+        } catch (Exception e) {
+            LOGGER.error("Error checking biome at {}: {}", pos, e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Finds a safe spawn location very close to a village
+     */
+    private Optional<BlockPos> findSpawnNearVillage(ServerWorld world, BlockPos villageCenter, RegistryKey<Biome> biomeKey) {
+        LOGGER.info("Finding spawn location near village at {} in biome {}", villageCenter, biomeKey.getValue());
+        
+        // Try positions very close to the village
+        for (int attempt = 0; attempt < 30; attempt++) {
+            double angle = Math.random() * 2 * Math.PI;
+            double distance = MIN_DISTANCE_FROM_VILLAGE + 
+                             Math.random() * (MAX_DISTANCE_FROM_VILLAGE - MIN_DISTANCE_FROM_VILLAGE);
             
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    // Only check the edge of the current radius to avoid duplicates
-                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
-                    
-                    ChunkPos chunkPos = new ChunkPos(centerChunkX + dx, centerChunkZ + dz);
-                    chunksChecked++;
-                    
-                    try {
-                        // For village searching, we need to load chunks to find structures
-                        // but we do it carefully and limit the scope
-                        WorldChunk chunk;
-                        if (world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) {
-                            chunk = world.getChunk(chunkPos.x, chunkPos.z);
-                        } else if (radius <= 10) {
-                            // Increased force-load radius from 3 to 10 chunks (~160 blocks)
-                            LOGGER.debug("Force loading chunk {} for village search", chunkPos);
-                            chunk = world.getChunk(chunkPos.x, chunkPos.z);
-                        } else {
-                            // Skip unloaded chunks beyond the aggressive search radius
-                            continue;
-                        }
-                        
-                        var structureStarts = chunk.getStructureStarts();
-                        structuresFound += structureStarts.size();
-                        
-                        for (var entry : structureStarts.entrySet()) {
-                            Structure structure = entry.getKey();
-                            StructureStart structureStart = entry.getValue();
-                            
-                            LOGGER.debug("Found structure in chunk {}: type={}, hasChildren={}", 
-                                        chunkPos, structure.getType(), structureStart.hasChildren());
-                            
-                            if (isVillageStructure(structure) && structureStart.hasChildren()) {
-                                BlockPos villageCenter = structureStart.getBoundingBox().getCenter();
-                                villages.add(villageCenter);
-                                LOGGER.info("Found village at: {} in chunk {}", villageCenter, chunkPos);
-                            }
-                        }
-                    } catch (Exception e) {
-                        LOGGER.debug("Error scanning chunk {}: {}", chunkPos, e.getMessage());
-                    }
+            int x = villageCenter.getX() + (int)(Math.cos(angle) * distance);
+            int z = villageCenter.getZ() + (int)(Math.sin(angle) * distance);
+            
+            // Find a safe Y level
+            BlockPos safePos = findSafeYLevel(world, x, z);
+            if (safePos != null) {
+                // Verify the spawn location is in the correct biome
+                if (isInTargetBiome(world, safePos, biomeKey)) {
+                double actualDistance = Math.sqrt(safePos.getSquaredDistance(villageCenter));
+                    LOGGER.info("Found safe spawn at {} (distance: {} from village) in correct biome {}", 
+                               safePos, actualDistance, biomeKey.getValue());
+                return Optional.of(safePos);
+                } else {
+                    LOGGER.debug("Spawn location at {} is not in target biome {}, trying another location", 
+                                safePos, biomeKey.getValue());
                 }
-            }
-            
-            LOGGER.debug("Radius {} complete: checked {} chunks, found {} structures, {} villages total", 
-                        radius, chunksChecked, structuresFound, villages.size());
-            
-            // If we found villages, we can stop searching early
-            if (!villages.isEmpty() && radius > 3) {
-                LOGGER.info("Found villages early, stopping search at radius {}", radius);
-                break;
             }
         }
         
-        LOGGER.info("Village search completed in {}ms, found {} villages", 
-                   System.currentTimeMillis() - startTime, villages.size());
-        return villages;
+        LOGGER.warn("Could not find safe spawn near village at {} in biome {}", villageCenter, biomeKey.getValue());
+        return Optional.empty();
+    }
+    
+    /**
+     * Finds a safe Y level at the given X,Z coordinates
+     */
+    private BlockPos findSafeYLevel(ServerWorld world, int x, int z) {
+        // Strategy 1: Try the standard range first
+        for (int y = SAFE_SPAWN_Y_MAX; y >= SAFE_SPAWN_Y_MIN; y--) {
+            BlockPos testPos = new BlockPos(x, y, z);
+            
+            if (isSafeSpawnLocation(world, testPos)) {
+                return testPos;
+            }
+        }
+        
+        // Strategy 2: If standard range fails, try a wider range with more lenient checks
+        LOGGER.debug("Standard Y range failed, trying extended range at X={}, Z={}", x, z);
+        for (int y = 140; y >= 40; y--) {
+            BlockPos testPos = new BlockPos(x, y, z);
+            
+            if (isLenientSafeSpawnLocation(world, testPos)) {
+                LOGGER.info("Found safe spawn using lenient check at {}", testPos);
+                return testPos;
+            }
+        }
+        
+        // Strategy 3: Find the highest solid block and place spawn above it
+        LOGGER.debug("Lenient checks failed, finding highest solid block at X={}, Z={}", x, z);
+        for (int y = 140; y >= 10; y--) {
+            BlockPos groundPos = new BlockPos(x, y, z);
+            if (world.getBlockState(groundPos).isSolidBlock(world, groundPos)) {
+                BlockPos spawnPos = groundPos.up();
+                // Make sure there's enough space above
+                if (world.getBlockState(spawnPos).isAir() && 
+                    world.getBlockState(spawnPos.up()).isAir()) {
+                    LOGGER.info("Found spawn on highest solid block at {}", spawnPos);
+                    return spawnPos;
+                }
+            }
+        }
+        
+        LOGGER.warn("Could not find any safe Y level at X={}, Z={}", x, z);
+        return null;
+    }
+    
+    /**
+     * More lenient check for safe spawn locations, useful for difficult terrain
+     */
+    private boolean isLenientSafeSpawnLocation(ServerWorld world, BlockPos pos) {
+        try {
+            BlockPos groundPos = pos.down();
+            
+            // Check if there's any solid-ish block below (including sand, gravel, etc.)
+            var groundState = world.getBlockState(groundPos);
+            if (!groundState.isSolidBlock(world, groundPos) && 
+                !groundState.isOpaque()) {
+                return false;
+            }
+            
+            // Check if spawn position has breathable space
+            var spawnState = world.getBlockState(pos);
+            if (!spawnState.isAir() && 
+                !spawnState.canReplace(null) &&
+                !spawnState.isReplaceable()) {
+                return false;
+            }
+            
+            // Check if space above is clear
+            var aboveState = world.getBlockState(pos.up());
+            if (!aboveState.isAir() && 
+                !aboveState.canReplace(null) &&
+                !aboveState.isReplaceable()) {
+                return false;
+            }
+            
+            // Allow spawning in/near water, but avoid lava
+            var fluidState = spawnState.getFluidState();
+            if (!fluidState.isEmpty()) {
+                // Check if it's water (safe) or lava (dangerous)
+                if (fluidState.isIn(net.minecraft.registry.tag.FluidTags.LAVA)) {
+                    return false; // Never spawn in lava
+                }
+                // Water is okay - player can swim
+            }
+            
+            return true;
+            
+        } catch (Exception e) {
+            LOGGER.debug("Error in lenient spawn safety check at {}: {}", pos, e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Checks if a location is safe for spawning
+     */
+    private boolean isSafeSpawnLocation(ServerWorld world, BlockPos pos) {
+        try {
+            // Check if the block below is solid
+            if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) {
+                return false;
+            }
+            
+            // Check if the spawn position and above are air
+            if (!world.getBlockState(pos).isAir()) {
+                return false;
+            }
+            
+            if (!world.getBlockState(pos.up()).isAir()) {
+                return false;
+            }
+            
+            // Check if it's not in water or lava
+            if (!world.getFluidState(pos).isEmpty()) {
+                return false;
+            }
+            
+            return true;
+            
+        } catch (Exception e) {
+            LOGGER.debug("Error checking spawn safety at {}: {}", pos, e.getMessage());
+            return false;
+        }
     }
     
     /**
@@ -208,82 +381,4 @@ public class ImprovedVillageSpawnManager {
             return false;
         }
     }
-    
-    /**
-     * Finds a safe spawn location very close to a village
-     */
-    private Optional<BlockPos> findSpawnNearVillage(ServerWorld world, BlockPos villageCenter) {
-        LOGGER.info("Finding spawn location near village at {}", villageCenter);
-        
-        // Try positions very close to the village
-        for (int attempt = 0; attempt < 30; attempt++) {
-            double angle = Math.random() * 2 * Math.PI;
-            double distance = MIN_DISTANCE_FROM_VILLAGE + 
-                             Math.random() * (MAX_DISTANCE_FROM_VILLAGE - MIN_DISTANCE_FROM_VILLAGE);
-            
-            int x = villageCenter.getX() + (int)(Math.cos(angle) * distance);
-            int z = villageCenter.getZ() + (int)(Math.sin(angle) * distance);
-            
-            // Find a safe Y level
-            BlockPos safePos = findSafeYLevel(world, x, z);
-            if (safePos != null) {
-                double actualDistance = Math.sqrt(safePos.getSquaredDistance(villageCenter));
-                LOGGER.info("Found safe spawn at {} (distance: {} from village)", safePos, actualDistance);
-                return Optional.of(safePos);
-            }
-        }
-        
-        LOGGER.warn("Could not find safe spawn near village at {}", villageCenter);
-        return Optional.empty();
-    }
-    
-    /**
-     * Finds a safe Y level at the given X,Z coordinates
-     */
-    private BlockPos findSafeYLevel(ServerWorld world, int x, int z) {
-        // Start from a reasonable height and work down
-        for (int y = SAFE_SPAWN_Y_MAX; y >= SAFE_SPAWN_Y_MIN; y--) {
-            BlockPos testPos = new BlockPos(x, y, z);
-            
-            if (isSafeSpawnLocation(world, testPos)) {
-                return testPos;
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Checks if a location is safe for spawning
-     */
-    private boolean isSafeSpawnLocation(ServerWorld world, BlockPos pos) {
-        try {
-            // Check if the block below is solid
-            if (!world.getBlockState(pos.down()).isSolidBlock(world, pos.down())) {
-                return false;
-            }
-            
-            // Check if the spawn position and above are air
-            if (!world.getBlockState(pos).isAir()) {
-                return false;
-            }
-            
-            if (!world.getBlockState(pos.up()).isAir()) {
-                return false;
-            }
-            
-            // Check if it's not in water or lava
-            if (!world.getFluidState(pos).isEmpty()) {
-                return false;
-            }
-            
-            return true;
-            
-        } catch (Exception e) {
-            LOGGER.debug("Error checking spawn safety at {}: {}", pos, e.getMessage());
-            return false;
-        }
-    }
-    
-
 } 

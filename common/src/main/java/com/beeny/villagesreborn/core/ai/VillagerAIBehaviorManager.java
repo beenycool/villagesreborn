@@ -11,11 +11,13 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Manages AI behavior for villagers based on world settings
- * Controls aggression levels, advanced AI features, and behavior patterns
+ * Manages AI behavior for villagers based on world settings.
+ * This manager reduces the performance impact of AI calculations by processing them on a fixed-time interval
+ * rather than on every game tick. It controls aggression levels, advanced AI features, and behavior patterns.
  */
 public class VillagerAIBehaviorManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(VillagerAIBehaviorManager.class);
+    private static final long AI_PROCESSING_INTERVAL_MS = 2000; // Process AI every 2 seconds
     private static VillagerAIBehaviorManager instance;
     
     private final Map<UUID, VillagerBehaviorState> villagerStates = new ConcurrentHashMap<>();
@@ -35,12 +37,26 @@ public class VillagerAIBehaviorManager {
     }
     
     /**
-     * Processes AI behavior for a villager based on world settings
+     * Processes AI behavior for a villager based on world settings.
+     * This method is designed to be called on each game tick, but it internally limits the processing
+     * of advanced AI to a fixed interval to optimize performance.
+     *
+     * @param villager The villager entity whose AI is to be processed.
      */
     public void processVillagerAI(VillagerEntity villager) {
         if (villager == null || villager.getWorld() == null) {
             return;
         }
+        
+        // Get or create behavior state to manage time-based checks
+        VillagerBehaviorState state = getOrCreateBehaviorState(villager);
+        long currentTime = System.currentTimeMillis();
+
+        // Limit AI processing to a fixed interval to improve performance
+        if (currentTime < state.getNextAiUpdateTime()) {
+            return;
+        }
+        state.setNextAiUpdateTime(currentTime + AI_PROCESSING_INTERVAL_MS);
         
         Object world = villager.getWorld();
         WorldSettingsManager settingsManager = WorldSettingsManager.getInstance();
@@ -53,7 +69,6 @@ public class VillagerAIBehaviorManager {
         }
         
         // Get or create behavior state
-        VillagerBehaviorState state = getOrCreateBehaviorState(villager);
         
         // Apply aggression level
         float aggressionLevel = settingsManager.getAiAggressionLevel(world);
@@ -79,6 +94,7 @@ public class VillagerAIBehaviorManager {
         
         // Apply memory-based decision making
         int memoryLimit = settingsManager.getVillagerMemoryLimit(world);
+        state.updateTimestamp(); // Record that an update has occurred
         processMemoryBasedBehavior(villager, state, memoryLimit);
         
         // Apply aggression-based behavior
@@ -149,7 +165,10 @@ public class VillagerAIBehaviorManager {
     }
     
     /**
-     * Gets or creates a behavior state for a villager
+     * Gets or creates a behavior state for a villager.
+     *
+     * @param villager The villager for whom the state is being retrieved.
+     * @return The {@link VillagerBehaviorState} for the given villager.
      */
     private VillagerBehaviorState getOrCreateBehaviorState(VillagerEntity villager) {
         return villagerStates.computeIfAbsent(villager.getUUID(), uuid -> new VillagerBehaviorState(uuid));
@@ -163,7 +182,9 @@ public class VillagerAIBehaviorManager {
     }
     
     /**
-     * Removes behavior state for a villager (cleanup)
+     * Removes behavior state for a villager (cleanup).
+     *
+     * @param villagerUUID The UUID of the villager whose state is to be removed.
      */
     public void removeBehaviorState(UUID villagerUUID) {
         villagerStates.remove(villagerUUID);
@@ -188,6 +209,7 @@ public class VillagerAIBehaviorManager {
         private boolean relationshipAware = false;
         private boolean dynamicTradingEnabled = false;
         private long lastUpdate = System.currentTimeMillis();
+        private long nextAiUpdateTime = 0;
         
         public VillagerBehaviorState(UUID villagerUUID) {
             this.villagerUUID = villagerUUID;
@@ -209,6 +231,8 @@ public class VillagerAIBehaviorManager {
         public void setDynamicTradingEnabled(boolean dynamicTradingEnabled) { this.dynamicTradingEnabled = dynamicTradingEnabled; }
         public long getLastUpdate() { return lastUpdate; }
         public void updateTimestamp() { this.lastUpdate = System.currentTimeMillis(); }
+        public long getNextAiUpdateTime() { return nextAiUpdateTime; }
+        public void setNextAiUpdateTime(long nextAiUpdateTime) { this.nextAiUpdateTime = nextAiUpdateTime; }
     }
     
     /**

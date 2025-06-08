@@ -19,6 +19,8 @@ public class CommandRegistry {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             registerSettingsTestCommand(dispatcher);
+            registerDebugCommand(dispatcher);
+            registerGuiTestCommand(dispatcher);
         });
         
         LOGGER.info("Registered Villages Reborn commands");
@@ -34,6 +36,28 @@ public class CommandRegistry {
                     .requires(source -> source.hasPermissionLevel(2)) // Require OP level
                     .executes(context -> SettingsTestCommand.execute(context.getSource()))
                 )
+        );
+    }
+    
+    /**
+     * Registers the comprehensive debug command
+     */
+    private static void registerDebugCommand(CommandDispatcher<ServerCommandSource> dispatcher) {
+        dispatcher.register(
+            CommandManager.literal("villagesreborn-debug")
+                .requires(source -> source.hasPermissionLevel(2)) // Require OP level
+                .executes(context -> DebugCommand.execute(context.getSource()))
+        );
+    }
+    
+    /**
+     * Registers the GUI and AI test command
+     */
+    private static void registerGuiTestCommand(CommandDispatcher<ServerCommandSource> dispatcher) {
+        dispatcher.register(
+            CommandManager.literal("villagesreborn-guitest")
+                .requires(source -> source.hasPermissionLevel(2)) // Require OP level
+                .executes(context -> GuiTestCommand.execute(context.getSource()))
         );
     }
 } 

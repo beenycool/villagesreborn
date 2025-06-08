@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import com.beeny.villagesreborn.core.common.NBTCompound;
 
 /**
  * Enhanced RelationshipData implementation supporting dynamic social structures and complex relationships
@@ -316,5 +317,28 @@ public class RelationshipData {
         }
         
         return profile.toString();
+    }
+
+    public NBTCompound toNBT() {
+        NBTCompound nbt = new NBTCompound();
+        nbt.putUUID("playerUUID", playerUUID);
+        nbt.putFloat("trustLevel", trustLevel);
+        nbt.putFloat("friendshipLevel", friendshipLevel);
+        nbt.putInt("interactionCount", interactionCount);
+        return nbt;
+    }
+
+    public static RelationshipData fromNBT(NBTCompound nbt) {
+        UUID playerUUID = nbt.getUUID("playerUUID");
+        if (playerUUID == null) {
+            // Log an error or handle this case appropriately
+            // For now, let's create a placeholder to avoid crashes
+            playerUUID = UUID.randomUUID();
+        }
+        RelationshipData data = new RelationshipData(playerUUID);
+        data.trustLevel = nbt.getFloat("trustLevel");
+        data.friendshipLevel = nbt.getFloat("friendshipLevel");
+        data.interactionCount = nbt.getInt("interactionCount");
+        return data;
     }
 }

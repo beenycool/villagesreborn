@@ -10,17 +10,27 @@ import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Enhanced combat decision engine that integrates AI-powered decision making
  * with robust fallback to rule-based systems.
+ * Optimized to reduce performance impact by caching decisions and limiting AI calls.
  */
 public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
     private static final Logger LOGGER = LoggerFactory.getLogger(EnhancedCombatDecisionEngine.class);
     private static final long DEFAULT_AI_TIMEOUT_MS = 150;
+    private static final long DECISION_CACHE_DURATION_MS = 2000; // Cache decisions for 2 seconds
+    private static final long THREAT_ASSESSMENT_CACHE_DURATION_MS = 1000; // Cache threat assessments for 1 second
     
     private final CombatAIEngine combatAI;
     private final CombatDecisionEngine ruleBased;
+    
+    // Performance optimization caches
+    private final Map<UUID, CachedCombatDecision> decisionCache = new ConcurrentHashMap<>();
+    private final Map<UUID, CachedThreatAssessment> threatCache = new ConcurrentHashMap<>();
     
     public EnhancedCombatDecisionEngine(CombatAIEngine combatAI) {
         this.combatAI = combatAI;
@@ -28,7 +38,8 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
     }
     
     /**
-     * Enhanced combat decision that tries AI first with timeout fallback
+     * Enhanced combat decision that tries AI first with timeout fallback.
+     * Now includes decision caching to improve performance.
      */
     public CombatDecision decideCombatAction(CombatSituation situation,
                                            CombatPersonalityTraits traits,
@@ -39,7 +50,7 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
     }
     
     /**
-     * Enhanced combat decision with configurable timeout
+     * Enhanced combat decision with configurable timeout and caching.
      */
     public CombatDecision decideCombatAction(CombatSituation situation,
                                            CombatPersonalityTraits traits,
@@ -47,6 +58,18 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
                                            MultiThreatAssessment threatData,
                                            RelationshipData relationships,
                                            long timeoutMs) {
+        
+        UUID villagerUUID = villager.getUUID();
+        long currentTime = System.currentTimeMillis();
+        
+        // Check if we have a cached decision that's still valid
+        CachedCombatDecision cachedDecision = decisionCache.get(villagerUUID);
+        if (cachedDecision != null && currentTime - cachedDecision.timestamp < DECISION_CACHE_DURATION_MS) {
+            if (isSituationSimilar(cachedDecision.situation, situation)) {
+                LOGGER.debug("Using cached combat decision for villager: {}", villagerUUID);
+                return cachedDecision.decision;
+            }
+        }
         
         // Determine if we should use AI for this decision
         if (combatAI != null && combatAI.shouldUseAI(villager, situation)) {
@@ -65,6 +88,9 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
                 if (aiDecision != null && combatAI.validateAIDecision(aiDecision, situation)) {
                     LOGGER.debug("AI combat decision successful: {}", aiDecision);
                     
+                    // Cache the decision
+                    cacheDecision(villagerUUID, aiDecision, situation, currentTime);
+                    
                     // Update combat memory if villager supports it
                     updateCombatMemory(villager, situation, aiDecision, true);
                     
@@ -82,9 +108,44 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
         
         // Fallback to rule-based decision
         CombatDecision fallbackDecision = generateRuleBasedDecision(situation, traits, villager, threatData, relationships);
+        
+        // Cache the fallback decision as well
+        cacheDecision(villagerUUID, fallbackDecision, situation, currentTime);
+        
         updateCombatMemory(villager, situation, fallbackDecision, false);
         
         return fallbackDecision;
+    }
+    
+    /**
+     * Caches a combat decision to avoid repeated expensive calculations.
+     */
+    private void cacheDecision(UUID villagerUUID, CombatDecision decision, CombatSituation situation, long timestamp) {
+        decisionCache.put(villagerUUID, new CachedCombatDecision(decision, situation, timestamp));
+        
+        // Clean up old cache entries periodically
+        if (decisionCache.size() > 100) {
+            cleanupDecisionCache();
+        }
+    }
+    
+    /**
+     * Checks if two combat situations are similar enough to reuse a cached decision.
+     */
+    private boolean isSituationSimilar(CombatSituation cached, CombatSituation current) {
+        // Simple similarity check - can be enhanced with more sophisticated logic
+        return cached.getEnemyCount() == current.getEnemyCount() &&
+               cached.getAllyCount() == current.getAllyCount() &&
+               cached.getOverallThreatLevel() == current.getOverallThreatLevel();
+    }
+    
+    /**
+     * Removes expired entries from the decision cache.
+     */
+    private void cleanupDecisionCache() {
+        long currentTime = System.currentTimeMillis();
+        decisionCache.entrySet().removeIf(entry -> 
+            currentTime - entry.getValue().timestamp > DECISION_CACHE_DURATION_MS);
     }
     
     /**
@@ -184,21 +245,42 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
     }
     
     /**
-     * Processes a complete combat tick with AI integration
+     * Processes a complete combat tick with AI integration and caching optimization.
      */
     public CombatTickResult processCombatTick(CombatCapableVillager villager, CombatSituation situation) {
-        // Gather contextual data
-        MultiThreatAssessment threatData = assessThreats(villager, situation.getEnemies());
+        // Use cached threat assessment if available
+        MultiThreatAssessment threatData = getCachedOrAssessThreats(villager, situation.getEnemies());
         RelationshipData relationships = villager.getRelationshipData();
         CombatPersonalityTraits traits = villager.getCombatTraits();
         
-        // Make decision
+        // Make decision (now with caching)
         CombatDecision decision = decideCombatAction(situation, traits, villager, threatData, relationships);
         
         // Execute decision
         boolean executed = executeDecision(villager, decision, situation);
         
         return new CombatTickResult(decision, executed, decision != null && !decision.isFallbackDecision());
+    }
+    
+    /**
+     * Gets cached threat assessment or performs new assessment if cache is stale.
+     */
+    private MultiThreatAssessment getCachedOrAssessThreats(CombatCapableVillager villager, List<LivingEntity> enemies) {
+        UUID villagerUUID = villager.getUUID();
+        long currentTime = System.currentTimeMillis();
+        
+        CachedThreatAssessment cached = threatCache.get(villagerUUID);
+        if (cached != null && currentTime - cached.timestamp < THREAT_ASSESSMENT_CACHE_DURATION_MS) {
+            if (cached.enemyCount == enemies.size()) {
+                return cached.assessment;
+            }
+        }
+        
+        // Perform new assessment
+        MultiThreatAssessment newAssessment = assessThreats(villager, enemies);
+        threatCache.put(villagerUUID, new CachedThreatAssessment(newAssessment, enemies.size(), currentTime));
+        
+        return newAssessment;
     }
     
     /**
@@ -455,5 +537,51 @@ public class EnhancedCombatDecisionEngine extends CombatDecisionEngine {
         public CombatDecision.CombatAction getAction() { 
             return decision != null ? decision.getAction() : null; 
         }
+    }
+    
+    /**
+     * Cache entry for combat decisions.
+     */
+    private static class CachedCombatDecision {
+        final CombatDecision decision;
+        final CombatSituation situation;
+        final long timestamp;
+        
+        CachedCombatDecision(CombatDecision decision, CombatSituation situation, long timestamp) {
+            this.decision = decision;
+            this.situation = situation;
+            this.timestamp = timestamp;
+        }
+    }
+    
+    /**
+     * Cache entry for threat assessments.
+     */
+    private static class CachedThreatAssessment {
+        final MultiThreatAssessment assessment;
+        final int enemyCount;
+        final long timestamp;
+        
+        CachedThreatAssessment(MultiThreatAssessment assessment, int enemyCount, long timestamp) {
+            this.assessment = assessment;
+            this.enemyCount = enemyCount;
+            this.timestamp = timestamp;
+        }
+    }
+    
+    /**
+     * Clears all cached data for a villager (e.g., when villager dies or leaves combat).
+     */
+    public void clearVillagerCache(UUID villagerUUID) {
+        decisionCache.remove(villagerUUID);
+        threatCache.remove(villagerUUID);
+    }
+    
+    /**
+     * Clears all cached data (e.g., on world unload).
+     */
+    public void clearAllCaches() {
+        decisionCache.clear();
+        threatCache.clear();
     }
 }

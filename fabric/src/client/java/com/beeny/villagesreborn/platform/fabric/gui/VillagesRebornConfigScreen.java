@@ -63,25 +63,48 @@ public class VillagesRebornConfigScreen extends Screen {
     protected void init() {
         super.init();
 
-        this.contentWidget = new ConfigContentWidget(this.width, this.height - 60, this.settings, this::onSettingChanged);
+        // Create content widget with proper spacing for buttons
+        this.contentWidget = new ConfigContentWidget(this.width, this.height - 100, this.settings, this::onSettingChanged);
         this.addDrawableChild(this.contentWidget);
 
-        // Add Done and Cancel buttons
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.done"), button -> {
-            saveSettings();
-            Objects.requireNonNull(this.client).setScreen(this.parent);
-        }).dimensions(this.width / 2 - 100, this.height - 27, 200, 20).build());
+        // Add Done, Cancel, and Test buttons with proper spacing
+        int buttonY = this.height - 30;
+        int buttonWidth = 60;
+        int buttonSpacing = 10;
+        int totalButtonsWidth = (buttonWidth * 3) + (buttonSpacing * 2);
+        int startX = (this.width - totalButtonsWidth) / 2;
 
+        // Done button
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.done"), button -> {
+            try {
+                saveSettings();
+                Objects.requireNonNull(this.client).setScreen(this.parent);
+                LOGGER.info("Settings saved and screen closed");
+            } catch (Exception e) {
+                LOGGER.error("Error saving settings", e);
+            }
+        }).dimensions(startX, buttonY, buttonWidth, 20).build());
+
+        // Cancel button  
         this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.cancel"), button -> {
-            // Revert changes
-            this.settings = this.originalSettings.copy();
-            Objects.requireNonNull(this.client).setScreen(this.parent);
-        }).dimensions(this.width / 2 - 100, this.height - 50, 200, 20).build());
+            try {
+                // Revert changes
+                this.settings = this.originalSettings.copy();
+                Objects.requireNonNull(this.client).setScreen(this.parent);
+                LOGGER.info("Settings cancelled and reverted");
+            } catch (Exception e) {
+                LOGGER.error("Error reverting settings", e);
+            }
+        }).dimensions(startX + buttonWidth + buttonSpacing, buttonY, buttonWidth, 20).build());
         
-        // Add Test Settings button
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Test Settings"), button -> {
-            testSettings();
-        }).dimensions(this.width / 2 - 100, this.height - 73, 200, 20).build());
+        // Test button
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("Test"), button -> {
+            try {
+                testSettings();
+            } catch (Exception e) {
+                LOGGER.error("Error testing settings", e);
+            }
+        }).dimensions(startX + (buttonWidth + buttonSpacing) * 2, buttonY, buttonWidth, 20).build());
     }
 
     private void onSettingChanged() {
@@ -258,36 +281,34 @@ public class VillagesRebornConfigScreen extends Screen {
         
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            LOGGER.info("ConfigContentWidget mouseClicked at ({}, {}) with {} widgets", mouseX, mouseY, allWidgets.size());
+            LOGGER.debug("ConfigContentWidget mouseClicked at ({}, {})", mouseX, mouseY);
             
-            // Forward mouse clicks to widgets first, without bounds checking
+            // Forward mouse clicks to widgets, prioritize visible widgets
             for (ClickableWidget widget : allWidgets) {
-                if (widget.isMouseOver(mouseX, mouseY)) {
-                    LOGGER.info("Widget {} is under mouse at ({}, {}), widget bounds: ({}, {}, {}, {})", 
-                        widget.getClass().getSimpleName(), mouseX, mouseY,
-                        widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight());
+                if (widget.visible && widget.isMouseOver(mouseX, mouseY)) {
                     if (widget.mouseClicked(mouseX, mouseY, button)) {
-                        LOGGER.info("Widget {} successfully handled the click", widget.getClass().getSimpleName());
+                        LOGGER.debug("Widget {} handled click", widget.getClass().getSimpleName());
                         return true;
                     }
                 }
             }
             
-            LOGGER.info("No widget handled the click, delegating to super");
-            return false; // Don't call super to avoid ScrollableWidget consuming the event
+            // Call super for scrolling behavior
+            return super.mouseClicked(mouseX, mouseY, button);
         }
         
         @Override
         public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-            // Forward mouse drags to widgets (important for sliders)
+            // Forward mouse drags to widgets first (important for sliders)
             for (ClickableWidget widget : allWidgets) {
-                if (widget.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
-                    LOGGER.info("Widget {} handled mouse drag", widget.getClass().getSimpleName());
+                if (widget.visible && widget.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
+                    LOGGER.debug("Widget {} handled mouse drag", widget.getClass().getSimpleName());
                     return true;
                 }
             }
             
-            return false; // Don't call super to avoid ScrollableWidget consuming the event
+            // Allow scrolling if no widget handled the drag
+            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
         }
         
         @Override
@@ -305,13 +326,13 @@ public class VillagesRebornConfigScreen extends Screen {
         public boolean mouseReleased(double mouseX, double mouseY, int button) {
             // Forward mouse releases to widgets
             for (ClickableWidget widget : allWidgets) {
-                if (widget.mouseReleased(mouseX, mouseY, button)) {
-                    LOGGER.info("Widget {} handled mouse release", widget.getClass().getSimpleName());
+                if (widget.visible && widget.mouseReleased(mouseX, mouseY, button)) {
+                    LOGGER.debug("Widget {} handled mouse release", widget.getClass().getSimpleName());
                     return true;
                 }
             }
             
-            return false; // Don't call super to avoid ScrollableWidget consuming the event
+            return super.mouseReleased(mouseX, mouseY, button);
         }
 
         // UI scaling helpers

@@ -3,6 +3,8 @@ package com.beeny.villagesreborn.platform.fabric;
 import com.beeny.villagesreborn.core.VillagesRebornCommon;
 import com.beeny.villagesreborn.core.api.Platform;
 import com.beeny.villagesreborn.platform.fabric.event.WorldCreationEventHandler;
+import com.beeny.villagesreborn.platform.fabric.event.VillagerAIEvents;
+import com.beeny.villagesreborn.platform.fabric.trading.DynamicTradingSystem;
 import com.beeny.villagesreborn.platform.fabric.config.FabricWorldSettingsManager;
 import com.beeny.villagesreborn.platform.fabric.config.CommandRegistry;
 import net.fabricmc.api.ModInitializer;
@@ -35,9 +37,13 @@ public class VillagesRebornFabric implements ModInitializer {
             // Initialize common module
             VillagesRebornCommon.initialize();
 
+            // Initialize systems
+            DynamicTradingSystem.initialize();
+
             // Register event handlers
             if (FabricLoader.getInstance().isModLoaded("fabric-lifecycle-events-v1")) {
                 WorldCreationEventHandler.register();
+                VillagerAIEvents.register();
             }
             
             // Register commands

@@ -175,7 +175,7 @@ public class VillagerBrainManagerImpl implements VillagerBrainManager {
         
         brainCache.values().forEach(brain -> {
             brain.cleanupOldMemories(threshold);
-            brain.decayMood(currentTime - brain.getCurrentMood().getLastUpdated());
+            brain.decayMood();
         });
     }
     

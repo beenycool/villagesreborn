@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.core.ai;
 
 import com.beeny.villagesreborn.core.ai.memory.*;
+import com.beeny.villagesreborn.core.common.NBTCompound;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +39,30 @@ public class MemoryBank {
         for (MemoryCategory category : MemoryCategory.values()) {
             categorizedMemories.put(category, new ArrayList<>());
         }
+    }
+
+    public NBTCompound toNBT() {
+        NBTCompound nbt = new NBTCompound();
+        nbt.putInt("memoryLimit", memoryLimit);
+        nbt.putInt("significantMemories_count", significantMemories.size());
+        for (int i = 0; i < significantMemories.size(); i++) {
+            nbt.putString("significantMemories_" + i, significantMemories.get(i));
+        }
+        return nbt;
+    }
+
+    public static MemoryBank fromNBT(NBTCompound nbt) {
+        MemoryBank bank = new MemoryBank();
+        if (nbt.contains("memoryLimit")) {
+            bank.setMemoryLimit(nbt.getInt("memoryLimit"));
+        }
+        int memoriesCount = nbt.getInt("significantMemories_count");
+        for (int i = 0; i < memoriesCount; i++) {
+            if (nbt.contains("significantMemories_" + i)) {
+                bank.addSignificantMemory(nbt.getString("significantMemories_" + i));
+            }
+        }
+        return bank;
     }
 
     // Legacy support methods

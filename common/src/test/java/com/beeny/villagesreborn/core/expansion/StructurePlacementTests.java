@@ -29,7 +29,7 @@ class StructurePlacementTests {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         structurePlacer = new StructurePlacer(mockPlacementAPI);
-        expansionManager = new VillageExpansionManager(structurePlacer);
+        expansionManager = new VillageExpansionManager(structurePlacer, null);
     }
     
     @Test
