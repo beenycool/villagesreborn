@@ -132,9 +132,10 @@ public class VillagesRebornTab extends ScrollableWidget {
      */
     private static Text safeTranslatable(String key) {
         try {
-            var text = Text.translatable(key);
-            return text != null ? text : Text.literal(key.substring(key.lastIndexOf('.') + 1));
+            // Simply use Text.translatable - let Minecraft handle missing translations
+            return Text.translatable(key);
         } catch (Exception e) {
+            LOGGER.warn("Failed to translate key '{}': {}", key, e.getMessage());
             return Text.literal(key.substring(key.lastIndexOf('.') + 1));
         }
     }
@@ -144,13 +145,10 @@ public class VillagesRebornTab extends ScrollableWidget {
      */
     private static Text safeTranslatableFormatted(String key, Formatting... formatting) {
         try {
-            var text = Text.translatable(key);
-            if (text != null) {
-                return text.copy().formatted(formatting);
-            } else {
-                return Text.literal(key.substring(key.lastIndexOf('.') + 1)).formatted(formatting);
-            }
+            // Simply use Text.translatable with formatting - let Minecraft handle missing translations
+            return Text.translatable(key).formatted(formatting);
         } catch (Exception e) {
+            LOGGER.warn("Failed to translate key '{}': {}", key, e.getMessage());
             return Text.literal(key.substring(key.lastIndexOf('.') + 1)).formatted(formatting);
         }
     }

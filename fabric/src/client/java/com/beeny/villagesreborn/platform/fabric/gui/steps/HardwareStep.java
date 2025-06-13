@@ -11,6 +11,7 @@ import net.minecraft.util.Formatting;
 public class HardwareStep implements WizardStep {
     private final HardwareInfo hardwareInfo;
     private WizardStep.StepContext context;
+    private boolean statusRendered = false;
 
     public HardwareStep(HardwareInfo hardwareInfo) {
         this.hardwareInfo = hardwareInfo;
@@ -19,6 +20,7 @@ public class HardwareStep implements WizardStep {
     @Override
     public void init(WizardStep.StepContext context) {
         this.context = context;
+        this.statusRendered = false; // Reset render cache on re-init
         int centerX = context.getWidth() / 2;
         int currentY = context.getHeight() / 4;
         int spacing = 12;
@@ -57,8 +59,8 @@ public class HardwareStep implements WizardStep {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Additional rendering for hardware detection status
-        if (this.context != null) {
+        // Cache status rendering - only render once unless step is reinitialized
+        if (this.context != null && !statusRendered) {
             int centerX = this.context.getWidth() / 2;
             int statusY = this.context.getHeight() - 40;
             
@@ -67,6 +69,7 @@ public class HardwareStep implements WizardStep {
             int textWidth = this.context.getTextRenderer().getWidth(statusText);
             context.drawText(this.context.getTextRenderer(), statusText, 
                 centerX - textWidth / 2, statusY, 0x888888, false);
+            statusRendered = true;
         }
     }
 

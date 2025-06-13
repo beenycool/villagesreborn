@@ -344,4 +344,29 @@ public class VillageAwareSpawnManager {
             return Optional.empty();
         });
     }
+
+    /**
+     * Synchronous version of fallback spawn location finding with timeout
+     * Added to support the fixed SpawnLocationMixin
+     */
+    public Optional<BlockPos> findFallbackSpawnLocationSync(ServerWorld world, RegistryKey<Biome> biomeKey, long timeoutMs) {
+        long startTime = System.currentTimeMillis();
+        LOGGER.info("Starting synchronous fallback spawn search for biome: {} with timeout: {}ms", biomeKey.getValue(), timeoutMs);
+        
+        try {
+            // Try to get async result with timeout
+            CompletableFuture<Optional<BlockPos>> future = findFallbackSpawnLocation(world, biomeKey);
+            return future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+            
+        } catch (java.util.concurrent.TimeoutException e) {
+            LOGGER.warn("Fallback spawn search timed out after {}ms for biome: {}", timeoutMs, biomeKey.getValue());
+            return Optional.empty();
+        } catch (Exception e) {
+            LOGGER.error("Error during synchronous fallback spawn search for biome: {}", biomeKey.getValue(), e);
+            return Optional.empty();
+        } finally {
+            long duration = System.currentTimeMillis() - startTime;
+            LOGGER.debug("Synchronous fallback spawn search completed in {}ms", duration);
+        }
+    }
 }

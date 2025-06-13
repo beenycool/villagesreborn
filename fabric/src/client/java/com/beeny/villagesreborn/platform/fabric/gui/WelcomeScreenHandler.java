@@ -23,10 +23,11 @@ public class WelcomeScreenHandler {
     
     public WelcomeScreenHandler() {
         this.hardwareManager = new HardwareInfoManager();
-        this.llmManager = new LLMProviderManager(new MockLLMApiClient());
+        // Use factory to create appropriate LLM client based on configuration
+        this.llmManager = new LLMProviderManager(LLMClientFactory.createLLMClient());
         loadSetupConfig();
         
-        LOGGER.debug("WelcomeScreenHandler initialized with default dependencies");
+        LOGGER.debug("WelcomeScreenHandler initialized with factory-created LLM client");
     }
 
     public WelcomeScreenHandler(HardwareInfoManager hardwareManager, LLMProviderManager llmManager, FirstTimeSetupConfig setupConfig) {

@@ -103,40 +103,138 @@ public class VillagerAIIntegration {
      * Updates AI for a villager (should be called periodically)
      */
     public void updateVillagerAI(VillagerEntity villager, ServerWorld world) {
-        if (!enabled) return;
+        if (!enabled) {
+            return;
+        }
         
         try {
             UUID villagerUUID = villager.getUuid();
             VillagerBrain brain = villagerBrains.get(villagerUUID);
             
             if (brain == null) {
+                // Initialize AI if not already done
                 initializeVillagerAI(villager, world);
-                return;
+                brain = villagerBrains.get(villagerUUID);
+                if (brain == null) return;
             }
             
             long currentTime = System.currentTimeMillis();
-            long lastUpdate = lastAIUpdate.getOrDefault(villagerUUID, 0L);
+            Long lastUpdate = lastAIUpdate.get(villagerUUID);
             
-            // Only update every 5 seconds to avoid performance issues
-            if (currentTime - lastUpdate < 5000) {
-                return;
+            // Only update every few seconds to avoid performance issues
+            if (lastUpdate == null || (currentTime - lastUpdate) > 5000) {
+                // Update AI state based on villager's current situation
+                updateAIState(villager, brain, world);
+                
+                // Process social interactions with nearby villagers
+                processNearbyVillagerInteractions(villager, brain, world);
+                
+                // Update memory based on environment
+                updateEnvironmentalMemories(villager, brain, world);
+                
+                lastAIUpdate.put(villagerUUID, currentTime);
+                
+                LOGGER.debug("Updated AI for villager: {} at {}", brain.getVillagerName(), currentTime);
             }
-            
-            // Update mood and memory decay
-            brain.decayMood();
-            brain.cleanupOldMemories(currentTime - 86400000); // 24 hours
-            
-            // Apply world settings
-            WorldSettingsManager settingsManager = WorldSettingsManager.getInstance();
-            if (settingsManager.isAdvancedAIEnabled(world)) {
-                processAdvancedAI(villager, brain, world);
-            }
-            
-            lastAIUpdate.put(villagerUUID, currentTime);
-            
+
         } catch (Exception e) {
             LOGGER.error("Failed to update AI for villager: {}", villager.getUuid(), e);
         }
+    }
+    
+    /**
+     * Updates the AI state based on villager's current condition
+     */
+    private void updateAIState(VillagerEntity villager, VillagerBrain brain, ServerWorld world) {
+        // Update mood based on health, hunger, etc.
+        updateMoodBasedOnCondition(villager, brain);
+        
+        // Update profession-specific behaviors
+        updateProfessionBehaviors(villager, brain);
+        
+        // Process time-based memory decay
+        brain.decayMood();
+        brain.cleanupOldMemories(System.currentTimeMillis() - 86400000); // 24 hours
+    }
+    
+    /**
+     * Processes interactions with nearby villagers for social relationships
+     */
+    private void processNearbyVillagerInteractions(VillagerEntity villager, VillagerBrain brain, ServerWorld world) {
+        // Find nearby villagers within interaction range
+        var nearbyVillagers = world.getEntitiesByClass(VillagerEntity.class, 
+            villager.getBoundingBox().expand(10.0), 
+            v -> v != villager && v.isAlive());
+            
+        for (VillagerEntity nearbyVillager : nearbyVillagers) {
+            UUID nearbyUUID = nearbyVillager.getUuid();
+            VillagerBrain nearbyBrain = villagerBrains.get(nearbyUUID);
+            
+            if (nearbyBrain != null) {
+                // Update relationship based on proximity and shared experiences
+                float relationshipChange = 0.01f; // Small positive change for being near each other
+                updateVillagerRelationship(villager.getUuid(), nearbyUUID, relationshipChange, "proximity");
+                
+                // Record social memory
+                brain.recordMemory(String.format("Spent time near %s", nearbyBrain.getVillagerName()));
+            }
+        }
+    }
+    
+    /**
+     * Updates environmental memories based on villager's surroundings
+     */
+    private void updateEnvironmentalMemories(VillagerEntity villager, VillagerBrain brain, ServerWorld world) {
+        // Record location and time of day
+        var pos = villager.getBlockPos();
+        var timeOfDay = world.getTimeOfDay() % 24000;
+        
+        brain.recordMemory(String.format("Was at position (%d, %d, %d) during %s", 
+            pos.getX(), pos.getY(), pos.getZ(), getTimeOfDayString(timeOfDay)));
+    }
+    
+    /**
+     * Updates mood based on villager's physical condition
+     */
+    private void updateMoodBasedOnCondition(VillagerEntity villager, VillagerBrain brain) {
+        var mood = brain.getCurrentMood();
+        
+        // Health affects mood
+        float healthRatio = villager.getHealth() / villager.getMaxHealth();
+        if (healthRatio < 0.5f) {
+            mood.setHappiness(Math.max(0.0f, mood.getHappiness() - 0.1f));
+            // Note: MoodState doesn't have adjustAnger, but we can use other mood factors
+        } else if (healthRatio > 0.9f) {
+            mood.setHappiness(Math.min(1.0f, mood.getHappiness() + 0.05f));
+        }
+        
+        // TODO: Add more mood factors like hunger, weather, etc.
+    }
+    
+    /**
+     * Updates profession-specific AI behaviors
+     */
+    private void updateProfessionBehaviors(VillagerEntity villager, VillagerBrain brain) {
+        String profession = villager.getVillagerData().getProfession().toString();
+        
+        // Profession-specific memory patterns
+        switch (profession) {
+            case "farmer" -> brain.recordMemory("Thinking about crops and harvest");
+            case "librarian" -> brain.recordMemory("Contemplating knowledge and books");
+            case "blacksmith" -> brain.recordMemory("Planning metalwork projects");
+            case "cleric" -> brain.recordMemory("Reflecting on spiritual matters");
+            default -> brain.recordMemory("Going about daily tasks");
+        }
+    }
+    
+    /**
+     * Converts time of day to readable string
+     */
+    private String getTimeOfDayString(long timeOfDay) {
+        if (timeOfDay < 6000) return "morning";
+        if (timeOfDay < 12000) return "noon";
+        if (timeOfDay < 18000) return "evening";
+        return "night";
     }
     
     /**
@@ -213,6 +311,13 @@ public class VillagerAIIntegration {
      */
     public VillagerBrain getVillagerBrain(UUID villagerUUID) {
         return villagerBrains.get(villagerUUID);
+    }
+    
+    /**
+     * Gets all villager brains (for debugging/testing)
+     */
+    public Map<UUID, VillagerBrain> getAllVillagerBrains() {
+        return new java.util.HashMap<>(villagerBrains);
     }
     
     /**
