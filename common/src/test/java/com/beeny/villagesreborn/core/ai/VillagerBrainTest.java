@@ -68,7 +68,7 @@ class VillagerBrainTest {
 
     @Test
     @DisplayName("Should process message and store interaction")
-    void shouldProcessMessageAndStoreInteraction() {
+    void shouldProcessMessageAndStoreInteraction() throws Exception {
         // Given: LLM response setup
         String playerMessage = "Hello, how are you today?";
         String llmResponse = "I'm doing well, thank you for asking!";
@@ -78,7 +78,8 @@ class VillagerBrainTest {
             .thenReturn(CompletableFuture.completedFuture(response));
 
         // When: Processing message
-        String result = villagerBrain.processMessage(mockPlayer, playerMessage, mockContext);
+        CompletableFuture<String> futureResult = villagerBrain.processMessage(mockPlayer, playerMessage, mockContext);
+        String result = futureResult.get();
 
         // Then: Should return response and store interaction
         assertEquals(llmResponse, result);

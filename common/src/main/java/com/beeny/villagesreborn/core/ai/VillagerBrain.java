@@ -6,6 +6,8 @@ import com.beeny.villagesreborn.core.llm.ConversationResponse;
 import com.beeny.villagesreborn.core.conversation.ConversationContext;
 import com.beeny.villagesreborn.core.common.Player;
 import com.beeny.villagesreborn.core.common.NBTCompound;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -15,12 +17,18 @@ import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Enhanced VillagerBrain implementation with PromptBuilder integration and rich memory support
+ * Enhanced VillagerBrain implementation with PromptBuilder integration and rich memory support.
+ * This class manages a villager's personality, mood, memories, and relationships, with optimizations
+ * to reduce the performance impact of complex AI calculations.
  */
 public class VillagerBrain {
     public static final int MAX_SHORT_TERM_MEMORY = 50;
+    public static final int DEFAULT_MEMORY_LIMIT = 150;
+    private static final long MOOD_DECAY_INTERVAL_MS = 60000; // 1 minute
+    private static final Logger LOGGER = LoggerFactory.getLogger(VillagerBrain.class);
     
     private final UUID villagerUUID;
+    private int memoryLimit = DEFAULT_MEMORY_LIMIT;
     private PersonalityProfile personalityTraits;
     private MoodState currentMood;
     private ConversationHistory shortTermMemory;
@@ -33,6 +41,7 @@ public class VillagerBrain {
     private String villageName = "Unknown Village";
     private long lastInteractionTime = 0;
     private long conversationCooldown = 0;
+    private long lastDecayTime = System.currentTimeMillis();
 
     public VillagerBrain(UUID villagerUUID) {
         this.villagerUUID = villagerUUID;
@@ -62,6 +71,15 @@ public class VillagerBrain {
     public void setVillagerName(String name) { this.villagerName = name; }
     public void setProfession(String profession) { this.profession = profession; }
     public void setVillageName(String villageName) { this.villageName = villageName; }
+    
+    public int getMemoryLimit() { return memoryLimit; }
+    public void setMemoryLimit(int memoryLimit) { 
+        this.memoryLimit = Math.max(50, Math.min(500, memoryLimit)); // Clamp to valid range
+        // Apply memory limit to memory bank
+        if (longTermMemory != null) {
+            longTermMemory.setMemoryLimit(memoryLimit);
+        }
+    }
 
     public void setLLMApiClient(LLMApiClient apiClient) {
         this.llmApiClient = apiClient;
@@ -71,74 +89,92 @@ public class VillagerBrain {
         this.conversationCooldown = cooldown;
     }
 
+    /**
+     * Updates the last interaction time to the current system time.
+     * This is used for managing conversation cooldowns.
+     */
     public void updateLastInteractionTime() {
         this.lastInteractionTime = System.currentTimeMillis();
     }
 
-    public String processMessage(Player player, String message, ConversationContext context) {
-        // Check cooldown
+    /**
+     * Processes a message from a player, generates a response, and updates the villager's internal state.
+     * This method is optimized to cache sentiment analysis and handle conversation cooldowns.
+     *
+     * @param player   The player interacting with the villager.
+     * @param message  The message from the player.
+     * @param context  The current conversation context.
+     * @return A {@link CompletableFuture} containing the villager's response, or null if on cooldown or an error occurs.
+     */
+    public CompletableFuture<String> processMessage(Player player, String message, ConversationContext context) {
         if (System.currentTimeMillis() - lastInteractionTime < conversationCooldown) {
-            return null;
+            return CompletableFuture.completedFuture(null); // Return empty future for cooldown
         }
 
         if (llmApiClient == null) {
-            return null;
+            return CompletableFuture.completedFuture(null); // No LLM client available
         }
+        
+        // Cache sentiment analysis to avoid re-computing it for the same message
+        float sentimentChange = calculateSentimentChange(message);
 
-        try {
-            // Build comprehensive prompt using enhanced PromptBuilder
-            String fullPrompt = promptBuilder.buildPrompt(this, context);
-            
-            // Add the current player message to the prompt
-            String finalPrompt = fullPrompt.replace("[Waiting for input]", message);
-            
-            // Build request with enhanced prompt
-            ConversationRequest request = ConversationRequest.builder()
-                .prompt(finalPrompt)
-                .build();
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Build comprehensive prompt using enhanced PromptBuilder
+                String fullPrompt = promptBuilder.buildPrompt(this, context);
+                
+                // Add the current player message to the prompt
+                String finalPrompt = fullPrompt.replace("[Waiting for input]", message);
+                
+                // Build request with enhanced prompt
+                ConversationRequest request = ConversationRequest.builder()
+                    .prompt(finalPrompt)
+                    .build();
 
-            // Get response
-            CompletableFuture<ConversationResponse> future = llmApiClient.generateConversationResponse(request);
-            ConversationResponse response = future.get();
+                // Get response
+                ConversationResponse response = llmApiClient.generateConversationResponse(request).get();
 
-            if (!response.isSuccess()) {
+                if (!response.isSuccess()) {
+                    return null;
+                }
+
+                // Store interaction in both short-term memory and enhanced long-term memory
+                ConversationInteraction interaction = new ConversationInteraction(
+                    System.currentTimeMillis(),
+                    player.getUUID(),
+                    message,
+                    response.getResponse(),
+                    currentMood.copy(),
+                    context.getLocation()
+                );
+                shortTermMemory.addInteraction(interaction);
+                
+                // Record detailed interaction in enhanced memory bank
+                recordDetailedPlayerInteraction(player, message, response.getResponse(), context, sentimentChange);
+
+                // Update relationship and mood
+                updateRelationship(player, sentimentChange);
+                updateMood(sentimentChange);
+
+                updateLastInteractionTime();
+                return response.getResponse();
+            } catch (Exception e) {
+                LOGGER.error("Error processing message for villager {}: {}", villagerUUID, e.getMessage());
                 return null;
             }
-
-            // Store interaction in both short-term memory and enhanced long-term memory
-            ConversationInteraction interaction = new ConversationInteraction(
-                System.currentTimeMillis(),
-                player.getUUID(),
-                message,
-                response.getResponse(),
-                currentMood.copy(),
-                context.getLocation()
-            );
-            shortTermMemory.addInteraction(interaction);
-            
-            // Record detailed interaction in enhanced memory bank
-            recordDetailedPlayerInteraction(player, message, response.getResponse(), context);
-
-            // Update relationship
-            updateRelationship(player, message);
-
-            // Update mood
-            updateMood(player, message);
-
-            updateLastInteractionTime();
-            return response.getResponse();
-        } catch (Exception e) {
-            return null;
-        }
+        });
     }
     
     /**
-     * Records a detailed player interaction in the enhanced memory bank
+     * Records a detailed player interaction in the enhanced memory bank.
+     *
+     * @param player          The player who interacted.
+     * @param message         The player's message.
+     * @param response        The villager's response.
+     * @param context         The conversation context.
+     * @param sentimentChange The calculated sentiment change from the interaction.
      */
-    private void recordDetailedPlayerInteraction(Player player, String message, String response, ConversationContext context) {
-        // Determine sentiment change based on message content and current mood
-        float sentimentChange = calculateSentimentChange(message);
-        
+    private void recordDetailedPlayerInteraction(Player player, String message, String response, ConversationContext context, float sentimentChange) {
         // Record the detailed interaction
         longTermMemory.recordPlayerInteraction(
             player.getUUID(),
@@ -191,26 +227,39 @@ public class VillagerBrain {
         return relationshipMap.computeIfAbsent(player.getUUID(), uuid -> new RelationshipData(uuid));
     }
 
-    public void updateRelationship(Player player, String message) {
+    /**
+     * Updates the relationship with a player based on the sentiment of an interaction.
+     *
+     * @param player          The player to update the relationship with.
+     * @param sentimentChange The sentiment change from the interaction.
+     */
+    public void updateRelationship(Player player, float sentimentChange) {
         RelationshipData relationship = getRelationship(player);
         relationship.incrementInteractionCount();
-        
-        // Enhanced relationship update based on sentiment
-        float sentimentChange = calculateSentimentChange(message);
         relationship.adjustTrust(sentimentChange * 0.5f);
         relationship.adjustFriendship(sentimentChange);
     }
 
-    public void updateMood(Player player, String message) {
-        // Enhanced mood update based on interaction
-        float sentimentChange = calculateSentimentChange(message);
+    /**
+     * Updates the villager's mood based on the sentiment of an interaction.
+     *
+     * @param sentimentChange The sentiment change from the interaction.
+     */
+    public void updateMood(float sentimentChange) {
         // Simple mood adjustment - could be more sophisticated
         currentMood.setLastUpdated(System.currentTimeMillis());
     }
 
-    public void decayMood(long timeElapsed) {
-        // Simplified mood decay
-        currentMood.decay(timeElapsed);
+    /**
+     * Decays the villager's mood over time. This method is designed to be called periodically.
+     */
+    public void decayMood() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastDecayTime >= MOOD_DECAY_INTERVAL_MS) {
+            long timeElapsed = currentTime - lastDecayTime;
+            currentMood.decay(timeElapsed);
+            lastDecayTime = currentTime;
+        }
     }
 
     public void cleanupOldMemories(long threshold) {
@@ -224,16 +273,48 @@ public class VillagerBrain {
     public NBTCompound toNBT() {
         NBTCompound nbt = new NBTCompound();
         nbt.putUUID("villagerUUID", villagerUUID);
-        nbt.put("personality", personalityTraits.toNBT());
-        nbt.put("mood", currentMood.toNBT());
-        nbt.put("shortTermMemory", shortTermMemory.toNBT());
+        nbt.putInt("memoryLimit", memoryLimit);
+        nbt.putString("villagerName", villagerName);
+        nbt.putString("profession", profession);
+        nbt.putString("villageName", villageName);
+        nbt.putLong("lastInteractionTime", lastInteractionTime);
+        nbt.putLong("conversationCooldown", conversationCooldown);
+        nbt.putLong("lastDecayTime", lastDecayTime);
+
+        if (personalityTraits != null) {
+            nbt.put("personality", personalityTraits.toNBT());
+        }
+        if (currentMood != null) {
+            nbt.put("mood", currentMood.toNBT());
+        }
+        if (shortTermMemory != null) {
+            nbt.put("shortTermMemory", shortTermMemory.toNBT());
+        }
+        if (longTermMemory != null) {
+            nbt.put("longTermMemory", longTermMemory.toNBT());
+        }
+        
+        NBTCompound relationshipsNBT = new NBTCompound();
+        for (Map.Entry<UUID, RelationshipData> entry : relationshipMap.entrySet()) {
+            relationshipsNBT.put(entry.getKey().toString(), entry.getValue().toNBT());
+        }
+        nbt.put("relationshipMap", relationshipsNBT);
+
         return nbt;
     }
 
     public static VillagerBrain fromNBT(NBTCompound nbt) {
-        UUID uuid = nbt.getUUID("villagerUUID");
-        VillagerBrain brain = new VillagerBrain(uuid);
-        
+        UUID villagerUUID = nbt.getUUID("villagerUUID");
+        VillagerBrain brain = new VillagerBrain(villagerUUID);
+
+        brain.setMemoryLimit(nbt.contains("memoryLimit") ? nbt.getInt("memoryLimit") : DEFAULT_MEMORY_LIMIT);
+        brain.setVillagerName(nbt.contains("villagerName") ? nbt.getString("villagerName") : "Unknown");
+        brain.setProfession(nbt.contains("profession") ? nbt.getString("profession") : "Unemployed");
+        brain.setVillageName(nbt.contains("villageName") ? nbt.getString("villageName") : "Unknown Village");
+        brain.lastInteractionTime = nbt.contains("lastInteractionTime") ? nbt.getLong("lastInteractionTime") : 0;
+        brain.setConversationCooldown(nbt.contains("conversationCooldown") ? nbt.getLong("conversationCooldown") : 0);
+        brain.lastDecayTime = nbt.contains("lastDecayTime") ? nbt.getLong("lastDecayTime") : System.currentTimeMillis();
+
         if (nbt.contains("personality")) {
             brain.personalityTraits = PersonalityProfile.fromNBT(nbt.getCompound("personality"));
         }
@@ -243,7 +324,27 @@ public class VillagerBrain {
         if (nbt.contains("shortTermMemory")) {
             brain.shortTermMemory = ConversationHistory.fromNBT(nbt.getCompound("shortTermMemory"));
         }
-        
+        if (nbt.contains("longTermMemory")) {
+            NBTCompound ltmNBT = nbt.getCompound("longTermMemory");
+            if (ltmNBT != null) {
+                brain.longTermMemory = MemoryBank.fromNBT(ltmNBT);
+            }
+        }
+
+        if (nbt.contains("relationshipMap")) {
+            NBTCompound relationshipsNBT = nbt.getCompound("relationshipMap");
+            if (relationshipsNBT != null) {
+                for (String key : relationshipsNBT.getData().keySet()) {
+                    UUID playerUUID = UUID.fromString(key);
+                    NBTCompound relationshipNBT = relationshipsNBT.getCompound(key);
+                    if (relationshipNBT != null) {
+                        RelationshipData data = RelationshipData.fromNBT(relationshipNBT);
+                        brain.relationshipMap.put(playerUUID, data);
+                    }
+                }
+            }
+        }
+
         return brain;
     }
 
@@ -313,10 +414,8 @@ public class VillagerBrain {
      * @param message The message from the player
      * @return Response string
      */
-    public String handleMessage(Player player, String message) {
-        // Use a default conversation context for this simplified interface
-        ConversationContext defaultContext = new ConversationContext();
-        defaultContext.setLocation("Village");
+    public CompletableFuture<String> handleMessage(Player player, String message) {
+        ConversationContext defaultContext = getCurrentConversationContext();
         return processMessage(player, message, defaultContext);
     }
     
@@ -412,7 +511,7 @@ public class VillagerBrain {
         shortTermMemory.addInteraction(interaction);
         
         // Also record in enhanced memory bank
-        recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, getCurrentConversationContext());
+        recordDetailedPlayerInteraction(player, playerMessage, villagerResponse, getCurrentConversationContext(), calculateSentimentChange(playerMessage));
     }
     
     /**

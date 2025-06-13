@@ -158,6 +158,16 @@ public class ModConfig {
     }
     
     /**
+     * Checks if the API key is properly configured
+     */
+    public boolean hasValidApiKey() {
+        return llmApiKey != null && 
+               !llmApiKey.trim().isEmpty() && 
+               !llmApiKey.equals("YOUR_API_KEY_HERE") &&
+               llmApiKey.length() >= 10;
+    }
+    
+    /**
      * Validate configuration integrity
      */
     public void validate() {

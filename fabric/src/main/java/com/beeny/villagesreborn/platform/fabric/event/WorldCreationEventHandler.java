@@ -46,6 +46,30 @@ public class WorldCreationEventHandler {
                 if (capturedSettings != null) {
                     LOGGER.info("Applying captured settings from world creation UI: {}", capturedSettings);
                     worldData.setSettings(capturedSettings);
+                    
+                    // Also check for spawn biome choice and store it
+                    try {
+                        var spawnBiomeChoice = WorldCreationSettingsCapture.getSpawnBiomeChoice();
+                        if (spawnBiomeChoice != null) {
+                            // Check if the object is actually an instance of BiomeDisplayInfo before casting
+                            if (spawnBiomeChoice instanceof com.beeny.villagesreborn.platform.fabric.biome.BiomeDisplayInfo biomeDisplayInfo) {
+                                LOGGER.info("Storing spawn biome choice: {}", biomeDisplayInfo.getRegistryKey().getValue());
+                                
+                                // Store the spawn biome choice in world data
+                                var spawnBiomeStorageManager = com.beeny.villagesreborn.platform.fabric.spawn.managers.SpawnBiomeStorageManager.getInstance();
+                                var spawnChoiceData = new com.beeny.villagesreborn.platform.fabric.spawn.SpawnBiomeChoiceData(
+                                    biomeDisplayInfo.getRegistryKey(), 
+                                    System.currentTimeMillis()
+                                );
+                                spawnBiomeStorageManager.setWorldSpawnBiome(world, spawnChoiceData);
+                                LOGGER.info("Successfully stored spawn biome choice for world");
+                            } else {
+                                LOGGER.warn("Spawn biome choice is not a BiomeDisplayInfo instance: {}", spawnBiomeChoice.getClass().getName());
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Failed to store spawn biome choice", e);
+                    }
                 } else {
                     // Fall back to hardware-based defaults
                     LOGGER.info("No captured settings found, using hardware-based defaults");

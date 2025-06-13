@@ -23,4 +23,8 @@ public class PolicyAssessment {
     public PolicyDecision.Decision getDecision() { return decision; }
     public float getSupportLevel() { return supportLevel; }
     public String getReasoning() { return reasoning; }
+
+    public boolean isSupportive() {
+        return this.decision == PolicyDecision.Decision.APPROVE;
+    }
 }

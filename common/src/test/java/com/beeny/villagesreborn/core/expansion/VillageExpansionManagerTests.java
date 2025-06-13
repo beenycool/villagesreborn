@@ -28,8 +28,8 @@ class VillageExpansionManagerTests {
         // When: scheduling next expansion
         long nextTick = expansionManager.scheduleNextExpansion(initialPopulation, currentTick);
         
-        // Then: next tick should be calculated based on population-dependent interval
-        long expectedInterval = expansionManager.calculateExpansionInterval(initialPopulation);
+        // Then: next tick should be calculated based on AI-influenced population-dependent interval
+        long expectedInterval = expansionManager.calculateAIInfluencedExpansionInterval(initialPopulation);
         assertEquals(currentTick + expectedInterval, nextTick);
     }
     
@@ -84,17 +84,17 @@ class VillageExpansionManagerTests {
     }
     
     @Test
-    @DisplayName("Should calculate expansion interval based on population density")
-    void testPopulationBasedExpansionInterval() {
+    @DisplayName("Should calculate AI-influenced expansion interval based on population density")
+    void testAIInfluencedPopulationBasedExpansionInterval() {
         // Given: different population sizes
         int smallPopulation = 50;
         int mediumPopulation = 150;
         int largePopulation = 300;
         
-        // When: calculating intervals
-        long smallInterval = expansionManager.calculateExpansionInterval(smallPopulation);
-        long mediumInterval = expansionManager.calculateExpansionInterval(mediumPopulation);
-        long largeInterval = expansionManager.calculateExpansionInterval(largePopulation);
+        // When: calculating AI-influenced intervals
+        long smallInterval = expansionManager.calculateAIInfluencedExpansionInterval(smallPopulation);
+        long mediumInterval = expansionManager.calculateAIInfluencedExpansionInterval(mediumPopulation);
+        long largeInterval = expansionManager.calculateAIInfluencedExpansionInterval(largePopulation);
         
         // Then: larger populations should have shorter intervals
         assertTrue(smallInterval > mediumInterval, "Small population should have longer interval");
