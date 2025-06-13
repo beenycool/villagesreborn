@@ -137,9 +137,10 @@ public class VillagerAISection extends VillagesRebornTab.ConfigurationSection {
      */
     private static Text safeTranslatable(String key, Object... args) {
         try {
-            var text = args.length > 0 ? Text.translatable(key, args) : Text.translatable(key);
-            return text != null ? text : Text.literal(key.substring(key.lastIndexOf('.') + 1));
+            // Simply use Text.translatable - let Minecraft handle missing translations
+            return args.length > 0 ? Text.translatable(key, args) : Text.translatable(key);
         } catch (Exception e) {
+            LOGGER.warn("Failed to translate key '{}': {}", key, e.getMessage());
             return Text.literal(key.substring(key.lastIndexOf('.') + 1));
         }
     }

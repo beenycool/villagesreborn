@@ -335,11 +335,17 @@ public class VillagerBrain {
             NBTCompound relationshipsNBT = nbt.getCompound("relationshipMap");
             if (relationshipsNBT != null) {
                 for (String key : relationshipsNBT.getData().keySet()) {
-                    UUID playerUUID = UUID.fromString(key);
-                    NBTCompound relationshipNBT = relationshipsNBT.getCompound(key);
-                    if (relationshipNBT != null) {
-                        RelationshipData data = RelationshipData.fromNBT(relationshipNBT);
-                        brain.relationshipMap.put(playerUUID, data);
+                    try {
+                        UUID playerUUID = UUID.fromString(key);
+                        NBTCompound relationshipNBT = relationshipsNBT.getCompound(key);
+                        if (relationshipNBT != null) {
+                            RelationshipData data = RelationshipData.fromNBT(relationshipNBT);
+                            brain.relationshipMap.put(playerUUID, data);
+                        }
+                    } catch (IllegalArgumentException e) {
+                        // Skip corrupted or invalid UUID entries and log the issue
+                        LOGGER.warn("Skipping corrupted relationship entry with invalid UUID key '{}' for villager {}: {}", 
+                                   key, villagerUUID, e.getMessage());
                     }
                 }
             }

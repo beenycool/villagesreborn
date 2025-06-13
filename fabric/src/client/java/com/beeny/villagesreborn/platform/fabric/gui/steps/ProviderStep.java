@@ -17,6 +17,8 @@ public class ProviderStep implements WizardStep {
     private WizardStep.StepContext context;
     private CyclingButtonWidget<LLMProvider> providerButton;
     private LLMProvider selectedProvider = LLMProvider.OPENAI;
+    private boolean statusRendered = false;
+    private String lastRenderedProvider = null;
 
     public ProviderStep(LLMProviderManager llmManager) {
         this.llmManager = llmManager;
@@ -25,6 +27,8 @@ public class ProviderStep implements WizardStep {
     @Override
     public void init(WizardStep.StepContext context) {
         this.context = context;
+        this.statusRendered = false; // Reset render cache on re-init
+        this.lastRenderedProvider = null;
         int centerX = context.getWidth() / 2;
         int currentY = context.getHeight() / 4;
         
@@ -42,31 +46,36 @@ public class ProviderStep implements WizardStep {
             .initially(selectedProvider)
             .build(centerX - 100, currentY, 200, 20, Text.literal("Provider"), (button, provider) -> {
                 selectedProvider = provider;
+                statusRendered = false; // Force re-render on selection change
+                lastRenderedProvider = null;
             });
         context.addDrawableChild(providerButton);
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Render provider selection status
-        if (this.context != null) {
+        // Cache rendering based on provider selection
+        if (this.context != null && !statusRendered) {
             int centerX = this.context.getWidth() / 2;
             int statusY = this.context.getHeight() / 2 + 60;
             
-            // Show selected provider info
-            if (selectedProvider != null) {
+            // Show selected provider info only if changed
+            if (selectedProvider != null && !selectedProvider.getDisplayName().equals(lastRenderedProvider)) {
                 String statusText = "Selected: " + selectedProvider.getDisplayName();
                 int textWidth = this.context.getTextRenderer().getWidth(statusText);
                 context.drawText(this.context.getTextRenderer(), statusText, 
                     centerX - textWidth / 2, statusY, 0x00AA00, false);
+                lastRenderedProvider = selectedProvider.getDisplayName();
             }
             
-            // Show step progress
+            // Show step progress (static, render once)
             int bottomY = this.context.getHeight() - 30;
             String progressText = "Step 2 of 5";
             int textWidth = this.context.getTextRenderer().getWidth(progressText);
             context.drawText(this.context.getTextRenderer(), progressText, 
                 centerX - textWidth / 2, bottomY, 0xAAAAAA, false);
+            
+            statusRendered = true;
         }
     }
 

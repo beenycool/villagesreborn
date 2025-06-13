@@ -1,6 +1,7 @@
 package com.beeny.villagesreborn.platform.fabric.event;
 
 import com.beeny.villagesreborn.platform.fabric.ai.VillagerAIIntegration;
+import com.beeny.villagesreborn.platform.fabric.trading.DynamicTradingSystem;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -8,73 +9,71 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Event handlers for integrating AI with villager lifecycle
+ * Handles AI-related events for villagers
+ * Integrates with VillagerAIIntegration to provide intelligent behavior
  */
 public class VillagerAIEvents {
     private static final Logger LOGGER = LoggerFactory.getLogger(VillagerAIEvents.class);
-    private static boolean registered = false;
+    private static final AtomicInteger tickCounter = new AtomicInteger(0);
+    private static final int AI_UPDATE_INTERVAL = 100; // Update AI every 100 ticks (5 seconds)
     
+    /**
+     * Registers all AI-related event handlers
+     */
     public static void register() {
-        if (registered) {
-            LOGGER.warn("VillagerAIEvents already registered");
-            return;
-        }
-        
-        LOGGER.info("Registering Villager AI event handlers");
+        LOGGER.info("Registering villager AI event handlers");
         
         // Register server tick handler for AI updates
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            try {
-                // Update AI for all villagers in all worlds every few ticks
-                if (server.getTicks() % 100 == 0) { // Every 5 seconds (20 ticks/second * 5)
-                    updateAllVillagerAI(server);
-                }
-                
-                // Cleanup every 10 minutes
-                if (server.getTicks() % 12000 == 0) {
-                    VillagerAIIntegration.getInstance().cleanup();
-                }
-            } catch (Exception e) {
-                LOGGER.error("Error in villager AI tick handler", e);
+            int currentTick = tickCounter.incrementAndGet();
+            
+            // Only process AI updates every AI_UPDATE_INTERVAL ticks
+            if (currentTick % AI_UPDATE_INTERVAL == 0) {
+                processVillagerAIUpdates(server);
             }
         });
         
-        registered = true;
-        LOGGER.info("Successfully registered Villager AI event handlers");
+        LOGGER.info("Villager AI event handlers registered successfully");
     }
     
     /**
-     * Updates AI for all villagers across all worlds
+     * Processes AI updates for all villagers across all worlds
      */
-    private static void updateAllVillagerAI(net.minecraft.server.MinecraftServer server) {
+    private static void processVillagerAIUpdates(net.minecraft.server.MinecraftServer server) {
         try {
             VillagerAIIntegration aiIntegration = VillagerAIIntegration.getInstance();
             
+            // Process all loaded server worlds
             for (ServerWorld world : server.getWorlds()) {
+                // Find all villagers in the world using a large bounding box
                 List<VillagerEntity> villagers = world.getEntitiesByClass(
                     VillagerEntity.class, 
                     net.minecraft.util.math.Box.of(
-                        net.minecraft.util.math.Vec3d.ZERO,
-                        world.getWorldBorder().getSize(),
-                        world.getWorldBorder().getSize(),
-                        world.getWorldBorder().getSize()
-                    ), 
-                    villager -> villager.isAlive()
+                        net.minecraft.util.math.Vec3d.ZERO, 
+                        30000000, 30000000, 30000000
+                    ),
+                    villager -> villager != null && villager.isAlive()
                 );
                 
+                // Update AI for each villager
                 for (VillagerEntity villager : villagers) {
                     try {
                         aiIntegration.updateVillagerAI(villager, world);
                     } catch (Exception e) {
-                        LOGGER.debug("Error updating AI for villager {}: {}", villager.getUuid(), e.getMessage());
+                        LOGGER.debug("Failed to update AI for villager {}: {}", villager.getUuid(), e.getMessage());
                     }
+                }
+                
+                if (!villagers.isEmpty()) {
+                    LOGGER.debug("Updated AI for {} villagers in world {}", villagers.size(), world.getRegistryKey().getValue());
                 }
             }
             
         } catch (Exception e) {
-            LOGGER.error("Error updating villager AI across all worlds", e);
+            LOGGER.error("Error during villager AI update process", e);
         }
     }
     

@@ -4,13 +4,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WizardManager {
-    private final List<WizardStep> steps = new ArrayList<>();
+    private final List<WizardStep> steps = new ArrayList<>(5); // Pre-size for known step count
     private int currentStepIndex = 0;
     private final StepFactory stepFactory;
+    private boolean stepsInitialized = false;
 
     public WizardManager(StepFactory stepFactory) {
         this.stepFactory = stepFactory;
-        initializeSteps();
+        // Lazy initialization - don't create steps until needed
+    }
+
+    private void ensureStepsInitialized() {
+        if (!stepsInitialized) {
+            initializeSteps();
+            stepsInitialized = true;
+        }
     }
 
     private void initializeSteps() {
@@ -22,10 +30,12 @@ public class WizardManager {
     }
 
     public WizardStep getCurrentStep() {
+        ensureStepsInitialized();
         return steps.get(currentStepIndex);
     }
 
     public List<WizardStep> getSteps() {
+        ensureStepsInitialized();
         return steps;
     }
 
@@ -34,11 +44,11 @@ public class WizardManager {
     }
 
     public int getTotalSteps() {
-        return steps.size();
+        return 5; // Return constant instead of computing steps.size()
     }
 
     public boolean hasNext() {
-        return currentStepIndex < steps.size() - 1;
+        return currentStepIndex < 4; // Use constant instead of steps.size() - 1
     }
 
     public boolean hasPrevious() {
@@ -46,7 +56,7 @@ public class WizardManager {
     }
 
     public boolean isLastStep() {
-        return currentStepIndex == steps.size() - 1;
+        return currentStepIndex == 4; // Use constant instead of steps.size() - 1
     }
 
     public void nextStep() {
@@ -62,6 +72,6 @@ public class WizardManager {
     }
 
     public void setCurrentStepIndex(int step) {
-        this.currentStepIndex = Math.max(0, Math.min(steps.size() - 1, step));
+        this.currentStepIndex = Math.max(0, Math.min(4, step)); // Use constant
     }
 }

@@ -41,7 +41,18 @@
   "villagesreborn.config.expansion.max_village_size.value": "Max Size: %d buildings",
   "villagesreborn.config.expansion.expansion_rate": "Expansion Rate",
   "villagesreborn.config.expansion.expansion_rate.tooltip": "How quickly villages expand (higher = faster)",
-  "villagesreborn.config.expansion.expansion_rate.value": "Rate: %d%%",
+  "villagesreborn.config.expansion.expansion_rate.value": "Rate: %.1f",
+  "villagesreborn.config.expansion.expansion_rate.level": "Rate: %s",
+  "villagesreborn.config.expansion.biome_specific": "Biome Specific Expansion",
+  "villagesreborn.config.expansion.biome_specific.tooltip": "Villages adapt expansion to their biome",
+  "villagesreborn.config.expansion.caravan_distance": "Max Caravan Distance",
+  "villagesreborn.config.expansion.caravan_distance.tooltip": "Maximum distance caravans can travel",
+  "villagesreborn.config.expansion.caravan_distance.value": "Distance: %d blocks",
+  "villagesreborn.config.expansion.interdimensional": "Interdimensional Villages",
+  "villagesreborn.config.expansion.interdimensional.tooltip": "Allow villages to expand across dimensions",
+  "villagesreborn.config.expansion.village_density": "Village Generation Density",
+  "villagesreborn.config.expansion.village_density.tooltip": "Density of village generation in new chunks",
+  "villagesreborn.config.expansion.village_density.value": "Density: %d",
   
   "villagesreborn.config.section.governance": "Village Governance",
   "villagesreborn.config.governance.elections": "Village Elections",
@@ -66,5 +77,6 @@
   "villagesreborn.world_creation.section.ai_configuration": "AI Configuration", 
   "villagesreborn.world_creation.section.village_expansion": "Village Expansion",
   "villagesreborn.world_creation.section.feature_toggles": "Feature Toggles",
-  "villagesreborn.world_creation.section.performance": "Performance"
+  "villagesreborn.world_creation.section.performance": "Performance",
+  "villagesreborn.world_creation.narration": "Villages Reborn Configuration"
 } 

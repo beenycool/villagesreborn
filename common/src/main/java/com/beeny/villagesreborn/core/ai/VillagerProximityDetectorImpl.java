@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 public class VillagerProximityDetectorImpl implements VillagerProximityDetector {
     
     private static final int GRID_SIZE = 16; // 16x16 block grid cells
-    private final Map<String, Set<VillagerEntity>> spatialGrid = new HashMap<>();
+    private final Map<String, Set<VillagerEntity>> spatialGrid = new ConcurrentHashMap<>();
     private final Map<UUID, String> villagerGridKeys = new ConcurrentHashMap<>();
     
     /**

@@ -329,16 +329,27 @@ public class RelationshipData {
     }
 
     public static RelationshipData fromNBT(NBTCompound nbt) {
+        // Validate essential data - playerUUID is required
         UUID playerUUID = nbt.getUUID("playerUUID");
         if (playerUUID == null) {
-            // Log an error or handle this case appropriately
-            // For now, let's create a placeholder to avoid crashes
-            playerUUID = UUID.randomUUID();
+            throw new IllegalArgumentException("Cannot deserialize RelationshipData: playerUUID is missing from NBT data");
         }
+        
         RelationshipData data = new RelationshipData(playerUUID);
-        data.trustLevel = nbt.getFloat("trustLevel");
-        data.friendshipLevel = nbt.getFloat("friendshipLevel");
-        data.interactionCount = nbt.getInt("interactionCount");
+        
+        // Safely read optional data with default values if missing
+        if (nbt.contains("trustLevel")) {
+            data.trustLevel = nbt.getFloat("trustLevel");
+        }
+        
+        if (nbt.contains("friendshipLevel")) {
+            data.friendshipLevel = nbt.getFloat("friendshipLevel");
+        }
+        
+        if (nbt.contains("interactionCount")) {
+            data.interactionCount = nbt.getInt("interactionCount");
+        }
+        
         return data;
     }
 }

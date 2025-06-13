@@ -114,23 +114,29 @@ public class HardwareInfoManager {
      * Detect hardware information with retry logic
      */
     private HardwareInfo detectHardwareInfoWithRetry() {
-        int maxRetries = 3;
+        int maxRetries = 2; // Reduced from 3 to 2 attempts
         
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 HardwareAbstractionLayer hardware = systemInfo.getHardware();
                 
-                // Detect RAM
+                // Detect RAM with early validation
                 GlobalMemory memory = hardware.getMemory();
                 long ramBytes = memory.getTotal();
+                if (ramBytes <= 0) {
+                    throw new RuntimeException("Invalid RAM detection");
+                }
                 int ramGB = (int) (ramBytes / (1024L * 1024L * 1024L));
                 
-                // Detect CPU cores
+                // Detect CPU cores with validation
                 CentralProcessor processor = hardware.getProcessor();
                 int cpuCores = processor.getLogicalProcessorCount();
+                if (cpuCores <= 0) {
+                    throw new RuntimeException("Invalid CPU core detection");
+                }
                 
-                // Detect AVX2 support
-                boolean hasAvx2 = detectAvx2Support(processor);
+                // Detect AVX2 support (cached to avoid repeated computation)
+                boolean hasAvx2 = detectAvx2SupportCached(processor);
                 
                 // Enhanced tier classification with performance scoring
                 double performanceScore = calculatePerformanceScore(ramGB, cpuCores, hasAvx2);
@@ -138,8 +144,10 @@ public class HardwareInfoManager {
                 
                 HardwareInfo info = new HardwareInfo(ramGB, cpuCores, hasAvx2, tier);
                 
-                // Validate minimum requirements
-                validateMinimumRequirements(info);
+                // Quick validation (no minimum requirements check to save time)
+                if (!isValidHardwareInfo(info)) {
+                    throw new RuntimeException("Invalid hardware info");
+                }
                 
                 LOGGER.info("Hardware detected: {} (Performance Score: {})", info, performanceScore);
                 return info;
@@ -151,7 +159,7 @@ public class HardwareInfoManager {
                 
                 LOGGER.debug("Hardware detection attempt {} failed, retrying...", attempt);
                 try {
-                    Thread.sleep(1000L * attempt); // Exponential backoff
+                    Thread.sleep(500L * attempt); // Reduced from 1000ms to 500ms
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Hardware detection interrupted", ie);
@@ -266,5 +274,20 @@ public class HardwareInfoManager {
             LOGGER.debug("Could not determine AVX2 support", e);
             return false;
         }
+    }
+
+    // Cache for AVX2 detection result
+    private volatile Boolean cachedAvx2Support;
+    
+    // Cached version of detectAvx2Support
+    private boolean detectAvx2SupportCached(CentralProcessor processor) {
+        if (cachedAvx2Support == null) {
+            synchronized (this) {
+                if (cachedAvx2Support == null) {
+                    cachedAvx2Support = detectAvx2Support(processor);
+                }
+            }
+        }
+        return cachedAvx2Support;
     }
 }

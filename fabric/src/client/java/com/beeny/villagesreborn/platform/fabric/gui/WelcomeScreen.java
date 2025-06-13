@@ -31,6 +31,13 @@ public class WelcomeScreen extends Screen {
     private ButtonWidget nextButton;
     private ButtonWidget backButton;
     
+    // Render state caching
+    private int lastRenderedStep = -1;
+    private boolean needsRedraw = true;
+    
+    // Performance monitoring
+    private final PerformanceMonitor performanceMonitor = new PerformanceMonitor("WelcomeScreen");
+    
     public WelcomeScreen(HardwareInfoManager hardwareManager, LLMProviderManager llmManager,
                         FirstTimeSetupConfig setupConfig) {
         super(Text.literal("Villages Reborn - Setup Wizard"));
@@ -103,6 +110,7 @@ public class WelcomeScreen extends Screen {
             saveConfiguration();
         } else {
             wizardManager.nextStep();
+            needsRedraw = true; // Mark for redraw
             init();
         }
     }
@@ -110,6 +118,7 @@ public class WelcomeScreen extends Screen {
     private void previousStep() {
         if (wizardManager.hasPrevious()) {
             wizardManager.previousStep();
+            needsRedraw = true; // Mark for redraw
             init();
         }
     }
@@ -133,16 +142,27 @@ public class WelcomeScreen extends Screen {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fillGradient(0, 0, this.width, this.height, 0x80000000, 0x80000000);
+        performanceMonitor.startFrame();
+        
+        // Only redraw background if necessary
+        if (needsRedraw) {
+            context.fillGradient(0, 0, this.width, this.height, 0x80000000, 0x80000000);
+            needsRedraw = false;
+        }
+        
         super.render(context, mouseX, mouseY, delta);
         
-        // Render step indicator and title
-        stepRenderer.renderStepIndicator(context, 
-            wizardManager.getCurrentStepIndex(), 
-            wizardManager.getTotalSteps());
-        stepRenderer.renderTitle(context, "Villages Reborn - Setup Wizard");
+        // Cache step indicator and title rendering
+        int currentStep = wizardManager.getCurrentStepIndex();
+        if (lastRenderedStep != currentStep) {
+            stepRenderer.renderStepIndicator(context, currentStep, wizardManager.getTotalSteps());
+            stepRenderer.renderTitle(context, "Villages Reborn - Setup Wizard");
+            lastRenderedStep = currentStep;
+        }
         
         getCurrentStep().render(context, mouseX, mouseY, delta);
+        
+        performanceMonitor.endFrame();
     }
     
     @Override
