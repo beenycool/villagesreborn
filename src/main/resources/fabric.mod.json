@@ -19,7 +19,7 @@
 			"com.beeny.Villagersreborn"
 		],
 		"client": [
-			"com.beeny.VillagersrebornClient"
+			"com.beeny.VillagersRebornClient"
 		],
 		"fabric-datagen": [
 			"com.beeny.VillagersrebornDataGenerator"

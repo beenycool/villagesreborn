@@ -1,0 +1,6 @@
+{
+  "item.villagersreborn.villager_journal": "Villager Journal",
+  "item.villagersreborn.villager_journal.tooltip": "Right-click to open an interactive journal of nearby villagers. Click names to teleport!",
+  "key.villagersreborn.open_journal": "Open Villager Journal",
+  "category.villagersreborn.general": "Villagers Reborn"
+}

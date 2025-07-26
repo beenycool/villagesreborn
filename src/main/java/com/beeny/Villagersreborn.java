@@ -1,6 +1,8 @@
 package com.beeny;
 
 import com.beeny.commands.VillagerCommands;
+import com.beeny.network.VillagerTeleportPacket;
+import com.beeny.registry.ModItems;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
@@ -22,8 +24,14 @@ public class Villagersreborn implements ModInitializer {
 
 		LOGGER.info("Initializing Villages Reborn mod...");
 		
+		// Register items
+		ModItems.initialize();
+		
 		// Register villager commands
 		VillagerCommands.register();
+		
+		// Register networking
+		VillagerTeleportPacket.register();
 		
 		LOGGER.info("Villages Reborn mod initialized successfully!");
 	}

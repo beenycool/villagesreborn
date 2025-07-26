@@ -29,6 +29,16 @@ public class VillagerEntityMixin {
     private void ensureNameIsVisible(CallbackInfo ci) {
         VillagerEntity villager = (VillagerEntity) (Object) this;
         
+        // Check if villager already has a custom name that wasn't set by our mod
+        // This happens when a player uses a name tag on the villager
+        if (villager.getCustomName() != null && !villager.hasAttached(VILLAGER_NAME)) {
+            // Preserve the name set by the player and store it in our attachment
+            String playerName = villager.getCustomName().getString();
+            villager.setAttached(VILLAGER_NAME, playerName);
+            villager.setCustomNameVisible(true);
+            return;
+        }
+        
         // Assign name if not already assigned and villager has proper position
         if (!villager.hasAttached(VILLAGER_NAME)) {
             var pos = villager.getBlockPos();
@@ -36,11 +46,27 @@ public class VillagerEntityMixin {
             
             // Only assign name if villager has a real position (not origin)
             if (world != null && !pos.equals(new net.minecraft.util.math.BlockPos(0, 0, 0))) {
-                String professionName = VillagerNames.generateNameForProfession(
-                    villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
-                    world,
-                    pos
-                );
+                String professionName;
+                
+                // Check if this is a baby villager that might have been created from breeding
+                if (villager.getBreedingAge() < 0) {
+                    // This is a baby villager, try to inherit surname from nearby adult villagers
+                    String inheritedSurname = findInheritedSurname(villager, world, pos);
+                    professionName = VillagerNames.generateNameForProfession(
+                        villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
+                        world,
+                        pos,
+                        inheritedSurname
+                    );
+                } else {
+                    // This is an adult villager, generate name normally
+                    professionName = VillagerNames.generateNameForProfession(
+                        villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
+                        world,
+                        pos
+                    );
+                }
+                
                 villager.setAttached(VILLAGER_NAME, professionName);
                 villager.setCustomName(Text.literal(professionName));
                 villager.setCustomNameVisible(true);
@@ -53,6 +79,39 @@ public class VillagerEntityMixin {
                 villager.setCustomNameVisible(true);
             }
         }
+    }
+    
+    /**
+     * Attempts to find an inherited surname from nearby adult villagers.
+     *
+     * @param babyVillager The baby villager that needs a surname
+     * @param world The world the villager is in
+     * @param pos The position of the baby villager
+     * @return An inherited surname, or null if none found
+     */
+    private static String findInheritedSurname(VillagerEntity babyVillager, net.minecraft.world.World world, net.minecraft.util.math.BlockPos pos) {
+        // Look for nearby adult villagers (within a certain radius)
+        java.util.List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
+            VillagerEntity.class,
+            new net.minecraft.util.math.Box(pos).expand(5.0), // 5 block radius
+            entity -> entity != babyVillager && entity.getBreedingAge() >= 0 // Only adult villagers
+        );
+        
+        // If we found nearby adult villagers, try to inherit a surname from one of them
+        if (!nearbyVillagers.isEmpty()) {
+            // Pick a random nearby villager to inherit from
+            VillagerEntity parentVillager = nearbyVillagers.get(world.random.nextInt(nearbyVillagers.size()));
+            
+            // Get the parent's name
+            String parentName = parentVillager.getAttached(VILLAGER_NAME);
+            if (parentName != null) {
+                // Extract the surname from the parent's name
+                return VillagerNames.extractSurname(parentName);
+            }
+        }
+        
+        // No surname found to inherit
+        return null;
     }
 
     @Inject(method = "setVillagerData", at = @At("TAIL"))
