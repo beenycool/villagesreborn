@@ -4,7 +4,7 @@ A Minecraft Fabric mod that gives villagers custom names based on their professi
 
 ## Description
 
-This mod enhances the Minecraft experience by giving each villager a unique name that reflects their profession. Instead of generic names like "Villager", you'll see names like "Blacksmith Alex" or "Librarian Emma". When villagers change professions, their names update accordingly to match their new job.
+This mod enhances the Minecraft experience by giving each villager a unique name that reflects their profession and the biome they inhabit. Instead of generic names like "Villager", you'll see names like "Blacksmith Alex Ironforge" or "Librarian Emma Bookworth". When villagers change professions, their names update accordingly to match their new job while preserving regional naming themes based on their environment.
 
 ## Features
 
@@ -12,6 +12,7 @@ This mod enhances the Minecraft experience by giving each villager a unique name
 - Names consist of a profession title and a random first name
 - Names update automatically when villagers change professions
 - Names remain visible above villagers' heads for easy identification
+- Names are regionally themed based on the biome where the villager is located
 - Supports all standard Minecraft villager professions:
   - Armorer
   - Butcher
@@ -26,6 +27,23 @@ This mod enhances the Minecraft experience by giving each villager a unique name
   - Shepherd
   - Toolsmith
   - Weaponsmith
+
+## Commands
+
+The mod includes several commands to interact with named villagers:
+
+- `/villager rename <entities> <name>` - Rename specific villagers to a custom name
+- `/villager rename nearest <name>` - Rename the nearest villager to a custom name
+- `/villager list` - List all named villagers in the area with their professions and locations
+- `/villager find <name>` - Find villagers by name (partial matching supported)
+- `/villager randomize` - Randomize names for all villagers in the area
+
+Command details:
+- All commands work within a certain radius (10-100 blocks depending on the command)
+- Villager names are preserved when using rename commands, allowing for custom naming
+- The list command shows villager names, professions, coordinates, and distance from player
+- The find command locates the nearest villager matching the search term
+- The randomize command generates new names for all villagers based on their professions and biomes
 
 ## Installation
 

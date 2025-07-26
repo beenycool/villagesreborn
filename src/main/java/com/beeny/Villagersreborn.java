@@ -1,5 +1,6 @@
 package com.beeny;
 
+import com.beeny.commands.VillagerCommands;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
@@ -19,6 +20,11 @@ public class Villagersreborn implements ModInitializer {
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
 
-		LOGGER.info("Hello Fabric world!");
+		LOGGER.info("Initializing Villages Reborn mod...");
+		
+		// Register villager commands
+		VillagerCommands.register();
+		
+		LOGGER.info("Villages Reborn mod initialized successfully!");
 	}
 }
