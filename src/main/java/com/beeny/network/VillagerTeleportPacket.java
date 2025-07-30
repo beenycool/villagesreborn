@@ -19,6 +19,9 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.server.world.ServerWorld;
+import java.util.Set;
+import net.minecraft.network.packet.s2c.play.PositionFlag;
 
 public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
     public static final Id<VillagerTeleportPacket> ID = new Id<>(Identifier.of("villagersreborn", "villager_teleport"));
@@ -41,7 +44,7 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
             int villagerId = payload.villagerId();
             
             context.server().execute(() -> {
-                Entity entity = player.getServerWorld().getEntityById(villagerId);
+                Entity entity = player.getWorld().getEntityById(villagerId);
                 
                 if (!(entity instanceof VillagerEntity)) {
                     player.sendMessage(Text.literal("§cEntity is not a villager!"), false);
@@ -55,10 +58,10 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
                     
                     // Teleport player to villager with safe positioning
                     Vec3d safePos = findSafePosition(villagerPos, player);
-                    player.teleport(safePos.x, safePos.y, safePos.z);
+                    player.teleport((ServerWorld)player.getWorld(), safePos.x, safePos.y, safePos.z, Set.<PositionFlag>of(), 0.0f, 0.0f, false);
                     
                     // Play teleport sound and send confirmation message
-                    player.getServerWorld().playSound(null, safePos.x, safePos.y, safePos.z, 
+                    player.getWorld().playSound(null, safePos.x, safePos.y, safePos.z, 
                         SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0f, 1.0f);
                     
                     String villagerName = villager.hasCustomName() ? 
@@ -159,32 +162,32 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
         
         // Check for solid ground below the position
         BlockPos groundPos = blockPos.down();
-        BlockState groundState = player.getServerWorld().getBlockState(groundPos);
-        boolean hasSolidGround = !groundState.isAir() && groundState.getCollisionShape(player.getServerWorld(), groundPos).getBoundingBox().getYLength() >= 0.0625;
+        BlockState groundState = player.getWorld().getBlockState(groundPos);
+        boolean hasSolidGround = !groundState.isAir() && groundState.getCollisionShape(player.getWorld(), groundPos).getBoundingBox().getLengthY() >= 0.0625;
         
         // Check if the full 2-block height is clear for the player
-        BlockState feetState = player.getServerWorld().getBlockState(blockPos);
-        BlockState headState = player.getServerWorld().getBlockState(blockPos.up());
+        BlockState feetState = player.getWorld().getBlockState(blockPos);
+        BlockState headState = player.getWorld().getBlockState(blockPos.up());
         
-        boolean feetClear = feetState.isAir() || !feetState.shouldSuffocate(player.getServerWorld(), blockPos);
-        boolean headClear = headState.isAir() || !headState.shouldSuffocate(player.getServerWorld(), blockPos.up());
+        boolean feetClear = feetState.isAir() || !feetState.shouldSuffocate(player.getWorld(), blockPos);
+        boolean headClear = headState.isAir() || !headState.shouldSuffocate(player.getWorld(), blockPos.up());
         
         // Additional safety checks for hazardous materials
-        boolean isLava = player.getServerWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.LAVA) ||
-                        player.getServerWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.LAVA) ||
-                        player.getServerWorld().getBlockState(groundPos).getFluidState().isIn(FluidTags.LAVA);
+        boolean isLava = player.getWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.LAVA) ||
+                        player.getWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.LAVA) ||
+                        player.getWorld().getBlockState(groundPos).getFluidState().isIn(FluidTags.LAVA);
         
-        boolean isWater = player.getServerWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.WATER) ||
-                         player.getServerWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.WATER);
+        boolean isWater = player.getWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.WATER) ||
+                         player.getWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.WATER);
         
         // Check for dangerous blocks like fire, magma, cactus, etc.
-        boolean isDangerous = player.getServerWorld().getBlockState(blockPos).isIn(BlockTags.FIRE) ||
-                             player.getServerWorld().getBlockState(blockPos.up()).isIn(BlockTags.FIRE) ||
-                             player.getServerWorld().getBlockState(groundPos).isIn(BlockTags.FIRE) ||
-                             player.getServerWorld().getBlockState(blockPos).getBlock() instanceof MagmaBlock ||
-                             player.getServerWorld().getBlockState(groundPos).getBlock() instanceof MagmaBlock ||
-                             player.getServerWorld().getBlockState(blockPos).getBlock() instanceof CactusBlock ||
-                             player.getServerWorld().getBlockState(blockPos.up()).getBlock() instanceof CactusBlock;
+        boolean isDangerous = player.getWorld().getBlockState(blockPos).isIn(BlockTags.FIRE) ||
+                             player.getWorld().getBlockState(blockPos.up()).isIn(BlockTags.FIRE) ||
+                             player.getWorld().getBlockState(groundPos).isIn(BlockTags.FIRE) ||
+                             player.getWorld().getBlockState(blockPos).getBlock() instanceof MagmaBlock ||
+                             player.getWorld().getBlockState(groundPos).getBlock() instanceof MagmaBlock ||
+                             player.getWorld().getBlockState(blockPos).getBlock() instanceof CactusBlock ||
+                             player.getWorld().getBlockState(blockPos.up()).getBlock() instanceof CactusBlock;
         
         return hasSolidGround && feetClear && headClear && !isLava && !isDangerous;
     }

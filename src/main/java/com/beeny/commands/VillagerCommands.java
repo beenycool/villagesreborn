@@ -1,10 +1,17 @@
 package com.beeny.commands;
 
+import com.beeny.Villagersreborn;
+import com.beeny.data.VillagerData;
+import com.beeny.system.VillagerRelationshipManager;
+import com.beeny.system.VillagerScheduleManager;
 import com.beeny.util.VillagerNames;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.command.argument.EntityArgumentType;
@@ -12,26 +19,19 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
-import com.mojang.serialization.Codec;
 
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class VillagerCommands {
-    private static final AttachmentType<String> VILLAGER_NAME = AttachmentRegistry.<String>builder()
-            .persistent(Codec.STRING)
-            .buildAndRegister(Identifier.of("villagersreborn", "villager_name"));
 
     // Configuration constants
     private static final double NEAREST_SEARCH_RADIUS = 10.0;
@@ -45,11 +45,9 @@ public class VillagerCommands {
         });
     }
 
-    // ========== Command Registration ==========
-
     private static void registerVillagerCommand(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(CommandManager.literal("villager")
-            // Enhanced rename command with entity selector support
+            // Original commands
             .then(CommandManager.literal("rename")
                 .then(CommandManager.argument("entities", EntityArgumentType.entities())
                     .then(CommandManager.argument("name", StringArgumentType.greedyString())
@@ -58,21 +56,85 @@ public class VillagerCommands {
                     .then(CommandManager.argument("name", StringArgumentType.greedyString())
                         .executes(VillagerCommands::renameNearestVillager))))
             
-            // List command
             .then(CommandManager.literal("list")
                 .executes(VillagerCommands::listNamedVillagers))
             
-            // Find command
             .then(CommandManager.literal("find")
                 .then(CommandManager.argument("name", StringArgumentType.greedyString())
                     .executes(VillagerCommands::findVillagerByName)))
             
-            // Randomize command
             .then(CommandManager.literal("randomize")
-                .executes(VillagerCommands::randomizeAllVillagerNames)));
+                .executes(VillagerCommands::randomizeAllVillagerNames))
+            
+            // New data commands
+            .then(CommandManager.literal("info")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerCommands::showVillagerInfo)))
+            
+            .then(CommandManager.literal("stats")
+                .executes(VillagerCommands::showVillageStats))
+            
+            // Family commands
+            .then(CommandManager.literal("family")
+                .then(CommandManager.literal("tree")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .executes(VillagerCommands::showFamilyTree)))
+                .then(CommandManager.literal("marry")
+                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                            .executes(VillagerCommands::marryVillagers))))
+                .then(CommandManager.literal("divorce")
+                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                            .executes(VillagerCommands::divorceVillagers)))))
+            
+            // Happiness commands
+            .then(CommandManager.literal("happiness")
+                .then(CommandManager.literal("set")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .then(CommandManager.argument("amount", IntegerArgumentType.integer(0, 100))
+                            .executes(VillagerCommands::setHappiness))))
+                .then(CommandManager.literal("adjust")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .then(CommandManager.argument("amount", IntegerArgumentType.integer(-100, 100))
+                            .executes(VillagerCommands::adjustHappiness))))
+                .then(CommandManager.literal("report")
+                    .executes(VillagerCommands::happinessReport)))
+            
+            // Personality commands
+            .then(CommandManager.literal("personality")
+                .then(CommandManager.literal("set")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .then(CommandManager.argument("personality", StringArgumentType.word())
+                            .suggests(VillagerCommands::suggestPersonalities)
+                            .executes(VillagerCommands::setPersonality))))
+                .then(CommandManager.literal("list")
+                    .executes(VillagerCommands::listPersonalities)))
+            
+            // Schedule commands
+            .then(CommandManager.literal("schedule")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerCommands::showSchedule)))
+            
+            // Data management
+            .then(CommandManager.literal("data")
+                .then(CommandManager.literal("export")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .executes(VillagerCommands::exportVillagerData)))
+                .then(CommandManager.literal("reset")
+                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                        .executes(VillagerCommands::resetVillagerData))))
+            
+            // Debug commands
+            .then(CommandManager.literal("debug")
+                .requires(source -> source.hasPermissionLevel(2))
+                .then(CommandManager.literal("relationships")
+                    .executes(VillagerCommands::debugRelationships))
+                .then(CommandManager.literal("cleanup")
+                    .executes(VillagerCommands::cleanupData))));
     }
 
-    // ========== Command Handlers ==========
+    // ========== Original Command Handlers (Updated) ==========
 
     private static int renameSelectedVillagers(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         String newName = StringArgumentType.getString(context, "name");
@@ -91,17 +153,22 @@ public class VillagerCommands {
         
         int renamedCount = 0;
         for (VillagerEntity villager : villagers) {
-            String oldName = villager.getAttached(VILLAGER_NAME);
-            setVillagerName(villager, newName);
-            renamedCount++;
-            
-            String feedback = oldName != null 
-                ? String.format("Renamed villager from '%s' to '%s' at (%.1f, %.1f, %.1f)", 
-                    oldName, newName, villager.getX(), villager.getY(), villager.getZ())
-                : String.format("Named villager '%s' at (%.1f, %.1f, %.1f)", 
-                    newName, villager.getX(), villager.getY(), villager.getZ());
-            
-            sendInfo(source, feedback);
+            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+            if (data != null) {
+                String oldName = data.getName();
+                data.setName(newName);
+                villager.setAttached(Villagersreborn.VILLAGER_NAME, newName); // Legacy support
+                villager.setCustomName(Text.literal(newName));
+                renamedCount++;
+                
+                String feedback = !oldName.isEmpty() 
+                    ? String.format("Renamed villager from '%s' to '%s' at (%.1f, %.1f, %.1f)", 
+                        oldName, newName, villager.getX(), villager.getY(), villager.getZ())
+                    : String.format("Named villager '%s' at (%.1f, %.1f, %.1f)", 
+                        newName, villager.getX(), villager.getY(), villager.getZ());
+                
+                sendInfo(source, feedback);
+            }
         }
         
         sendSuccess(source, String.format("Successfully renamed %d villager%s to '%s'", 
@@ -119,14 +186,443 @@ public class VillagerCommands {
             return 0;
         }
 
-        String oldName = nearestVillager.getAttached(VILLAGER_NAME);
-        setVillagerName(nearestVillager, newName);
+        VillagerData data = nearestVillager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) return 0;
+        
+        String oldName = data.getName();
+        data.setName(newName);
+        nearestVillager.setAttached(Villagersreborn.VILLAGER_NAME, newName); // Legacy support
+        nearestVillager.setCustomName(Text.literal(newName));
 
-        String feedback = oldName != null 
+        String feedback = !oldName.isEmpty() 
             ? String.format("Renamed villager from '%s' to '%s'", oldName, newName)
             : String.format("Named villager '%s'", newName);
         
         sendSuccess(source, feedback);
+        return 1;
+    }
+
+    // ========== New Command Handlers ==========
+
+    private static int showVillagerInfo(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) {
+            sendError(context.getSource(), "Villager has no data");
+            return 0;
+        }
+        
+        ServerCommandSource source = context.getSource();
+        
+        sendInfo(source, "=== " + data.getName() + " ===");
+        sendInfo(source, "Gender: " + data.getGender() + " | Age: " + data.getAgeInDays());
+        sendInfo(source, "Personality: " + data.getPersonality() + " | Happiness: " + 
+            data.getHappiness() + "% (" + data.getHappinessDescription() + ")");
+        sendInfo(source, "Hobby: " + data.getHobby());
+        
+        if (!data.getFavoriteFood().isEmpty()) {
+            sendInfo(source, "Favorite Food: " + data.getFavoriteFood());
+        }
+        
+        sendInfo(source, "Birth Place: " + data.getBirthPlace());
+        sendInfo(source, "Total Trades: " + data.getTotalTrades());
+        
+        if (!data.getProfessionHistory().isEmpty()) {
+            sendInfo(source, "Profession History: " + String.join(" → ", data.getProfessionHistory()));
+        }
+        
+        if (!data.getSpouseId().isEmpty()) {
+            String spouseName = getVillagerNameById(source, data.getSpouseId());
+            sendInfo(source, "Spouse: " + (spouseName != null ? spouseName : "Unknown (ID: " + data.getSpouseId() + ")"));
+        }
+        
+        if (!data.getChildrenIds().isEmpty()) {
+            List<String> childrenNames = data.getChildrenIds().stream()
+                .map(childId -> getVillagerNameById(source, childId))
+                .filter(name -> name != null)
+                .collect(Collectors.toList());
+            if (!childrenNames.isEmpty()) {
+                sendInfo(source, "Children: " + String.join(", ", childrenNames));
+            }
+        }
+        
+        if (!data.getNotes().isEmpty()) {
+            sendInfo(source, "Notes: " + data.getNotes());
+        }
+        
+        return 1;
+    }
+
+    private static int showVillageStats(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, 200);
+        
+        if (villagers.isEmpty()) {
+            sendInfo(source, "No villagers found in the area");
+            return 0;
+        }
+        
+        // Calculate statistics
+        Map<String, Integer> professionCounts = new HashMap<>();
+        Map<String, Integer> personalityCounts = new HashMap<>();
+        int totalHappiness = 0;
+        int marriedCount = 0;
+        int totalAge = 0;
+        int babyCount = 0;
+        int elderCount = 0;
+        Map<String, Integer> hobbyCount = new HashMap<>();
+        
+        for (VillagerEntity villager : villagers) {
+            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+            if (data != null) {
+                // Profession
+                String profession = villager.getVillagerData().profession().toString();
+                professionCounts.put(profession, professionCounts.getOrDefault(profession, 0) + 1);
+                
+                // Personality
+                personalityCounts.put(data.getPersonality(), 
+                    personalityCounts.getOrDefault(data.getPersonality(), 0) + 1);
+                
+                // Happiness
+                totalHappiness += data.getHappiness();
+                
+                // Marriage
+                if (!data.getSpouseId().isEmpty()) marriedCount++;
+                
+                // Age
+                totalAge += data.getAge();
+                if (data.getAge() < 20) babyCount++;
+                if (data.getAge() > 300) elderCount++;
+                
+                // Hobby
+                hobbyCount.put(data.getHobby(), hobbyCount.getOrDefault(data.getHobby(), 0) + 1);
+            }
+        }
+        
+        sendInfo(source, "=== Village Statistics ===");
+        sendInfo(source, "Total Villagers: " + villagers.size());
+        sendInfo(source, "Average Happiness: " + (totalHappiness / villagers.size()) + "%");
+        sendInfo(source, "Average Age: " + (totalAge / villagers.size()) + " days");
+        sendInfo(source, "Married: " + marriedCount + " (" + (marriedCount * 100 / villagers.size()) + "%)");
+        sendInfo(source, "Babies: " + babyCount + " | Elders: " + elderCount);
+        
+        sendInfo(source, "\nProfessions:");
+        professionCounts.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .forEach(entry -> sendInfo(source, "  " + entry.getKey() + ": " + entry.getValue()));
+        
+        sendInfo(source, "\nPersonalities:");
+        personalityCounts.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .forEach(entry -> sendInfo(source, "  " + entry.getKey() + ": " + entry.getValue()));
+        
+        sendInfo(source, "\nPopular Hobbies:");
+        hobbyCount.entrySet().stream()
+            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+            .limit(5)
+            .forEach(entry -> sendInfo(source, "  " + entry.getKey() + ": " + entry.getValue()));
+        
+        return 1;
+    }
+
+    private static int showFamilyTree(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        List<Text> familyTree = VillagerRelationshipManager.getFamilyTree(villager);
+        familyTree.forEach(text -> context.getSource().sendFeedback(() -> text, false));
+        
+        return 1;
+    }
+
+    private static int marryVillagers(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity1 = EntityArgumentType.getEntity(context, "villager1");
+        Entity entity2 = EntityArgumentType.getEntity(context, "villager2");
+        
+        if (!(entity1 instanceof VillagerEntity villager1) || !(entity2 instanceof VillagerEntity villager2)) {
+            sendError(context.getSource(), "Both entities must be villagers");
+            return 0;
+        }
+        
+        if (VillagerRelationshipManager.attemptMarriage(villager1, villager2)) {
+            sendSuccess(context.getSource(), "Marriage successful!");
+        } else {
+            sendError(context.getSource(), "Marriage failed - conditions not met");
+            
+            // Provide helpful feedback
+            if (!VillagerRelationshipManager.canMarry(villager1, villager2)) {
+                VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
+                VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
+                
+                if (data1 != null && data2 != null) {
+                    if (data1.getAge() < 100 || data2.getAge() < 100) {
+                        sendInfo(context.getSource(), "Reason: One or both villagers are too young");
+                    } else if (!data1.getSpouseId().isEmpty() || !data2.getSpouseId().isEmpty()) {
+                        sendInfo(context.getSource(), "Reason: One or both villagers are already married");
+                    } else if (data1.getHappiness() < 40 || data2.getHappiness() < 40) {
+                        sendInfo(context.getSource(), "Reason: One or both villagers are too unhappy");
+                    } else {
+                        sendInfo(context.getSource(), "Reason: Incompatible personalities or other factors");
+                    }
+                }
+            }
+        }
+        
+        return 1;
+    }
+
+    private static int divorceVillagers(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity1 = EntityArgumentType.getEntity(context, "villager1");
+        Entity entity2 = EntityArgumentType.getEntity(context, "villager2");
+        
+        if (!(entity1 instanceof VillagerEntity villager1) || !(entity2 instanceof VillagerEntity villager2)) {
+            sendError(context.getSource(), "Both entities must be villagers");
+            return 0;
+        }
+        
+        VillagerRelationshipManager.divorce(villager1, villager2);
+        sendSuccess(context.getSource(), "Villagers have been divorced");
+        
+        return 1;
+    }
+
+    private static int setHappiness(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        int amount = IntegerArgumentType.getInteger(context, "amount");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data != null) {
+            data.setHappiness(amount);
+            sendSuccess(context.getSource(), "Set " + data.getName() + "'s happiness to " + amount + "%");
+        }
+        
+        return 1;
+    }
+
+    private static int adjustHappiness(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        int amount = IntegerArgumentType.getInteger(context, "amount");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data != null) {
+            data.adjustHappiness(amount);
+            sendSuccess(context.getSource(), "Adjusted " + data.getName() + "'s happiness by " + 
+                (amount >= 0 ? "+" : "") + amount + "% (now " + data.getHappiness() + "%)");
+        }
+        
+        return 1;
+    }
+
+    private static int happinessReport(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, 100);
+        
+        if (villagers.isEmpty()) {
+            sendInfo(source, "No villagers found in the area");
+            return 0;
+        }
+        
+        // Sort by happiness
+        List<VillagerEntity> sortedVillagers = villagers.stream()
+            .filter(v -> v.getAttached(Villagersreborn.VILLAGER_DATA) != null)
+            .sorted((v1, v2) -> {
+                VillagerData d1 = v1.getAttached(Villagersreborn.VILLAGER_DATA);
+                VillagerData d2 = v2.getAttached(Villagersreborn.VILLAGER_DATA);
+                return Integer.compare(d2.getHappiness(), d1.getHappiness());
+            })
+            .collect(Collectors.toList());
+        
+        sendInfo(source, "=== Happiness Report ===");
+        
+        // Show top 5 happiest
+        sendInfo(source, "Happiest Villagers:");
+        sortedVillagers.stream().limit(5).forEach(villager -> {
+            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+            sendInfo(source, String.format("  %s: %d%% (%s)", 
+                data.getName(), data.getHappiness(), data.getHappinessDescription()));
+        });
+        
+        // Show bottom 5 unhappiest
+        if (sortedVillagers.size() > 5) {
+            sendInfo(source, "\nUnhappiest Villagers:");
+            sortedVillagers.stream()
+                .skip(Math.max(0, sortedVillagers.size() - 5))
+                .forEach(villager -> {
+                    VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                    sendInfo(source, String.format("  %s: %d%% (%s)", 
+                        data.getName(), data.getHappiness(), data.getHappinessDescription()));
+                });
+        }
+        
+        return 1;
+    }
+
+    private static int setPersonality(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        String personality = StringArgumentType.getString(context, "personality");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        // Validate personality
+        if (!Arrays.asList(VillagerData.PERSONALITIES).contains(personality)) {
+            sendError(context.getSource(), "Invalid personality. Use /villager personality list to see valid options");
+            return 0;
+        }
+        
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data != null) {
+            String oldPersonality = data.getPersonality();
+            data.setPersonality(personality);
+            sendSuccess(context.getSource(), "Changed " + data.getName() + "'s personality from " + 
+                oldPersonality + " to " + personality);
+        }
+        
+        return 1;
+    }
+
+    private static int listPersonalities(CommandContext<ServerCommandSource> context) {
+        ServerCommandSource source = context.getSource();
+        sendInfo(source, "Available Personalities:");
+        for (String personality : VillagerData.PERSONALITIES) {
+            sendInfo(source, "  - " + personality);
+        }
+        return 1;
+    }
+
+    private static CompletableFuture<Suggestions> suggestPersonalities(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
+        for (String personality : VillagerData.PERSONALITIES) {
+            builder.suggest(personality);
+        }
+        return builder.buildFuture();
+    }
+
+    private static int showSchedule(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        List<Text> scheduleInfo = VillagerScheduleManager.getScheduleInfo(villager);
+        scheduleInfo.forEach(text -> context.getSource().sendFeedback(() -> text, false));
+        
+        return 1;
+    }
+
+    private static int exportVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) {
+            sendError(context.getSource(), "Villager has no data");
+            return 0;
+        }
+        
+        // Create a formatted export
+        ServerCommandSource source = context.getSource();
+        sendInfo(source, "=== Villager Data Export ===");
+        sendInfo(source, "Name: " + data.getName());
+        sendInfo(source, "Gender: " + data.getGender());
+        sendInfo(source, "Age: " + data.getAge());
+        sendInfo(source, "Personality: " + data.getPersonality());
+        sendInfo(source, "Happiness: " + data.getHappiness());
+        sendInfo(source, "Hobby: " + data.getHobby());
+        sendInfo(source, "Favorite Food: " + data.getFavoriteFood());
+        sendInfo(source, "Birth Time: " + data.getBirthTime());
+        sendInfo(source, "Birth Place: " + data.getBirthPlace());
+        sendInfo(source, "Total Trades: " + data.getTotalTrades());
+        sendInfo(source, "Spouse: " + data.getSpouseName() + " (ID: " + data.getSpouseId() + ")");
+        sendInfo(source, "Children: " + String.join(", ", data.getChildrenNames()));
+        sendInfo(source, "Family: " + String.join(", ", data.getFamilyMembers()));
+        sendInfo(source, "Profession History: " + String.join(", ", data.getProfessionHistory()));
+        sendInfo(source, "Notes: " + data.getNotes());
+        sendInfo(source, "=== End Export ===");
+        
+        return 1;
+    }
+
+    private static int resetVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity = EntityArgumentType.getEntity(context, "villager");
+        
+        if (!(entity instanceof VillagerEntity villager)) {
+            sendError(context.getSource(), "Entity is not a villager");
+            return 0;
+        }
+        
+        // Create new data
+        VillagerData newData = new VillagerData();
+        villager.setAttached(Villagersreborn.VILLAGER_DATA, newData);
+        
+        sendSuccess(context.getSource(), "Reset data for villager at " + villager.getBlockPos());
+        return 1;
+    }
+
+    private static int debugRelationships(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, 200);
+        
+        Map<String, List<String>> marriages = new HashMap<>();
+        Map<String, List<String>> families = new HashMap<>();
+        
+        for (VillagerEntity villager : villagers) {
+            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+            if (data != null) {
+                if (!data.getSpouseName().isEmpty()) {
+                    marriages.computeIfAbsent(data.getName(), k -> new ArrayList<>())
+                        .add(data.getSpouseName());
+                }
+                
+                if (!data.getFamilyMembers().isEmpty()) {
+                    families.put(data.getName(), data.getFamilyMembers());
+                }
+            }
+        }
+        
+        sendInfo(source, "=== Relationship Debug ===");
+        sendInfo(source, "Marriages:");
+        marriages.forEach((name, spouses) -> 
+            sendInfo(source, "  " + name + " ↔ " + String.join(", ", spouses)));
+        
+        sendInfo(source, "\nFamily Connections:");
+        families.forEach((name, members) -> 
+            sendInfo(source, "  " + name + ": " + String.join(", ", members)));
+        
+        return 1;
+    }
+
+    private static int cleanupData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        
+        // This would clean up orphaned data, fix inconsistencies, etc.
+        sendInfo(source, "Data cleanup completed (feature not fully implemented)");
+        
         return 1;
     }
 
@@ -143,15 +639,32 @@ public class VillagerCommands {
         sendInfo(source, "Named villagers in area:");
         
         namedVillagers.stream()
-            .sorted(Comparator.comparing(villager -> villager.getAttached(VILLAGER_NAME)))
+            .sorted((v1, v2) -> {
+                VillagerData d1 = v1.getAttached(Villagersreborn.VILLAGER_DATA);
+                VillagerData d2 = v2.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (d1 == null || d2 == null) return 0;
+                return d1.getName().compareTo(d2.getName());
+            })
             .forEach(villager -> {
-                String name = villager.getAttached(VILLAGER_NAME);
-                String professionId = villager.getVillagerData().profession().toString();
-                Vec3d pos = villager.getPos();
-                double distance = source.getPosition().distanceTo(pos);
-                
-                sendInfo(source, String.format("- %s (%s) at (%.1f, %.1f, %.1f) - %.1f blocks away", 
-                    name, professionId, pos.x, pos.y, pos.z, distance));
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (data != null) {
+                    String professionId = villager.getVillagerData().profession().toString();
+                    Vec3d pos = villager.getPos();
+                    double distance = source.getPosition().distanceTo(pos);
+                    
+                    // Create coordinates text
+                    Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
+                        .formatted(Formatting.AQUA);
+                    
+                    Text message = Text.literal("- ")
+                        .append(Text.literal(data.getName()).formatted(Formatting.WHITE))
+                        .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
+                        .append(Text.literal(" at "))
+                        .append(coordsText)
+                        .append(Text.literal(String.format(" - %.1f blocks away", distance)).formatted(Formatting.GRAY));
+                    
+                    source.sendFeedback(() -> message, false);
+                }
             });
         
         sendSuccess(source, String.format("Total: %d villagers", namedVillagers.size()));
@@ -165,8 +678,8 @@ public class VillagerCommands {
         List<VillagerEntity> matchingVillagers = getNamedVillagersInArea(source, FIND_SEARCH_RADIUS)
             .stream()
             .filter(villager -> {
-                String villagerName = villager.getAttached(VILLAGER_NAME);
-                return villagerName != null && villagerName.toLowerCase().contains(searchName.toLowerCase());
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                return data != null && data.getName().toLowerCase().contains(searchName.toLowerCase());
             })
             .sorted(Comparator.comparingDouble(villager -> 
                 source.getPosition().squaredDistanceTo(villager.getPos())))
@@ -179,13 +692,23 @@ public class VillagerCommands {
         }
         
         VillagerEntity closestMatch = matchingVillagers.get(0);
-        String name = closestMatch.getAttached(VILLAGER_NAME);
+        VillagerData data = closestMatch.getAttached(Villagersreborn.VILLAGER_DATA);
         Vec3d pos = closestMatch.getPos();
         double distance = Math.sqrt(source.getPosition().squaredDistanceTo(pos));
         String professionId = closestMatch.getVillagerData().profession().toString();
         
-        sendSuccess(source, String.format("Found %s (%s) at (%.1f, %.1f, %.1f) - %.1f blocks away", 
-            name, professionId, pos.x, pos.y, pos.z, distance));
+        // Create coordinates message
+        Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
+            .formatted(Formatting.AQUA);
+        
+        Text message = Text.literal("Found ")
+            .append(Text.literal(data.getName()).formatted(Formatting.GREEN))
+            .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
+            .append(Text.literal(" at "))
+            .append(coordsText)
+            .append(Text.literal(String.format(" - %.1f blocks away", distance)).formatted(Formatting.GRAY));
+        
+        source.sendFeedback(() -> message, false);
         
         if (matchingVillagers.size() > 1) {
             sendInfo(source, String.format("Found %d more villager%s with matching names", 
@@ -209,13 +732,17 @@ public class VillagerCommands {
         int renamedCount = 0;
         for (VillagerEntity villager : villagers) {
             String newName = VillagerNames.generateNameForProfession(
-                villager.getVillagerData().profession().getKey().orElse(net.minecraft.village.VillagerProfession.NITWIT),
                 world,
                 villager.getBlockPos()
             );
             
-            setVillagerName(villager, newName);
-            renamedCount++;
+            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+            if (data != null) {
+                data.setName(newName);
+                villager.setAttached(Villagersreborn.VILLAGER_NAME, newName); // Legacy support
+                villager.setCustomName(Text.literal(newName));
+                renamedCount++;
+            }
         }
         
         sendSuccess(source, String.format("Randomized names for %d villager%s", 
@@ -224,15 +751,6 @@ public class VillagerCommands {
     }
 
     // ========== Helper Methods ==========
-
-    private static void setVillagerName(VillagerEntity villager, String name) {
-        Objects.requireNonNull(villager, "Villager cannot be null");
-        Objects.requireNonNull(name, "Name cannot be null");
-        
-        villager.setAttached(VILLAGER_NAME, name);
-        villager.setCustomName(Text.literal(name));
-        villager.setCustomNameVisible(true);
-    }
 
     private static VillagerEntity findNearestVillager(ServerCommandSource source) {
         Vec3d sourcePos = source.getPosition();
@@ -248,7 +766,10 @@ public class VillagerCommands {
     private static List<VillagerEntity> getNamedVillagersInArea(ServerCommandSource source, double radius) {
         return getAllVillagersInArea(source, radius)
             .stream()
-            .filter(villager -> villager.hasAttached(VILLAGER_NAME))
+            .filter(villager -> {
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                return data != null && !data.getName().isEmpty();
+            })
             .collect(Collectors.toList());
     }
 
@@ -259,6 +780,24 @@ public class VillagerCommands {
         
         return world.getEntitiesByClass(VillagerEntity.class, searchBox, 
             villager -> sourcePos.distanceTo(villager.getPos()) <= radius);
+    }
+
+    private static String getVillagerNameById(ServerCommandSource source, String villagerUuid) {
+        if (villagerUuid == null || villagerUuid.isEmpty()) {
+            return null;
+        }
+        
+        World world = source.getWorld();
+        List<VillagerEntity> villagers = world.getEntitiesByClass(VillagerEntity.class, 
+            new Box(-30000000, -256, -30000000, 30000000, 256, 30000000), 
+            villager -> villager.getUuidAsString().equals(villagerUuid));
+        
+        if (!villagers.isEmpty()) {
+            VillagerData data = villagers.get(0).getAttached(Villagersreborn.VILLAGER_DATA);
+            return data != null ? data.getName() : null;
+        }
+        
+        return null;
     }
 
     // ========== Messaging Utilities ==========

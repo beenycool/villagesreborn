@@ -1,6 +1,7 @@
 package com.beeny.client.gui;
 
 import com.beeny.network.VillagerTeleportPacket;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import com.beeny.util.VillagerNames;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -301,14 +302,14 @@ public class VillagerJournalScreen extends Screen {
             }
             
             playClickSound();
-            VillagerTeleportPacket.sendToServer(entry.villagerId);
+            ClientPlayNetworking.send(new VillagerTeleportPacket(entry.villagerId));
             close();
         }
     }
     
     private void playClickSound() {
         if (client != null) {
-            client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0f, 0.8f));
+            client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f, 0.8f));
         }
     }
     
@@ -326,8 +327,8 @@ public class VillagerJournalScreen extends Screen {
         
         VillagerEntry(VillagerEntity villager) {
             this.name = getVillagerName(villager);
-            this.profession = villager.getVillagerData().getProfession().toString().toLowerCase();
-            this.level = villager.getVillagerData().getLevel();
+            this.profession = villager.getVillagerData().profession().toString().toLowerCase();
+            this.level = villager.getVillagerData().level();
             this.villagerId = villager.getId();
             this.distance = 0; // Will be calculated during updates
         }

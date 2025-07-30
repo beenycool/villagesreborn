@@ -1,135 +1,455 @@
 package com.beeny.mixin;
 
+import com.beeny.Villagersreborn;
+import com.beeny.data.VillagerData;
+import com.beeny.system.VillagerRelationshipManager;
+import com.beeny.system.VillagerScheduleManager;
 import com.beeny.util.VillagerNames;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.village.TradeOffer;
 import net.minecraft.village.VillagerProfession;
-import com.mojang.serialization.Codec;
+import net.minecraft.world.World;
+import net.minecraft.entity.LightningEntity;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.List;
+import java.util.Random;
 
 @Mixin(VillagerEntity.class)
-public class VillagerEntityMixin {
-    private static final AttachmentType<String> VILLAGER_NAME = AttachmentRegistry.<String>builder()
-            .persistent(Codec.STRING)
-            .buildAndRegister(Identifier.of("villagersreborn", "villager_name"));
-
-    @Inject(method = "<init>*", at = @At("TAIL"))
-    private void assignRandomName(CallbackInfo ci) {
-        // Don't assign name immediately during construction
-        // Name will be assigned in mobTick when villager has proper position
+public abstract class VillagerEntityMixin extends LivingEntity {
+    @Shadow public abstract void setVillagerData(net.minecraft.village.VillagerData villagerData);
+    
+    @Unique
+    private static final Random RANDOM = new Random();
+    
+    @Unique
+    private int greetingCooldown = 0;
+    
+    @Unique
+    private int updateCounter = 0;
+    
+    protected VillagerEntityMixin() {
+        super(null, null);
     }
-
-    @Inject(method = "mobTick", at = @At("HEAD"))
-    private void ensureNameIsVisible(CallbackInfo ci) {
+    
+    @Inject(method = "<init>*", at = @At("TAIL"))
+    private void initializeVillagerData(CallbackInfo ci) {
         VillagerEntity villager = (VillagerEntity) (Object) this;
         
-        // Check if villager already has a custom name that wasn't set by our mod
-        // This happens when a player uses a name tag on the villager
-        if (villager.getCustomName() != null && !villager.hasAttached(VILLAGER_NAME)) {
-            // Preserve the name set by the player and store it in our attachment
-            String playerName = villager.getCustomName().getString();
-            villager.setAttached(VILLAGER_NAME, playerName);
-            villager.setCustomNameVisible(true);
+        // Initialize the comprehensive data attachment
+        if (!villager.hasAttached(Villagersreborn.VILLAGER_DATA)) {
+            VillagerData data = new VillagerData();
+            villager.setAttached(Villagersreborn.VILLAGER_DATA, data);
+        }
+    }
+    
+    @Inject(method = "mobTick", at = @At("HEAD"))
+    private void onMobTick(CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data == null) return;
+        
+        updateCounter++;
+        
+        // Update name and ensure visibility
+        if (data.getName().isEmpty() || updateCounter % 20 == 0) {
+            ensureNameAndData(villager, data);
+        }
+        
+        // Update greeting cooldown
+        if (greetingCooldown > 0) {
+            greetingCooldown--;
+        }
+        
+        // Periodic happiness adjustments based on conditions
+        if (updateCounter % 100 == 0) {
+            updateHappinessBasedOnConditions(villager, data);
+        }
+        
+        // Check for nearby spouse for happiness bonus
+        if (updateCounter % 200 == 0 && !data.getSpouseId().isEmpty()) {
+            checkSpouseProximity(villager, data);
+        }
+    }
+    
+    @Inject(method = "interactMob", at = @At("HEAD"), cancellable = true)
+    private void onInteractMob(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
+        if (player.getWorld().isClient) return;
+        
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data == null) return;
+        
+        // Shift-click to see detailed info
+        if (player.isSneaking() && hand == Hand.MAIN_HAND) {
+            showDetailedInfo(player, villager, data);
+            cir.setReturnValue(ActionResult.SUCCESS);
             return;
         }
         
-        // Assign name if not already assigned and villager has proper position
-        if (!villager.hasAttached(VILLAGER_NAME)) {
-            var pos = villager.getBlockPos();
-            var world = villager.getWorld();
+        // Greeting system
+        if (greetingCooldown == 0 && hand == Hand.MAIN_HAND && player.getStackInHand(hand).isEmpty()) {
+            greetVillager(player, villager, data);
+            greetingCooldown = 100; // 5 seconds cooldown
+        }
+    }
+    
+    @Inject(method = "onDeath", at = @At("HEAD"))
+    private void onVillagerDeath(DamageSource source, CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data == null || villager.getWorld().isClient) return;
+        
+        // Notify family members
+        if (!data.getSpouseName().isEmpty() || !data.getChildrenNames().isEmpty()) {
+            notifyFamilyOfDeath(villager, data);
+        }
+        
+        // Cleanup
+        VillagerNames.cleanupVillager(villager.getUuidAsString());
+        VillagerRelationshipManager.removeProposalTime(villager.getUuidAsString());
+    }
+    
+    @Inject(method = "setVillagerData", at = @At("TAIL"))
+    private void onProfessionChange(net.minecraft.village.VillagerData villagerData, CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data == null) return;
+        
+        // Track profession history
+        String professionKey = villagerData.profession().getKey()
+            .map(key -> key.getValue().toString()).orElse("minecraft:none");
+        data.addProfession(professionKey);
+        
+        // Update name if needed
+        if (!data.getName().isEmpty()) {
+            String newName = VillagerNames.updateProfessionInName(
+                data.getName(),
+                villagerData.profession().getKey().orElse(VillagerProfession.NITWIT),
+                villager.getWorld(),
+                villager.getBlockPos()
+            );
+            data.setName(newName);
+            villager.setCustomName(Text.literal(newName));
+        }
+    }
+    
+    @Inject(method = "afterUsing", at = @At("TAIL"))
+    private void onTradeComplete(TradeOffer offer, CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data == null) return;
+        
+        // Increment trade counter
+        data.incrementTrades();
+        
+        // Increase happiness from trading
+        data.adjustHappiness(2);
+        
+        // Update player relationship if possible
+        Entity customer = villager.getCustomer();
+        if (customer instanceof PlayerEntity player) {
+            data.updatePlayerRelation(player.getUuidAsString(), 1);
             
-            // Only assign name if villager has a real position (not origin)
-            if (world != null && !pos.equals(new net.minecraft.util.math.BlockPos(0, 0, 0))) {
-                String professionName;
-                
-                // Check if this is a baby villager that might have been created from breeding
-                if (villager.getBreedingAge() < 0) {
-                    // This is a baby villager, try to inherit surname from nearby adult villagers
-                    String inheritedSurname = findInheritedSurname(villager, world, pos);
-                    professionName = VillagerNames.generateNameForProfession(
-                        villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
-                        world,
-                        pos,
-                        inheritedSurname
-                    );
-                } else {
-                    // This is an adult villager, generate name normally
-                    professionName = VillagerNames.generateNameForProfession(
-                        villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
-                        world,
-                        pos
-                    );
+            // Check for favorite player
+            if (data.getTotalTrades() > 10 && data.getFavoritePlayerId().isEmpty()) {
+                int reputation = data.getPlayerReputation(player.getUuidAsString());
+                if (reputation > 20) {
+                    data.setFavoritePlayerId(player.getUuidAsString());
+                    player.sendMessage(Text.literal(data.getName() + " now considers you their favorite customer!")
+                        .formatted(Formatting.GOLD), false);
                 }
-                
-                villager.setAttached(VILLAGER_NAME, professionName);
-                villager.setCustomName(Text.literal(professionName));
-                villager.setCustomNameVisible(true);
-            }
-        } else {
-            // Ensure existing name is visible
-            String name = villager.getAttached(VILLAGER_NAME);
-            if (name != null && villager.getCustomName() == null) {
-                villager.setCustomName(Text.literal(name));
-                villager.setCustomNameVisible(true);
             }
         }
     }
     
-    /**
-     * Attempts to find an inherited surname from nearby adult villagers.
-     *
-     * @param babyVillager The baby villager that needs a surname
-     * @param world The world the villager is in
-     * @param pos The position of the baby villager
-     * @return An inherited surname, or null if none found
-     */
-    private static String findInheritedSurname(VillagerEntity babyVillager, net.minecraft.world.World world, net.minecraft.util.math.BlockPos pos) {
-        // Look for nearby adult villagers (within a certain radius)
-        java.util.List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
-            VillagerEntity.class,
-            new net.minecraft.util.math.Box(pos).expand(5.0), // 5 block radius
-            entity -> entity != babyVillager && entity.getBreedingAge() >= 0 // Only adult villagers
-        );
+    @Inject(method = "onStruckByLightning", at = @At("HEAD"))
+    private void onStruckByLightning(ServerWorld world, LightningEntity lightning, CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         
-        // If we found nearby adult villagers, try to inherit a surname from one of them
-        if (!nearbyVillagers.isEmpty()) {
-            // Pick a random nearby villager to inherit from
-            VillagerEntity parentVillager = nearbyVillagers.get(world.random.nextInt(nearbyVillagers.size()));
+        if (data != null) {
+            // Dramatic personality change from lightning
+            String[] dramaticPersonalities = {"Energetic", "Confident", "Cheerful"};
+            data.setPersonality(dramaticPersonalities[RANDOM.nextInt(dramaticPersonalities.length)]);
+            data.adjustHappiness(-20); // Scared but alive
+        }
+    }
+    
+    @Inject(method = "wakeUp", at = @At("TAIL"))
+    private void onWakeUp(CallbackInfo ci) {
+        VillagerEntity villager = (VillagerEntity) (Object) this;
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data != null) {
+            // Morning happiness adjustment
+            if (data.getHappiness() > 70) {
+                data.adjustHappiness(2); // Good morning!
+            }
+        }
+    }
+    
+    @Unique
+    private void ensureNameAndData(VillagerEntity villager, VillagerData data) {
+        // Ensure villager has a name
+        if (data.getName().isEmpty()) {
+            var pos = villager.getBlockPos();
+            var world = villager.getWorld();
             
-            // Get the parent's name
-            String parentName = parentVillager.getAttached(VILLAGER_NAME);
-            if (parentName != null) {
-                // Extract the surname from the parent's name
-                return VillagerNames.extractSurname(parentName);
+            // Only assign name if villager has a real position
+            if (world != null && !pos.equals(new net.minecraft.util.math.BlockPos(0, 0, 0))) {
+                String generatedName = VillagerNames.generateNameForProfession(
+                    world,
+                    pos
+                );
+                
+                data.setName(generatedName);
+                
+                // Set gender based on name generation
+                boolean isMale = (pos.getX() + pos.getZ()) % 2 == 0;
+                data.setGender(isMale ? "Male" : "Female");
+                
+                // Set birth place
+                data.setBirthPlace(String.format("X:%d Y:%d Z:%d", pos.getX(), pos.getY(), pos.getZ()));
+                
+                // Legacy support
+                villager.setAttached(Villagersreborn.VILLAGER_NAME, generatedName);
             }
         }
         
-        // No surname found to inherit
-        return null;
-    }
-
-    @Inject(method = "setVillagerData", at = @At("TAIL"))
-    private void updateNameOnProfessionChange(CallbackInfo ci) {
-        VillagerEntity villager = (VillagerEntity) (Object) this;
-        
-        // Only update if villager already has a name (preserve first name)
-        if (villager.hasAttached(VILLAGER_NAME)) {
-            String currentName = villager.getAttached(VILLAGER_NAME);
-            String newName = VillagerNames.updateProfessionInName(
-                currentName,
-                villager.getVillagerData().profession().getKey().orElse(VillagerProfession.NITWIT),
-                villager.getWorld(),
-                villager.getBlockPos()
-            );
-            villager.setAttached(VILLAGER_NAME, newName);
-            villager.setCustomName(Text.literal(newName));
-            villager.setCustomNameVisible(true);
+        // Update custom name
+        Text activitySuffix = Text.empty();
+        if (villager.getWorld() instanceof ServerWorld) {
+            VillagerScheduleManager.Activity activity = VillagerScheduleManager.getCurrentActivity(villager);
+            activitySuffix = Text.literal(" [" + activity.description + "]")
+                .formatted(Formatting.GRAY);
         }
+        
+        villager.setCustomName(Text.literal(data.getName()).append(activitySuffix));
+        villager.setCustomNameVisible(true);
+    }
+    
+    @Unique
+    private void updateHappinessBasedOnConditions(VillagerEntity villager, VillagerData data) {
+        // Check bed access
+        if (villager.getWorld().getTimeOfDay() % 24000 > 13000) { // Night time
+            BlockPos bedPos = villager.getSleepingPosition().orElse(null);
+            if (bedPos == null) {
+                data.adjustHappiness(-1); // No bed makes villager unhappy
+            }
+        }
+        
+        // Check workstation access
+        if (villager.getVillagerData().profession() != VillagerProfession.NITWIT && 
+            villager.getVillagerData().profession() != VillagerProfession.NONE) {
+            // This is simplified - in reality you'd check for actual workstation
+            if (villager.getVillagerData().level() > 0) {
+                data.adjustHappiness(1); // Has workstation
+            }
+        }
+        
+        // Social needs
+        List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
+            VillagerEntity.class,
+            villager.getBoundingBox().expand(10),
+            v -> v != villager
+        );
+        
+        if (nearbyVillagers.size() > 2) {
+            data.adjustHappiness(1); // Social villager is happy
+        } else if (nearbyVillagers.isEmpty()) {
+            data.adjustHappiness(-1); // Lonely
+        }
+    }
+    
+    @Unique
+    private void checkSpouseProximity(VillagerEntity villager, VillagerData data) {
+        if (data.getSpouseId().isEmpty()) return;
+        
+        // Find spouse entity by UUID
+        VillagerEntity spouse = null;
+        for (VillagerEntity entity : villager.getWorld().getEntitiesByClass(VillagerEntity.class,
+                villager.getBoundingBox().expand(100.0), e -> true)) {
+            if (entity.getUuidAsString().equals(data.getSpouseId())) {
+                spouse = entity;
+                break;
+            }
+        }
+        
+        if (spouse != null && spouse.isAlive()) {
+            double distance = villager.getPos().distanceTo(spouse.getPos());
+            if (distance < 20) {
+                data.adjustHappiness(1); // Happy to be near spouse
+            } else if (distance > 100) {
+                data.adjustHappiness(-1); // Missing spouse
+            }
+        }
+    }
+    
+    @Unique
+    private void greetVillager(PlayerEntity player, VillagerEntity villager, VillagerData data) {
+        String playerUuid = player.getUuidAsString();
+        int reputation = data.getPlayerReputation(playerUuid);
+        
+        String greeting;
+        Formatting color;
+        
+        if (reputation > 50) {
+            greeting = getPositiveGreeting(data.getName(), data.getPersonality());
+            color = Formatting.GREEN;
+            data.adjustHappiness(1);
+        } else if (reputation < -20) {
+            greeting = getNegativeGreeting(data.getName(), data.getPersonality());
+            color = Formatting.RED;
+        } else {
+            greeting = getNeutralGreeting(data.getName(), data.getPersonality());
+            color = Formatting.WHITE;
+        }
+        
+        player.sendMessage(Text.literal(greeting).formatted(color), true);
+        
+        // Small reputation gain for greeting
+        data.updatePlayerRelation(playerUuid, 1);
+    }
+    
+    @Unique
+    private String getPositiveGreeting(String name, String personality) {
+        String[] greetings = switch (personality) {
+            case "Friendly" -> new String[]{
+                "Hello dear friend! How wonderful to see you!",
+                "My friend! Welcome back!",
+                "Always a pleasure to see you!"
+            };
+            case "Shy" -> new String[]{
+                "Oh, h-hello... nice to see you again...",
+                "You're back... that's nice...",
+                "Hi... I was hoping you'd visit..."
+            };
+            case "Grumpy" -> new String[]{
+                "Oh, it's you. I suppose you're alright.",
+                "Hmph. At least you're better than most.",
+                "You again? Well, could be worse."
+            };
+            default -> new String[]{
+                "Good to see you again!",
+                "Welcome back, friend!",
+                "Hello there!"
+            };
+        };
+        return greetings[RANDOM.nextInt(greetings.length)];
+    }
+    
+    @Unique
+    private String getNeutralGreeting(String name, String personality) {
+        String[] greetings = switch (personality) {
+            case "Friendly" -> new String[]{"Hello there!", "Good day to you!", "Welcome!"};
+            case "Shy" -> new String[]{"H-hello...", "Oh, um, hi...", "..."};
+            case "Grumpy" -> new String[]{"What now?", "Yes?", "Hmph."};
+            default -> new String[]{"Hello.", "Greetings.", "Good day."};
+        };
+        return greetings[RANDOM.nextInt(greetings.length)];
+    }
+    
+    @Unique
+    private String getNegativeGreeting(String name, String personality) {
+        String[] greetings = switch (personality) {
+            case "Friendly" -> new String[]{
+                "Oh... it's you...",
+                "I'd rather not talk right now...",
+                "Please leave me be..."
+            };
+            case "Grumpy" -> new String[]{
+                "You! Get away from me!",
+                "Haven't you done enough?",
+                "Bah! Leave me alone!"
+            };
+            default -> new String[]{
+                "Go away.",
+                "I don't want to talk to you.",
+                "Leave me alone."
+            };
+        };
+        return greetings[RANDOM.nextInt(greetings.length)];
+    }
+    
+    @Unique
+    private void showDetailedInfo(PlayerEntity player, VillagerEntity villager, VillagerData data) {
+        player.sendMessage(Text.literal("=== " + data.getName() + " ===").formatted(Formatting.GOLD), false);
+        player.sendMessage(Text.literal("Gender: " + data.getGender() + " | Age: " + data.getAgeInDays()), false);
+        player.sendMessage(Text.literal("Personality: " + data.getPersonality() + " | Mood: " + data.getHappinessDescription()), false);
+        player.sendMessage(Text.literal("Hobby: " + data.getHobby()), false);
+        
+        if (!data.getFavoriteFood().isEmpty()) {
+            player.sendMessage(Text.literal("Favorite Food: " + data.getFavoriteFood()).formatted(Formatting.GREEN), false);
+        }
+        
+        if (!data.getSpouseName().isEmpty()) {
+            player.sendMessage(Text.literal("Married to: " + data.getSpouseName()).formatted(Formatting.RED), false);
+        }
+        
+        if (!data.getChildrenNames().isEmpty()) {
+            player.sendMessage(Text.literal("Children: " + String.join(", ", data.getChildrenNames())).formatted(Formatting.LIGHT_PURPLE), false);
+        }
+        
+        player.sendMessage(Text.literal("Total Trades: " + data.getTotalTrades()).formatted(Formatting.GOLD), false);
+        player.sendMessage(Text.literal("Your Reputation: " + data.getPlayerReputation(player.getUuidAsString())).formatted(Formatting.AQUA), false);
+    }
+    
+    @Unique
+    private void notifyFamilyOfDeath(VillagerEntity villager, VillagerData data) {
+        if (!(villager.getWorld() instanceof ServerWorld serverWorld)) return;
+        
+        // Find and update spouse
+        if (!data.getSpouseId().isEmpty()) {
+            VillagerEntity spouse = null;
+            for (VillagerEntity entity : serverWorld.getEntitiesByClass(VillagerEntity.class,
+                    villager.getBoundingBox().expand(200.0), e -> true)) {
+                if (entity.getUuidAsString().equals(data.getSpouseId())) {
+                    spouse = entity;
+                    break;
+                }
+            }
+            
+            if (spouse != null) {
+                VillagerData spouseData = spouse.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (spouseData != null) {
+                    spouseData.setWidowed();
+                    spouseData.adjustHappiness(-50);
+                    spouseData.setNotes("Lost spouse " + data.getName() + " - Forever in mourning");
+                }
+            }
+        }
+        
+        // Notify players
+        serverWorld.getPlayers().forEach(player -> {
+            if (player.getPos().distanceTo(villager.getPos()) < 100) {
+                player.sendMessage(Text.literal("💔 " + data.getName() + " has passed away...")
+                    .formatted(Formatting.DARK_RED), false);
+            }
+        });
     }
 }
