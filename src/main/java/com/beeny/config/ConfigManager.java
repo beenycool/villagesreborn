@@ -19,22 +19,22 @@ public class ConfigManager {
         try {
             Path configPath = Paths.get("config", CONFIG_FILE_NAME);
             
-            // Create config directory if it doesn't exist
+            
             if (!Files.exists(configPath.getParent())) {
                 Files.createDirectories(configPath.getParent());
             }
             
-            // Create default config file if it doesn't exist
+            
             if (!Files.exists(configPath)) {
                 createDefaultConfig(configPath);
                 return;
             }
             
-            // Read and parse config file
+            
             String content = Files.readString(configPath);
             JsonObject config = JsonParser.parseString(content).getAsJsonObject();
             
-            // Load values from config
+            
             if (config.has("villagerScanChunkRadius")) {
                 VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS = config.get("villagerScanChunkRadius").getAsInt();
             }

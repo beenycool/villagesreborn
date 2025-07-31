@@ -46,12 +46,12 @@ public class Villagersreborn implements ModInitializer {
 	private static final Random RANDOM = new Random();
 	private static int tickCounter = 0;
 
-	// Attachment for villager name (legacy - kept for compatibility)
+	
 	public static final AttachmentType<String> VILLAGER_NAME = AttachmentRegistry.<String>builder()
 			.persistent(Codec.STRING)
 			.buildAndRegister(Identifier.of(MOD_ID, "villager_name"));
 	
-	// New attachment for comprehensive villager data
+	
 	public static final AttachmentType<VillagerData> VILLAGER_DATA = AttachmentRegistry.<VillagerData>builder()
 			.persistent(VillagerData.CODEC)
 			.initializer(VillagerData::new)
@@ -61,28 +61,28 @@ public class Villagersreborn implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Initializing Villages Reborn mod...");
 		
-		// Load configuration
+		
 		com.beeny.config.ConfigManager.loadConfig();
 		
-		// Register items
+		
 		ModItems.initialize();
 		
-		// Register commands
+		
 		VillagerCommands.register();
 		
-		// Register networking
+		
 		VillagerTeleportPacket.register();
 		UpdateVillagerNotesPacket.register();
 		VillagerMarriagePacket.register();
 		
-		// Register events
+		
 		registerEvents();
 		
-		// Register tick events
+		
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			tickCounter++;
 			
-			// Check for marriages every 5 seconds (100 ticks)
+			
 			if (tickCounter % 100 == 0) {
 				server.getWorlds().forEach(world -> {
 					if (world instanceof ServerWorld serverWorld) {
@@ -91,7 +91,7 @@ public class Villagersreborn implements ModInitializer {
 				});
 			}
 			
-			// Update villager ages every minute (1200 ticks)
+			
 			if (tickCounter % 1200 == 0) {
 				server.getWorlds().forEach(world -> {
 					if (world instanceof ServerWorld serverWorld) {
@@ -100,7 +100,7 @@ public class Villagersreborn implements ModInitializer {
 				});
 			}
 			
-			// Schedule updates every 10 seconds
+			
 			if (tickCounter % 200 == 0) {
 				server.getWorlds().forEach(world -> {
 					if (world instanceof ServerWorld serverWorld) {
@@ -109,7 +109,7 @@ public class Villagersreborn implements ModInitializer {
 				});
 			}
 			
-			// Clean up stale proposal times every 30 seconds (600 ticks)
+			
 			if (tickCounter % 600 == 0) {
 				VillagerRelationshipManager.cleanupStaleProposalTimes();
 			}
@@ -119,7 +119,7 @@ public class Villagersreborn implements ModInitializer {
 	}
 	
 	private void registerEvents() {
-		// Right-click villager with specific items
+		
 		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
 			if (entity instanceof VillagerEntity villager && !world.isClient) {
 				ItemStack heldItem = player.getStackInHand(hand);
@@ -127,38 +127,38 @@ public class Villagersreborn implements ModInitializer {
 				
 				if (data == null) return ActionResult.PASS;
 				
-				// Feed villager their favorite food
+				
 				if (!heldItem.isEmpty() && isFoodItem(heldItem)) {
 					Identifier foodId = Registries.ITEM.getId(heldItem.getItem());
 					String foodRegistryName = foodId.toString();
 					String foodDisplayName = heldItem.getName().getString();
 					
 					if (data.getFavoriteFood().isEmpty()) {
-						// Set favorite food
+						
 						data.setFavoriteFood(foodRegistryName);
 						data.adjustHappiness(10);
 						player.sendMessage(Text.literal(data.getName() + " now loves " + foodDisplayName + "!")
 							.formatted(Formatting.GREEN), false);
 					} else if (data.getFavoriteFood().equals(foodRegistryName)) {
-						// Feeding favorite food
+						
 						data.adjustHappiness(5);
 						if (!player.isCreative()) {
 							heldItem.decrement(1);
 						}
 						
-						// Heart particles
+						
 						((ServerWorld) world).spawnParticles(ParticleTypes.HEART,
 							villager.getX(), villager.getY() + 2, villager.getZ(),
 							5, 0.5, 0.5, 0.5, 0.1);
 						
-						// Happy sound
+						
 						world.playSound(null, villager.getBlockPos(),
 							SoundEvents.ENTITY_VILLAGER_YES, SoundCategory.NEUTRAL, 1.0f, 1.0f);
 						
 						player.sendMessage(Text.literal(data.getName() + " is happy! (+" + 5 + " happiness)")
 							.formatted(Formatting.GREEN), false);
 					} else {
-						// Not favorite food
+						
 						data.adjustHappiness(1);
 						if (!player.isCreative()) {
 							heldItem.decrement(1);
@@ -179,7 +179,7 @@ public class Villagersreborn implements ModInitializer {
 					return ActionResult.SUCCESS;
 				}
 				
-				// Give gift (emerald) to improve relationship
+				
 				if (heldItem.isOf(Items.EMERALD)) {
 					String playerUuid = player.getUuidAsString();
 					data.updatePlayerRelation(playerUuid, 5);
@@ -189,7 +189,7 @@ public class Villagersreborn implements ModInitializer {
 						heldItem.decrement(1);
 					}
 					
-					// Sparkle particles
+					
 					((ServerWorld) world).spawnParticles(ParticleTypes.HAPPY_VILLAGER,
 						villager.getX(), villager.getY() + 1, villager.getZ(),
 						10, 0.5, 0.5, 0.5, 0.1);
@@ -222,12 +222,12 @@ public class Villagersreborn implements ModInitializer {
 	}
 	
 	private void checkForMarriages(ServerWorld world) {
-		// Get players in the world to limit search area
+		
 		List<ServerPlayerEntity> players = world.getPlayers();
 		if (players.isEmpty()) return;
 		
-		// Create a smaller bounding box around all players (reduced from config value)
-		int searchRadius = Math.min(32, VillagersRebornConfig.getBoundingBoxSize() / 4); // Max 32 blocks, or 1/4 of config
+		
+		int searchRadius = Math.min(32, VillagersRebornConfig.getBoundingBoxSize() / 4); 
 		Box searchBox = createBoundingBoxAroundPlayers(players, searchRadius);
 		
 		List<VillagerEntity> villagers = world.getEntitiesByClass(
@@ -236,17 +236,17 @@ public class Villagersreborn implements ModInitializer {
 			v -> true
 		);
 		
-		// Check each pair of villagers for potential marriage
+		
 		for (int i = 0; i < villagers.size(); i++) {
 			VillagerEntity villager1 = villagers.get(i);
 			
 			for (int j = i + 1; j < villagers.size(); j++) {
 				VillagerEntity villager2 = villagers.get(j);
 				
-				// Check if villagers are near each other before attempting marriage
+				
 				double distance = villager1.getPos().distanceTo(villager2.getPos());
-				if (distance <= 10.0) { // Only consider villagers within 10 blocks of each other
-					// Small chance to attempt marriage if conditions are met
+				if (distance <= 10.0) { 
+					
 					if (RANDOM.nextFloat() < 0.01f) {
 						VillagerRelationshipManager.attemptMarriage(villager1, villager2);
 					}
@@ -260,16 +260,16 @@ public class Villagersreborn implements ModInitializer {
 				return new Box(0, 0, 0, 0, 0, 0);
 			}
 			
-			// Start with the first player's position
+			
 			BlockPos pos = players.get(0).getBlockPos();
 			int minX = pos.getX() - radius;
-			int minY = Math.max(pos.getY() - radius, -64); // Minimum Y level
+			int minY = Math.max(pos.getY() - radius, -64); 
 			int minZ = pos.getZ() - radius;
 			int maxX = pos.getX() + radius;
-			int maxY = Math.min(pos.getY() + radius, 320); // Maximum Y level
+			int maxY = Math.min(pos.getY() + radius, 320); 
 			int maxZ = pos.getZ() + radius;
 			
-			// Expand the box to include all other players
+			
 			for (int i = 1; i < players.size(); i++) {
 				pos = players.get(i).getBlockPos();
 				minX = Math.min(minX, pos.getX() - radius);
@@ -284,11 +284,11 @@ public class Villagersreborn implements ModInitializer {
 		}
 	
 	private void updateVillagerAges(ServerWorld world) {
-		// Get players in the world to limit search area
+		
 		List<ServerPlayerEntity> players = world.getPlayers();
 		if (players.isEmpty()) return;
 		
-		// Create a bounding box around all players
+		
 		int searchRadius = VillagersRebornConfig.getBoundingBoxSize();
 		Box searchBox = createBoundingBoxAroundPlayers(players, searchRadius);
 		
@@ -303,11 +303,11 @@ public class Villagersreborn implements ModInitializer {
 			if (data != null) {
 				data.incrementAge();
 				
-				// Natural happiness decay/recovery
+				
 				if (data.getHappiness() > VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD) {
-					data.adjustHappiness(-VillagersRebornConfig.HAPPINESS_DECAY_RATE); // Slowly decay to neutral
+					data.adjustHappiness(-VillagersRebornConfig.HAPPINESS_DECAY_RATE); 
 				} else if (data.getHappiness() < VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD) {
-					data.adjustHappiness(VillagersRebornConfig.HAPPINESS_RECOVERY_RATE); // Slowly recover to neutral
+					data.adjustHappiness(VillagersRebornConfig.HAPPINESS_RECOVERY_RATE); 
 				}
 			}
 		}

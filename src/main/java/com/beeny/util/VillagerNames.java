@@ -20,58 +20,58 @@ public class VillagerNames {
     private static final Map<String, List<String>> REGIONAL_SURNAMES = new HashMap<>();
     private static final Map<String, List<String>> PROFESSION_NAMES = new HashMap<>();
     
-    // Cache for villager genders to maintain consistency
+    
     private static final Map<String, Boolean> VILLAGER_GENDERS = new ConcurrentHashMap<>();
     
     private static final Random RANDOM = new Random();
     
     static {
-        // Desert names
+        
         REGIONAL_MALE_NAMES.put("desert", Arrays.asList("Amir", "Omar", "Khalid", "Rashid", "Tariq", "Zaid", "Farid", "Hakim", "Jamal", "Karim"));
         REGIONAL_FEMALE_NAMES.put("desert", Arrays.asList("Amina", "Fatima", "Leila", "Noor", "Sara", "Yasmin", "Zahra", "Amira", "Hana", "Layla"));
         REGIONAL_SURNAMES.put("desert", Arrays.asList("Al-Rashid", "Ibn-Saud", "Al-Farsi", "Al-Masri", "Al-Tikriti", "Al-Baghdadi", "Al-Dimashqi", "Al-Kufi"));
         
-        // Snow names
+        
         REGIONAL_MALE_NAMES.put("snow", Arrays.asList("Bjorn", "Erik", "Gunnar", "Harald", "Leif", "Olaf", "Ragnar", "Sven", "Thor", "Ulf"));
         REGIONAL_FEMALE_NAMES.put("snow", Arrays.asList("Astrid", "Freya", "Greta", "Helga", "Ingrid", "Liv", "Sigrid", "Thyra", "Yrsa", "Asta"));
         REGIONAL_SURNAMES.put("snow", Arrays.asList("Bjornsson", "Eriksson", "Gunnarsson", "Haraldsson", "Leifsson", "Olafsson", "Ragnarsson", "Svensson"));
         
-        // Taiga names
+        
         REGIONAL_MALE_NAMES.put("taiga", Arrays.asList("Ivan", "Dmitri", "Sergei", "Vladimir", "Alexei", "Nikolai", "Pavel", "Yuri", "Mikhail", "Andrei"));
         REGIONAL_FEMALE_NAMES.put("taiga", Arrays.asList("Anya", "Katya", "Nadia", "Olga", "Svetlana", "Tatiana", "Vera", "Yelena", "Irina", "Ludmila"));
         REGIONAL_SURNAMES.put("taiga", Arrays.asList("Ivanov", "Petrov", "Sidorov", "Smirnov", "Kuznetsov", "Popov", "Volkov", "Romanov"));
         
-        // Plains names
+        
         REGIONAL_MALE_NAMES.put("plains", Arrays.asList("William", "Henry", "James", "John", "Robert", "Michael", "David", "Richard", "Charles", "Thomas"));
         REGIONAL_FEMALE_NAMES.put("plains", Arrays.asList("Mary", "Elizabeth", "Sarah", "Margaret", "Catherine", "Anne", "Jane", "Alice", "Emily", "Charlotte"));
         REGIONAL_SURNAMES.put("plains", Arrays.asList("Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Wilson", "Moore", "Taylor"));
         
-        // Savanna names
+        
         REGIONAL_MALE_NAMES.put("savanna", Arrays.asList("Kwame", "Kofi", "Amara", "Chike", "Jabari", "Baraka", "Hasani", "Jelani", "Omari", "Tafari"));
         REGIONAL_FEMALE_NAMES.put("savanna", Arrays.asList("Aisha", "Fatima", "Imani", "Khadija", "Mariam", "Nia", "Saida", "Zahra", "Amina", "Halima"));
         REGIONAL_SURNAMES.put("savanna", Arrays.asList("Diallo", "Keita", "Touré", "Sow", "Ba", "Diop", "Fall", "Ndiaye", "Sarr", "Cissé"));
         
-        // Jungle names
+        
         REGIONAL_MALE_NAMES.put("jungle", Arrays.asList("Miguel", "Carlos", "José", "Antonio", "Luis", "Manuel", "Pedro", "Rafael", "Francisco", "Juan"));
         REGIONAL_FEMALE_NAMES.put("jungle", Arrays.asList("Maria", "Ana", "Isabel", "Carmen", "Rosa", "Julia", "Teresa", "Dolores", "Sofia", "Lucia"));
         REGIONAL_SURNAMES.put("jungle", Arrays.asList("Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Almeida", "Costa", "Pereira", "Carvalho"));
         
-        // Swamp names
+        
         REGIONAL_MALE_NAMES.put("swamp", Arrays.asList("Tobias", "Jeremiah", "Ezekiel", "Mordecai", "Silas", "Ambrose", "Cornelius", "Barnabas", "Thaddeus", "Ichabod"));
         REGIONAL_FEMALE_NAMES.put("swamp", Arrays.asList("Prudence", "Temperance", "Constance", "Mercy", "Charity", "Verity", "Felicity", "Serenity", "Patience", "Grace"));
         REGIONAL_SURNAMES.put("swamp", Arrays.asList("Blackwater", "Grimm", "Marsh", "Boggart", "Murkwood", "Fenwick", "Shadowmere", "Gloom"));
         
-        // Ocean/Beach names
+        
         REGIONAL_MALE_NAMES.put("ocean", Arrays.asList("Dylan", "Morgan", "Kai", "Finn", "Murphy", "Ronan", "Caspian", "Drake", "Neptune", "Triton"));
         REGIONAL_FEMALE_NAMES.put("ocean", Arrays.asList("Marina", "Coral", "Pearl", "Nerissa", "Delphine", "Mira", "Cordelia", "Isla", "Moana", "Ariel"));
         REGIONAL_SURNAMES.put("ocean", Arrays.asList("Seaworth", "Tidewater", "Saltwind", "Wavecrest", "Deepwater", "Stormshore", "Seafoam", "Shellhaven"));
         
-        // Default names for other biomes
+        
         REGIONAL_MALE_NAMES.put("default", Arrays.asList("Alex", "Sam", "Jordan", "Casey", "Morgan", "Taylor", "Jamie", "Riley", "Avery", "Quinn"));
         REGIONAL_FEMALE_NAMES.put("default", Arrays.asList("Alex", "Sam", "Jordan", "Casey", "Morgan", "Taylor", "Jamie", "Riley", "Avery", "Quinn"));
         REGIONAL_SURNAMES.put("default", Arrays.asList("Stone", "River", "Forest", "Hill", "Brook", "Lake", "Field", "Wood", "Meadow", "Glen"));
         
-        // Profession names
+        
         PROFESSION_NAMES.put("minecraft:none", Arrays.asList("Villager", "Settler", "Commoner", "Peasant", "Townsperson"));
         PROFESSION_NAMES.put("minecraft:armorer", Arrays.asList("Armorer", "Smith", "Blacksmith", "Metalsmith", "Armorsmith"));
         PROFESSION_NAMES.put("minecraft:butcher", Arrays.asList("Butcher", "Meatcutter", "Slaughterer", "Meatmonger", "Purveyor"));
@@ -122,7 +122,7 @@ public class VillagerNames {
     }
     
     private static String getBiomeKey(RegistryEntry<Biome> biomeEntry) {
-        // Get the biome's registry key
+        
         Optional<RegistryKey<Biome>> keyOpt = biomeEntry.getKey();
         if (keyOpt.isEmpty()) {
             return "default";
@@ -130,13 +130,13 @@ public class VillagerNames {
         
         RegistryKey<Biome> biomeKey = keyOpt.get();
         
-        // Desert biomes
+        
         if (biomeKey.equals(BiomeKeys.DESERT) || biomeKey.equals(BiomeKeys.BADLANDS) || 
             biomeKey.equals(BiomeKeys.ERODED_BADLANDS) || biomeKey.equals(BiomeKeys.WOODED_BADLANDS)) {
             return "desert";
         }
         
-        // Snow biomes
+        
         if (biomeKey.equals(BiomeKeys.SNOWY_PLAINS) || biomeKey.equals(BiomeKeys.SNOWY_TAIGA) || 
             biomeKey.equals(BiomeKeys.FROZEN_RIVER) || biomeKey.equals(BiomeKeys.SNOWY_BEACH) ||
             biomeKey.equals(BiomeKeys.GROVE) || biomeKey.equals(BiomeKeys.SNOWY_SLOPES) ||
@@ -144,36 +144,36 @@ public class VillagerNames {
             return "snow";
         }
         
-        // Taiga biomes
+        
         if (biomeKey.equals(BiomeKeys.TAIGA) || biomeKey.equals(BiomeKeys.OLD_GROWTH_PINE_TAIGA) || 
             biomeKey.equals(BiomeKeys.OLD_GROWTH_SPRUCE_TAIGA)) {
             return "taiga";
         }
         
-        // Plains biomes
+        
         if (biomeKey.equals(BiomeKeys.PLAINS) || biomeKey.equals(BiomeKeys.SUNFLOWER_PLAINS) ||
             biomeKey.equals(BiomeKeys.MEADOW)) {
             return "plains";
         }
         
-        // Savanna biomes
+        
         if (biomeKey.equals(BiomeKeys.SAVANNA) || biomeKey.equals(BiomeKeys.SAVANNA_PLATEAU) ||
             biomeKey.equals(BiomeKeys.WINDSWEPT_SAVANNA)) {
             return "savanna";
         }
         
-        // Jungle biomes
+        
         if (biomeKey.equals(BiomeKeys.JUNGLE) || biomeKey.equals(BiomeKeys.SPARSE_JUNGLE) ||
             biomeKey.equals(BiomeKeys.BAMBOO_JUNGLE)) {
             return "jungle";
         }
         
-        // Swamp biomes
+        
         if (biomeKey.equals(BiomeKeys.SWAMP) || biomeKey.equals(BiomeKeys.MANGROVE_SWAMP)) {
             return "swamp";
         }
         
-        // Ocean/Beach biomes
+        
         if (biomeKey.equals(BiomeKeys.BEACH) || biomeKey.equals(BiomeKeys.OCEAN) || 
             biomeKey.equals(BiomeKeys.WARM_OCEAN) || biomeKey.equals(BiomeKeys.LUKEWARM_OCEAN) ||
             biomeKey.equals(BiomeKeys.COLD_OCEAN) || biomeKey.equals(BiomeKeys.FROZEN_OCEAN) ||
@@ -218,7 +218,7 @@ public class VillagerNames {
             return villager.getCustomName().getString();
         }
         
-        // Generate a name if the villager doesn't have one
+        
         return generateName(villager);
     }
     
@@ -226,7 +226,7 @@ public class VillagerNames {
         RegistryEntry<Biome> biomeEntry = world.getBiome(pos);
         String biomeKey = getBiomeKey(biomeEntry);
         
-        // Use a deterministic gender based on position for consistency
+        
         boolean isMale = (pos.getX() + pos.getZ()) % 2 == 0;
         
         List<String> firstNames = isMale ?
@@ -246,10 +246,15 @@ public class VillagerNames {
     }
     
     public static String generateNameForProfession(World world, BlockPos pos, String inheritedSurname) {
+        if (inheritedSurname == null || inheritedSurname.trim().isEmpty()) {
+            // When no inherited surname, delegate to the simpler method
+            return generateNameForProfession(world, pos);
+        }
+        
+        // When we have an inherited surname, we need to generate just the first name
         RegistryEntry<Biome> biomeEntry = world.getBiome(pos);
         String biomeKey = getBiomeKey(biomeEntry);
         
-        // Use a deterministic gender based on position for consistency
         boolean isMale = (pos.getX() + pos.getZ()) % 2 == 0;
         
         List<String> firstNames = isMale ?
@@ -261,18 +266,7 @@ public class VillagerNames {
         }
         
         String firstName = firstNames.get(RANDOM.nextInt(firstNames.size()));
-        
-        if (inheritedSurname != null && !inheritedSurname.trim().isEmpty()) {
-            return firstName + " " + inheritedSurname;
-        }
-        
-        List<String> surnames = REGIONAL_SURNAMES.getOrDefault(biomeKey, REGIONAL_SURNAMES.get("default"));
-        if (surnames.isEmpty()) {
-            return firstName;
-        }
-        
-        String surname = surnames.get(RANDOM.nextInt(surnames.size()));
-        return firstName + " " + surname;
+        return firstName + " " + inheritedSurname;
     }
     
     public static String updateProfessionInName(String currentName, RegistryKey<VillagerProfession> profession, World world, BlockPos pos) {
@@ -280,11 +274,11 @@ public class VillagerNames {
             return generateNameForProfession(world, pos);
         }
         
-        // Keep the current name unchanged - profession change doesn't affect personal name
+        
         return currentName;
     }
     
-    // Cleanup method for when entities are removed
+    
     public static void cleanupVillager(String villagerUuid) {
         VILLAGER_GENDERS.remove(villagerUuid);
     }

@@ -14,7 +14,7 @@ import java.util.*;
 
 public class VillagerDialogueSystem {
     
-    // Dialogue categories
+    
     public enum DialogueCategory {
         GREETING,
         WEATHER,
@@ -29,7 +29,7 @@ public class VillagerDialogueSystem {
         FAREWELL
     }
     
-    // Context for dialogue generation
+    
     public static class DialogueContext {
         public final VillagerEntity villager;
         public final PlayerEntity player;
@@ -74,7 +74,7 @@ public class VillagerDialogueSystem {
     }
     
     private static void initializeDialogueTemplates() {
-        // Friendly personality dialogues
+        
         Map<DialogueCategory, List<String>> friendlyDialogues = new HashMap<>();
         
         friendlyDialogues.put(DialogueCategory.GREETING, Arrays.asList(
@@ -122,7 +122,7 @@ public class VillagerDialogueSystem {
         
         DIALOGUE_TEMPLATES.put("Friendly", friendlyDialogues);
         
-        // Grumpy personality dialogues
+        
         Map<DialogueCategory, List<String>> grumpyDialogues = new HashMap<>();
         
         grumpyDialogues.put(DialogueCategory.GREETING, Arrays.asList(
@@ -149,7 +149,7 @@ public class VillagerDialogueSystem {
         
         DIALOGUE_TEMPLATES.put("Grumpy", grumpyDialogues);
         
-        // Shy personality dialogues
+        
         Map<DialogueCategory, List<String>> shyDialogues = new HashMap<>();
         
         shyDialogues.put(DialogueCategory.GREETING, Arrays.asList(
@@ -169,12 +169,12 @@ public class VillagerDialogueSystem {
         
         DIALOGUE_TEMPLATES.put("Shy", shyDialogues);
         
-        // Add more personalities and categories as needed
+        
         initializeMoreDialogues();
     }
     
     private static void initializeMoreDialogues() {
-        // Energetic personality
+        
         Map<DialogueCategory, List<String>> energeticDialogues = new HashMap<>();
         
         energeticDialogues.put(DialogueCategory.GREETING, Arrays.asList(
@@ -193,12 +193,12 @@ public class VillagerDialogueSystem {
         
         DIALOGUE_TEMPLATES.put("Energetic", energeticDialogues);
         
-        // Profession-specific dialogues
+        
         initializeProfessionDialogues();
     }
     
     private static void initializeProfessionDialogues() {
-        // Farmer-specific advice
+        
         Map<DialogueCategory, List<String>> farmerDialogues = new HashMap<>();
         
         farmerDialogues.put(DialogueCategory.ADVICE, Arrays.asList(
@@ -215,10 +215,10 @@ public class VillagerDialogueSystem {
             "I remember when this field was just wilderness. Look at it now!"
         ));
         
-        // Store by profession key
+        
         DIALOGUE_TEMPLATES.put("profession_farmer", farmerDialogues);
         
-        // Librarian-specific
+        
         Map<DialogueCategory, List<String>> librarianDialogues = new HashMap<>();
         
         librarianDialogues.put(DialogueCategory.ADVICE, Arrays.asList(
@@ -238,34 +238,32 @@ public class VillagerDialogueSystem {
         DIALOGUE_TEMPLATES.put("profession_librarian", librarianDialogues);
     }
     
-    /**
-     * Generate appropriate dialogue based on context
-     */
+    
     public static Text generateDialogue(DialogueContext context, DialogueCategory category) {
         if (context.villagerData == null) {
             return Text.literal("...").formatted(Formatting.GRAY);
         }
         
-        // Get personality-based dialogues
+        
         String personality = context.villagerData.getPersonality();
         Map<DialogueCategory, List<String>> personalityDialogues = 
             DIALOGUE_TEMPLATES.getOrDefault(personality, DIALOGUE_TEMPLATES.get("Friendly"));
         
-        // Get profession-specific dialogues if available
+        
         String professionKey = "profession_" + context.villager.getVillagerData()
             .profession().toString().toLowerCase().replace("minecraft:", "");
         Map<DialogueCategory, List<String>> professionDialogues = 
             DIALOGUE_TEMPLATES.get(professionKey);
         
-        // Choose dialogue pool
+        
         List<String> dialogueOptions = new ArrayList<>();
         
-        // Add personality dialogues
+        
         if (personalityDialogues.containsKey(category)) {
             dialogueOptions.addAll(personalityDialogues.get(category));
         }
         
-        // Add profession dialogues for certain categories
+        
         if (professionDialogues != null && 
             (category == DialogueCategory.ADVICE || category == DialogueCategory.STORY || 
              category == DialogueCategory.WORK)) {
@@ -274,43 +272,41 @@ public class VillagerDialogueSystem {
             }
         }
         
-        // Fallback if no dialogues found
+        
         if (dialogueOptions.isEmpty()) {
             return generateFallbackDialogue(context, category);
         }
         
-        // Select and process dialogue
+        
         String selectedDialogue = dialogueOptions.get(RANDOM.nextInt(dialogueOptions.size()));
         String processedDialogue = processDialogueTags(selectedDialogue, context);
         
-        // Apply formatting based on mood and reputation
+        
         Formatting formatting = getDialogueFormatting(context);
         
         return Text.literal(processedDialogue).formatted(formatting);
     }
     
-    /**
-     * Process dialogue tags with context-specific information
-     */
+    
     private static String processDialogueTags(String dialogue, DialogueContext context) {
         Map<String, String> replacements = new HashMap<>();
         
-        // Basic replacements
+        
         replacements.put("{player}", context.player.getName().getString());
         replacements.put("{timeOfDay}", context.timeOfDay.name.toLowerCase());
         replacements.put("{weather}", context.weather);
         replacements.put("{biome}", formatBiomeName(context.biome));
         replacements.put("{profession}", "villager");
         
-        // Activity replacement
+        
         VillagerScheduleManager.Activity currentActivity = 
             VillagerScheduleManager.getCurrentActivity(context.villager);
         replacements.put("{activity}", currentActivity.description.toLowerCase());
         
-        // Hobby replacement
+        
         replacements.put("{hobby}", context.villagerData.getHobby().toLowerCase());
         
-        // Family replacements
+        
         if (!context.villagerData.getSpouseName().isEmpty()) {
             replacements.put("{spouse}", context.villagerData.getSpouseName());
             replacements.put("{familyMember}", context.villagerData.getSpouseName());
@@ -322,7 +318,7 @@ public class VillagerDialogueSystem {
             replacements.put("{familyMember}", "family");
         }
         
-        // Random villager names for gossip
+        
         List<VillagerEntity> nearbyVillagers = context.villager.getWorld().getEntitiesByClass(
             VillagerEntity.class,
             context.villager.getBoundingBox().expand(30),
@@ -344,11 +340,11 @@ public class VillagerDialogueSystem {
             }
         }
         
-        // Location replacements
+        
         String[] locations = {"old oak tree", "village well", "market square", "forest edge", "river bend"};
         replacements.put("{location}", locations[RANDOM.nextInt(locations.length)]);
         
-        // Perform replacements
+        
         String processed = dialogue;
         for (Map.Entry<String, String> entry : replacements.entrySet()) {
             processed = processed.replace(entry.getKey(), entry.getValue());
@@ -357,9 +353,7 @@ public class VillagerDialogueSystem {
         return processed;
     }
     
-    /**
-     * Generate fallback dialogue when no specific dialogue is found
-     */
+    
     private static Text generateFallbackDialogue(DialogueContext context, DialogueCategory category) {
         String message = switch (category) {
             case GREETING -> "Hello there!";
@@ -378,9 +372,7 @@ public class VillagerDialogueSystem {
         return Text.literal(message).formatted(Formatting.GRAY);
     }
     
-    /**
-     * Get formatting based on mood and reputation
-     */
+    
     private static Formatting getDialogueFormatting(DialogueContext context) {
         if (context.playerReputation > 50) {
             return Formatting.GREEN;
@@ -394,62 +386,56 @@ public class VillagerDialogueSystem {
         return Formatting.WHITE;
     }
     
-    /**
-     * Format biome name for display
-     */
+    
     private static String formatBiomeName(String biome) {
         return biome.replace("_", " ").toLowerCase();
     }
     
-    /**
-     * Format profession name for display
-     */
+    
     private static String formatProfessionName(VillagerProfession profession) {
         String name = profession.toString().replace("minecraft:", "");
         return name.substring(0, 1).toUpperCase() + name.substring(1).toLowerCase();
     }
     
-    /**
-     * Choose appropriate dialogue category based on context
-     */
+    
     public static DialogueCategory chooseDialogueCategory(DialogueContext context) {
-        // Weighted selection based on context
+        
         Map<DialogueCategory, Integer> weights = new HashMap<>();
         
-        // Always possible
+        
         weights.put(DialogueCategory.GREETING, 20);
         weights.put(DialogueCategory.WEATHER, 15);
         weights.put(DialogueCategory.MOOD, 15);
         
-        // Time-based
+        
         if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.MORNING || 
             context.timeOfDay == VillagerScheduleManager.TimeOfDay.AFTERNOON) {
             weights.put(DialogueCategory.WORK, 20);
         }
         
-        // Relationship-based
+        
         if (context.playerReputation > 20) {
             weights.put(DialogueCategory.GOSSIP, 15);
             weights.put(DialogueCategory.ADVICE, 10);
             weights.put(DialogueCategory.STORY, 10);
         }
         
-        // Family-based
+        
         if (!context.villagerData.getSpouseName().isEmpty() || 
             !context.villagerData.getChildrenNames().isEmpty()) {
             weights.put(DialogueCategory.FAMILY, 20);
         }
         
-        // Hobby always possible
+        
         weights.put(DialogueCategory.HOBBY, 10);
         
-        // Evening/night
+        
         if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
             context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
             weights.put(DialogueCategory.FAREWELL, 25);
         }
         
-        // Weighted random selection
+        
         int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
         int random = RANDOM.nextInt(totalWeight);
         int currentWeight = 0;
@@ -461,35 +447,33 @@ public class VillagerDialogueSystem {
             }
         }
         
-        return DialogueCategory.GREETING; // Fallback
+        return DialogueCategory.GREETING; 
     }
     
-    /**
-     * Generate a complete conversation
-     */
+    
     public static List<Text> generateConversation(VillagerEntity villager, PlayerEntity player) {
         DialogueContext context = new DialogueContext(villager, player);
         List<Text> conversation = new ArrayList<>();
         
-        // Opening
+        
         DialogueCategory openingCategory = RANDOM.nextBoolean() ? 
             DialogueCategory.GREETING : DialogueCategory.MOOD;
         conversation.add(generateDialogue(context, openingCategory));
         
-        // Main topic
+        
         DialogueCategory mainCategory = chooseDialogueCategory(context);
         if (mainCategory != openingCategory) {
             conversation.add(generateDialogue(context, mainCategory));
         }
         
-        // Possible follow-up
+        
         if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
             DialogueCategory followUp = RANDOM.nextBoolean() ? 
                 DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
             conversation.add(generateDialogue(context, followUp));
         }
         
-        // Closing (if evening/night)
+        
         if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
             context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
             conversation.add(generateDialogue(context, DialogueCategory.FAREWELL));

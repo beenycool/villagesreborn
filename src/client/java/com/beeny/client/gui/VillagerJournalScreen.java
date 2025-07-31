@@ -20,17 +20,17 @@ import java.util.List;
 import java.util.Map;
 
 public class VillagerJournalScreen extends Screen {
-    // Constants for magic numbers
+    
     private static final int BACKGROUND_WIDTH = 320;
     private static final int BACKGROUND_HEIGHT = 240;
     private static final int ENTRY_HEIGHT = 40;
     private static final int MARGIN = 10;
     private static final int MAX_VISIBLE_ENTRIES = 5;
-    private static final int DISTANCE_UPDATE_INTERVAL = 20; // ticks
+    private static final int DISTANCE_UPDATE_INTERVAL = 20; 
     private static final int PROFESSION_ICON_SIZE = 10;
     private static final int PULSE_DISTANCE_THRESHOLD = 10;
     
-    // Profession color cache for consistent coloring
+    
     private static final Map<String, Integer> PROFESSION_COLORS = new HashMap<>();
     static {
         PROFESSION_COLORS.put("farmer", 0xFF8B4513);
@@ -46,18 +46,18 @@ public class VillagerJournalScreen extends Screen {
     }
     
     private final List<VillagerEntry> villagerEntries;
-    private final ButtonWidget[] villagerButtons; // Fixed-size button array
+    private final ButtonWidget[] villagerButtons; 
     private ButtonWidget scrollUpButton;
     private ButtonWidget scrollDownButton;
     private ButtonWidget closeButton;
     
-    // Pre-calculated journal positions
+    
     private int journalX;
     private int journalY;
     private int entriesStartX;
     private int entriesStartY;
     
-    // State management
+    
     private float animationTick = 0;
     private int scrollOffset = 0;
     private int ticksSinceLastUpdate = 0;
@@ -88,7 +88,7 @@ public class VillagerJournalScreen extends Screen {
     }
     
     private void createStaticButtons() {
-        // Create fixed button array without recreation
+        
         for (int i = 0; i < MAX_VISIBLE_ENTRIES; i++) {
             final int buttonIndex = i;
             villagerButtons[i] = ButtonWidget.builder(
@@ -98,7 +98,7 @@ public class VillagerJournalScreen extends Screen {
                         BACKGROUND_WIDTH - 2 * MARGIN, 30).build();
         }
         
-        // Persistent scroll buttons with state management
+        
         scrollUpButton = ButtonWidget.builder(
             Text.literal("↑"),
             btn -> scrollUp()
@@ -118,14 +118,14 @@ public class VillagerJournalScreen extends Screen {
     }
     
     private void updateVillagerButtons() {
-        // Clear existing buttons
+        
         for (ButtonWidget button : villagerButtons) {
             remove(button);
         }
         remove(scrollUpButton);
         remove(scrollDownButton);
         
-        // Add visible villager buttons with efficient position-based indexing
+        
         int visibleCount = Math.min(villagerEntries.size() - scrollOffset, MAX_VISIBLE_ENTRIES);
         for (int i = 0; i < visibleCount; i++) {
             VillagerEntry entry = villagerEntries.get(i + scrollOffset);
@@ -133,7 +133,7 @@ public class VillagerJournalScreen extends Screen {
             addDrawableChild(villagerButtons[i]);
         }
         
-        // Add scroll buttons if needed
+        
         if (scrollOffset > 0) {
             addDrawableChild(scrollUpButton);
         }
@@ -142,7 +142,7 @@ public class VillagerJournalScreen extends Screen {
         }
     }
     
-    // Dedicated scroll methods with bounds checking
+    
     private void scrollUp() {
         if (scrollOffset > 0) {
             scrollOffset = Math.max(0, scrollOffset - 1);
@@ -164,7 +164,7 @@ public class VillagerJournalScreen extends Screen {
         super.tick();
         ticksSinceLastUpdate++;
         
-        // Distance update throttling (every 20 ticks / 1 second)
+        
         if (ticksSinceLastUpdate >= DISTANCE_UPDATE_INTERVAL) {
             updateVillagerDistances();
             ticksSinceLastUpdate = 0;
@@ -175,12 +175,12 @@ public class VillagerJournalScreen extends Screen {
         if (client == null || client.player == null) return;
         
         for (VillagerEntry entry : villagerEntries) {
-            // Safe villager entity lookup with error handling
+            
             Entity entity = client.world.getEntityById(entry.villagerId);
             if (entity instanceof VillagerEntity villager) {
                 entry.distance = (int) villager.getPos().distanceTo(client.player.getPos());
             } else {
-                entry.distance = -1; // Handling of missing or non-villager entities
+                entry.distance = -1; 
             }
         }
     }
@@ -190,14 +190,14 @@ public class VillagerJournalScreen extends Screen {
         renderBackground(context, mouseX, mouseY, delta);
         animationTick += delta;
         
-        // Better background glow animation
+        
         renderJournalBackground(context);
         renderAnimatedTitle(context);
         renderVillagerEntries(context, mouseX, mouseY);
         
         super.render(context, mouseX, mouseY, delta);
         
-        // Single tooltip rendering optimization
+        
         renderSingleTooltip(context, mouseX, mouseY);
     }
     
@@ -224,18 +224,18 @@ public class VillagerJournalScreen extends Screen {
             VillagerEntry entry = villagerEntries.get(i + scrollOffset);
             int entryY = entriesStartY + (i * ENTRY_HEIGHT);
             
-            // Improved entry hover detection
+            
             boolean isHovered = isMouseOverEntry(mouseX, mouseY, i);
             
             int backgroundColor = isHovered ? 0x55FFFFFF : 0x33FFFFFF;
             context.fill(entriesStartX, entryY, entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN, entryY + 30, backgroundColor);
             
-            // Profession icon with cached colors
+            
             int professionColor = PROFESSION_COLORS.getOrDefault(entry.profession.toLowerCase(), 0xFF4169E1);
             context.fill(entriesStartX + 5, entryY + 5, entriesStartX + 5 + PROFESSION_ICON_SIZE, 
                         entryY + 5 + PROFESSION_ICON_SIZE, professionColor);
             
-            // Visual pulse effect for nearby villagers
+            
             if (entry.distance != -1 && entry.distance <= PULSE_DISTANCE_THRESHOLD) {
                 float pulse = (MathHelper.sin(animationTick * 0.3f) + 1) * 0.5f;
                 int pulseColor = (int)(255 * pulse) << 24 | 0x00FF00;
@@ -245,14 +245,14 @@ public class VillagerJournalScreen extends Screen {
         }
     }
     
-    // Helper method for improved entry hover detection
+    
     private boolean isMouseOverEntry(int mouseX, int mouseY, int entryIndex) {
         int entryY = entriesStartY + (entryIndex * ENTRY_HEIGHT);
         return mouseX >= entriesStartX && mouseX <= entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN &&
                mouseY >= entryY && mouseY <= entryY + 30;
     }
     
-    // Single tooltip rendering optimization
+    
     private void renderSingleTooltip(DrawContext context, int mouseX, int mouseY) {
         int visibleCount = Math.min(villagerEntries.size() - scrollOffset, MAX_VISIBLE_ENTRIES);
         
@@ -260,15 +260,15 @@ public class VillagerJournalScreen extends Screen {
             if (isMouseOverEntry(mouseX, mouseY, i)) {
                 VillagerEntry entry = villagerEntries.get(i + scrollOffset);
                 
-                // Efficient tooltip building
+                
                 List<Text> tooltip = buildTooltip(entry);
                 context.drawTooltip(textRenderer, tooltip, mouseX, mouseY);
-                break; // Single tooltip only
+                break; 
             }
         }
     }
     
-    // Efficient tooltip building
+    
     private List<Text> buildTooltip(VillagerEntry entry) {
         List<Text> tooltip = new ArrayList<>(5);
         tooltip.add(Text.literal("Name: " + entry.name).formatted(Formatting.AQUA));
@@ -285,7 +285,7 @@ public class VillagerJournalScreen extends Screen {
         return tooltip;
     }
     
-    // Helper method for capitalized profession names
+    
     private String capitalize(String str) {
         if (str == null || str.isEmpty()) return str;
         return str.substring(0, 1).toUpperCase() + str.substring(1);
@@ -295,9 +295,9 @@ public class VillagerJournalScreen extends Screen {
         if (entryIndex >= 0 && entryIndex < villagerEntries.size() && client != null && client.player != null) {
             VillagerEntry entry = villagerEntries.get(entryIndex);
             
-            // Null checks for client state
+            
             if (entry.distance == -1) {
-                // Don't teleport to missing villagers
+                
                 return;
             }
             
@@ -323,14 +323,14 @@ public class VillagerJournalScreen extends Screen {
         final String profession;
         final int level;
         final int villagerId;
-        int distance; // Mutable for periodic updates
+        int distance; 
         
         VillagerEntry(VillagerEntity villager) {
             this.name = getVillagerName(villager);
             this.profession = villager.getVillagerData().profession().toString().toLowerCase();
             this.level = villager.getVillagerData().level();
             this.villagerId = villager.getId();
-            this.distance = 0; // Will be calculated during updates
+            this.distance = 0; 
         }
         
         private String getVillagerName(VillagerEntity villager) {

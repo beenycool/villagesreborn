@@ -50,7 +50,7 @@ public class VillagerScheduleManager {
         private final Map<TimeOfDay, Activity> activities = new EnumMap<>(TimeOfDay.class);
         
         public Schedule() {
-            // Default schedule
+            
             activities.put(TimeOfDay.DAWN, Activity.WAKE_UP);
             activities.put(TimeOfDay.MORNING, Activity.WORK);
             activities.put(TimeOfDay.NOON, Activity.SOCIALIZE);
@@ -95,12 +95,12 @@ public class VillagerScheduleManager {
     private static final Map<String, Schedule> PROFESSION_SCHEDULES = new HashMap<>();
     
     static {
-        // Initialize profession-specific schedules
+        
         initializeProfessionSchedules();
     }
     
     private static void initializeProfessionSchedules() {
-        // Farmer schedule
+        
         Schedule farmerSchedule = new Schedule();
         farmerSchedule.setActivity(TimeOfDay.DAWN, Activity.WAKE_UP);
         farmerSchedule.setActivity(TimeOfDay.MORNING, Activity.WORK);
@@ -110,7 +110,7 @@ public class VillagerScheduleManager {
         farmerSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
         PROFESSION_SCHEDULES.put("minecraft:farmer", farmerSchedule);
         
-        // Librarian schedule
+        
         Schedule librarianSchedule = new Schedule();
         librarianSchedule.setActivity(TimeOfDay.DAWN, Activity.WAKE_UP);
         librarianSchedule.setActivity(TimeOfDay.MORNING, Activity.STUDY);
@@ -120,7 +120,7 @@ public class VillagerScheduleManager {
         librarianSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
         PROFESSION_SCHEDULES.put("minecraft:librarian", librarianSchedule);
         
-        // Cleric schedule
+        
         Schedule clericSchedule = new Schedule();
         clericSchedule.setActivity(TimeOfDay.DAWN, Activity.PRAY);
         clericSchedule.setActivity(TimeOfDay.MORNING, Activity.WORK);
@@ -130,7 +130,7 @@ public class VillagerScheduleManager {
         clericSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
         PROFESSION_SCHEDULES.put("minecraft:cleric", clericSchedule);
         
-        // Blacksmith schedule
+        
         Schedule blacksmithSchedule = new Schedule();
         blacksmithSchedule.setActivity(TimeOfDay.DAWN, Activity.WAKE_UP);
         blacksmithSchedule.setActivity(TimeOfDay.MORNING, Activity.WORK);
@@ -142,7 +142,7 @@ public class VillagerScheduleManager {
         PROFESSION_SCHEDULES.put("minecraft:weaponsmith", blacksmithSchedule);
         PROFESSION_SCHEDULES.put("minecraft:toolsmith", blacksmithSchedule);
         
-        // Nitwit schedule (lazy)
+        
         Schedule nitwitSchedule = new Schedule();
         nitwitSchedule.setActivity(TimeOfDay.DAWN, Activity.SLEEP);
         nitwitSchedule.setActivity(TimeOfDay.MORNING, Activity.WAKE_UP);
@@ -162,20 +162,20 @@ public class VillagerScheduleManager {
         
         Schedule schedule = PROFESSION_SCHEDULES.getOrDefault(professionKey, new Schedule());
         
-        // Special cases based on villager state
+        
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data != null) {
-            // If very unhappy, might skip work
+            
             if (data.getHappiness() < 20 && schedule.getActivity(timeOfDay) == Activity.WORK) {
                 return Activity.WANDER;
             }
             
-            // On special days (birthdays, anniversaries), different schedule
+            
             if (isSpecialDay(data, worldTime)) {
                 return Activity.SOCIALIZE;
             }
             
-            // Babies have different schedule
+            
             if (data.getAge() < 20) {
                 return switch (timeOfDay) {
                     case DAWN, MORNING -> Activity.WAKE_UP;
@@ -201,7 +201,7 @@ public class VillagerScheduleManager {
             Activity currentActivity = getCurrentActivity(villager);
             updateVillagerBehavior(villager, currentActivity);
             
-            // Update custom name to show activity
+            
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 Text activityText = Text.literal(" [" + currentActivity.description + "]")
@@ -213,30 +213,30 @@ public class VillagerScheduleManager {
     }
     
     private static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
-        // This would integrate with the villager's AI goals
-        // For now, just update their state based on activity
+        
+        
         
         switch (activity) {
             case SLEEP -> {
                 // Villager should go to bed - note: sleep behavior handled by Minecraft AI
             }
             case WORK -> {
-                // Villager should go to workstation
+                
             }
             case SOCIALIZE -> {
-                // Villager should seek other villagers
+                
             }
             case EAT -> {
-                // Villager should seek food
+                
             }
             default -> {
-                // Default behavior
+                
             }
         }
     }
     
     private static boolean isSpecialDay(VillagerData data, long worldTime) {
-        // Check if it's the villager's birthday (every 365 Minecraft days)
+        
         long daysSinceBirth = (worldTime - data.getBirthTime()) / 24000;
         return daysSinceBirth > 0 && daysSinceBirth % 365 == 0;
     }
@@ -275,7 +275,7 @@ public class VillagerScheduleManager {
                     .formatted(getActivityFormatting(activity))));
         }
         
-        // Current activity
+        
         Activity current = getCurrentActivity(villager);
         info.add(Text.empty());
         info.add(Text.literal("Currently: ")
@@ -286,7 +286,7 @@ public class VillagerScheduleManager {
         return info;
     }
     
-    // Custom goal for following schedules
+    
     public static class ScheduleGoal extends Goal {
         private final VillagerEntity villager;
         private Activity lastActivity;

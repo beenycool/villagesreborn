@@ -55,7 +55,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     private void initializeVillagerData(CallbackInfo ci) {
         VillagerEntity villager = (VillagerEntity) (Object) this;
         
-        // Initialize the comprehensive data attachment
+        
         if (!villager.hasAttached(Villagersreborn.VILLAGER_DATA)) {
             VillagerData data = new VillagerData();
             villager.setAttached(Villagersreborn.VILLAGER_DATA, data);
@@ -71,22 +71,22 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         updateCounter++;
         
-        // Update name and ensure visibility
+        
         if (data.getName().isEmpty() || updateCounter % 20 == 0) {
             ensureNameAndData(villager, data);
         }
         
-        // Update greeting cooldown
+        
         if (greetingCooldown > 0) {
             greetingCooldown--;
         }
         
-        // Periodic happiness adjustments based on conditions
+        
         if (updateCounter % 100 == 0) {
             updateHappinessBasedOnConditions(villager, data);
         }
         
-        // Check for nearby spouse for happiness bonus
+        
         if (updateCounter % 200 == 0 && !data.getSpouseId().isEmpty()) {
             checkSpouseProximity(villager, data);
         }
@@ -101,17 +101,17 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data == null) return;
         
-        // Shift-click to see detailed info
+        
         if (player.isSneaking() && hand == Hand.MAIN_HAND) {
             showDetailedInfo(player, villager, data);
             cir.setReturnValue(ActionResult.SUCCESS);
             return;
         }
         
-        // Greeting system
+        
         if (greetingCooldown == 0 && hand == Hand.MAIN_HAND && player.getStackInHand(hand).isEmpty()) {
             greetVillager(player, villager, data);
-            greetingCooldown = 100; // 5 seconds cooldown
+            greetingCooldown = 100; 
         }
     }
     
@@ -122,12 +122,12 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data == null || villager.getWorld().isClient) return;
         
-        // Notify family members
+        
         if (!data.getSpouseName().isEmpty() || !data.getChildrenNames().isEmpty()) {
             notifyFamilyOfDeath(villager, data);
         }
         
-        // Cleanup
+        
         VillagerNames.cleanupVillager(villager.getUuidAsString());
         VillagerRelationshipManager.removeProposalTime(villager.getUuidAsString());
     }
@@ -139,12 +139,12 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data == null) return;
         
-        // Track profession history
+        
         String professionKey = villagerData.profession().getKey()
             .map(key -> key.getValue().toString()).orElse("minecraft:none");
         data.addProfession(professionKey);
         
-        // Update name if needed
+        
         if (!data.getName().isEmpty()) {
             String newName = VillagerNames.updateProfessionInName(
                 data.getName(),
@@ -164,18 +164,18 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data == null) return;
         
-        // Increment trade counter
+        
         data.incrementTrades();
         
-        // Increase happiness from trading
+        
         data.adjustHappiness(2);
         
-        // Update player relationship if possible
+        
         Entity customer = villager.getCustomer();
         if (customer instanceof PlayerEntity player) {
             data.updatePlayerRelation(player.getUuidAsString(), 1);
             
-            // Check for favorite player
+            
             if (data.getTotalTrades() > 10 && data.getFavoritePlayerId().isEmpty()) {
                 int reputation = data.getPlayerReputation(player.getUuidAsString());
                 if (reputation > 20) {
@@ -193,10 +193,10 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         
         if (data != null) {
-            // Dramatic personality change from lightning
+            
             String[] dramaticPersonalities = {"Energetic", "Confident", "Cheerful"};
             data.setPersonality(dramaticPersonalities[RANDOM.nextInt(dramaticPersonalities.length)]);
-            data.adjustHappiness(-20); // Scared but alive
+            data.adjustHappiness(-20); 
         }
     }
     
@@ -206,21 +206,21 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         
         if (data != null) {
-            // Morning happiness adjustment
+            
             if (data.getHappiness() > 70) {
-                data.adjustHappiness(2); // Good morning!
+                data.adjustHappiness(2); 
             }
         }
     }
     
     @Unique
     private void ensureNameAndData(VillagerEntity villager, VillagerData data) {
-        // Ensure villager has a name
+        
         if (data.getName().isEmpty()) {
             var pos = villager.getBlockPos();
             var world = villager.getWorld();
             
-            // Only assign name if villager has a real position
+            
             if (world != null && !pos.equals(new net.minecraft.util.math.BlockPos(0, 0, 0))) {
                 String generatedName = VillagerNames.generateNameForProfession(
                     world,
@@ -229,19 +229,19 @@ public abstract class VillagerEntityMixin extends LivingEntity {
                 
                 data.setName(generatedName);
                 
-                // Set gender based on name generation
+                
                 boolean isMale = (pos.getX() + pos.getZ()) % 2 == 0;
                 data.setGender(isMale ? "Male" : "Female");
                 
-                // Set birth place
+                
                 data.setBirthPlace(String.format("X:%d Y:%d Z:%d", pos.getX(), pos.getY(), pos.getZ()));
                 
-                // Legacy support
+                
                 villager.setAttached(Villagersreborn.VILLAGER_NAME, generatedName);
             }
         }
         
-        // Update custom name
+        
         Text activitySuffix = Text.empty();
         if (villager.getWorld() instanceof ServerWorld) {
             VillagerScheduleManager.Activity activity = VillagerScheduleManager.getCurrentActivity(villager);
@@ -255,24 +255,24 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     
     @Unique
     private void updateHappinessBasedOnConditions(VillagerEntity villager, VillagerData data) {
-        // Check bed access
-        if (villager.getWorld().getTimeOfDay() % 24000 > 13000) { // Night time
+        
+        if (villager.getWorld().getTimeOfDay() % 24000 > 13000) { 
             BlockPos bedPos = villager.getSleepingPosition().orElse(null);
             if (bedPos == null) {
-                data.adjustHappiness(-1); // No bed makes villager unhappy
+                data.adjustHappiness(-1); 
             }
         }
         
-        // Check workstation access
+        
         if (villager.getVillagerData().profession() != VillagerProfession.NITWIT && 
             villager.getVillagerData().profession() != VillagerProfession.NONE) {
-            // This is simplified - in reality you'd check for actual workstation
+            
             if (villager.getVillagerData().level() > 0) {
-                data.adjustHappiness(1); // Has workstation
+                data.adjustHappiness(1); 
             }
         }
         
-        // Social needs
+        
         List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
             VillagerEntity.class,
             villager.getBoundingBox().expand(10),
@@ -280,9 +280,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         );
         
         if (nearbyVillagers.size() > 2) {
-            data.adjustHappiness(1); // Social villager is happy
+            data.adjustHappiness(1); 
         } else if (nearbyVillagers.isEmpty()) {
-            data.adjustHappiness(-1); // Lonely
+            data.adjustHappiness(-1); 
         }
     }
     
@@ -290,7 +290,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     private void checkSpouseProximity(VillagerEntity villager, VillagerData data) {
         if (data.getSpouseId().isEmpty()) return;
         
-        // Find spouse entity by UUID
+        
         VillagerEntity spouse = null;
         for (VillagerEntity entity : villager.getWorld().getEntitiesByClass(VillagerEntity.class,
                 villager.getBoundingBox().expand(100.0), e -> true)) {
@@ -303,9 +303,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         if (spouse != null && spouse.isAlive()) {
             double distance = villager.getPos().distanceTo(spouse.getPos());
             if (distance < 20) {
-                data.adjustHappiness(1); // Happy to be near spouse
+                data.adjustHappiness(1); 
             } else if (distance > 100) {
-                data.adjustHappiness(-1); // Missing spouse
+                data.adjustHappiness(-1); 
             }
         }
     }
@@ -332,7 +332,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         player.sendMessage(Text.literal(greeting).formatted(color), true);
         
-        // Small reputation gain for greeting
+        
         data.updatePlayerRelation(playerUuid, 1);
     }
     
@@ -423,7 +423,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     private void notifyFamilyOfDeath(VillagerEntity villager, VillagerData data) {
         if (!(villager.getWorld() instanceof ServerWorld serverWorld)) return;
         
-        // Find and update spouse
+        
         if (!data.getSpouseId().isEmpty()) {
             VillagerEntity spouse = null;
             for (VillagerEntity entity : serverWorld.getEntitiesByClass(VillagerEntity.class,
@@ -444,7 +444,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             }
         }
         
-        // Notify players
+        
         serverWorld.getPlayers().forEach(player -> {
             if (player.getPos().distanceTo(villager.getPos()) < 100) {
                 player.sendMessage(Text.literal("💔 " + data.getName() + " has passed away...")

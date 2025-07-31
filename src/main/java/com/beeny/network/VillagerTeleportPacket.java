@@ -56,11 +56,11 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
                 if (!villager.isRemoved()) {
                     Vec3d villagerPos = villager.getPos();
                     
-                    // Teleport player to villager with safe positioning
+                    
                     Vec3d safePos = findSafePosition(villagerPos, player);
                     player.teleport((ServerWorld)player.getWorld(), safePos.x, safePos.y, safePos.z, Set.<PositionFlag>of(), 0.0f, 0.0f, false);
                     
-                    // Play teleport sound and send confirmation message
+                    
                     player.getWorld().playSound(null, safePos.x, safePos.y, safePos.z, 
                         SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0f, 1.0f);
                     
@@ -75,24 +75,24 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
     }
     
     private static Vec3d findSafePosition(Vec3d villagerPos, ServerPlayerEntity player) {
-        // Try to find a safe position near the villager
+        
         Vec3d[] offsets = {
-            new Vec3d(2, 0, 0),   // East
-            new Vec3d(-2, 0, 0),  // West
-            new Vec3d(0, 0, 2),   // South
-            new Vec3d(0, 0, -2),  // North
-            new Vec3d(1, 0, 1),   // Southeast
-            new Vec3d(-1, 0, 1),  // Southwest
-            new Vec3d(1, 0, -1),  // Northeast
-            new Vec3d(-1, 0, -1), // Northwest
-            new Vec3d(3, 0, 0),   // Extended East
-            new Vec3d(-3, 0, 0),  // Extended West
-            new Vec3d(0, 0, 3),   // Extended South
-            new Vec3d(0, 0, -3),  // Extended North
-            new Vec3d(2, 1, 0),   // East +1 up
-            new Vec3d(-2, 1, 0),  // West +1 up
-            new Vec3d(0, 1, 2),   // South +1 up
-            new Vec3d(0, 1, -2),  // North +1 up
+            new Vec3d(2, 0, 0),   
+            new Vec3d(-2, 0, 0),  
+            new Vec3d(0, 0, 2),   
+            new Vec3d(0, 0, -2),  
+            new Vec3d(1, 0, 1),   
+            new Vec3d(-1, 0, 1),  
+            new Vec3d(1, 0, -1),  
+            new Vec3d(-1, 0, -1), 
+            new Vec3d(3, 0, 0),   
+            new Vec3d(-3, 0, 0),  
+            new Vec3d(0, 0, 3),   
+            new Vec3d(0, 0, -3),  
+            new Vec3d(2, 1, 0),   
+            new Vec3d(-2, 1, 0),  
+            new Vec3d(0, 1, 2),   
+            new Vec3d(0, 1, -2),  
         };
         
         for (Vec3d offset : offsets) {
@@ -102,23 +102,23 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
             }
         }
         
-        // Enhanced fallback: search for safe positions in a wider area
+        
         Vec3d safeFallback = findSafeFallbackPosition(villagerPos, player);
         if (safeFallback != null) {
             return safeFallback;
         }
         
-        // Last resort: check if villager position itself is safe
+        
         if (isSafePosition(villagerPos, player)) {
             return villagerPos;
         }
         
-        // Emergency fallback: find any safe position nearby
+        
         return findEmergencySafePosition(villagerPos, player);
     }
     
     private static Vec3d findSafeFallbackPosition(Vec3d centerPos, ServerPlayerEntity player) {
-        // Search in a 5x5 area around the villager
+        
         for (int x = -3; x <= 3; x++) {
             for (int z = -3; z <= 3; z++) {
                 for (int y = 0; y <= 2; y++) {
@@ -133,7 +133,7 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
     }
     
     private static Vec3d findEmergencySafePosition(Vec3d centerPos, ServerPlayerEntity player) {
-        // Emergency search: find the closest safe position even if far away
+        
         double bestDistance = Double.MAX_VALUE;
         Vec3d bestPos = null;
         
@@ -152,27 +152,27 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
             }
         }
         
-        // If still no safe position found, return player's current position as last resort
+        
         return bestPos != null ? bestPos : player.getPos();
     }
     
     private static boolean isSafePosition(Vec3d pos, ServerPlayerEntity player) {
-        // Use BlockPos.ofFloored() to correctly convert Vec3d to BlockPos without truncating decimals
+        
         BlockPos blockPos = BlockPos.ofFloored(pos);
         
-        // Check for solid ground below the position
+        
         BlockPos groundPos = blockPos.down();
         BlockState groundState = player.getWorld().getBlockState(groundPos);
         boolean hasSolidGround = !groundState.isAir() && groundState.getCollisionShape(player.getWorld(), groundPos).getBoundingBox().getLengthY() >= 0.0625;
         
-        // Check if the full 2-block height is clear for the player
+        
         BlockState feetState = player.getWorld().getBlockState(blockPos);
         BlockState headState = player.getWorld().getBlockState(blockPos.up());
         
         boolean feetClear = feetState.isAir() || !feetState.shouldSuffocate(player.getWorld(), blockPos);
         boolean headClear = headState.isAir() || !headState.shouldSuffocate(player.getWorld(), blockPos.up());
         
-        // Additional safety checks for hazardous materials
+        
         boolean isLava = player.getWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.LAVA) ||
                         player.getWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.LAVA) ||
                         player.getWorld().getBlockState(groundPos).getFluidState().isIn(FluidTags.LAVA);
@@ -180,7 +180,7 @@ public record VillagerTeleportPacket(int villagerId) implements CustomPayload {
         boolean isWater = player.getWorld().getBlockState(blockPos).getFluidState().isIn(FluidTags.WATER) ||
                          player.getWorld().getBlockState(blockPos.up()).getFluidState().isIn(FluidTags.WATER);
         
-        // Check for dangerous blocks like fire, magma, cactus, etc.
+        
         boolean isDangerous = player.getWorld().getBlockState(blockPos).isIn(BlockTags.FIRE) ||
                              player.getWorld().getBlockState(blockPos.up()).isIn(BlockTags.FIRE) ||
                              player.getWorld().getBlockState(groundPos).isIn(BlockTags.FIRE) ||

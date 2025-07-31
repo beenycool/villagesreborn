@@ -18,10 +18,10 @@ public class VillagersRebornClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        // Register client-side networking
+        
         VillagerTeleportPacketClient.register();
         
-        // Register key binding for opening journal
+        
         openJournalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.villagersreborn.open_journal",
             InputUtil.Type.KEYSYM,
@@ -29,7 +29,7 @@ public class VillagersRebornClient implements ClientModInitializer {
             "category.villagersreborn.general"
         ));
         
-        // Register tick event for key handling
+        
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openJournalKey.wasPressed()) {
                 if (client.player != null && client.world != null) {

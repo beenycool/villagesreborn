@@ -22,13 +22,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class EnhancedVillagerJournalScreen extends Screen {
-    // Screen dimensions
+    
     private static final int SCREEN_WIDTH = 400;
     private static final int SCREEN_HEIGHT = 300;
     private static final int TAB_HEIGHT = 30;
     private static final int CONTENT_MARGIN = 10;
     
-    // Tabs
+    
     private enum Tab {
         LIST("List", 0xFF4A90E2),
         DETAILS("Details", 0xFF7B68EE),
@@ -48,32 +48,32 @@ public class EnhancedVillagerJournalScreen extends Screen {
     private Tab currentTab = Tab.LIST;
     private final Map<Tab, ButtonWidget> tabButtons = new HashMap<>();
     
-    // Villager data
+    
     private final List<VillagerEntity> villagers;
     private VillagerEntity selectedVillager;
     private VillagerData selectedVillagerData;
     
-    // List tab
+    
     private int scrollOffset = 0;
     private static final int ENTRIES_PER_PAGE = 8;
     private ButtonWidget scrollUpButton;
     private ButtonWidget scrollDownButton;
     private final List<ButtonWidget> villagerButtons = new ArrayList<>();
     
-    // Details tab
+    
     private ButtonWidget teleportButton;
     private ButtonWidget refreshButton;
     
-    // Notes tab
+    
     private TextFieldWidget notesField;
     private ButtonWidget saveNotesButton;
     
-    // Search
+    
     private TextFieldWidget searchField;
     private String searchQuery = "";
     private List<VillagerEntity> filteredVillagers;
     
-    // Animation
+    
     private float animationTick = 0;
     
     public EnhancedVillagerJournalScreen(List<VillagerEntity> villagers) {
@@ -81,7 +81,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         this.villagers = villagers;
         this.filteredVillagers = new ArrayList<>(villagers);
         
-        // Sort by name initially
+        
         this.filteredVillagers.sort((v1, v2) -> {
             String name1 = VillagerNames.getVillagerName(v1);
             String name2 = VillagerNames.getVillagerName(v2);
@@ -96,7 +96,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int screenX = (width - SCREEN_WIDTH) / 2;
         int screenY = (height - SCREEN_HEIGHT) / 2;
         
-        // Create tab buttons
+        
         int tabWidth = SCREEN_WIDTH / Tab.values().length;
         int tabX = screenX;
         for (Tab tab : Tab.values()) {
@@ -110,19 +110,19 @@ public class EnhancedVillagerJournalScreen extends Screen {
             tabX += tabWidth;
         }
         
-        // Create search field
+        
         searchField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN, 
             screenY + TAB_HEIGHT + 5, 150, 20, Text.literal("Search"));
         searchField.setChangedListener(this::updateSearch);
         searchField.setPlaceholder(Text.literal("Search villagers..."));
         addDrawableChild(searchField);
         
-        // Initialize current tab
+        
         switchTab(currentTab);
     }
     
     private void switchTab(Tab newTab) {
-        // Clear previous tab widgets
+        
         clearTabWidgets();
         
         currentTab = newTab;
@@ -141,7 +141,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initListTab(int screenX, int contentY) {
-        // Scroll buttons
+        
         scrollUpButton = ButtonWidget.builder(
             Text.literal("▲"),
             btn -> scrollList(-1)
@@ -154,7 +154,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         ).dimensions(screenX + SCREEN_WIDTH - 30, contentY + 200, 20, 20).build();
         addDrawableChild(scrollDownButton);
         
-        // Villager list buttons
+        
         villagerButtons.clear();
         for (int i = 0; i < ENTRIES_PER_PAGE; i++) {
             final int index = i;
@@ -187,11 +187,11 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initFamilyTab(int screenX, int contentY) {
-        // Family tree visualization will be rendered in the render method
+        
     }
     
     private void initStatsTab(int screenX, int contentY) {
-        // Statistics will be rendered in the render method
+        
     }
     
     private void initNotesTab(int screenX, int contentY) {
@@ -215,7 +215,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void clearTabWidgets() {
-        // Remove tab-specific widgets
+        
         villagerButtons.forEach(this::remove);
         villagerButtons.clear();
         
@@ -235,10 +235,10 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int screenX = (width - SCREEN_WIDTH) / 2;
         int screenY = (height - SCREEN_HEIGHT) / 2;
         
-        // Draw main background
+        
         context.fill(screenX, screenY, screenX + SCREEN_WIDTH, screenY + SCREEN_HEIGHT, 0xFF2C3E50);
         
-        // Draw tab backgrounds
+        
         int tabWidth = SCREEN_WIDTH / Tab.values().length;
         int tabX = screenX;
         for (Tab tab : Tab.values()) {
@@ -247,12 +247,12 @@ public class EnhancedVillagerJournalScreen extends Screen {
             tabX += tabWidth;
         }
         
-        // Draw content area
+        
         int contentY = screenY + TAB_HEIGHT + 35;
         context.fill(screenX + 5, contentY - 5, screenX + SCREEN_WIDTH - 5, 
             screenY + SCREEN_HEIGHT - 5, 0xFF1A252F);
         
-        // Render tab content
+        
         switch (currentTab) {
             case LIST -> renderListTab(context, screenX, contentY);
             case DETAILS -> renderDetailsTab(context, screenX, contentY);
@@ -265,7 +265,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void renderListTab(DrawContext context, int screenX, int contentY) {
-        // Update button visibility
+        
         if (scrollUpButton != null) {
             scrollUpButton.visible = scrollOffset > 0;
         }
@@ -285,14 +285,14 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int y = contentY + 10;
         int lineHeight = 15;
         
-        // Name and profession
+        
         context.drawTextWithShadow(textRenderer, 
             Text.literal("Name: ").formatted(Formatting.GRAY).append(
                 Text.literal(selectedVillagerData.getName()).formatted(Formatting.WHITE)),
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
         y += lineHeight;
         
-        // Age and gender
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("Age: ").formatted(Formatting.GRAY).append(
                 Text.literal(String.valueOf(selectedVillagerData.getAgeInDays())).formatted(Formatting.WHITE)),
@@ -305,7 +305,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
         y += lineHeight;
         
-        // Personality and mood
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("Personality: ").formatted(Formatting.GRAY).append(
                 Text.literal(selectedVillagerData.getPersonality()).formatted(Formatting.YELLOW)),
@@ -319,11 +319,11 @@ public class EnhancedVillagerJournalScreen extends Screen {
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
         y += lineHeight;
         
-        // Happiness bar
+        
         renderHappinessBar(context, screenX + CONTENT_MARGIN, y, selectedVillagerData.getHappiness());
         y += 20;
         
-        // Hobby and favorite food
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("Hobby: ").formatted(Formatting.GRAY).append(
                 Text.literal(selectedVillagerData.getHobby()).formatted(Formatting.AQUA)),
@@ -338,7 +338,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             y += lineHeight;
         }
         
-        // Trade count
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("Total Trades: ").formatted(Formatting.GRAY).append(
                 Text.literal(String.valueOf(selectedVillagerData.getTotalTrades())).formatted(Formatting.GOLD)),
@@ -356,7 +356,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int y = contentY + 10;
         int lineHeight = 15;
         
-        // Spouse
+        
         if (!selectedVillagerData.getSpouseName().isEmpty()) {
             context.drawTextWithShadow(textRenderer,
                 Text.literal("❤ Spouse: ").formatted(Formatting.RED).append(
@@ -365,7 +365,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             y += lineHeight + 5;
         }
         
-        // Children
+        
         if (!selectedVillagerData.getChildrenNames().isEmpty()) {
             context.drawTextWithShadow(textRenderer,
                 Text.literal("👶 Children:").formatted(Formatting.GREEN),
@@ -381,7 +381,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             y += 5;
         }
         
-        // Other family
+        
         if (!selectedVillagerData.getFamilyMembers().isEmpty()) {
             context.drawTextWithShadow(textRenderer,
                 Text.literal("👨‍👩‍👧‍👦 Family Members:").formatted(Formatting.AQUA),
@@ -409,7 +409,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int y = contentY + 10;
         int lineHeight = 20;
         
-        // Calculate village statistics
+        
         Map<String, Integer> professionCounts = new HashMap<>();
         int totalHappiness = 0;
         int marriedCount = 0;
@@ -429,7 +429,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             }
         }
         
-        // Display statistics
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("📊 Village Statistics").formatted(Formatting.GOLD),
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
@@ -458,7 +458,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
         y += lineHeight + 10;
         
-        // Profession breakdown
+        
         context.drawTextWithShadow(textRenderer,
             Text.literal("Professions:").formatted(Formatting.AQUA),
             screenX + CONTENT_MARGIN, y, 0xFFFFFF);
@@ -496,15 +496,15 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int barWidth = 200;
         int barHeight = 10;
         
-        // Background
+        
         context.fill(x, y, x + barWidth, y + barHeight, 0xFF000000);
         
-        // Happiness fill
+        
         int fillWidth = (int) (barWidth * (happiness / 100.0f));
         int color = getHappinessColor(happiness);
         context.fill(x + 1, y + 1, x + fillWidth - 1, y + barHeight - 1, color);
         
-        // Text
+        
         String happinessText = happiness + "%";
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(happinessText),
             x + barWidth / 2, y + 1, 0xFFFFFF);
@@ -519,11 +519,11 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private int getHappinessColor(int happiness) {
-        if (happiness >= 80) return 0xFF55FF55; // GREEN
-        if (happiness >= 60) return 0xFFFFFF55; // YELLOW
-        if (happiness >= 40) return 0xFFFFAA00; // GOLD
-        if (happiness >= 20) return 0xFFFF5555; // RED
-        return 0xFFAA0000; // DARK_RED
+        if (happiness >= 80) return 0xFF55FF55; 
+        if (happiness >= 60) return 0xFFFFFF55; 
+        if (happiness >= 40) return 0xFFFFAA00; 
+        if (happiness >= 20) return 0xFFFF5555; 
+        return 0xFFAA0000; 
     }
     
     private void updateListButtons() {
@@ -548,7 +548,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
         if (index >= 0 && index < filteredVillagers.size()) {
             selectedVillager = filteredVillagers.get(index);
             selectedVillagerData = selectedVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-            switchTab(currentTab); // Refresh the current tab with selected villager data
+            switchTab(currentTab); 
         }
     }
     
@@ -586,7 +586,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
                 .collect(Collectors.toList());
         }
         
-        // Sort filtered results
+        
         filteredVillagers.sort((v1, v2) -> {
             String name1 = VillagerNames.getVillagerName(v1);
             String name2 = VillagerNames.getVillagerName(v2);
@@ -602,13 +602,13 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     private void teleportToVillager() {
         if (selectedVillager != null && client != null && client.player != null) {
-            // Send teleport packet to server
+            
             ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillager.getId()));
             
-            // Play sound
+            
             client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_ENDERMAN_TELEPORT, 1.0f));
             
-            // Close screen
+            
             close();
         }
     }
@@ -616,7 +616,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     private void refreshVillagerData() {
         if (selectedVillager != null) {
             selectedVillagerData = selectedVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-            switchTab(currentTab); // Refresh the current tab display
+            switchTab(currentTab); 
         }
     }
     
@@ -624,15 +624,15 @@ public class EnhancedVillagerJournalScreen extends Screen {
         if (selectedVillager != null && notesField != null && client != null) {
             String notes = notesField.getText();
             
-            // Send packet to server to update notes
+            
             ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillager.getId(), notes));
             
-            // Update local data
+            
             if (selectedVillagerData != null) {
                 selectedVillagerData.setNotes(notes);
             }
             
-            // Play sound
+            
             client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ITEM_BOOK_PAGE_TURN, 1.0f));
         }
     }

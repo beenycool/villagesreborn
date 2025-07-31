@@ -15,7 +15,7 @@ import java.util.List;
 
 @Environment(EnvType.CLIENT)
 public class VillagerJournalItemClient {
-    private static final int SCAN_RADIUS = 50; // Blocks to scan for villagers
+    private static final int SCAN_RADIUS = 50; 
 
     public static void openVillagerJournal(World world, PlayerEntity player) {
         if (player == null) return;
@@ -37,7 +37,7 @@ public class VillagerJournalItemClient {
             return;
         }
 
-        // Open the enhanced GUI screen
+        
         MinecraftClient.getInstance().setScreen(new VillagerJournalScreen(villagers));
     }
 }

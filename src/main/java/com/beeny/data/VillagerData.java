@@ -53,48 +53,48 @@ public class VillagerData {
             })
     );
     
-    // Basic Information
+    
     private String name;
-    private int age; // In Minecraft days
+    private int age; 
     private String gender;
     private String personality;
     
-    // Stats
-    private int happiness; // 0-100
+    
+    private int happiness; 
     private int totalTrades;
     private String favoritePlayerId;
     
-    // History
-    private List<String> professionHistory;
-    private Map<String, Integer> playerRelations; // Player UUID -> reputation
     
-    // Family
+    private List<String> professionHistory;
+    private Map<String, Integer> playerRelations; 
+    
+    
     private List<String> familyMembers;
     private String spouseName;
     private String spouseId;
     private List<String> childrenIds;
     private List<String> childrenNames;
     
-    // Personal details
-    private String favoriteFood; // Stored as registry name string
+    
+    private String favoriteFood; 
     private String hobby;
     private long birthTime;
     private String birthPlace;
     private String notes;
     
-    // Personality types
+    
     public static final String[] PERSONALITIES = {
         "Friendly", "Grumpy", "Shy", "Energetic", "Lazy", 
         "Curious", "Serious", "Cheerful", "Nervous", "Confident"
     };
     
-    // Hobbies
+    
     public static final String[] HOBBIES = {
         "Gardening", "Reading", "Fishing", "Cooking", "Singing",
         "Dancing", "Crafting", "Exploring", "Collecting", "Gossiping"
     };
     
-    // Constructor for new villagers
+    
     public VillagerData() {
         this.name = "";
         this.age = 0;
@@ -117,7 +117,7 @@ public class VillagerData {
         this.notes = "";
     }
     
-    // Full constructor for codec
+    
     public VillagerData(String name, int age, String gender, String personality, int happiness,
                        int totalTrades, String favoritePlayerId, List<String> professionHistory,
                        Map<String, Integer> playerRelations, List<String> familyMembers,
@@ -145,7 +145,7 @@ public class VillagerData {
         this.notes = notes;
     }
     
-    // Methods for managing data
+    
     public void incrementAge() {
         this.age++;
     }
@@ -212,7 +212,7 @@ public class VillagerData {
         }
     }
     
-    // Getters and setters
+    
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
@@ -259,7 +259,7 @@ public class VillagerData {
     public String getFavoritePlayerId() { return favoritePlayerId; }
     public void setFavoritePlayerId(String favoritePlayerId) { this.favoritePlayerId = favoritePlayerId; }
     
-    // Utility method to get age in days
+    
     public String getAgeInDays() {
         if (age < 20) {
             return age + " days (Baby)";
@@ -272,7 +272,7 @@ public class VillagerData {
         }
     }
     
-    // Get happiness description
+    
     public String getHappinessDescription() {
         if (happiness >= 80) return "Very Happy";
         if (happiness >= 60) return "Happy";

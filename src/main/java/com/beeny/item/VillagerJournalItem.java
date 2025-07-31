@@ -15,7 +15,7 @@ import net.minecraft.util.math.BlockPos;
 import java.util.List;
 
 public class VillagerJournalItem extends Item {
-    private static final int SCAN_RADIUS = 50; // Blocks to scan for villagers
+    private static final int SCAN_RADIUS = 50; 
 
     public VillagerJournalItem(Settings settings) {
         super(settings);
@@ -24,11 +24,11 @@ public class VillagerJournalItem extends Item {
     @Override
     public ActionResult use(World world, PlayerEntity user, Hand hand) {
         if (world.isClient) {
-            // Client-side handling will be done through the client entrypoint
+            
             return ActionResult.SUCCESS;
         }
         
-        // Server-side: scan for nearby villagers
+        
         List<VillagerEntity> villagers = world.getEntitiesByClass(
             VillagerEntity.class,
             new Box(
@@ -59,11 +59,11 @@ public class VillagerJournalItem extends Item {
     @Override
     public ActionResult useOnBlock(ItemUsageContext context) {
         if (context.getWorld().isClient) {
-            // Client-side handling will be done through the client entrypoint
+            
             return ActionResult.SUCCESS;
         }
         
-        // Server-side logic
+        
         return ActionResult.SUCCESS;
     }
 }

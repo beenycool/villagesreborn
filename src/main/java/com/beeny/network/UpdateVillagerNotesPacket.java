@@ -47,13 +47,13 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
             ServerPlayerEntity player = context.player();
             
             context.server().execute(() -> {
-                // Validate villagerId is positive
+                
                 if (payload.villagerId() <= 0) {
                     player.sendMessage(Text.literal("§cInvalid villager ID!"), false);
                     return;
                 }
                 
-                // Validate player is not null
+                
                 if (player == null) {
                     LOGGER.warn("Player is null in UpdateVillagerNotesPacket");
                     return;
@@ -61,7 +61,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 Entity entity = player.getWorld().getEntityById(payload.villagerId());
                 
-                // Validate entity exists and is a VillagerEntity
+                
                 if (!(entity instanceof VillagerEntity)) {
                     player.sendMessage(Text.literal("§cEntity is not a villager!"), false);
                     return;
@@ -69,7 +69,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 VillagerEntity villager = (VillagerEntity) entity;
                 
-                // Validate player is within reasonable distance of the villager (10 blocks)
+                
                 double distance = player.getPos().distanceTo(villager.getPos());
                 if (distance > 10.0) {
                     player.sendMessage(Text.literal("§cYou are too far from the villager!"), false);
@@ -78,7 +78,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
                 
-                // Validate villager data exists
+                
                 if (data == null) {
                     player.sendMessage(Text.literal("§cVillager data not found!"), false);
                     return;
