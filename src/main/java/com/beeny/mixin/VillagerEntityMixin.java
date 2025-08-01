@@ -4,6 +4,7 @@ import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
+import com.beeny.system.ServerVillagerManager;
 import com.beeny.util.VillagerNames;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
@@ -33,6 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 @Mixin(VillagerEntity.class)
 public abstract class VillagerEntityMixin extends LivingEntity {
@@ -59,6 +61,11 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         if (!villager.hasAttached(Villagersreborn.VILLAGER_DATA)) {
             VillagerData data = new VillagerData();
             villager.setAttached(Villagersreborn.VILLAGER_DATA, data);
+            
+            // Track this villager with the ServerVillagerManager
+            if (!villager.getWorld().isClient && villager.getWorld() instanceof ServerWorld) {
+                ServerVillagerManager.getInstance().trackVillager(villager);
+            }
         }
     }
     
@@ -122,6 +129,8 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data == null || villager.getWorld().isClient) return;
         
+        // Untrack this villager
+        ServerVillagerManager.getInstance().untrackVillager(villager.getUuid());
         
         if (!data.getSpouseName().isEmpty() || !data.getChildrenNames().isEmpty()) {
             notifyFamilyOfDeath(villager, data);
@@ -273,16 +282,21 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         }
         
         
-        List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
-            VillagerEntity.class,
-            villager.getBoundingBox().expand(10),
-            v -> v != villager
-        );
+        // Use ServerVillagerManager for efficient nearby villager lookup
+        List<VillagerEntity> nearbyVillagers = new java.util.ArrayList<>();
+        for (VillagerEntity v : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
+            if (v != villager && v.getWorld() == villager.getWorld()) {
+                double distance = villager.getPos().distanceTo(v.getPos());
+                if (distance <= 10.0) {
+                    nearbyVillagers.add(v);
+                }
+            }
+        }
         
         if (nearbyVillagers.size() > 2) {
-            data.adjustHappiness(1); 
+            data.adjustHappiness(1);
         } else if (nearbyVillagers.isEmpty()) {
-            data.adjustHappiness(-1); 
+            data.adjustHappiness(-1);
         }
     }
     
@@ -290,22 +304,15 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     private void checkSpouseProximity(VillagerEntity villager, VillagerData data) {
         if (data.getSpouseId().isEmpty()) return;
         
-        
-        VillagerEntity spouse = null;
-        for (VillagerEntity entity : villager.getWorld().getEntitiesByClass(VillagerEntity.class,
-                villager.getBoundingBox().expand(100.0), e -> true)) {
-            if (entity.getUuidAsString().equals(data.getSpouseId())) {
-                spouse = entity;
-                break;
-            }
-        }
+        // Use ServerVillagerManager instead of scanning the world
+        VillagerEntity spouse = ServerVillagerManager.getInstance().getVillager(UUID.fromString(data.getSpouseId()));
         
         if (spouse != null && spouse.isAlive()) {
             double distance = villager.getPos().distanceTo(spouse.getPos());
             if (distance < 20) {
-                data.adjustHappiness(1); 
+                data.adjustHappiness(1);
             } else if (distance > 100) {
-                data.adjustHappiness(-1); 
+                data.adjustHappiness(-1);
             }
         }
     }
@@ -425,14 +432,8 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         
         if (!data.getSpouseId().isEmpty()) {
-            VillagerEntity spouse = null;
-            for (VillagerEntity entity : serverWorld.getEntitiesByClass(VillagerEntity.class,
-                    villager.getBoundingBox().expand(200.0), e -> true)) {
-                if (entity.getUuidAsString().equals(data.getSpouseId())) {
-                    spouse = entity;
-                    break;
-                }
-            }
+            // Use ServerVillagerManager instead of scanning the world
+            VillagerEntity spouse = ServerVillagerManager.getInstance().getVillager(UUID.fromString(data.getSpouseId()));
             
             if (spouse != null) {
                 VillagerData spouseData = spouse.getAttached(Villagersreborn.VILLAGER_DATA);

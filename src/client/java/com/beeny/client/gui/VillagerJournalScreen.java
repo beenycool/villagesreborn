@@ -1,6 +1,7 @@
 package com.beeny.client.gui;
 
 import com.beeny.network.VillagerTeleportPacket;
+import com.beeny.network.RequestVillagerListPacket;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import com.beeny.util.VillagerNames;
 import net.minecraft.client.gui.DrawContext;
@@ -23,7 +24,7 @@ public class VillagerJournalScreen extends Screen {
     
     private static final int BACKGROUND_WIDTH = 320;
     private static final int BACKGROUND_HEIGHT = 240;
-    private static final int ENTRY_HEIGHT = 40;
+    private static final int ENTRY_HEIGHT = 50;
     private static final int MARGIN = 10;
     private static final int MAX_VISIBLE_ENTRIES = 5;
     private static final int DISTANCE_UPDATE_INTERVAL = 20; 
@@ -70,6 +71,22 @@ public class VillagerJournalScreen extends Screen {
         for (VillagerEntity villager : villagers) {
             villagerEntries.add(new VillagerEntry(villager));
         }
+    }
+    
+    public static VillagerJournalScreen createFromPacketData(List<RequestVillagerListPacket.VillagerDataPacket> villagerDataList) {
+        VillagerJournalScreen screen = new VillagerJournalScreen();
+        
+        for (RequestVillagerListPacket.VillagerDataPacket data : villagerDataList) {
+            screen.villagerEntries.add(new VillagerEntry(data));
+        }
+        
+        return screen;
+    }
+    
+    private VillagerJournalScreen() {
+        super(Text.literal("Villager Journal"));
+        this.villagerEntries = new ArrayList<>();
+        this.villagerButtons = new ButtonWidget[MAX_VISIBLE_ENTRIES];
     }
     
     @Override
@@ -129,7 +146,8 @@ public class VillagerJournalScreen extends Screen {
         int visibleCount = Math.min(villagerEntries.size() - scrollOffset, MAX_VISIBLE_ENTRIES);
         for (int i = 0; i < visibleCount; i++) {
             VillagerEntry entry = villagerEntries.get(i + scrollOffset);
-            villagerButtons[i].setMessage(Text.literal(entry.name).formatted(Formatting.AQUA));
+            String buttonText = formatVillagerInfo(entry);
+            villagerButtons[i].setMessage(Text.literal(buttonText));
             addDrawableChild(villagerButtons[i]);
         }
         
@@ -175,19 +193,16 @@ public class VillagerJournalScreen extends Screen {
         if (client == null || client.player == null) return;
         
         for (VillagerEntry entry : villagerEntries) {
-            
-            Entity entity = client.world.getEntityById(entry.villagerId);
-            if (entity instanceof VillagerEntity villager) {
-                entry.distance = (int) villager.getPos().distanceTo(client.player.getPos());
-            } else {
-                entry.distance = -1; 
-            }
+            // Calculate distance based on stored coordinates
+            double dx = entry.x - client.player.getX();
+            double dy = entry.y - client.player.getY();
+            double dz = entry.z - client.player.getZ();
+            entry.distance = (int) Math.sqrt(dx * dx + dy * dy + dz * dz);
         }
     }
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
         animationTick += delta;
         
         
@@ -228,12 +243,28 @@ public class VillagerJournalScreen extends Screen {
             boolean isHovered = isMouseOverEntry(mouseX, mouseY, i);
             
             int backgroundColor = isHovered ? 0x55FFFFFF : 0x33FFFFFF;
-            context.fill(entriesStartX, entryY, entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN, entryY + 30, backgroundColor);
+            context.fill(entriesStartX, entryY, entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN, entryY + 40, backgroundColor);
             
             
             int professionColor = PROFESSION_COLORS.getOrDefault(entry.profession.toLowerCase(), 0xFF4169E1);
             context.fill(entriesStartX + 5, entryY + 5, entriesStartX + 5 + PROFESSION_ICON_SIZE, 
                         entryY + 5 + PROFESSION_ICON_SIZE, professionColor);
+            
+            
+            context.drawTextWithShadow(textRenderer, Text.literal(entry.name).formatted(Formatting.AQUA),
+                entriesStartX + 20, entryY + 5, 0xFFFFFF);
+            
+            
+            String professionText = capitalize(entry.profession) + " (Lv." + entry.level + ")";
+            context.drawTextWithShadow(textRenderer, Text.literal(professionText).formatted(Formatting.YELLOW),
+                entriesStartX + 20, entryY + 18, 0xFFFFFF);
+            
+            
+            String distanceText = entry.distance == -1 ? "Missing" : entry.distance + " blocks";
+            Formatting distanceColor = entry.distance == -1 ? Formatting.RED : 
+                (entry.distance <= PULSE_DISTANCE_THRESHOLD ? Formatting.GREEN : Formatting.GRAY);
+            context.drawTextWithShadow(textRenderer, Text.literal(distanceText).formatted(distanceColor),
+                entriesStartX + 20, entryY + 30, 0xFFFFFF);
             
             
             if (entry.distance != -1 && entry.distance <= PULSE_DISTANCE_THRESHOLD) {
@@ -242,6 +273,16 @@ public class VillagerJournalScreen extends Screen {
                 context.fill(entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN - 15, entryY + 5, 
                            entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN - 5, entryY + 15, pulseColor);
             }
+            
+            
+            if (client != null && client.player != null && !client.player.isCreative()) {
+                context.drawTextWithShadow(textRenderer, Text.literal("🔒").formatted(Formatting.RED),
+                    entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN - 25, entryY + 5, 0xFFFFFF);
+            }
+            
+            // Family tree icon (hint for shift+right-click)
+            context.drawTextWithShadow(textRenderer, Text.literal("🌳").formatted(Formatting.GREEN),
+                entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN - 40, entryY + 20, 0xFFFFFF);
         }
     }
     
@@ -249,7 +290,7 @@ public class VillagerJournalScreen extends Screen {
     private boolean isMouseOverEntry(int mouseX, int mouseY, int entryIndex) {
         int entryY = entriesStartY + (entryIndex * ENTRY_HEIGHT);
         return mouseX >= entriesStartX && mouseX <= entriesStartX + BACKGROUND_WIDTH - 2 * MARGIN &&
-               mouseY >= entryY && mouseY <= entryY + 30;
+               mouseY >= entryY && mouseY <= entryY + 40;
     }
     
     
@@ -270,18 +311,18 @@ public class VillagerJournalScreen extends Screen {
     
     
     private List<Text> buildTooltip(VillagerEntry entry) {
-        List<Text> tooltip = new ArrayList<>(5);
-        tooltip.add(Text.literal("Name: " + entry.name).formatted(Formatting.AQUA));
-        tooltip.add(Text.literal("Profession: " + capitalize(entry.profession)).formatted(Formatting.YELLOW));
-        tooltip.add(Text.literal("Level: " + entry.level).formatted(Formatting.GREEN));
+        List<Text> tooltip = new ArrayList<>(3);
         
-        if (entry.distance == -1) {
-            tooltip.add(Text.literal("Distance: Unknown (villager missing)").formatted(Formatting.RED));
-        } else {
-            tooltip.add(Text.literal("Distance: " + entry.distance + " blocks").formatted(Formatting.GRAY));
+        if (client != null && client.player != null) {
+            if (client.player.isCreative()) {
+                tooltip.add(Text.literal("Click to teleport!").formatted(Formatting.LIGHT_PURPLE));
+            } else {
+                tooltip.add(Text.literal("Teleport only available in Creative Mode").formatted(Formatting.RED));
+            }
+            
+            tooltip.add(Text.literal("🌳 Shift+Right-click villager for family tree").formatted(Formatting.GREEN));
         }
         
-        tooltip.add(Text.literal("Click to teleport!").formatted(Formatting.LIGHT_PURPLE));
         return tooltip;
     }
     
@@ -291,12 +332,16 @@ public class VillagerJournalScreen extends Screen {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
     
+    private String formatVillagerInfo(VillagerEntry entry) {
+        return entry.name + " | " + capitalize(entry.profession) + " Lv." + entry.level;
+    }
+    
     private void teleportToVillager(int entryIndex) {
         if (entryIndex >= 0 && entryIndex < villagerEntries.size() && client != null && client.player != null) {
             VillagerEntry entry = villagerEntries.get(entryIndex);
             
             
-            if (entry.distance == -1) {
+            if (!client.player.isCreative()) {
                 
                 return;
             }
@@ -323,14 +368,29 @@ public class VillagerJournalScreen extends Screen {
         final String profession;
         final int level;
         final int villagerId;
-        int distance; 
+        final int x, y, z;
+        int distance;
         
         VillagerEntry(VillagerEntity villager) {
             this.name = getVillagerName(villager);
             this.profession = villager.getVillagerData().profession().toString().toLowerCase();
             this.level = villager.getVillagerData().level();
             this.villagerId = villager.getId();
-            this.distance = 0; 
+            this.x = (int) villager.getX();
+            this.y = (int) villager.getY();
+            this.z = (int) villager.getZ();
+            this.distance = 0;
+        }
+        
+        VillagerEntry(RequestVillagerListPacket.VillagerDataPacket data) {
+            this.name = data.getName();
+            this.profession = data.getProfession().toLowerCase();
+            this.level = 1; // Default level since we don't have this info from server
+            this.villagerId = data.getEntityId();
+            this.x = data.getX();
+            this.y = data.getY();
+            this.z = data.getZ();
+            this.distance = 0;
         }
         
         private String getVillagerName(VillagerEntity villager) {

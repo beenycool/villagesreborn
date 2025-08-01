@@ -81,6 +81,8 @@ public class VillagerData {
     private long birthTime;
     private String birthPlace;
     private String notes;
+    private long deathTime;
+    private boolean isAlive;
     
     
     public static final String[] PERSONALITIES = {
@@ -115,6 +117,8 @@ public class VillagerData {
         this.birthTime = System.currentTimeMillis();
         this.birthPlace = "";
         this.notes = "";
+        this.deathTime = 0;
+        this.isAlive = true;
     }
     
     
@@ -123,7 +127,7 @@ public class VillagerData {
                        Map<String, Integer> playerRelations, List<String> familyMembers,
                        String spouseName, String spouseId, List<String> childrenIds, List<String> childrenNames,
                        String favoriteFood, String hobby, long birthTime, String birthPlace,
-                       String notes) {
+                       String notes, long deathTime, boolean isAlive) {
         this.name = name;
         this.age = age;
         this.gender = gender;
@@ -143,6 +147,8 @@ public class VillagerData {
         this.birthTime = birthTime;
         this.birthPlace = birthPlace;
         this.notes = notes;
+        this.deathTime = deathTime;
+        this.isAlive = isAlive;
     }
     
     
@@ -255,6 +261,12 @@ public class VillagerData {
     
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    
+    public long getDeathTime() { return deathTime; }
+    public void setDeathTime(long deathTime) { this.deathTime = deathTime; this.isAlive = false; }
+    
+    public boolean isAlive() { return isAlive; }
+    public void setAlive(boolean alive) { this.isAlive = alive; }
     
     public String getFavoritePlayerId() { return favoritePlayerId; }
     public void setFavoritePlayerId(String favoritePlayerId) { this.favoritePlayerId = favoritePlayerId; }

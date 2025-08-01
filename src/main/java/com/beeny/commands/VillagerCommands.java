@@ -2,8 +2,10 @@ package com.beeny.commands;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.network.OpenFamilyTreePacket;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
+import com.beeny.system.ServerVillagerManager;
 import com.beeny.util.VillagerNames;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -13,6 +15,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.entity.Entity;
@@ -26,10 +29,12 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.server.world.ServerWorld;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 public class VillagerCommands {
     
@@ -85,7 +90,11 @@ public class VillagerCommands {
                 .then(CommandManager.literal("divorce")
                     .then(CommandManager.argument("villager1", EntityArgumentType.entity())
                         .then(CommandManager.argument("villager2", EntityArgumentType.entity())
-                            .executes(VillagerCommands::divorceVillagers)))))
+                            .executes(VillagerCommands::divorceVillagers))))
+                .then(CommandManager.literal("breed")
+                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                            .executes(VillagerCommands::breedVillagers)))))
             
             
             .then(CommandManager.literal("happiness")
@@ -336,8 +345,19 @@ public class VillagerCommands {
             return 0;
         }
         
-        List<Text> familyTree = VillagerRelationshipManager.getFamilyTree(villager);
-        familyTree.forEach(text -> context.getSource().sendFeedback(() -> text, false));
+        // Check if the command source is a player
+        if (context.getSource().getPlayer() == null) {
+            sendError(context.getSource(), "Only players can view the family tree GUI");
+            return 0;
+        }
+        
+        // Send packet to open family tree GUI on client
+        ServerPlayNetworking.send(context.getSource().getPlayer(), 
+            new OpenFamilyTreePacket(villager.getId()));
+        
+        sendSuccess(context.getSource(), "Opening family tree for " + 
+            (villager.getAttached(Villagersreborn.VILLAGER_DATA) != null ? 
+             villager.getAttached(Villagersreborn.VILLAGER_DATA).getName() : "villager"));
         
         return 1;
     }
@@ -389,6 +409,85 @@ public class VillagerCommands {
         
         VillagerRelationshipManager.divorce(villager1, villager2);
         sendSuccess(context.getSource(), "Villagers have been divorced");
+        
+        return 1;
+    }
+    
+    private static int breedVillagers(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        Entity entity1 = EntityArgumentType.getEntity(context, "villager1");
+        Entity entity2 = EntityArgumentType.getEntity(context, "villager2");
+        
+        if (!(entity1 instanceof VillagerEntity villager1) || !(entity2 instanceof VillagerEntity villager2)) {
+            sendError(context.getSource(), "Both entities must be villagers");
+            return 0;
+        }
+        
+        // Check if they're married
+        VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
+        VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
+        
+        if (data1 == null || data2 == null) {
+            sendError(context.getSource(), "Villager data not found");
+            return 0;
+        }
+        
+        // Check if they are married to each other
+        if (!data1.getSpouseId().equals(villager2.getUuidAsString()) || 
+            !data2.getSpouseId().equals(villager1.getUuidAsString())) {
+            sendError(context.getSource(), "Villagers must be married to each other to breed");
+            return 0;
+        }
+        
+        // Spawn baby villager
+        if (villager1.getWorld() instanceof ServerWorld serverWorld) {
+            VillagerEntity baby = new VillagerEntity(net.minecraft.entity.EntityType.VILLAGER, serverWorld);
+            
+            // Position baby between parents
+            Vec3d pos1 = villager1.getPos();
+            Vec3d pos2 = villager2.getPos();
+            Vec3d babyPos = pos1.add(pos2).multiply(0.5);
+            baby.setPosition(babyPos.x, babyPos.y, babyPos.z);
+            
+            // Make it a baby
+            baby.setBaby(true);
+            
+            // Initialize baby with VillagerData
+            VillagerData babyData = new VillagerData();
+            baby.setAttached(Villagersreborn.VILLAGER_DATA, babyData);
+            
+            // Set baby name using VillagerNames utility
+            String babyName = VillagerNames.generateName(baby);
+            babyData.setName(babyName);
+            baby.setCustomName(Text.literal(babyName));
+            
+            // Spawn the baby in world
+            serverWorld.spawnEntity(baby);
+            
+            // Call the relationship manager to handle family setup
+            VillagerRelationshipManager.onVillagerBreed(villager1, villager2, baby);
+            
+            // Visual effects
+            serverWorld.spawnParticles(net.minecraft.particle.ParticleTypes.HEART,
+                babyPos.x, babyPos.y + 1, babyPos.z,
+                15, 0.5, 0.5, 0.5, 0.1);
+            
+            serverWorld.playSound(null, baby.getBlockPos(),
+                net.minecraft.sound.SoundEvents.ENTITY_VILLAGER_YES, 
+                net.minecraft.sound.SoundCategory.NEUTRAL, 1.0f, 1.5f);
+            
+            sendSuccess(context.getSource(), "Baby villager born! Welcome " + babyName + "!");
+            
+            // Notify nearby players
+            serverWorld.getPlayers().forEach(player -> {
+                if (player.getPos().distanceTo(babyPos) < 50) {
+                    player.sendMessage(Text.literal("👶 " + data1.getName() + " and " + 
+                        data2.getName() + " had a baby: " + babyName + "!").formatted(Formatting.GREEN), false);
+                }
+            });
+        } else {
+            sendError(context.getSource(), "Can only breed villagers in server world");
+            return 0;
+        }
         
         return 1;
     }
@@ -777,10 +876,20 @@ public class VillagerCommands {
     private static List<VillagerEntity> getAllVillagersInArea(ServerCommandSource source, double radius) {
         World world = source.getWorld();
         Vec3d sourcePos = source.getPosition();
-        Box searchBox = Box.of(sourcePos, radius * 2, radius * 2, radius * 2);
         
-        return world.getEntitiesByClass(VillagerEntity.class, searchBox, 
-            villager -> sourcePos.distanceTo(villager.getPos()) <= radius);
+        // Use ServerVillagerManager instead of scanning the world
+        List<VillagerEntity> villagers = new ArrayList<>();
+        for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
+            // Only include villagers in the same world
+            if (villager.getWorld() != world) continue;
+            
+            // Check if villager is within radius
+            if (sourcePos.distanceTo(villager.getPos()) <= radius) {
+                villagers.add(villager);
+            }
+        }
+        
+        return villagers;
     }
 
     private static String getVillagerNameById(ServerCommandSource source, String villagerUuid) {
@@ -788,14 +897,16 @@ public class VillagerCommands {
             return null;
         }
         
-        World world = source.getWorld();
-        List<VillagerEntity> villagers = world.getEntitiesByClass(VillagerEntity.class, 
-            new Box(-30000000, -256, -30000000, 30000000, 256, 30000000), 
-            villager -> villager.getUuidAsString().equals(villagerUuid));
-        
-        if (!villagers.isEmpty()) {
-            VillagerData data = villagers.get(0).getAttached(Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getName() : null;
+        // Use ServerVillagerManager instead of scanning the world
+        try {
+            VillagerEntity villager = ServerVillagerManager.getInstance().getVillager(UUID.fromString(villagerUuid));
+            if (villager != null) {
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                return data != null ? data.getName() : null;
+            }
+        } catch (IllegalArgumentException e) {
+            // Invalid UUID format
+            return null;
         }
         
         return null;

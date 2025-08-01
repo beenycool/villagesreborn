@@ -2,6 +2,7 @@ package com.beeny.system;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -157,57 +158,220 @@ public class VillagerScheduleManager {
         long worldTime = villager.getWorld().getTimeOfDay();
         TimeOfDay timeOfDay = TimeOfDay.fromWorldTime(worldTime);
         
-        String professionKey = villager.getVillagerData().profession().getKey()
-            .map(key -> key.getValue().toString()).orElse("minecraft:none");
-        
-        Schedule schedule = PROFESSION_SCHEDULES.getOrDefault(professionKey, new Schedule());
-        
-        
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (data != null) {
-            
-            if (data.getHappiness() < 20 && schedule.getActivity(timeOfDay) == Activity.WORK) {
-                return Activity.WANDER;
+        if (data == null) {
+            return Activity.WANDER;
+        }
+        
+        // Get individual time preferences based on personality and villager ID
+        int personalityOffset = getPersonalityTimeOffset(data);
+        int individualOffset = Math.abs(villager.getUuid().hashCode()) % 4 - 2; // -2 to +1 hours variation
+        long adjustedTime = (worldTime + (personalityOffset + individualOffset) * 1000) % 24000;
+        TimeOfDay adjustedTimeOfDay = TimeOfDay.fromWorldTime(adjustedTime);
+        
+        // Get base activity probabilities for the time period
+        Map<Activity, Float> activityWeights = getActivityWeights(adjustedTimeOfDay, data, villager);
+        
+        // Select activity based on weighted probability
+        return selectWeightedActivity(activityWeights, villager);
+    }
+    
+    private static int getPersonalityTimeOffset(VillagerData data) {
+        return switch (data.getPersonality()) {
+            case "Energetic" -> -2; // Early riser
+            case "Lazy" -> 3; // Late sleeper
+            case "Serious" -> -1; // Slightly early
+            case "Cheerful" -> -1; // Morning person
+            case "Grumpy" -> 2; // Not a morning person
+            case "Nervous" -> 1; // Irregular schedule
+            default -> 0; // Normal schedule
+        };
+    }
+    
+    private static Map<Activity, Float> getActivityWeights(TimeOfDay timeOfDay, VillagerData data, VillagerEntity villager) {
+        Map<Activity, Float> weights = new EnumMap<>(Activity.class);
+        
+        // Base weights for time of day
+        switch (timeOfDay) {
+            case DAWN -> {
+                weights.put(Activity.WAKE_UP, 0.3f);
+                weights.put(Activity.SLEEP, 0.4f);
+                weights.put(Activity.PRAY, 0.1f);
+                weights.put(Activity.WANDER, 0.2f);
             }
-            
-            
-            if (isSpecialDay(data, worldTime)) {
-                return Activity.SOCIALIZE;
+            case MORNING -> {
+                weights.put(Activity.WORK, 0.4f);
+                weights.put(Activity.EAT, 0.2f);
+                weights.put(Activity.SOCIALIZE, 0.1f);
+                weights.put(Activity.EXERCISE, 0.1f);
+                weights.put(Activity.STUDY, 0.1f);
+                weights.put(Activity.WANDER, 0.1f);
             }
-            
-            
-            if (data.getAge() < 20) {
-                return switch (timeOfDay) {
-                    case DAWN, MORNING -> Activity.WAKE_UP;
-                    case NOON -> Activity.EAT;
-                    case AFTERNOON -> Activity.SOCIALIZE;
-                    case DUSK -> Activity.RELAX;
-                    default -> Activity.SLEEP;
-                };
+            case NOON -> {
+                weights.put(Activity.EAT, 0.35f);
+                weights.put(Activity.WORK, 0.25f);
+                weights.put(Activity.SOCIALIZE, 0.2f);
+                weights.put(Activity.RELAX, 0.1f);
+                weights.put(Activity.SHOP, 0.1f);
+            }
+            case AFTERNOON -> {
+                weights.put(Activity.WORK, 0.35f);
+                weights.put(Activity.SOCIALIZE, 0.2f);
+                weights.put(Activity.HOBBY, 0.15f);
+                weights.put(Activity.STUDY, 0.1f);
+                weights.put(Activity.SHOP, 0.1f);
+                weights.put(Activity.WANDER, 0.1f);
+            }
+            case DUSK -> {
+                weights.put(Activity.RELAX, 0.3f);
+                weights.put(Activity.SOCIALIZE, 0.25f);
+                weights.put(Activity.EAT, 0.2f);
+                weights.put(Activity.HOBBY, 0.15f);
+                weights.put(Activity.WANDER, 0.1f);
+            }
+            case NIGHT -> {
+                weights.put(Activity.SLEEP, 0.6f);
+                weights.put(Activity.RELAX, 0.15f);
+                weights.put(Activity.SOCIALIZE, 0.1f);
+                weights.put(Activity.STUDY, 0.1f);
+                weights.put(Activity.WANDER, 0.05f);
+            }
+            case MIDNIGHT -> {
+                weights.put(Activity.SLEEP, 0.85f);
+                weights.put(Activity.WANDER, 0.1f);
+                weights.put(Activity.STUDY, 0.05f);
             }
         }
         
-        return schedule.getActivity(timeOfDay);
+        // Apply personality modifiers
+        applyPersonalityModifiers(weights, data);
+        
+        // Apply profession modifiers
+        applyProfessionModifiers(weights, villager);
+        
+        // Apply contextual modifiers
+        applyContextualModifiers(weights, data, villager);
+        
+        return weights;
+    }
+    
+    private static void applyPersonalityModifiers(Map<Activity, Float> weights, VillagerData data) {
+        switch (data.getPersonality()) {
+            case "Energetic" -> {
+                weights.replaceAll((k, v) -> k == Activity.EXERCISE || k == Activity.WORK ? v * 1.5f : v);
+                weights.replaceAll((k, v) -> k == Activity.SLEEP || k == Activity.RELAX ? v * 0.7f : v);
+            }
+            case "Lazy" -> {
+                weights.replaceAll((k, v) -> k == Activity.RELAX || k == Activity.SLEEP ? v * 1.4f : v);
+                weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.EXERCISE ? v * 0.6f : v);
+            }
+            case "Friendly" -> {
+                weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 1.6f : v);
+            }
+            case "Shy" -> {
+                weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.5f : v);
+                weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.HOBBY ? v * 1.3f : v);
+            }
+            case "Curious" -> {
+                weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.WANDER ? v * 1.4f : v);
+            }
+            case "Serious" -> {
+                weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.STUDY ? v * 1.3f : v);
+                weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 0.8f : v);
+            }
+            case "Cheerful" -> {
+                weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 1.3f : v);
+            }
+            case "Grumpy" -> {
+                weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.6f : v);
+                weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 1.4f : v);
+            }
+        }
+    }
+    
+    private static void applyProfessionModifiers(Map<Activity, Float> weights, VillagerEntity villager) {
+        String professionKey = villager.getVillagerData().profession().getKey()
+            .map(key -> key.getValue().toString()).orElse("minecraft:none");
+            
+        switch (professionKey) {
+            case "minecraft:librarian" -> {
+                weights.replaceAll((k, v) -> k == Activity.STUDY ? v * 2.0f : v);
+            }
+            case "minecraft:cleric" -> {
+                weights.replaceAll((k, v) -> k == Activity.PRAY ? v * 3.0f : v);
+            }
+            case "minecraft:farmer" -> {
+                weights.replaceAll((k, v) -> k == Activity.WORK ? v * 1.5f : v);
+            }
+            case "minecraft:nitwit" -> {
+                weights.replaceAll((k, v) -> k == Activity.WANDER || k == Activity.RELAX ? v * 1.8f : v);
+                weights.replaceAll((k, v) -> k == Activity.WORK ? v * 0.3f : v);
+            }
+        }
+    }
+    
+    private static void applyContextualModifiers(Map<Activity, Float> weights, VillagerData data, VillagerEntity villager) {
+        // Happiness affects activity preferences
+        if (data.getHappiness() < 20) {
+            weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 2.0f : v);
+            weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.SOCIALIZE ? v * 0.5f : v);
+        } else if (data.getHappiness() > 80) {
+            weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 1.4f : v);
+        }
+        
+        // Age affects activities
+        if (data.getAge() < 20) { // Young villagers
+            weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.WANDER ? v * 1.5f : v);
+            weights.replaceAll((k, v) -> k == Activity.WORK ? v * 0.3f : v);
+        } else if (data.getAge() > 300) { // Elder villagers
+            weights.replaceAll((k, v) -> k == Activity.RELAX || k == Activity.STUDY ? v * 1.3f : v);
+            weights.replaceAll((k, v) -> k == Activity.EXERCISE ? v * 0.4f : v);
+        }
+        
+        // Special day modifier
+        if (isSpecialDay(data, villager.getWorld().getTimeOfDay())) {
+            weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 3.0f : v);
+        }
+    }
+    
+    private static Activity selectWeightedActivity(Map<Activity, Float> weights, VillagerEntity villager) {
+        float totalWeight = weights.values().stream().reduce(0f, Float::sum);
+        if (totalWeight <= 0) return Activity.WANDER;
+        
+        net.minecraft.util.math.random.Random random = villager.getWorld().getRandom();
+        float randomValue = random.nextFloat() * totalWeight;
+        
+        float currentWeight = 0;
+        for (Map.Entry<Activity, Float> entry : weights.entrySet()) {
+            currentWeight += entry.getValue();
+            if (randomValue <= currentWeight) {
+                return entry.getKey();
+            }
+        }
+        
+        return Activity.WANDER;
     }
     
     public static void updateSchedules(ServerWorld world) {
-        List<VillagerEntity> villagers = world.getEntitiesByClass(
-            VillagerEntity.class,
-            new Box(-30000000, -256, -30000000, 30000000, 256, 30000000),
-            v -> true
-        );
-        
-        for (VillagerEntity villager : villagers) {
+        // Use ServerVillagerManager instead of scanning the entire world
+        for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
+            // Only update villagers in the same world
+            if (villager.getWorld() != world) continue;
+            
             Activity currentActivity = getCurrentActivity(villager);
             updateVillagerBehavior(villager, currentActivity);
             
             
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
-                Text activityText = Text.literal(" [" + currentActivity.description + "]")
-                    .formatted(getActivityFormatting(currentActivity));
-                Text fullName = Text.literal(data.getName()).append(activityText);
-                villager.setCustomName(fullName);
+                if (currentActivity != Activity.WAKE_UP) {
+                    Text activityText = Text.literal(" [" + currentActivity.description + "]")
+                        .formatted(getActivityFormatting(currentActivity));
+                    Text fullName = Text.literal(data.getName()).append(activityText);
+                    villager.setCustomName(fullName);
+                } else {
+                    villager.setCustomName(Text.literal(data.getName()));
+                }
             }
         }
     }

@@ -339,9 +339,18 @@ public class VillagerRelationshipManager {
     public static List<VillagerEntity> findPotentialPartners(VillagerEntity villager) {
         if (villager.getWorld() == null) return List.of();
         
-        return villager.getWorld().getEntitiesByClass(VillagerEntity.class, 
-            villager.getBoundingBox().expand(MARRIAGE_RANGE), 
-            potential -> canMarry(villager, potential));
+        // Use ServerVillagerManager for efficient lookup instead of world scanning
+        List<VillagerEntity> marriageCandidates = new java.util.ArrayList<>();
+        for (VillagerEntity potential : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
+            if (potential != villager && canMarry(villager, potential)) {
+                // Check distance from villager
+                double distance = villager.getPos().distanceTo(potential.getPos());
+                if (distance <= MARRIAGE_RANGE) {
+                    marriageCandidates.add(potential);
+                }
+            }
+        }
+        return marriageCandidates;
     }
     
     

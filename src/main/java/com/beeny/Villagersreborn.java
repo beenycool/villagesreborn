@@ -6,13 +6,19 @@ import com.beeny.data.VillagerData;
 import com.beeny.network.VillagerTeleportPacket;
 import com.beeny.network.UpdateVillagerNotesPacket;
 import com.beeny.network.VillagerMarriagePacket;
+import com.beeny.network.OpenFamilyTreePacket;
+import com.beeny.network.FamilyTreeDataPacket;
+import com.beeny.network.RequestVillagerListPacket;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import com.beeny.registry.ModItems;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
+import com.beeny.system.ServerVillagerManager;
 import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -70,10 +76,18 @@ public class Villagersreborn implements ModInitializer {
 		
 		VillagerCommands.register();
 		
+		// Initialize ServerVillagerManager on server start
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			ServerVillagerManager.getInstance().initialize(server);
+		});
+		
 		
 		VillagerTeleportPacket.register();
 		UpdateVillagerNotesPacket.register();
 		VillagerMarriagePacket.register();
+		OpenFamilyTreePacket.register();
+		FamilyTreeDataPacket.register();
+		RequestVillagerListPacket.register();
 		
 		
 		registerEvents();
@@ -126,6 +140,16 @@ public class Villagersreborn implements ModInitializer {
 				VillagerData data = villager.getAttached(VILLAGER_DATA);
 				
 				if (data == null) return ActionResult.PASS;
+				
+				// Check for empty hand (right-click to open family tree)
+				if (heldItem.isEmpty() && player.isSneaking()) {
+					if (player instanceof ServerPlayerEntity serverPlayer) {
+						LOGGER.info("[Villagersreborn] Sending OpenFamilyTreePacket for villager ID: " + villager.getId());
+						// Send packet to open family tree GUI
+						ServerPlayNetworking.send(serverPlayer, new OpenFamilyTreePacket(villager.getId()));
+						return ActionResult.SUCCESS;
+					}
+				}
 				
 				
 				if (!heldItem.isEmpty() && isFoodItem(heldItem)) {
@@ -208,17 +232,7 @@ public class Villagersreborn implements ModInitializer {
 	}
 	
 	private boolean isFoodItem(ItemStack stack) {
-		return stack.getItem().getComponents().contains(DataComponentTypes.FOOD) || 
-			   stack.isOf(Items.BREAD) ||
-			   stack.isOf(Items.CAKE) ||
-			   stack.isOf(Items.COOKIE) ||
-			   stack.isOf(Items.APPLE) ||
-			   stack.isOf(Items.GOLDEN_APPLE) ||
-			   stack.isOf(Items.CARROT) ||
-			   stack.isOf(Items.POTATO) ||
-			   stack.isOf(Items.BEETROOT) ||
-			   stack.isOf(Items.MELON_SLICE) ||
-			   stack.isOf(Items.PUMPKIN_PIE);
+		return stack.getItem().getComponents().contains(DataComponentTypes.FOOD);
 	}
 	
 	private void checkForMarriages(ServerWorld world) {
