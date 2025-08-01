@@ -26,9 +26,9 @@ public class VillagerScheduleManager {
         NIGHT(13000, 23000, "Night"),
         MIDNIGHT(23000, 24000, "Midnight");
         
-        final long startTime;
-        final long endTime;
-        final String name;
+        public final long startTime;
+        public final long endTime;
+        public final String name;
         
         TimeOfDay(long startTime, long endTime, String name) {
             this.startTime = startTime;

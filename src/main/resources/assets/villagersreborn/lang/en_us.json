@@ -2,5 +2,20 @@
   "item.villagersreborn.villager_journal": "Villager Journal",
   "item.villagersreborn.villager_journal.tooltip": "Right-click to open an interactive journal of nearby villagers. Click names to teleport!",
   "key.villagersreborn.open_journal": "Open Villager Journal",
-  "category.villagersreborn.general": "Villagers Reborn"
+  "category.villagersreborn.general": "Villagers Reborn",
+  
+  "gui.villagersreborn.settings.title": "Villagers Reborn Settings",
+  "gui.villagersreborn.settings.enable_dynamic_dialogue": "Enable Dynamic Dialogue",
+  "gui.villagersreborn.settings.ai_provider": "AI Provider",
+  "gui.villagersreborn.settings.api_key": "API Key",
+  "gui.villagersreborn.settings.api_endpoint": "API Endpoint",
+  "gui.villagersreborn.settings.model": "Model",
+  "gui.villagersreborn.settings.local_url": "Local Server URL",
+  "gui.villagersreborn.settings.local_model": "Local Model",
+  "gui.villagersreborn.settings.temperature": "Temperature",
+  "gui.villagersreborn.settings.max_tokens": "Max Tokens",
+  "gui.villagersreborn.settings.timeout": "Timeout (ms)",
+  "gui.villagersreborn.settings.fallback": "Fallback to Static Dialogue",
+  "gui.villagersreborn.settings.test_connection": "Test Connection",
+  "gui.villagersreborn.settings.done": "Done"
 }

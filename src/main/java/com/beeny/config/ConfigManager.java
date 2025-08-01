@@ -51,6 +51,59 @@ public class ConfigManager {
                 VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
             }
             
+            // Load LLM dialogue settings
+            if (config.has("enableDynamicDialogue")) {
+                VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = config.get("enableDynamicDialogue").getAsBoolean();
+            }
+            
+            if (config.has("llmProvider")) {
+                VillagersRebornConfig.LLM_PROVIDER = config.get("llmProvider").getAsString();
+            }
+            
+            if (config.has("llmApiKey")) {
+                VillagersRebornConfig.LLM_API_KEY = config.get("llmApiKey").getAsString();
+            }
+            
+            if (config.has("llmApiEndpoint")) {
+                VillagersRebornConfig.LLM_API_ENDPOINT = config.get("llmApiEndpoint").getAsString();
+            }
+            
+            if (config.has("llmModel")) {
+                VillagersRebornConfig.LLM_MODEL = config.get("llmModel").getAsString();
+            }
+            
+            if (config.has("llmTemperature")) {
+                VillagersRebornConfig.LLM_TEMPERATURE = config.get("llmTemperature").getAsDouble();
+            }
+            
+            if (config.has("llmMaxTokens")) {
+                VillagersRebornConfig.LLM_MAX_TOKENS = config.get("llmMaxTokens").getAsInt();
+            }
+            
+            if (config.has("llmRequestTimeout")) {
+                VillagersRebornConfig.LLM_REQUEST_TIMEOUT = config.get("llmRequestTimeout").getAsInt();
+            }
+            
+            if (config.has("fallbackToStatic")) {
+                VillagersRebornConfig.FALLBACK_TO_STATIC = config.get("fallbackToStatic").getAsBoolean();
+            }
+            
+            if (config.has("enableDialogueCache")) {
+                VillagersRebornConfig.ENABLE_DIALOGUE_CACHE = config.get("enableDialogueCache").getAsBoolean();
+            }
+            
+            if (config.has("dialogueCacheSize")) {
+                VillagersRebornConfig.DIALOGUE_CACHE_SIZE = config.get("dialogueCacheSize").getAsInt();
+            }
+            
+            if (config.has("conversationHistoryLimit")) {
+                VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = config.get("conversationHistoryLimit").getAsInt();
+            }
+            
+            if (config.has("localLlmUrl")) {
+                VillagersRebornConfig.LLM_LOCAL_URL = config.get("localLlmUrl").getAsString();
+            }
+            
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
         } catch (Exception e) {
             Villagersreborn.LOGGER.error("Failed to load Villagers Reborn config", e);
@@ -63,6 +116,21 @@ public class ConfigManager {
         config.addProperty("happinessNeutralThreshold", VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD);
         config.addProperty("happinessDecayRate", VillagersRebornConfig.HAPPINESS_DECAY_RATE);
         config.addProperty("happinessRecoveryRate", VillagersRebornConfig.HAPPINESS_RECOVERY_RATE);
+        
+        // Add LLM dialogue settings
+        config.addProperty("enableDynamicDialogue", VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE);
+        config.addProperty("llmProvider", VillagersRebornConfig.LLM_PROVIDER);
+        config.addProperty("llmApiKey", VillagersRebornConfig.LLM_API_KEY);
+        config.addProperty("llmApiEndpoint", VillagersRebornConfig.LLM_API_ENDPOINT);
+        config.addProperty("llmModel", VillagersRebornConfig.LLM_MODEL);
+        config.addProperty("llmTemperature", VillagersRebornConfig.LLM_TEMPERATURE);
+        config.addProperty("llmMaxTokens", VillagersRebornConfig.LLM_MAX_TOKENS);
+        config.addProperty("llmRequestTimeout", VillagersRebornConfig.LLM_REQUEST_TIMEOUT);
+        config.addProperty("fallbackToStatic", VillagersRebornConfig.FALLBACK_TO_STATIC);
+        config.addProperty("enableDialogueCache", VillagersRebornConfig.ENABLE_DIALOGUE_CACHE);
+        config.addProperty("dialogueCacheSize", VillagersRebornConfig.DIALOGUE_CACHE_SIZE);
+        config.addProperty("conversationHistoryLimit", VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT);
+        config.addProperty("localLlmUrl", VillagersRebornConfig.LLM_LOCAL_URL);
         
         Files.writeString(configPath, GSON.toJson(config));
         Villagersreborn.LOGGER.info("Created default Villagers Reborn config");

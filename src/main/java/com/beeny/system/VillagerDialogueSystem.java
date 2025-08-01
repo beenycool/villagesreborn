@@ -2,6 +2,9 @@ package com.beeny.system;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.dialogue.LLMDialogueManager;
+import com.beeny.dialogue.VillagerMemoryManager;
+import com.beeny.config.VillagersRebornConfig;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
@@ -11,6 +14,7 @@ import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.World;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 public class VillagerDialogueSystem {
     
@@ -244,6 +248,48 @@ public class VillagerDialogueSystem {
             return Text.literal("...").formatted(Formatting.GRAY);
         }
         
+        // Try LLM generation first if enabled
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            try {
+                Text llmDialogue = LLMDialogueManager.generateDialogueSync(context, category);
+                if (llmDialogue != null) {
+                    return llmDialogue;
+                }
+            } catch (Exception e) {
+                System.err.println("LLM dialogue generation failed, falling back to static: " + e.getMessage());
+            }
+        }
+        
+        // Fall back to static dialogue system
+        return generateStaticDialogue(context, category);
+    }
+    
+    public static CompletableFuture<Text> generateDialogueAsync(DialogueContext context, DialogueCategory category) {
+        if (context.villagerData == null) {
+            return CompletableFuture.completedFuture(Text.literal("...").formatted(Formatting.GRAY));
+        }
+        
+        // Try LLM generation first if enabled
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            return LLMDialogueManager.generateDialogueAsync(context, category)
+                .thenCompose(llmDialogue -> {
+                    if (llmDialogue != null) {
+                        return CompletableFuture.completedFuture(llmDialogue);
+                    } else {
+                        // Fall back to static dialogue
+                        return CompletableFuture.completedFuture(generateStaticDialogue(context, category));
+                    }
+                })
+                .exceptionally(throwable -> {
+                    System.err.println("Async LLM dialogue generation failed, falling back to static: " + throwable.getMessage());
+                    return generateStaticDialogue(context, category);
+                });
+        } else {
+            return CompletableFuture.completedFuture(generateStaticDialogue(context, category));
+        }
+    }
+    
+    private static Text generateStaticDialogue(DialogueContext context, DialogueCategory category) {
         
         String personality = context.villagerData.getPersonality();
         Map<DialogueCategory, List<String>> personalityDialogues = 
@@ -284,7 +330,12 @@ public class VillagerDialogueSystem {
         
         Formatting formatting = getDialogueFormatting(context);
         
-        return Text.literal(processedDialogue).formatted(formatting);
+        // Update memory for static dialogue too
+        VillagerMemoryManager.addVillagerResponse(
+            context.villager, context.player, processedDialogue, category.name()
+        );
+        
+        return (Text) Text.literal(processedDialogue).formatted(formatting);
     }
     
     
@@ -369,7 +420,7 @@ public class VillagerDialogueSystem {
             case FAREWELL -> "Goodbye!";
         };
         
-        return Text.literal(message).formatted(Formatting.GRAY);
+        return (Text) Text.literal(message).formatted(Formatting.GRAY);
     }
     
     
@@ -480,5 +531,40 @@ public class VillagerDialogueSystem {
         }
         
         return conversation;
+    }
+    
+    public static CompletableFuture<List<Text>> generateConversationAsync(VillagerEntity villager, PlayerEntity player) {
+        DialogueContext context = new DialogueContext(villager, player);
+        List<CompletableFuture<Text>> futureDialogues = new ArrayList<>();
+        
+        
+        DialogueCategory openingCategory = RANDOM.nextBoolean() ? 
+            DialogueCategory.GREETING : DialogueCategory.MOOD;
+        futureDialogues.add(generateDialogueAsync(context, openingCategory));
+        
+        
+        DialogueCategory mainCategory = chooseDialogueCategory(context);
+        if (mainCategory != openingCategory) {
+            futureDialogues.add(generateDialogueAsync(context, mainCategory));
+        }
+        
+        
+        if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
+            DialogueCategory followUp = RANDOM.nextBoolean() ? 
+                DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
+            futureDialogues.add(generateDialogueAsync(context, followUp));
+        }
+        
+        
+        if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
+            context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
+            futureDialogues.add(generateDialogueAsync(context, DialogueCategory.FAREWELL));
+        }
+        
+        // Combine all futures
+        return CompletableFuture.allOf(futureDialogues.toArray(new CompletableFuture[0]))
+            .thenApply(v -> futureDialogues.stream()
+                .map(CompletableFuture::join)
+                .collect(java.util.stream.Collectors.toList()));
     }
 }

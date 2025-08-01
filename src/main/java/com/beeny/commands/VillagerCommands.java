@@ -7,6 +7,8 @@ import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
 import com.beeny.util.VillagerNames;
+import com.beeny.commands.DialogueCommands;
+import com.beeny.commands.DialogueSetupCommands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -46,6 +48,8 @@ public class VillagerCommands {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             registerVillagerCommand(dispatcher, registryAccess);
+            DialogueCommands.register(dispatcher, registryAccess);
+            DialogueSetupCommands.register(dispatcher, registryAccess);
         });
     }
 
