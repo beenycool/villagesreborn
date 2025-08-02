@@ -379,7 +379,11 @@ public class VillagerLearningSystem {
         
         // Calculate average outcome
         double avgOutcome = relevantExperiences.stream()
-            .mapToDouble(exp -> exp.outcome * exp.getRelevanceScore())
+         double avgOutcome = relevantExperiences.stream()
+-            .mapToDouble(exp -> exp.outcome * exp.getRelevanceScore())
++            .mapToDouble(exp -> exp.getOutcome() * exp.getRelevanceScore())
+             .average()
+             .orElse(0.0);
             .average()
             .orElse(0.0);
         
