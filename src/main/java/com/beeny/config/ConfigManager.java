@@ -100,8 +100,8 @@ public class ConfigManager {
                 VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = config.get("conversationHistoryLimit").getAsInt();
             }
             
-            if (config.has("localLlmUrl")) {
-                VillagersRebornConfig.LLM_LOCAL_URL = config.get("localLlmUrl").getAsString();
+            if (config.has("llmLocalUrl")) {
+                VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalUrl").getAsString();
             }
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
