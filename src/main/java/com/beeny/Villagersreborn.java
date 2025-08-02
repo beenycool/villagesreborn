@@ -10,6 +10,8 @@ import com.beeny.network.VillagerMarriagePacket;
 import com.beeny.network.OpenFamilyTreePacket;
 import com.beeny.network.FamilyTreeDataPacket;
 import com.beeny.network.RequestVillagerListPacket;
+import com.beeny.network.TestLLMConnectionPacket;
+import com.beeny.network.TestLLMConnectionResultPacket;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import com.beeny.registry.ModItems;
 import com.beeny.system.VillagerRelationshipManager;
@@ -108,6 +110,8 @@ public class Villagersreborn implements ModInitializer {
 		OpenFamilyTreePacket.register();
 		FamilyTreeDataPacket.register();
 		RequestVillagerListPacket.register();
+		TestLLMConnectionPacket.register();
+		TestLLMConnectionResultPacket.register();
 		
 		
 		registerEvents();

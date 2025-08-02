@@ -16,6 +16,14 @@ import java.util.concurrent.ThreadLocalRandom;
  * and adapt their behavior patterns over time
  */
 public class VillagerLearningSystem {
+
+    // Time thresholds
+    private static final long RECENT_THRESHOLD_MS = 60L * 60L * 1000L; // 1 hour
+    private static final float DAILY_DECAY_MS = 24f * 60f * 60f * 1000f;  // 1 day
+    
+    // Adaptation thresholds
+    private static final int MIN_EXPERIENCES_FOR_ADAPTATION = 3;
+    private static final double NEGATIVE_OUTCOME_THRESHOLD = -0.3;
     
     // Experience types that villagers can learn from
     public enum ExperienceType {
@@ -58,13 +66,14 @@ public class VillagerLearningSystem {
             reinforcements.incrementAndGet();
         }
         
+        private static final long RECENT_THRESHOLD_MS = 3600000L; // 1 hour
         public boolean isRecent() {
-            return (System.currentTimeMillis() - timestamp) < 3600000; // 1 hour
+            return (System.currentTimeMillis() - timestamp) < RECENT_THRESHOLD_MS;
         }
         
         public float getRelevanceScore() {
             // Newer experiences and those with more reinforcements are more relevant
-            float timeRelevance = Math.max(0.1f, 1.0f - ((System.currentTimeMillis() - timestamp) / 86400000.0f)); // 1 day decay
+            float timeRelevance = Math.max(0.1f, 1.0f - ((System.currentTimeMillis() - timestamp) / DAILY_DECAY_MS)); // 1 day decay
             float reinforcementRelevance = Math.min(1.0f, reinforcements.get() / 10.0f);
             return timeRelevance * reinforcementRelevance;
         }
@@ -149,6 +158,7 @@ public class VillagerLearningSystem {
         private float learningRate; // How quickly they adapt (0.0 to 1.0)
         private long lastLearningUpdate;
         
+        private static final float EXPERIENCE_LIMIT = 100.0f;
         public VillagerLearningProfile() {
             this.experiences = Collections.synchronizedList(new ArrayList<>());
             this.patterns = new ConcurrentHashMap<>();
@@ -257,6 +267,14 @@ public class VillagerLearningSystem {
         public LearnedPattern getPattern(String patternId) {
             return patterns.get(patternId);
         }
+
+        /**
+         * Gets the count of learning experiences for this villager.
+         * @return The number of learning experiences
+         */
+        public int getExperienceCount() {
+            return experiences.size();
+        }
     }
     
     // Global learning profiles for all villagers
@@ -342,6 +360,8 @@ public class VillagerLearningSystem {
         }
     }
     
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerLearningSystem.class);
+
     public static void processWorkOutcome(VillagerEntity villager, String workType, float satisfaction) {
         VillagerLearningProfile profile = getLearningProfile(villager);
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
@@ -371,20 +391,22 @@ public class VillagerLearningSystem {
             relevantExperiences = profile.getRelevantExperiences(
                 ExperienceType.valueOf(behaviorType.toUpperCase()), "general");
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid behaviorType for ExperienceType: " + behaviorType);
+            LOGGER.error("Invalid behaviorType for ExperienceType: {}", behaviorType, e);
             return false;
         }
-        
-        if (relevantExperiences.size() < 3) return false; // Need enough data
-        
-        // Calculate average outcome
-        double avgOutcome = relevantExperiences.stream()
-            .mapToDouble(exp -> exp.getOutcome() * exp.getRelevanceScore())
-            .average()
-            .orElse(0.0);
-        
-        // Adapt if consistently negative outcomes
-        return avgOutcome < -0.3;
+
+        if (relevantExperiences.size() < MIN_EXPERIENCES_FOR_ADAPTATION) return false;
+
+        double totalWeightedOutcome = 0.0;
+        double totalWeight = 0.0;
+        for (LearningExperience exp : relevantExperiences) {
+            double weight = exp.getRelevanceScore();
+            totalWeightedOutcome += exp.getOutcome() * weight;
+            totalWeight += weight;
+        }
+        double avgOutcome = totalWeight > 0 ? totalWeightedOutcome / totalWeight : 0.0;
+
+        return avgOutcome < NEGATIVE_OUTCOME_THRESHOLD;
     }
     
     public static float getLearnedPreference(VillagerEntity villager, String preferenceType) {

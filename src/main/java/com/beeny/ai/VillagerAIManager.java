@@ -165,27 +165,47 @@ public class VillagerAIManager {
         
         // Update emotions
         if (config.enableEmotions && shouldUpdateEmotion(state, currentTime)) {
-            updateEmotionalState(villager, state);
+            try {
+                updateEmotionalState(villager, state);
+            } catch (Exception e) {
+                logger.error("Error updating emotional state for villager {}", uuid, e);
+            }
         }
         
         // Update GOAP planning
         if (config.enableGOAP && shouldUpdateGOAP(state, currentTime)) {
-            updateGOAPPlanning(villager, state);
+            try {
+                updateGOAPPlanning(villager, state);
+            } catch (Exception e) {
+                logger.error("Error updating GOAP planning for villager {}", uuid, e);
+            }
         }
         
         // Update utility AI decisions
         if (config.enableUtilityAI) {
-            updateUtilityDecisions(villager, state);
+            try {
+                updateUtilityDecisions(villager, state);
+            } catch (Exception e) {
+                logger.error("Error updating utility decisions for villager {}", uuid, e);
+            }
         }
         
         // Update learning
         if (config.enableLearning && shouldUpdateLearning(state, currentTime)) {
-            updateLearning(villager, state);
+            try {
+                updateLearning(villager, state);
+            } catch (Exception e) {
+                logger.error("Error updating learning for villager {}", uuid, e);
+            }
         }
         
         // Check for quest opportunities
         if (config.enableQuests && shouldCheckQuests(state, currentTime)) {
-            checkQuestOpportunities(villager, state);
+            try {
+                checkQuestOpportunities(villager, state);
+            } catch (Exception e) {
+                logger.error("Error checking quest opportunities for villager {}", uuid, e);
+            }
         }
         
         // Update profession satisfaction and evaluate career changes
@@ -647,9 +667,9 @@ public class VillagerAIManager {
         // Add profession information
         VillagerProfessionManager.ProfessionData profData = VillagerProfessionManager.getProfessionData(villager);
         if (profData != null) {
-            status.add(Text.literal("Profession: " + profData.professionId).formatted(Formatting.YELLOW));
-            status.add(Text.literal("Skill Level: " + String.format("%.1f", profData.skillLevel)).formatted(Formatting.GREEN));
-            status.add(Text.literal("Job Satisfaction: " + String.format("%.1f", profData.satisfaction)).formatted(Formatting.AQUA));
+            status.add(Text.literal("Profession: " + profData.getProfessionId()).formatted(Formatting.YELLOW));
+            status.add(Text.literal("Skill Level: " + String.format("%.1f", profData.getSkillLevel())).formatted(Formatting.GREEN));
+            status.add(Text.literal("Job Satisfaction: " + String.format("%.1f", profData.getSatisfaction())).formatted(Formatting.AQUA));
             status.add(Text.literal("Professional Competency: " + String.format("%.1f", profData.getOverallCompetency())).formatted(Formatting.GOLD));
         }
         

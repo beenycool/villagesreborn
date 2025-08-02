@@ -24,8 +24,11 @@ import net.minecraft.util.hit.HitResult;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class VillagerActivityCommands {
+    private static final Logger LOGGER = LogManager.getLogger(VillagerActivityCommands.class);
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(CommandManager.literal("villager")
@@ -83,7 +86,7 @@ public class VillagerActivityCommands {
                 .formatted(Formatting.GOLD);
             
             if (currentActivity != null) {
-                long duration = (villager.getWorld().getTimeOfDay() - currentActivity.getStartTime()) / 1000;
+                long duration = (villager.getWorld().getTimeOfDay() - currentActivity.getStartTime()) / 1200;
                 message = message.append(Text.literal("Activity: " + currentActivity.getActivity() + "\n")
                     .formatted(Formatting.GREEN))
                     .append(Text.literal("Duration: " + duration + " minutes\n")
@@ -147,7 +150,7 @@ public class VillagerActivityCommands {
                 .formatted(Formatting.YELLOW));
             
             for (DailyActivityTracker.ActivityEntry activity : dailyLog.getActivities()) {
-                long durationMinutes = activity.getDuration() / 1000;
+                long durationMinutes = activity.getDuration() / 1200;
                 message = message.append(Text.literal("• " + activity.getActivity() + 
                     " (" + durationMinutes + "min) - " + activity.getDetails() + "\n")
                     .formatted(Formatting.GREEN));
@@ -155,7 +158,7 @@ public class VillagerActivityCommands {
             
             message = message.append(Text.literal("\nSummary:\n").formatted(Formatting.AQUA));
             for (Map.Entry<String, Long> entry : dailyLog.getActivityDurations().entrySet()) {
-                long minutes = entry.getValue() / 1000;
+                long minutes = entry.getValue() / 1200;
                 message = message.append(Text.literal("• " + entry.getKey() + ": " + minutes + " minutes\n")
                     .formatted(Formatting.GRAY));
             }
@@ -221,7 +224,7 @@ public class VillagerActivityCommands {
                 
                 DailyActivityTracker.ActivityEntry mostFrequent = log.getMostFrequentActivity();
                 if (mostFrequent != null) {
-                    long duration = log.getTotalActivityTime(mostFrequent.getActivity()) / 1000;
+                    long duration = log.getTotalActivityTime(mostFrequent.getActivity()) / 1200;
                     message = message.append(Text.literal(mostFrequent.getActivity() + " (" + duration + "min)")
                         .formatted(Formatting.GREEN));
                 }
@@ -279,7 +282,7 @@ public class VillagerActivityCommands {
             long totalTime = weeklySummary.values().stream().mapToLong(Long::longValue).sum();
             
             for (Map.Entry<String, Long> entry : weeklySummary.entrySet()) {
-                long minutes = entry.getValue() / 1000;
+                long minutes = entry.getValue() / 1200;
                 long hours = minutes / 60;
                 minutes = minutes % 60;
                 
@@ -359,7 +362,7 @@ public class VillagerActivityCommands {
                     .formatted(Formatting.YELLOW));
                 
                 if (currentActivity != null) {
-                    long duration = (villager.getWorld().getTimeOfDay() - currentActivity.getStartTime()) / 1000;
+                    long duration = (villager.getWorld().getTimeOfDay() - currentActivity.getStartTime()) / 1200;
                     message = message.append(Text.literal(currentActivity.getActivity() + " (" + duration + "min)")
                         .formatted(Formatting.GREEN));
                 } else {
@@ -420,7 +423,7 @@ public class VillagerActivityCommands {
             
             export.append("Activity Breakdown:\n");
             for (Map.Entry<String, Long> entry : log.getActivityDurations().entrySet()) {
-                long minutes = entry.getValue() / 1000;
+                long minutes = entry.getValue() / 1200;
                 export.append("  ").append(entry.getKey()).append(": ").append(minutes).append(" minutes\n");
             }
             export.append("\n");
@@ -429,7 +432,7 @@ public class VillagerActivityCommands {
         context.getSource().sendFeedback(() -> Text.literal("Activity data exported to server log")
             .formatted(Formatting.GREEN), false);
 
-        System.out.println(export.toString());
+        LOGGER.info(export.toString());
 
         return 1;
     }

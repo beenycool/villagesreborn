@@ -17,5 +17,7 @@
   "gui.villagersreborn.settings.timeout": "Timeout (ms)",
   "gui.villagersreborn.settings.fallback": "Fallback to Static Dialogue",
   "gui.villagersreborn.settings.test_connection": "Test Connection",
-  "gui.villagersreborn.settings.done": "Done"
+  "gui.villagersreborn.settings.done": "Done",
+  "villagersreborn.dialogue.generating": "Generating reply...",
+  "villagersreborn.journal.search_placeholder": "Search villagers..."
 }

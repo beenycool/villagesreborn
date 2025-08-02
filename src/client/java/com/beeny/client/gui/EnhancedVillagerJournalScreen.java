@@ -111,10 +111,10 @@ public class EnhancedVillagerJournalScreen extends Screen {
         }
         
         
-        searchField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN, 
+        searchField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN,
             screenY + TAB_HEIGHT + 5, 150, 20, Text.literal("Search"));
         searchField.setChangedListener(this::updateSearch);
-        searchField.setPlaceholder(Text.literal("Search villagers..."));
+        searchField.setPlaceholder(Text.translatable("villagersreborn.journal.search_placeholder"));
         addDrawableChild(searchField);
         
         

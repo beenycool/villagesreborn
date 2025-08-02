@@ -24,15 +24,8 @@ public class DialogueCache {
         // Schedule cleanup every 10 minutes
         cleanupExecutor.scheduleAtFixedRate(DialogueCache::cleanup, 10, 10, TimeUnit.MINUTES);
     }
+    // Removed redundant shutdownCleanupExecutor() method; use shutdown() only
 
-    /**
-     * Shuts down the cleanup executor service.
-     * Call this during application shutdown or mod unload to prevent resource leaks.
-     */
-    public static void shutdownCleanupExecutor() {
-        cleanupExecutor.shutdown();
-    }
-    
     private static class CacheEntry {
         public final String dialogue;
         public final long timestamp;
@@ -107,30 +100,30 @@ public class DialogueCache {
     
     public static String get(String key) {
         if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) return null;
-        
-        CacheEntry entry = cache.get(key);
-        if (entry == null || entry.isExpired()) {
-            if (entry != null) {
-                cache.remove(key); // Clean up expired entry
+        synchronized (cache) {
+            CacheEntry entry = cache.get(key);
+            if (entry == null || entry.isExpired()) {
+                if (entry != null) {
+                    cache.remove(key); // Clean up expired entry
+                }
+                return null;
             }
-            return null;
+            return entry.dialogue;
         }
-        
-        return entry.dialogue;
     }
     
     public static boolean contains(String key) {
         if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) return false;
-        
-        CacheEntry entry = cache.get(key);
-        if (entry == null || entry.isExpired()) {
-            if (entry != null) {
-                cache.remove(key); // Clean up expired entry
+        synchronized (cache) {
+            CacheEntry entry = cache.get(key);
+            if (entry == null || entry.isExpired()) {
+                if (entry != null) {
+                    cache.remove(key); // Clean up expired entry
+                }
+                return false;
             }
-            return false;
+            return true;
         }
-        
-        return true;
     }
     
     public static void invalidate(String key) {

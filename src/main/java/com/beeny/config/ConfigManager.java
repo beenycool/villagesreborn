@@ -41,7 +41,8 @@ public class ConfigManager {
         config.addProperty("enableDialogueCache", VillagersRebornConfig.ENABLE_DIALOGUE_CACHE);
         config.addProperty("dialogueCacheSize", VillagersRebornConfig.DIALOGUE_CACHE_SIZE);
         config.addProperty("conversationHistoryLimit", VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT);
-        config.addProperty("llmLocalUrl", VillagersRebornConfig.LLM_LOCAL_URL);
+        // keep JSON key stable for backward compatibility; map to new field
+        config.addProperty("llmLocalEndpoint", VillagersRebornConfig.LLM_LOCAL_URL);
 
         Files.writeString(configPath, GSON.toJson(config));
     }
@@ -136,8 +137,8 @@ public class ConfigManager {
                 VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = config.get("conversationHistoryLimit").getAsInt();
             }
             
-            if (config.has("llmLocalUrl")) {
-                VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalUrl").getAsString();
+            if (config.has("llmLocalEndpoint")) {
+                VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalEndpoint").getAsString();
             }
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
@@ -190,7 +191,7 @@ public class ConfigManager {
         boolean enableDialogueCache,
         int dialogueCacheSize,
         int conversationHistoryLimit,
-        String llmLocalUrl
+        String llmLocalEndpoint
     ) throws IOException {
         Path configPath = Paths.get("config", CONFIG_FILE_NAME);
         saveConfig(
@@ -210,7 +211,7 @@ public class ConfigManager {
             enableDialogueCache,
             dialogueCacheSize,
             conversationHistoryLimit,
-            llmLocalUrl,
+            llmLocalEndpoint,
             configPath
         );
     }
@@ -235,7 +236,7 @@ public class ConfigManager {
         boolean enableDialogueCache,
         int dialogueCacheSize,
         int conversationHistoryLimit,
-        String llmLocalUrl,
+        String llmLocalEndpoint,
         Path configPath
     ) throws IOException {
         JsonObject config = new JsonObject();
@@ -255,7 +256,7 @@ public class ConfigManager {
         config.addProperty("enableDialogueCache", enableDialogueCache);
         config.addProperty("dialogueCacheSize", dialogueCacheSize);
         config.addProperty("conversationHistoryLimit", conversationHistoryLimit);
-        config.addProperty("llmLocalUrl", llmLocalUrl);
+        config.addProperty("llmLocalEndpoint", llmLocalEndpoint);
         if (!Files.exists(configPath.getParent())) {
             Files.createDirectories(configPath.getParent());
         }

@@ -128,7 +128,6 @@ public class VillagerGOAP {
         public final String name;
         public final float baseCost;
         protected final VillagerEntity villager;
-        
         public Action(String name, float baseCost, VillagerEntity villager) {
             this.name = name;
             this.baseCost = baseCost;
@@ -708,10 +707,46 @@ public class VillagerGOAP {
             VillagerScheduleManager.TimeOfDay timeOfDay = VillagerScheduleManager.TimeOfDay.fromWorldTime(villager.getWorld().getTimeOfDay());
             state.setString("time_of_day", timeOfDay.name());
             
-            // Daily activity tracking (would be persisted in real implementation)
-            // For now, just set defaults
-            state.setBool("has_worked_today", false);
-            state.setBool("has_socialized_today", false);
+            // Daily activity tracking with time-based reset
+            long worldTime = villager.getWorld().getTimeOfDay();
+            int currentDay = (int) (worldTime / 24000);
+
+            // Use villager's lastConversationTime as a lightweight persisted "last day touched"
+            // If day changed since last touch, reset daily flags to false; otherwise infer from logs
+            long lastTouch = (data != null) ? data.getLastConversationTime() : 0L;
+            int lastDay = (int) (lastTouch / 24000);
+            boolean newDay = currentDay != lastDay;
+
+            boolean hasWorkedToday = false, hasSocializedToday = false;
+
+            if (!newDay) {
+                // Infer from DailyActivityTracker if available for current day
+                com.beeny.system.DailyActivityTracker.DailyLog todayLog =
+                    com.beeny.system.DailyActivityTracker.getDailyLog(villager.getUuidAsString(), currentDay);
+                if (todayLog != null) {
+                    java.util.Map<String, Long> durations = todayLog.getActivityDurations();
+                    long workTime = durations.getOrDefault("Working", 0L);
+                    long socializeTime = durations.getOrDefault("Socializing", 0L);
+                    // Some places might label socialize activity differently; be defensive
+                    if (socializeTime == 0L) {
+                        socializeTime = durations.getOrDefault("Socialize", 0L);
+                    }
+                    hasWorkedToday = workTime > 0;
+                    hasSocializedToday = socializeTime > 0;
+                }
+            } else {
+                // Day changed: reset daily flags
+                hasWorkedToday = false;
+                hasSocializedToday = false;
+                // Update last touch to the start of current day to avoid repeat resets within the day
+                if (data != null) {
+                    // Store as a time within current day so (time/24000) == currentDay
+                    data.setLastConversationTime(currentDay * 24000L);
+                }
+            }
+
+            state.setBool("has_worked_today", hasWorkedToday);
+            state.setBool("has_socialized_today", hasSocializedToday);
             
             return state;
         }

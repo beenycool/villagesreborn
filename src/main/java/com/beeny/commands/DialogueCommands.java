@@ -212,8 +212,17 @@ public class DialogueCommands {
         String status = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? "ENABLED" : "DISABLED";
         Formatting color = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? Formatting.GREEN : Formatting.RED;
         
-        context.getSource().sendFeedback(() -> 
+        context.getSource().sendFeedback(() ->
             Text.literal("Dynamic dialogue " + status).formatted(color), false);
+    
+        // Persist configuration to disk
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            context.getSource().sendFeedback(() ->
+                Text.literal("Configuration saved").formatted(Formatting.GRAY), false);
+        } catch (Exception e) {
+            context.getSource().sendError(Text.literal("Failed to save configuration: " + e.getMessage()));
+        }
         
         return 1;
     }
@@ -226,12 +235,21 @@ public class DialogueCommands {
         // Reinitialize the dialogue manager
         LLMDialogueManager.initialize();
         
-        context.getSource().sendFeedback(() -> 
+        context.getSource().sendFeedback(() ->
             Text.literal("LLM provider set to: " + provider).formatted(Formatting.GREEN), false);
         
-        context.getSource().sendFeedback(() -> 
+        context.getSource().sendFeedback(() ->
             Text.literal("Provider configured: " + (LLMDialogueManager.isConfigured() ? "YES" : "NO"))
                 .formatted(LLMDialogueManager.isConfigured() ? Formatting.GREEN : Formatting.RED), false);
+    
+        // Persist configuration to disk
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            context.getSource().sendFeedback(() ->
+                Text.literal("Configuration saved").formatted(Formatting.GRAY), false);
+        } catch (Exception e) {
+            context.getSource().sendError(Text.literal("Failed to save configuration: " + e.getMessage()));
+        }
         
         return 1;
     }

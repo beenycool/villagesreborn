@@ -31,15 +31,35 @@ public class VillagerProfessionManager {
     
     // Profession skill and satisfaction tracking
     public static class ProfessionData {
-        public final String professionId;
-        public float skillLevel; // 0.0 to 100.0
-        public float satisfaction; // 0.0 to 100.0
-        public long timeInProfession;
-        public int successfulTrades;
-        public int failedTrades;
-        public final Map<String, Float> specializations; // Sub-skills within profession
-        public final Set<String> knownRecipes;
-        public float innovation; // Ability to create new trade offers
+        private final String professionId;
+        private float skillLevel; // 0.0 to 100.0
+        private float satisfaction; // 0.0 to 100.0
+        private long timeInProfession;
+        private int successfulTrades;
+        private int failedTrades;
+        private final Map<String, Float> specializations; // Sub-skills within profession
+        private final Set<String> knownRecipes;
+        private float innovation; // Ability to create new trade offers
+
+        public String getProfessionId() { return professionId; }
+        public float getSkillLevel() { return skillLevel; }
+        public void setSkillLevel(float level) { this.skillLevel = Math.max(0.0f, Math.min(100.0f, level)); }
+        public float getSatisfaction() { return satisfaction; }
+        public void setSatisfaction(float value) { this.satisfaction = Math.max(0.0f, Math.min(100.0f, value)); }
+        public long getTimeInProfession() { return timeInProfession; }
+        public void setTimeInProfession(long value) { this.timeInProfession = Math.max(0L, value); }
+        public int getSuccessfulTrades() { return successfulTrades; }
+        public void setSuccessfulTrades(int value) { this.successfulTrades = Math.max(0, value); }
+        public int getFailedTrades() { return failedTrades; }
+        public void setFailedTrades(int value) { this.failedTrades = Math.max(0, value); }
+        public Map<String, Float> getSpecializations() { return specializations; }
+        public Set<String> getKnownRecipes() { return knownRecipes; }
+        public float getInnovation() { return innovation; }
+        public void setInnovation(float innovation) { this.innovation = Math.max(0.0f, Math.min(100.0f, innovation)); }
+        public void incrementSuccessfulTrades() { this.successfulTrades++; }
+        public void incrementFailedTrades() { this.failedTrades++; }
+        public void addTimeInProfession(long deltaMs) { this.timeInProfession += Math.max(0L, deltaMs); }
+
         
         public ProfessionData(String professionId) {
             this.professionId = professionId;
@@ -131,10 +151,10 @@ public class VillagerProfessionManager {
         
         public float getOverallCompetency() {
             float baseCompetency = skillLevel * 0.6f;
-            float specializationBonus = specializations.values().stream()
-                .reduce(0.0f, Float::sum) / specializations.size() * 0.3f;
+            float specAvg = specializations.isEmpty() ? 0.0f :
+                (float)(specializations.values().stream().mapToDouble(Float::doubleValue).average().orElse(0.0));
+            float specializationBonus = specAvg * 0.3f;
             float experienceBonus = Math.min(20.0f, timeInProfession / 3600000.0f) * 0.1f; // Hours to bonus
-            
             return Math.min(100.0f, baseCompetency + specializationBonus + experienceBonus);
         }
         
@@ -166,18 +186,15 @@ public class VillagerProfessionManager {
             
             // Check if villager is not novice level (has no trades yet)
             if (villager.getOffers().size() > 0) {
-                // Experienced villagers need more convincing to change careers
                 VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+                if (emotions == null) return false;
                 float boredom = emotions.getEmotion(VillagerEmotionSystem.EmotionType.BOREDOM);
-                
-                if (boredom < 60.0f) return false; // Not bored enough to change
+                if (boredom < BOREDOM_THRESHOLD_CHANGE) return false;
             }
-            
-            // Check village need for this profession
+
             VillagerUtilityAI.VillageNeedsConsideration villageNeeds = new VillagerUtilityAI.VillageNeedsConsideration();
             float villageNeed = villageNeeds.getValue(villager, newProfession.toString());
-            
-            return villageNeed > 0.3f; // Village has moderate need for this profession
+            return villageNeed > VILLAGE_NEED_THRESHOLD;
         }
         
         public static boolean attemptProfessionChange(VillagerEntity villager, VillagerProfession newProfession) {
@@ -252,26 +269,19 @@ public class VillagerProfessionManager {
             }
         }
         
+        // Static profession relationship matrix for experience transfer
+        private static final Map<String, Map<String, Float>> RELATIONSHIP_MATRIX = new HashMap<>();
+        static {
+            RELATIONSHIP_MATRIX.put("farmer", Map.of("shepherd", 0.3f, "fisherman", 0.2f, "leatherworker", 0.1f));
+            RELATIONSHIP_MATRIX.put("blacksmith", Map.of("armorer", 0.7f, "weaponsmith", 0.7f, "toolsmith", 0.8f));
+            RELATIONSHIP_MATRIX.put("librarian", Map.of("cartographer", 0.4f, "cleric", 0.2f));
+            RELATIONSHIP_MATRIX.put("fletcher", Map.of("toolsmith", 0.3f, "weaponsmith", 0.4f));
+            // ... add other mappings as needed
+        }
+
         private static float calculateExperienceTransferRate(String oldProf, String newProf) {
-            // Define profession relationship matrix
-            // Replace large Map.of(...) with mutable map to avoid arity limitations
-            Map<String, Map<String, Float>> relationshipMatrix = new java.util.HashMap<>();
-            // Populate a subset to maintain behavior without exceeding Map.of arity
-            relationshipMatrix.put("farmer", Map.of("shepherd", 0.3f, "fisherman", 0.2f, "leatherworker", 0.1f));
-            relationshipMatrix.put("blacksmith", Map.of("armorer", 0.7f, "weaponsmith", 0.7f, "toolsmith", 0.8f));
-            relationshipMatrix.put("armorer", Map.of("blacksmith", 0.6f, "weaponsmith", 0.5f, "leatherworker", 0.3f));
-            relationshipMatrix.put("weaponsmith", Map.of("blacksmith", 0.6f, "armorer", 0.5f, "fletcher", 0.3f));
-            relationshipMatrix.put("toolsmith", Map.of("blacksmith", 0.7f, "mason", 0.3f));
-            relationshipMatrix.put("librarian", Map.of("cartographer", 0.4f, "cleric", 0.2f));
-            relationshipMatrix.put("cartographer", Map.of("librarian", 0.3f, "fisherman", 0.2f));
-            relationshipMatrix.put("cleric", Map.of("librarian", 0.2f, "farmer", 0.1f));
-            relationshipMatrix.put("fletcher", Map.of("leatherworker", 0.3f, "weaponsmith", 0.2f));
-            relationshipMatrix.put("fisherman", Map.of("farmer", 0.2f, "cartographer", 0.2f));
-            relationshipMatrix.put("shepherd", Map.of("farmer", 0.4f, "leatherworker", 0.5f));
-            relationshipMatrix.put("leatherworker", Map.of("shepherd", 0.4f, "armorer", 0.2f));
-            relationshipMatrix.put("mason", Map.of("toolsmith", 0.3f, "librarian", 0.1f));
-            
-            return relationshipMatrix.getOrDefault(oldProf, Map.of()).getOrDefault(newProf, 0.0f);
+            return RELATIONSHIP_MATRIX.getOrDefault(oldProf, java.util.Collections.emptyMap())
+                .getOrDefault(newProf, 0.0f);
         }
         
         private static void transferRelevantSpecializations(ProfessionData oldData, ProfessionData newData,
@@ -299,6 +309,30 @@ public class VillagerProfessionManager {
         }
     }
     
+    private static final float BOREDOM_THRESHOLD_CHANGE = 60.0f;
+    private static final float VILLAGE_NEED_THRESHOLD = 0.3f;
+    private static final float VILLAGE_NEED_FILTER_THRESHOLD = 0.2f;
+
+    // Profession relationship matrix extracted as static final to avoid reallocation
+    private static final Map<String, Map<String, Float>> RELATIONSHIP_MATRIX;
+    static {
+        Map<String, Map<String, Float>> m = new HashMap<>();
+        m.put("farmer", Map.of("shepherd", 0.3f, "fisherman", 0.2f, "leatherworker", 0.1f));
+        m.put("blacksmith", Map.of("armorer", 0.7f, "weaponsmith", 0.7f, "toolsmith", 0.8f));
+        m.put("armorer", Map.of("blacksmith", 0.6f, "weaponsmith", 0.5f, "leatherworker", 0.3f));
+        m.put("weaponsmith", Map.of("blacksmith", 0.6f, "armorer", 0.5f, "fletcher", 0.3f));
+        m.put("toolsmith", Map.of("blacksmith", 0.7f, "mason", 0.3f));
+        m.put("librarian", Map.of("cartographer", 0.4f, "cleric", 0.2f));
+        m.put("cartographer", Map.of("librarian", 0.3f, "fisherman", 0.2f));
+        m.put("cleric", Map.of("librarian", 0.2f, "farmer", 0.1f));
+        m.put("fletcher", Map.of("leatherworker", 0.3f, "weaponsmith", 0.2f));
+        m.put("fisherman", Map.of("farmer", 0.2f, "cartographer", 0.2f));
+        m.put("shepherd", Map.of("farmer", 0.4f, "leatherworker", 0.5f));
+        m.put("leatherworker", Map.of("shepherd", 0.4f, "armorer", 0.2f));
+        m.put("mason", Map.of("toolsmith", 0.3f, "librarian", 0.1f));
+        RELATIONSHIP_MATRIX = java.util.Collections.unmodifiableMap(m);
+    }
+
     // Workstation management
     public static class WorkstationManager {
         
@@ -394,15 +428,15 @@ public class VillagerProfessionManager {
             if (profData == null) return;
             
             float baseExperience = successful ? 2.0f : -0.5f;
-            String specialization = getRelevantSpecialization(profData.professionId, tradedItem);
+            String specialization = getRelevantSpecialization(profData.getProfessionId(), tradedItem);
             
             profData.gainExperience(baseExperience, specialization);
             
             if (successful) {
-                profData.successfulTrades++;
+                profData.incrementSuccessfulTrades();
                 profData.updateSatisfaction(1.0f, "successful_trade");
             } else {
-                profData.failedTrades++;
+                profData.incrementFailedTrades();
                 profData.updateSatisfaction(-2.0f, "failed_trade");
             }
             
@@ -430,7 +464,9 @@ public class VillagerProfessionManager {
                     yield "research";
                 }
                 case "blacksmith", "armorer", "weaponsmith", "toolsmith" -> {
-                    if (item.getItem().toString().contains("sword") || item.getItem().toString().contains("axe")) yield "tool_crafting";
+                    net.minecraft.item.Item it = item.getItem();
+                    if (it instanceof net.minecraft.item.ToolItem) yield "tool_crafting";
+                    if (it.getComponents().contains(net.minecraft.component.DataComponentTypes.EQUIPPABLE)) yield "armor_crafting";
                     yield "metalworking";
                 }
                 default -> "general";
@@ -535,7 +571,7 @@ public class VillagerProfessionManager {
             TradeOfferList offers = villager.getOffers();
             
             // Example: Innovative librarian might offer books with rare enchantments
-            if (profData.professionId.equals("librarian") && profData.innovation > 0.8f) {
+            if (profData.getProfessionId().equals("librarian") && profData.getInnovation() > 0.8f) {
                 // Would create special enchanted book trade
                 profData.knownRecipes.add("innovative_enchantment");
             }
@@ -596,9 +632,9 @@ public class VillagerProfessionManager {
         public static List<VillagerProfession> recommendProfessions(VillagerEntity villager) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
-            
-            if (data == null) return new ArrayList<>();
-            
+
+            if (data == null || emotions == null) return new ArrayList<>();
+
             List<VillagerProfession> recommendations = new ArrayList<>();
             
             // Analyze personality and emotions for career fit
@@ -609,34 +645,80 @@ public class VillagerProfessionManager {
             // Personality-based recommendations
             switch (personality) {
                 case "Curious" -> {
+                    // Knowledge-seeking and exploration-oriented roles
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CARTOGRAPHER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.LIBRARIAN));
                     if (curiosity > 60.0f) {
-                        // These constants are RegistryKey; skip adding if wrong type
-                        // TODO: adapt to correct API for recommendations type if needed
+                        // Technical crafting can also satisfy curiosity
+                        recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.TOOLSMITH));
                     }
                 }
                 case "Energetic" -> {
-                    // TODO: adapt to correct type for recommendations; constants are RegistryKey, skip to compile
+                    // Active, outdoors, and production-heavy roles
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD);
                 }
                 case "Friendly" -> {
-                    // TODO: adjust to proper type (RegistryEntry vs RegistryKey vs VillagerProfession)
-                    // recommendations.add(VillagerProfession.FARMER);
-                    // recommendations.add(VillagerProfession.SHEPHERD);
+                    // Social-forward roles with frequent player interaction
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.LIBRARIAN));
                 }
                 case "Serious" -> {
-                    // recommendations.add(VillagerProfession.CLERIC);
-                    // recommendations.add(VillagerProfession.ARMORER);
+                    // Disciplined and precise roles
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON);
                 }
                 case "Confident" -> {
-                    // recommendations.add(VillagerProfession.WEAPONSMITH);
-                    // recommendations.add(VillagerProfession.TOOLSMITH);
+                    // High-agency crafting roles
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.TOOLSMITH));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
+                }
+                case "Cheerful" -> {
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
+                }
+                case "Shy" -> {
+                    // Lower-social-contact roles
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON);
+                }
+                case "Grumpy" -> {
+                    // Independent craftsmanship
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.TOOLSMITH));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
+                }
+                case "Nervous" -> {
+                    // Calm, predictable environments
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.LIBRARIAN));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER);
+                }
+                default -> {
+                    // Generic fallback
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
                 }
             }
             
+            // De-duplicate while preserving order
+            List<VillagerProfession> unique = new ArrayList<>();
+            for (VillagerProfession p : recommendations) {
+                if (!unique.contains(p)) unique.add(p);
+            }
+
             // Filter based on village needs
-            return recommendations.stream()
+            return unique.stream()
                 .filter(prof -> {
                     VillagerUtilityAI.VillageNeedsConsideration villageNeeds = new VillagerUtilityAI.VillageNeedsConsideration();
-                    return villageNeeds.getValue(villager, prof.toString()) > 0.2f;
+                    // Use the registry ID string consistently for needs evaluation
+                    String key = Registries.VILLAGER_PROFESSION.getId(prof).toString();
+                    return villageNeeds.getValue(villager, key) > VILLAGE_NEED_FILTER_THRESHOLD;
                 })
                 .toList();
         }

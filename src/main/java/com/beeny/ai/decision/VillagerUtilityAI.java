@@ -205,7 +205,7 @@ public class VillagerUtilityAI {
             
             float love = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LOVE) / 100.0f;
             float happiness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS) / 100.0f;
-            float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS) / 100.0f; // Normalize to 0-1 range
+            float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS) / 100.0f; // Normalize to 0–1 range
             
             return Math.max(0.0f, Math.min(1.0f, (love + happiness + loneliness) / 3.0f));
         }
@@ -311,6 +311,7 @@ public class VillagerUtilityAI {
     
     // Decision makers
     public static class MarriageDecisionMaker {
+        private static final float PROPOSAL_PROBABILITY_MODIFIER = 0.1f;
         private final Decision marriageDecision;
         
         public MarriageDecisionMaker() {
@@ -329,7 +330,7 @@ public class VillagerUtilityAI {
             float utility = marriageDecision.calculateUtility(villager, potential);
             float threshold = getMarriageThreshold(villager);
             
-            return utility > threshold && ThreadLocalRandom.current().nextFloat() < (utility * 0.1f);
+            return utility > threshold && ThreadLocalRandom.current().nextFloat() < (utility * PROPOSAL_PROBABILITY_MODIFIER);
         }
         
         private float getMarriageThreshold(VillagerEntity villager) {

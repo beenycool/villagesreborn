@@ -26,6 +26,7 @@ public class VillagersRebornConfig {
     public static int CONVERSATION_HISTORY_LIMIT = 10;
     
     // Local LLM settings (when LLM_PROVIDER = "local")
+    // Renamed for naming consistency with other llm* keys
     public static String LLM_LOCAL_URL = "http://localhost:8080";
     
     

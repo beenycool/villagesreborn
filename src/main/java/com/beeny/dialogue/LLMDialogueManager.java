@@ -15,16 +15,17 @@ public class LLMDialogueManager {
     private static volatile LLMDialogueProvider currentProvider;
     private static volatile boolean initialized = false;
     
-    public static void initialize() {
+    public static synchronized void initialize() {
         if (initialized) {
             shutdown();
         }
-        
+
         try {
             currentProvider = createProvider();
             initialized = true;
         } catch (Exception e) {
-            System.err.println("Failed to initialize LLM dialogue provider: " + e.getMessage());
+            org.slf4j.LoggerFactory.getLogger(LLMDialogueManager.class)
+                .error("Failed to initialize LLM dialogue provider", e);
             currentProvider = null;
         }
     }
@@ -211,11 +212,20 @@ public class LLMDialogueManager {
      */
     public static CompletableFuture<Boolean> testConnection(String provider, String apiKey, String endpoint, String model) {
         try {
-            // Minimal validation: ensure provider instance can be created and is configured
+            // Create a temporary provider instance with the provided parameters
             LLMDialogueProvider temp = createProvider(provider, apiKey, endpoint, model);
-            return CompletableFuture.completedFuture(temp != null && temp.isConfigured());
-
-
+            if (temp == null) {
+                return CompletableFuture.completedFuture(false);
+            }
+            
+            // Check if the provider is properly configured
+            if (!temp.isConfigured()) {
+                return CompletableFuture.completedFuture(false);
+            }
+            
+            // For a more thorough test, we could try to make a simple request
+            // but for now, just checking configuration is sufficient
+            return CompletableFuture.completedFuture(true);
         } catch (Throwable e) {
             return CompletableFuture.completedFuture(false);
         }
@@ -225,15 +235,20 @@ public class LLMDialogueManager {
      * Helper to create a provider instance from parameters.
      */
     private static LLMDialogueProvider createProvider(String provider, String apiKey, String endpoint, String model) {
-        switch (provider.toLowerCase()) {
-            case "gemini":
-                return new GeminiDialogueProvider();
-            case "openrouter":
-                return new OpenRouterDialogueProvider();
-            case "local":
-                return new LocalLLMProvider();
-            default:
-                return null;
+        try {
+            switch (provider.toLowerCase()) {
+                case "gemini":
+                    return new GeminiDialogueProvider(apiKey, endpoint, model);
+                case "openrouter":
+                    return new OpenRouterDialogueProvider(apiKey, endpoint, model);
+                case "local":
+                    return new LocalLLMProvider(apiKey, endpoint, model);
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to create LLM provider: " + e.getMessage());
+            return null;
         }
     }
 

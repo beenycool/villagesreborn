@@ -101,8 +101,8 @@ public class VillagerAIIntegrationTest {
             
             Map<String, Object> metrics = Map.of(
                 "ai_active", state.isAIActive,
-                "profession", profData.professionId,
-                "skill_level", profData.skillLevel,
+                "profession", profData.getProfessionId(),
+                "skill_level", profData.getSkillLevel(),
                 "dominant_emotion", emotions.getDominantEmotion().name()
             );
             
@@ -187,8 +187,8 @@ public class VillagerAIIntegrationTest {
                 data.setPlayerMemory(player.getUuidAsString(), "Friendly player who greets politely");
                 String memory = data.getPlayerMemory(player.getUuidAsString());
                 
-                if (!memory.contains("Friendly")) {
-                    return new IntegrationTestResult("Memory System", false, 
+                if (memory == null || !memory.contains("Friendly")) {
+                    return new IntegrationTestResult("Memory System", false,
                         "Villager data memory not working", System.currentTimeMillis() - startTime);
                 }
             }
@@ -196,7 +196,7 @@ public class VillagerAIIntegrationTest {
             Map<String, Object> metrics = Map.of(
                 "conversation_length", conversationHistory.length(),
                 "topics_discussed", discussedTopics.size(),
-                "has_player_memory", data != null && !data.getPlayerMemory(player.getUuidAsString()).isEmpty()
+                "has_player_memory", data != null && data.getPlayerMemory(player.getUuidAsString()) != null && !data.getPlayerMemory(player.getUuidAsString()).isEmpty()
             );
             
             return new IntegrationTestResult("Memory System", true, 
@@ -321,24 +321,24 @@ public class VillagerAIIntegrationTest {
             VillagerProfessionManager.ProfessionData profData = VillagerProfessionManager.getProfessionData(villager);
             
             // Test skill progression
-            float initialSkill = profData.skillLevel;
+            float initialSkill = profData.getSkillLevel();
             VillagerProfessionManager.SkillSystem.processTradeExperience(villager, true, 
                 new net.minecraft.item.ItemStack(net.minecraft.item.Items.BREAD));
             
-            if (profData.skillLevel <= initialSkill) {
+            if (profData.getSkillLevel() <= initialSkill) {
                 return new IntegrationTestResult("Profession System", false, 
                     "Skill progression not working", System.currentTimeMillis() - startTime);
             }
             
             // Test satisfaction tracking
-            float satisfaction = profData.satisfaction;
+            float satisfaction = profData.getSatisfaction();
             VillagerProfessionManager.updateProfessionSatisfaction(villager);
             
             // Test career recommendations
             List<VillagerProfession> recommendations = VillagerProfessionManager.CareerCounselor.recommendProfessions(villager);
             
             Map<String, Object> metrics = Map.of(
-                "skill_improvement", profData.skillLevel - initialSkill,
+                "skill_improvement", profData.getSkillLevel() - initialSkill,
                 "satisfaction", satisfaction,
                 "competency", profData.getOverallCompetency(),
                 "career_options", recommendations.size()
@@ -455,9 +455,9 @@ public class VillagerAIIntegrationTest {
             
             Map<String, Object> metrics = new java.util.HashMap<>();
             metrics.put("happiness_level", happiness);
-            metrics.put("profession_skill", profData.skillLevel);
-            // Avoid direct access to private field; use 0 as placeholder
-            metrics.put("learning_experiences", 0);
+            metrics.put("profession_skill", profData.getSkillLevel());
+            // Use accessor method to get experience count
+            metrics.put("learning_experiences", learningSystem.getExperienceCount(villagerUuid));
             metrics.put("ai_status_lines", aiStatus.size());
             metrics.put("dialogue_generated", dialogue != null);
             

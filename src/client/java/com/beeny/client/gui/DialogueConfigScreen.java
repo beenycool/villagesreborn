@@ -239,7 +239,7 @@ public class DialogueConfigScreen extends Screen {
     
     private void saveAndClose() {
         // Validate settings
-        if (tempEnabled && apiKeyField.getText().trim().isEmpty()) {
+        if (tempEnabled && !tempProvider.equals("local") && apiKeyField.getText().trim().isEmpty()) {
             setStatusMessage(Text.literal("API key is required when dynamic dialogue is enabled"), Formatting.RED);
             return;
         }
@@ -250,6 +250,12 @@ public class DialogueConfigScreen extends Screen {
         VillagersRebornConfig.LLM_API_KEY = apiKeyField.getText().trim();
         VillagersRebornConfig.LLM_API_ENDPOINT = endpointField.getText().trim();
         VillagersRebornConfig.LLM_MODEL = modelField.getText().trim();
+        if ("local".equalsIgnoreCase(tempProvider)) {
+            // Keep both in sync for now; JSON uses llmLocalEndpoint key
+            VillagersRebornConfig.LLM_LOCAL_URL = endpointField.getText().trim().isEmpty()
+                ? VillagersRebornConfig.LLM_LOCAL_URL
+                : endpointField.getText().trim();
+        }
         
         // Reinitialize dialogue manager
         LLMDialogueManager.initialize();
@@ -263,7 +269,22 @@ public class DialogueConfigScreen extends Screen {
     private void saveConfigToFile() {
         // Persist settings to villagersreborn.json
         try {
+            // Ensure in-memory config mirrors UI state before saving
+            com.beeny.config.VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = tempEnabled;
+            com.beeny.config.VillagersRebornConfig.LLM_PROVIDER = tempProvider;
+            com.beeny.config.VillagersRebornConfig.LLM_API_KEY = apiKeyField.getText().trim();
+            com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT = endpointField.getText().trim();
+            com.beeny.config.VillagersRebornConfig.LLM_MODEL = modelField.getText().trim();
+            if ("local".equalsIgnoreCase(tempProvider)) {
+                com.beeny.config.VillagersRebornConfig.LLM_LOCAL_URL = endpointField.getText().trim();
+            }
+
+            // Persist to disk
             com.beeny.config.ConfigManager.saveConfig();
+
+            // Optionally reload to verify persistence
+            com.beeny.config.ConfigManager.loadConfig();
+
             setStatusMessage(Text.literal("✓ Settings saved!"), Formatting.GREEN);
         } catch (Exception e) {
             setStatusMessage(Text.literal("✗ Failed to save settings: " + e.getMessage()), Formatting.RED);

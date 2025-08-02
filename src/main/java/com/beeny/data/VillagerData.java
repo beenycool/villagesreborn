@@ -58,9 +58,9 @@ public class VillagerData {
                 data.notes = "";
                 data.deathTime = 0L;
                 // Initialize new fields with defaults - they won't be persisted via codec
-                data.playerMemories = new HashMap<>();
-                data.topicFrequency = new HashMap<>();
-                data.recentEvents = new ArrayList<>();
+                data.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
+                data.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
+                data.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
                 data.lastConversationTime = 0;
                 return data;
             })
@@ -137,9 +137,9 @@ public class VillagerData {
         this.notes = "";
         this.deathTime = 0;
         this.isAlive = true;
-        this.playerMemories = new HashMap<>();
-        this.topicFrequency = new HashMap<>();
-        this.recentEvents = new ArrayList<>();
+        this.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
+        this.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
+        this.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
         this.lastConversationTime = 0;
     }
     
@@ -171,9 +171,9 @@ public class VillagerData {
         this.notes = notes;
         this.deathTime = deathTime;
         this.isAlive = isAlive;
-        this.playerMemories = new HashMap<>();
-        this.topicFrequency = new HashMap<>();
-        this.recentEvents = new ArrayList<>();
+        this.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
+        this.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
+        this.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
         this.lastConversationTime = 0;
     }
     
@@ -198,6 +198,10 @@ public class VillagerData {
     
     public int getPlayerReputation(String playerUuid) {
         return playerRelations.getOrDefault(playerUuid, 0);
+    }
+    
+    public void adjustPlayerReputation(String playerUuid, int change) {
+        updatePlayerRelation(playerUuid, change);
     }
     
     public void marry(String spouseId) {

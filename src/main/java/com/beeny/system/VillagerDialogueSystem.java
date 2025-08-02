@@ -5,8 +5,10 @@ import com.beeny.data.VillagerData;
 import com.beeny.dialogue.LLMDialogueManager;
 import com.beeny.dialogue.VillagerMemoryManager;
 import com.beeny.config.VillagersRebornConfig;
+import com.beeny.network.AsyncVillagerChatPacket;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
@@ -14,8 +16,8 @@ import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.World;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.CompletableFuture;
 
 public class VillagerDialogueSystem {
     
@@ -95,7 +97,7 @@ public class VillagerDialogueSystem {
         }
     }
     
-    private static final Random RANDOM = new Random();
+    // Removed shared Random; use ThreadLocalRandom for thread safety
     private static final Map<String, Map<DialogueCategory, List<String>>> DIALOGUE_TEMPLATES = new HashMap<>();
     
     static {
@@ -281,7 +283,25 @@ public class VillagerDialogueSystem {
             return Text.literal("...").formatted(Formatting.GRAY);
         }
 
+        UUID conversationId = UUID.randomUUID();
+
         if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            // Send interim packet if the player is a server player
+            if (context.player instanceof ServerPlayerEntity) {
+                ServerPlayerEntity serverPlayer = (ServerPlayerEntity) context.player;
+                AsyncVillagerChatPacket interimPacket = new AsyncVillagerChatPacket(
+                    conversationId,
+                    context.villager.getUuid(),
+                    context.villagerData.getName(),
+                    context.player.getUuid(),
+                    Text.translatable("villagersreborn.dialogue.generating").getString(),
+                    false,
+                    System.currentTimeMillis()
+                );
+                // Note: Need to implement ServerPlayNetworking.send for AsyncVillagerChatPacket
+                // serverPlayer.networkHandler.sendPacket(interimPacket);
+            }
+
             LLMDialogueManager.generateDialogueAsync(context, category)
                 .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
                 .whenComplete((llmDialogue, throwable) -> {
@@ -289,13 +309,33 @@ public class VillagerDialogueSystem {
                         LOGGER.warn("LLM dialogue generation failed or timed out, falling back to static", throwable);
                         onDialogueReady.accept(null);
                     } else if (llmDialogue != null) {
+                        // Send final packet on the server thread
+                        if (context.player instanceof ServerPlayerEntity) {
+                            ServerPlayerEntity serverPlayer = (ServerPlayerEntity) context.player;
+                            serverPlayer.getServer().execute(() -> {
+                                ServerPlayerEntity onlinePlayer = serverPlayer.getServer().getPlayerManager().getPlayer(serverPlayer.getUuid());
+                                if (onlinePlayer != null) {
+                                    AsyncVillagerChatPacket finalPacket = new AsyncVillagerChatPacket(
+                                        conversationId,
+                                        context.villager.getUuid(),
+                                        context.villagerData.getName(),
+                                        context.player.getUuid(),
+                                        llmDialogue.getString(),
+                                        true,
+                                        System.currentTimeMillis()
+                                    );
+                                    // Note: Need to implement ServerPlayNetworking.send for AsyncVillagerChatPacket
+                                    // onlinePlayer.networkHandler.sendPacket(finalPacket);
+                                }
+                            });
+                        }
                         onDialogueReady.accept(llmDialogue);
                     } else {
                         onDialogueReady.accept(null);
                     }
                 });
             // Return placeholder immediately; actual dialogue will be provided via callback
-            return Text.literal("...").formatted(Formatting.GRAY);
+            return Text.translatable("villagersreborn.dialogue.generating");
         }
 
         // Fall back to static dialogue system
@@ -319,7 +359,7 @@ public class VillagerDialogueSystem {
                     }
                 })
                 .exceptionally(throwable -> {
-                    System.err.println("Async LLM dialogue generation failed, falling back to static: " + throwable.getMessage());
+                    LOGGER.error("Async LLM dialogue generation failed, falling back to static", throwable);
                     return generateStaticDialogue(context, category);
                 });
         } else {
@@ -362,7 +402,7 @@ public class VillagerDialogueSystem {
         }
         
         
-        String selectedDialogue = dialogueOptions.get(RANDOM.nextInt(dialogueOptions.size()));
+        String selectedDialogue = dialogueOptions.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(dialogueOptions.size()));
         String processedDialogue = processDialogueTags(selectedDialogue, context);
         
         
@@ -415,14 +455,14 @@ public class VillagerDialogueSystem {
         );
         
         if (!nearbyVillagers.isEmpty()) {
-            VillagerEntity randomVillager1 = nearbyVillagers.get(RANDOM.nextInt(nearbyVillagers.size()));
+            VillagerEntity randomVillager1 = nearbyVillagers.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(nearbyVillagers.size()));
             VillagerData data1 = randomVillager1.getAttached(Villagersreborn.VILLAGER_DATA);
             replacements.put("{villager1}", data1.getName());
             
             if (nearbyVillagers.size() > 1) {
                 VillagerEntity randomVillager2;
                 do {
-                    randomVillager2 = nearbyVillagers.get(RANDOM.nextInt(nearbyVillagers.size()));
+                    randomVillager2 = nearbyVillagers.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(nearbyVillagers.size()));
                 } while (randomVillager2 == randomVillager1);
                 VillagerData data2 = randomVillager2.getAttached(Villagersreborn.VILLAGER_DATA);
                 replacements.put("{villager2}", data2.getName());
@@ -431,7 +471,7 @@ public class VillagerDialogueSystem {
         
         
         String[] locations = {"old oak tree", "village well", "market square", "forest edge", "river bend"};
-        replacements.put("{location}", locations[RANDOM.nextInt(locations.length)]);
+        replacements.put("{location}", locations[ThreadLocalRandom.current().nextInt(locations.length)]);
         
         
         String processed = dialogue;
@@ -526,7 +566,7 @@ public class VillagerDialogueSystem {
         
         
         int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
-        int random = RANDOM.nextInt(totalWeight);
+        int random = java.util.concurrent.ThreadLocalRandom.current().nextInt(totalWeight);
         int currentWeight = 0;
         
         for (Map.Entry<DialogueCategory, Integer> entry : weights.entrySet()) {
@@ -544,27 +584,52 @@ public class VillagerDialogueSystem {
         DialogueContext context = new DialogueContext(villager, player);
         List<Text> conversation = new ArrayList<>();
 
-        DialogueCategory openingCategory = RANDOM.nextBoolean()
+        DialogueCategory openingCategory = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
             ? DialogueCategory.GREETING
             : DialogueCategory.MOOD;
-        conversation.add(generateDialogue(context, openingCategory, t -> {}));
+        conversation.add(generateDialogue(context, openingCategory, dialogue -> {
+            // Store the opening dialogue in memory for context
+            if (dialogue != null) {
+                VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
+                    "Conversation started with " + openingCategory.name().toLowerCase());
+            }
+        }));
 
         DialogueCategory mainCategory = chooseDialogueCategory(context);
         if (mainCategory != openingCategory) {
-            conversation.add(generateDialogue(context, mainCategory, t -> {}));
+            conversation.add(generateDialogue(context, mainCategory, dialogue -> {
+                // Update villager's topic frequency when dialogue is generated
+                if (dialogue != null && context.villagerData != null) {
+                    context.villagerData.incrementTopicFrequency(mainCategory.name());
+                }
+            }));
         }
 
-        if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
-            DialogueCategory followUp = RANDOM.nextBoolean()
+        if (context.playerReputation > 30 && java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
+            DialogueCategory followUp = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
                 ? DialogueCategory.GOSSIP
                 : DialogueCategory.ADVICE;
-            conversation.add(generateDialogue(context, followUp, t -> {}));
+            conversation.add(generateDialogue(context, followUp, dialogue -> {
+                // High reputation players get better relationship building
+                if (dialogue != null && context.villagerData != null) {
+                    context.villagerData.adjustPlayerReputation(context.player.getUuidAsString(), 1);
+                    VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
+                        "Shared " + followUp.name().toLowerCase());
+                }
+            }));
         }
 
         if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK
             || context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT)
             && mainCategory != DialogueCategory.FAREWELL) {
-            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, t -> {}));
+            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, dialogue -> {
+                // End conversation properly and update conversation time
+                if (dialogue != null && context.villagerData != null) {
+                    context.villagerData.updateLastConversationTime();
+                    VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
+                        "Conversation ended");
+                }
+            }));
         }
 
         return conversation;
@@ -574,7 +639,7 @@ public class VillagerDialogueSystem {
         List<CompletableFuture<Text>> futureDialogues = new ArrayList<>();
         
         
-        DialogueCategory openingCategory = RANDOM.nextBoolean() ? 
+        DialogueCategory openingCategory = java.util.concurrent.ThreadLocalRandom.current().nextBoolean() ?
             DialogueCategory.GREETING : DialogueCategory.MOOD;
         futureDialogues.add(generateDialogueAsync(context, openingCategory));
         
@@ -585,8 +650,8 @@ public class VillagerDialogueSystem {
         }
         
         
-        if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
-            DialogueCategory followUp = RANDOM.nextBoolean() ? 
+        if (context.playerReputation > 30 && java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
+            DialogueCategory followUp = java.util.concurrent.ThreadLocalRandom.current().nextBoolean() ?
                 DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
             futureDialogues.add(generateDialogueAsync(context, followUp));
         }

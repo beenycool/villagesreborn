@@ -223,7 +223,7 @@ public class VillagerMemoryManager {
             
             // Restore discussedTopics
             if (playerMemory.contains("discussedTopics")) {
-                NbtList topicsList = playerMemory.getList("discussedTopics").orElse(null);
+                NbtList topicsList = playerMemory.getList("discussedTopics");
                 Set<String> topics = new HashSet<>();
                 if (topicsList != null) {
                     for (int i = 0; i < topicsList.size(); i++) {
@@ -243,7 +243,7 @@ public class VillagerMemoryManager {
             }
             
             if (playerMemory.contains("conversations")) {
-                NbtList conversationList = playerMemory.getList("conversations").orElse(null);
+                NbtList conversationList = playerMemory.getList("conversations");
                 if (conversationList == null) continue;
 
                 List<ConversationEntry> entries = new ArrayList<>();

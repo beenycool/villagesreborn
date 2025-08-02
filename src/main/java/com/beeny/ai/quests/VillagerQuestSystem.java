@@ -195,21 +195,37 @@ public class VillagerQuestSystem {
             if (data == null) return null;
             
             // Determine what item to fetch based on villager's profession and needs
-            Map<String, String> itemMap = switch (villager.getVillagerData().profession().toString()) {
-                case "minecraft:farmer" -> Map.of(
+            String professionId = net.minecraft.registry.Registries.VILLAGER_PROFESSION.getId(villager.getVillagerData().profession()).getPath();
+            Map<String, String> itemMap = switch (professionId) {
+                case "farmer" -> Map.of(
                     "Seeds", "I need some seeds to expand my farm",
                     "Bone Meal", "Bone meal would help my crops grow faster",
                     "Water Bucket", "I need water for my irrigation system"
                 );
-                case "minecraft:librarian" -> Map.of(
+                case "librarian" -> Map.of(
                     "Paper", "I need paper to write more books",
                     "Ink Sac", "I'm running low on ink for my writing",
                     "Feather", "A feather would help me craft better quills"
                 );
-                case "minecraft:blacksmith", "minecraft:armorer", "minecraft:toolsmith", "minecraft:weaponsmith" -> Map.of(
+                case "toolsmith" -> Map.of(
                     "Iron Ingot", "I need iron for my smithing work",
                     "Coal", "My forge is running low on fuel",
                     "Diamond", "A diamond would let me craft superior tools"
+                );
+                case "armorer" -> Map.of(
+                    "Iron Ingot", "I need iron for my armor work",
+                    "Leather", "Leather helps me craft flexible armor",
+                    "Diamond", "A diamond would let me craft superior armor"
+                );
+                case "weaponsmith" -> Map.of(
+                    "Iron Ingot", "I need iron for my tool work",
+                    "Stick", "Sticks are needed for tool handles",
+                    "Diamond", "A diamond would let me craft superior tools"
+                );
+                case "fletcher" -> Map.of(
+                    "Iron Ingot", "I need iron for my weapon work",
+                    "Stick", "Sticks are needed for weapon handles",
+                    "Diamond", "A diamond would let me craft superior weapons"
                 );
                 default -> Map.of(
                     "Food", "I'm getting quite hungry",
@@ -606,10 +622,40 @@ public class VillagerQuestSystem {
             for (Map.Entry<String, Object> reward : quest.rewards.entrySet()) {
                 switch (reward.getKey()) {
                     case "emeralds" -> {
-                        // This would integrate with economy system to give emeralds
-                        // For now, just improve reputation significantly
-                        if (questGiverData != null) {
-                            questGiverData.updatePlayerRelation(player.getUuidAsString(), 20);
+                        // Give actual emeralds to the player
+                        try {
+                            String rewardText = reward.getValue().toString();
+                            int emeraldCount = 1; // default
+                            
+                            // Parse emerald count from reward text like "3 Emeralds" or "10 Emerald"
+                            String[] parts = rewardText.split(" ");
+                            if (parts.length > 0) {
+                                try {
+                                    emeraldCount = Integer.parseInt(parts[0]);
+                                } catch (NumberFormatException e) {
+                                    // Use default of 1 if parsing fails
+                                }
+                            }
+                            
+                            // Give emeralds to player
+                            ItemStack emeralds = new ItemStack(net.minecraft.item.Items.EMERALD, emeraldCount);
+                            if (!player.getInventory().insertStack(emeralds)) {
+                                // If inventory is full, drop at player's location
+                                player.dropStack((net.minecraft.server.world.ServerWorld) player.getWorld(), emeralds);
+                            }
+                            
+                            player.sendMessage(Text.literal("Received " + emeraldCount + " emerald" + (emeraldCount > 1 ? "s" : "") + "!")
+                                .formatted(Formatting.GREEN), false);
+                            
+                            // Also improve reputation
+                            if (questGiverData != null) {
+                                questGiverData.updatePlayerRelation(player.getUuidAsString(), 15);
+                            }
+                        } catch (Exception e) {
+                            // Fallback to just reputation if emerald giving fails
+                            if (questGiverData != null) {
+                                questGiverData.updatePlayerRelation(player.getUuidAsString(), 20);
+                            }
                         }
                     }
                     case "reputation" -> {
@@ -618,8 +664,51 @@ public class VillagerQuestSystem {
                         }
                     }
                     case "special" -> {
-                        // Special rewards could include rare items, titles, etc.
-                        // Implementation would depend on specific reward systems
+                        // Special rewards implementation
+                        String specialReward = reward.getValue().toString().toLowerCase();
+                        
+                        switch (specialReward) {
+                            case "rare_book" -> {
+                                ItemStack book = new ItemStack(net.minecraft.item.Items.BOOK);
+                                book.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, Text.literal("Village Chronicle").formatted(Formatting.GOLD));
+                                if (!player.getInventory().insertStack(book)) {
+                                    player.dropStack((net.minecraft.server.world.ServerWorld) player.getWorld(), book);
+                                }
+                                player.sendMessage(Text.literal("Received a rare book!").formatted(Formatting.GOLD), false);
+                            }
+                            case "friendship_token" -> {
+                                ItemStack token = new ItemStack(net.minecraft.item.Items.GOLD_NUGGET);
+                                token.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, Text.literal("Friendship Token").formatted(Formatting.YELLOW));
+                                if (!player.getInventory().insertStack(token)) {
+                                    player.dropStack((net.minecraft.server.world.ServerWorld) player.getWorld(), token);
+                                }
+                                player.sendMessage(Text.literal("Received a friendship token!").formatted(Formatting.YELLOW), false);
+                                
+                                // Boost reputation with all villagers
+                                if (questGiverData != null) {
+                                    questGiverData.updatePlayerRelation(player.getUuidAsString(), 50);
+                                }
+                            }
+                            case "village_key" -> {
+                                ItemStack key = new ItemStack(net.minecraft.item.Items.TRIPWIRE_HOOK);
+                                key.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, Text.literal("Village Key").formatted(Formatting.AQUA));
+                                if (!player.getInventory().insertStack(key)) {
+                                    player.dropStack((net.minecraft.server.world.ServerWorld) player.getWorld(), key);
+                                }
+                                player.sendMessage(Text.literal("Received a village key! This grants you special access.").formatted(Formatting.AQUA), false);
+                            }
+                            default -> {
+                                // Default special reward: extra reputation and a small gift
+                                if (questGiverData != null) {
+                                    questGiverData.updatePlayerRelation(player.getUuidAsString(), 25);
+                                }
+                                ItemStack gift = new ItemStack(net.minecraft.item.Items.COOKIE, 3);
+                                if (!player.getInventory().insertStack(gift)) {
+                                    player.dropStack((net.minecraft.server.world.ServerWorld) player.getWorld(), gift);
+                                }
+                                player.sendMessage(Text.literal("Received a special thank you gift!").formatted(Formatting.LIGHT_PURPLE), false);
+                            }
+                        }
                     }
                 }
             }
