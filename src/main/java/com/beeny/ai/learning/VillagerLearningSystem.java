@@ -163,7 +163,7 @@ public class VillagerLearningSystem {
             
             // Limit experience history to prevent memory issues
             if (experiences.size() > 200) {
-                experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements < 3);
+                experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
             }
             
             // Trigger pattern learning
@@ -184,7 +184,7 @@ public class VillagerLearningSystem {
                 }
             }
             
-            pattern.updatePattern(conditions, experience.outcome);
+            pattern.updatePattern(conditions, experience.getOutcome());
         }
         
         private void updatePreferences(Experience experience) {
@@ -193,7 +193,7 @@ public class VillagerLearningSystem {
             float currentPreference = preferences.getOrDefault(preferenceKey, 0.0f);
             
             // Update preference using learning rate
-            float adjustment = experience.outcome * learningRate * 0.1f;
+            float adjustment = experience.getOutcome() * learningRate * 0.1f;
             float newPreference = Math.max(-1.0f, Math.min(1.0f, currentPreference + adjustment));
             preferences.put(preferenceKey, newPreference);
         }
@@ -379,11 +379,7 @@ public class VillagerLearningSystem {
         
         // Calculate average outcome
         double avgOutcome = relevantExperiences.stream()
-         double avgOutcome = relevantExperiences.stream()
--            .mapToDouble(exp -> exp.outcome * exp.getRelevanceScore())
-+            .mapToDouble(exp -> exp.getOutcome() * exp.getRelevanceScore())
-             .average()
-             .orElse(0.0);
+            .mapToDouble(exp -> exp.getOutcome() * exp.getRelevanceScore())
             .average()
             .orElse(0.0);
         
@@ -419,9 +415,9 @@ public class VillagerLearningSystem {
         Map<String, Integer> emotionalTrends = new HashMap<>();
         for (Experience exp : profile.experiences) {
             if (exp.isRecent()) {
-                if (exp.outcome > 0.5f) {
+                if (exp.getOutcome() > 0.5f) {
                     emotionalTrends.put("positive", emotionalTrends.getOrDefault("positive", 0) + 1);
-                } else if (exp.outcome < -0.5f) {
+                } else if (exp.getOutcome() < -0.5f) {
                     emotionalTrends.put("negative", emotionalTrends.getOrDefault("negative", 0) + 1);
                 }
             }
@@ -480,9 +476,9 @@ public class VillagerLearningSystem {
                 NbtCompound expNbt = new NbtCompound();
                 expNbt.putString("type", exp.type.name());
                 expNbt.putString("context", exp.context);
-                expNbt.putFloat("outcome", exp.outcome);
+                expNbt.putFloat("outcome", exp.getOutcome());
                 expNbt.putLong("timestamp", exp.timestamp);
-                expNbt.putInt("reinforcements", exp.reinforcements);
+                expNbt.putInt("reinforcements", exp.reinforcements.get());
 
                 // Serialize parameters (limit to 5 keys)
                 NbtCompound paramsNbt = new NbtCompound();
