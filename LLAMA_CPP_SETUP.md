@@ -58,11 +58,13 @@ Update your configuration:
 
 ```java
 // In VillagersRebornConfig.java or config file
-LLM_PROVIDER = "llamacpp";
-LOCAL_LLM_URL = "http://localhost:8080";
-LOCAL_LLM_MODEL = "llama-2-7b-chat"; // Model name for reference
+```java
+LLM_PROVIDER = "local";
+LLM_LOCAL_URL = "http://localhost:8080";
+LLM_MODEL = "llama-2-7b-chat"; // Model name for reference
 LLM_TEMPERATURE = 0.7;
 LLM_MAX_TOKENS = 150;
+LLM_REQUEST_TIMEOUT = 15000; // 15 seconds for local processing
 ```
 
 ## Advanced Configuration
@@ -78,8 +80,9 @@ LLM_TEMPERATURE = 0.7;
 LLM_MAX_TOKENS = 150;
 
 // Local server settings
-LOCAL_LLM_URL = "http://localhost:8080";
-LOCAL_REQUEST_TIMEOUT = 15000; // 15 seconds for local processing
+LLM_LOCAL_URL = "http://localhost:8080";
+LLM_REQUEST_TIMEOUT = 15000; // 15 seconds for local processing
+```
 ```
 
 ### Server Optimization

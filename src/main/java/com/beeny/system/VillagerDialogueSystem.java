@@ -41,7 +41,7 @@ public class VillagerDialogueSystem {
         public final int playerReputation;
         public final VillagerScheduleManager.TimeOfDay timeOfDay;
         public final String weather;
-        private WorldContextInfo worldContextInfo;
+        public WorldContextInfo worldContextInfo;
 
         /**
          * Constructs a DialogueContext representing the state of a conversation between a villager and a player.
@@ -71,7 +71,7 @@ public class VillagerDialogueSystem {
         /**
          * Helper class to encapsulate weather and biome retrieval logic.
          */
-        private static class WorldContextInfo {
+        public static class WorldContextInfo {
             public final String weather;
             public final String biome;
 
@@ -370,7 +370,7 @@ public class VillagerDialogueSystem {
         replacements.put("{player}", context.player.getName().getString());
         replacements.put("{timeOfDay}", context.timeOfDay.name.toLowerCase());
         replacements.put("{weather}", context.weather);
-        replacements.put("{biome}", formatBiomeName(context.biome));
+        replacements.put("{biome}", formatBiomeName(context.worldContextInfo.biome));
         replacements.put("{profession}", "villager");
         
         

@@ -34,25 +34,28 @@ public class VillagerLearningSystem {
         public final ExperienceType type;
         public final String context;
         public final Map<String, Object> parameters;
-        public float outcome; // -1.0 (very negative) to 1.0 (very positive)
+        // Thread-safe mutable outcome
+        private final java.util.concurrent.atomic.AtomicReference<Float> outcome; // -1.0 (very negative) to 1.0 (very positive)
         public final long timestamp;
-        public int reinforcements; // How many times this pattern has been reinforced
+        private final java.util.concurrent.atomic.AtomicInteger reinforcements; // Thread-safe reinforcement count
         
         public Experience(ExperienceType type, String context, Map<String, Object> parameters, float outcome) {
             this.type = type;
             this.context = context;
             this.parameters = new HashMap<>(parameters);
-            this.outcome = outcome;
+            this.outcome = new java.util.concurrent.atomic.AtomicReference<>(outcome);
             this.timestamp = System.currentTimeMillis();
-            this.reinforcements = 1;
+            this.reinforcements = new java.util.concurrent.atomic.AtomicInteger(1);
         }
         
         public void reinforce(float newOutcome) {
             // Update outcome using weighted average (recent experiences matter more)
-            float weight = 1.0f / (reinforcements + 1);
-            float updatedOutcome = (outcome * (1 - weight)) + (newOutcome * weight);
-            this.outcome = updatedOutcome;
-            this.reinforcements++;
+            int currentReinforcements = reinforcements.get();
+            float weight = 1.0f / (currentReinforcements + 1);
+            float currentOutcome = outcome.get();
+            float updatedOutcome = (currentOutcome * (1 - weight)) + (newOutcome * weight);
+            outcome.set(updatedOutcome);
+            reinforcements.incrementAndGet();
         }
         
         public boolean isRecent() {
@@ -62,8 +65,13 @@ public class VillagerLearningSystem {
         public float getRelevanceScore() {
             // Newer experiences and those with more reinforcements are more relevant
             float timeRelevance = Math.max(0.1f, 1.0f - ((System.currentTimeMillis() - timestamp) / 86400000.0f)); // 1 day decay
-            float reinforcementRelevance = Math.min(1.0f, reinforcements / 10.0f);
+            float reinforcementRelevance = Math.min(1.0f, reinforcements.get() / 10.0f);
             return timeRelevance * reinforcementRelevance;
+        }
+
+        // Thread-safe getter for outcome
+        public float getOutcome() {
+            return outcome.get();
         }
     }
     

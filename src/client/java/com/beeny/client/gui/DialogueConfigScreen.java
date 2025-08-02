@@ -214,23 +214,17 @@ public class DialogueConfigScreen extends Screen {
             setStatusMessage(Text.literal("Please enter an API key first"), Formatting.RED);
             return;
         }
-        
+
         setStatusMessage(Text.literal("Testing connection..."), Formatting.YELLOW);
-        
-        // Apply temporary settings for testing
-        String oldProvider = VillagersRebornConfig.LLM_PROVIDER;
-        String oldApiKey = VillagersRebornConfig.LLM_API_KEY;
-        String oldEndpoint = VillagersRebornConfig.LLM_API_ENDPOINT;
-        String oldModel = VillagersRebornConfig.LLM_MODEL;
-        
-        VillagersRebornConfig.LLM_PROVIDER = tempProvider;
-        VillagersRebornConfig.LLM_API_KEY = apiKeyField.getText().trim();
-        VillagersRebornConfig.LLM_API_ENDPOINT = endpointField.getText().trim();
-        VillagersRebornConfig.LLM_MODEL = modelField.getText().trim();
-        
-        LLMDialogueManager.initialize();
-        
-        LLMDialogueManager.testConnection().thenAccept(success -> {
+
+        // Prepare temporary settings for testing
+        String provider = tempProvider;
+        String apiKey = apiKeyField.getText().trim();
+        String endpoint = endpointField.getText().trim();
+        String model = modelField.getText().trim();
+
+        // Pass temporary settings directly to the test method
+        LLMDialogueManager.testConnection(provider, apiKey, endpoint, model).thenAccept(success -> {
             if (success) {
                 setStatusMessage(Text.literal("✓ Connection successful!"), Formatting.GREEN);
             } else {
@@ -240,13 +234,6 @@ public class DialogueConfigScreen extends Screen {
             setStatusMessage(Text.literal("✗ Connection error: " + throwable.getMessage()), Formatting.RED);
             return null;
         });
-        
-        // Restore original settings
-        VillagersRebornConfig.LLM_PROVIDER = oldProvider;
-        VillagersRebornConfig.LLM_API_KEY = oldApiKey;
-        VillagersRebornConfig.LLM_API_ENDPOINT = oldEndpoint;
-        VillagersRebornConfig.LLM_MODEL = oldModel;
-        LLMDialogueManager.initialize();
     }
     
     private void saveAndClose() {
@@ -286,7 +273,7 @@ public class DialogueConfigScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw background
         this.renderBackground(context, mouseX, mouseY, delta);
-        
+
         int centerX = this.width / 2;
         int centerY = this.height / 2;
         int panelLeft = centerX - PANEL_WIDTH / 2;

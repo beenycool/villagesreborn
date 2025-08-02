@@ -226,7 +226,7 @@ public class VillagerProfessionManager {
                 "changed careers from " + oldProfessionId + " to " + newProfessionId);
             
             // Find and claim appropriate workstation
-            findAndClaimWorkstation(villager, newProfession);
+            WorkstationManager.findAndClaimWorkstation(villager, newProfession);
             
             return true;
         }

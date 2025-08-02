@@ -12,40 +12,67 @@ import java.util.concurrent.ThreadLocalRandom;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.InputStream;
+import java.util.logging.Logger;
 
 /**
  * Utility AI system for complex decision making
  * Evaluates multiple factors to make intelligent choices about relationships, career, and life decisions
  */
 public class VillagerUtilityAI {
+    // Logger for error reporting
+    private static final Logger LOGGER = Logger.getLogger(VillagerUtilityAI.class.getName());
     // Personality compatibility config
     private static Map<String, Set<String>> highCompatibility = new HashMap<>();
     private static Set<List<String>> lowCompatibility = new HashSet<>();
 
     static {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            InputStream is = VillagerUtilityAI.class.getClassLoader()
-                .getResourceAsStream("personality_compatibility.json");
-            if (is != null) {
-                Map<String, Object> config = mapper.readValue(is, new TypeReference<Map<String, Object>>() {});
-                // Parse high compatibility
-                Map<String, List<String>> high = (Map<String, List<String>>) config.get("high");
+        ObjectMapper mapper = new ObjectMapper();
+        try (InputStream is = VillagerUtilityAI.class.getClassLoader()
+                .getResourceAsStream("personality_compatibility.json")) {
+            if (is == null) {
+                LOGGER.severe("personality_compatibility.json not found in resources.");
+                return;
+            }
+            Map<String, Object> config = mapper.readValue(is, new TypeReference<Map<String, Object>>() {});
+            // Validate structure
+            if (!config.containsKey("high") || !(config.get("high") instanceof Map)) {
+                LOGGER.severe("Missing or invalid 'high' key in personality_compatibility.json");
+                return;
+            }
+            if (!config.containsKey("low") || !(config.get("low") instanceof List)) {
+                LOGGER.severe("Missing or invalid 'low' key in personality_compatibility.json");
+                return;
+            }
+            // Parse high compatibility
+            Map<String, List<String>> high = (Map<String, List<String>>) config.get("high");
+            if (high == null || high.isEmpty()) {
+                LOGGER.warning("'high' compatibility map is empty.");
+            } else {
                 for (Map.Entry<String, List<String>> entry : high.entrySet()) {
+                    if (entry.getKey() == null || entry.getValue() == null) {
+                        LOGGER.warning("Null key or value in 'high' compatibility map.");
+                        continue;
+                    }
                     highCompatibility.put(entry.getKey(), new HashSet<>(entry.getValue()));
                 }
-                // Parse low compatibility
-                List<List<String>> low = (List<List<String>>) config.get("low");
+            }
+            // Parse low compatibility
+            List<List<String>> low = (List<List<String>>) config.get("low");
+            if (low == null || low.isEmpty()) {
+                LOGGER.warning("'low' compatibility list is empty.");
+            } else {
                 for (List<String> pair : low) {
-                    // Store both orders for symmetry
-                    if (pair.size() == 2) {
-                        lowCompatibility.add(pair);
-                        lowCompatibility.add(Arrays.asList(pair.get(1), pair.get(0)));
+                    if (pair == null || pair.size() != 2 || pair.get(0) == null || pair.get(1) == null) {
+                        LOGGER.warning("Invalid pair in 'low' compatibility list: " + pair);
+                        continue;
                     }
+                    // Store both orders for symmetry
+                    lowCompatibility.add(pair);
+                    lowCompatibility.add(Arrays.asList(pair.get(1), pair.get(0)));
                 }
             }
         } catch (Exception e) {
-            System.err.println("Failed to load personality compatibility config: " + e.getMessage());
+            LOGGER.severe("Failed to load personality compatibility config: " + e.getMessage());
         }
     }
     
@@ -94,6 +121,7 @@ public class VillagerUtilityAI {
         public final List<Consideration> considerations;
         private float cachedUtility = -1.0f;
         private long lastCalculation = 0;
+        private final Object lock = new Object();
         
         public Decision(String name) {
             this.name = name;
@@ -107,7 +135,7 @@ public class VillagerUtilityAI {
         
         public float calculateUtility(VillagerEntity villager, Object context) {
             long currentTime = System.currentTimeMillis();
-            synchronized (this) {
+            synchronized (lock) {
                 if (currentTime - lastCalculation > 1000) { // Cache for 1 second
                     float sum = 0.0f;
                     int count = considerations.size();
@@ -140,7 +168,11 @@ public class VillagerUtilityAI {
             
             String personality1 = villagerData.getPersonality();
             String personality2 = partnerData.getPersonality();
-            
+
+            if (personality1 == null || personality2 == null) {
+                return 0.0f; // No compatibility if either personality is missing
+            }
+
             // High compatibility
             if (highCompatibility.getOrDefault(personality1, Collections.emptySet()).contains(personality2)) {
                 return 0.9f;
@@ -172,7 +204,7 @@ public class VillagerUtilityAI {
             
             float love = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LOVE) / 100.0f;
             float happiness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS) / 100.0f;
-            float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS) / 50.0f; // Normalize to 0-2 range
+            float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS) / 100.0f; // Normalize to 0-1 range
             
             return Math.max(0.0f, Math.min(1.0f, (love + happiness + loneliness) / 3.0f));
         }
@@ -501,10 +533,11 @@ public class VillagerUtilityAI {
             List<VillagerEntity> potentialPartners = VillagerRelationshipManager.findPotentialPartners(villager);
             if (!potentialPartners.isEmpty()) {
                 List<VillagerEntity> rankedPartners = marriageDecisionMaker.rankPotentialPartners(villager, potentialPartners);
-                VillagerEntity bestPartner = rankedPartners.get(0);
-                
-                if (marriageDecisionMaker.shouldPropose(villager, bestPartner)) {
-                    VillagerRelationshipManager.attemptMarriage(villager, bestPartner);
+                if (!rankedPartners.isEmpty()) {
+                    VillagerEntity bestPartner = rankedPartners.get(0);
+                    if (marriageDecisionMaker.shouldPropose(villager, bestPartner)) {
+                        VillagerRelationshipManager.attemptMarriage(villager, bestPartner);
+                    }
                 }
             }
             

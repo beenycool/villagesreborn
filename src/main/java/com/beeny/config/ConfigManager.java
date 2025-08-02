@@ -51,6 +51,11 @@ public class ConfigManager {
                 VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
             }
             
+            // AI thread pool size
+            if (config.has("aiThreadPoolSize")) {
+                VillagersRebornConfig.AI_THREAD_POOL_SIZE = config.get("aiThreadPoolSize").getAsInt();
+            }
+
             // Load LLM dialogue settings
             if (config.has("enableDynamicDialogue")) {
                 VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = config.get("enableDynamicDialogue").getAsBoolean();

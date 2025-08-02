@@ -16,6 +16,7 @@ import net.minecraft.util.Formatting;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DialogueSetupCommands {
     

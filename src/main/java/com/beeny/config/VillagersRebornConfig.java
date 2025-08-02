@@ -32,4 +32,6 @@ public class VillagersRebornConfig {
     public static int getBoundingBoxSize() {
         return VILLAGER_SCAN_CHUNK_RADIUS * 16;
     }
+    // AI thread pool size for VillagerAIManager
+    public static int AI_THREAD_POOL_SIZE = 4;
 }

@@ -22,6 +22,7 @@ import net.minecraft.util.Formatting;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.StreamSupport;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -61,9 +62,12 @@ public class VillagerAIManager {
     }
     
     private static AIConfig config = new AIConfig();
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+    private static final int DEFAULT_AI_THREAD_POOL_SIZE = Math.max(2, Runtime.getRuntime().availableProcessors());
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(DEFAULT_AI_THREAD_POOL_SIZE);
     private static final Map<String, Long> lastAIUpdate = new ConcurrentHashMap<>();
     private static final Map<String, VillagerAIState> villagerAIStates = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> playerLastInteractionTimestamps = new ConcurrentHashMap<>();
+    private static final long INTERACTION_RATE_LIMIT_MS = 1000; // 1 second rate limit
     
     // Individual villager AI state
     public static class VillagerAIState {
@@ -337,6 +341,17 @@ public class VillagerAIManager {
      * Handle player interaction with villager
      */
     public static Text handlePlayerInteraction(VillagerEntity villager, PlayerEntity player, String message) {
+        // Rate limiting: ignore if player interacts too frequently
+        UUID playerId = player.getUuid();
+        long now = System.currentTimeMillis();
+        Long lastInteraction = playerLastInteractionTimestamps.get(playerId);
+        if (lastInteraction != null && (now - lastInteraction) < INTERACTION_RATE_LIMIT_MS) {
+            // Optionally, return a message indicating rate limit
+            return Text.literal("You're interacting too quickly. Please wait a moment.").formatted(Formatting.RED);
+            // Or: return null; // to silently ignore
+        }
+        playerLastInteractionTimestamps.put(playerId, now);
+
         if (!config.enableChat) {
             return null; // Fall back to default dialogue system
         }
@@ -344,7 +359,7 @@ public class VillagerAIManager {
         // Update AI state for interaction
         VillagerAIState state = villagerAIStates.get(villager.getUuidAsString());
         if (state != null) {
-            state.setContext("last_player_interaction", System.currentTimeMillis());
+            state.setContext("last_player_interaction", now);
             state.setContext("last_interacting_player", player.getUuidAsString());
         }
         
@@ -362,7 +377,7 @@ public class VillagerAIManager {
         }
         
         // Generate enhanced dialogue that considers AI state
-        return VillagerChatSystem.generateEnhancedDialogue(villager, player, 
+        return VillagerChatSystem.generateEnhancedDialogue(villager, player,
             com.beeny.system.VillagerDialogueSystem.DialogueCategory.GREETING);
     }
     
@@ -482,12 +497,14 @@ public class VillagerAIManager {
         
         // Load AI state
         if (nbt.contains("ai_state")) {
-            NbtCompound aiStateNbt = nbt.getCompound("ai_state");
-            VillagerAIState state = new VillagerAIState();
-            state.currentGoal = aiStateNbt.getString("current_goal");
-            state.currentAction = aiStateNbt.getString("current_action");
-            state.isAIActive = aiStateNbt.getBoolean("is_ai_active");
-            villagerAIStates.put(villager.getUuidAsString(), state);
+            NbtCompound aiStateNbt = nbt.getCompound("ai_state").orElse(null);
+            if (aiStateNbt != null) {
+                VillagerAIState state = new VillagerAIState();
+                state.currentGoal = aiStateNbt.getString("current_goal").orElse("");
+                state.currentAction = aiStateNbt.getString("current_action").orElse("");
+                state.isAIActive = aiStateNbt.getBoolean("is_ai_active").orElse(true);
+                villagerAIStates.put(villager.getUuidAsString(), state);
+            }
         }
     }
     
@@ -570,7 +587,7 @@ public class VillagerAIManager {
         Map<String, Object> analytics = new HashMap<>();
         
         analytics.put("active_villager_ais", villagerAIStates.size());
-        analytics.put("total_tracked_villagers", ServerVillagerManager.getInstance().getAllTrackedVillagers().size());
+        analytics.put("total_tracked_villagers", StreamSupport.stream(ServerVillagerManager.getInstance().getAllTrackedVillagers().spliterator(), false).count());
         analytics.put("gossip_size", VillagerGossipNetwork.class.getSimpleName()); // Would get actual size
         analytics.put("config", config);
         

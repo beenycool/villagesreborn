@@ -49,11 +49,12 @@ You can tweak settings in `config/villagersreborn.json`:
 
 ### AI Settings
 - `enableDynamicDialogue`: Turn AI chat on or off
-- `llmProvider`: Pick "openai", "gemini", "local", or "openrouter"
-- `llmApiKey`: Your API key
-- `llmApiEndpoint`: Custom API endpoint (for local models)
+- `llmProvider`: Choose "gemini", "local", or "openrouter"
+- `llmApiKey`: Your API key (required for "gemini" and "openrouter")
+- `llmLocalUrl`: The local API endpoint for "local" provider (e.g., "http://localhost:11434/v1/chat/completions")
+- `llmApiEndpoint`: Optional override for the API endpoint (used with "gemini" or "openrouter")
 - `llmModel`: Which model to use
-- `llmTemperature`: How creative the responses are (0.0-2.0)
+- `llmTemperature`: How creative the responses are (0.0–2.0)
 - `llmMaxTokens`: Max response length
 - `llmRequestTimeout`: Timeout in seconds
 

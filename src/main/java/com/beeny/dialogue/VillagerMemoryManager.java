@@ -211,24 +211,24 @@ public class VillagerMemoryManager {
         if (!nbt.contains("conversationMemory")) return;
         
         String villagerUuid = villager.getUuidAsString();
-        NbtCompound memoryNbt = nbt.getCompound("conversationMemory");
+        NbtCompound memoryNbt = nbt.getCompound("conversationMemory").orElse(null);
         if (memoryNbt == null) return;
         
         Map<String, ConversationHistory> villagerMemory = new ConcurrentHashMap<>();
         
         for (String playerUuid : memoryNbt.getKeys()) {
-            NbtCompound playerMemory = memoryNbt.getCompound(playerUuid);
+            NbtCompound playerMemory = memoryNbt.getCompound(playerUuid).orElse(null);
             if (playerMemory == null) continue;
             ConversationHistory history = new ConversationHistory();
             
             // Restore discussedTopics
             if (playerMemory.contains("discussedTopics")) {
-                NbtList topicsList = playerMemory.getList("discussedTopics");
+                NbtList topicsList = playerMemory.getList("discussedTopics").orElse(null);
                 Set<String> topics = new HashSet<>();
                 if (topicsList != null) {
                     for (int i = 0; i < topicsList.size(); i++) {
-                        String topic = topicsList.getString(i);
-                        if (topic != null && !topic.isEmpty()) {
+                        String topic = topicsList.getString(i).orElse("");
+                        if (!topic.isEmpty()) {
                             topics.add(topic);
                         }
                     }
@@ -238,27 +238,27 @@ public class VillagerMemoryManager {
 
             // Restore lastInteraction
             if (playerMemory.contains("lastInteraction")) {
-                long lastInteraction = playerMemory.getLong("lastInteraction");
+                long lastInteraction = playerMemory.getLong("lastInteraction").orElse(0L);
                 history.setLastInteraction(lastInteraction);
             }
             
             if (playerMemory.contains("conversations")) {
-                NbtList conversationList = playerMemory.getList("conversations");
+                NbtList conversationList = playerMemory.getList("conversations").orElse(null);
                 if (conversationList == null) continue;
                 
                 List<ConversationEntry> entries = new ArrayList<>();
                 for (int i = 0; i < conversationList.size(); i++) {
-                    NbtCompound entryNbt = conversationList.getCompound(i);
+                    NbtCompound entryNbt = conversationList.getCompound(i).orElse(null);
                     if (entryNbt == null) continue;
-                    String speaker = entryNbt.getString("speaker");
-                    String message = entryNbt.getString("message");
-                    long timestamp = entryNbt.getLong("timestamp");
-                    String category = entryNbt.getString("category");
+                    String speaker = entryNbt.getString("speaker").orElse("");
+                    String message = entryNbt.getString("message").orElse("");
+                    long timestamp = entryNbt.getLong("timestamp").orElse(0L);
+                    String category = entryNbt.getString("category").orElse("");
                     ConversationEntry entry = new ConversationEntry(
-                        speaker != null ? speaker : "",
-                        message != null ? message : "",
+                        speaker,
+                        message,
                         timestamp,
-                        (category != null && !category.isEmpty()) ? category : null
+                        !category.isEmpty() ? category : null
                     );
                     entries.add(entry);
                 }

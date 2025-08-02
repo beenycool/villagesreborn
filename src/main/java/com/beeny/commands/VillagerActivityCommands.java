@@ -15,6 +15,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.EntityHitResult;
@@ -22,6 +23,7 @@ import net.minecraft.util.hit.HitResult;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 
 public class VillagerActivityCommands {
 
@@ -71,7 +73,7 @@ public class VillagerActivityCommands {
         VillagerScheduleManager.Activity scheduleActivity = VillagerScheduleManager.getCurrentActivity(villager);
 
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== Current Activity for " + data.getName() + " ===\n")
+            MutableText message = Text.literal("=== Current Activity for " + data.getName() + " ===\n")
                 .formatted(Formatting.GOLD);
             
             if (currentActivity != null) {
@@ -126,7 +128,7 @@ public class VillagerActivityCommands {
         }
 
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== Daily Log for " + data.getName() + " (Day " + day + ") ===\n")
+            MutableText message = Text.literal("=== Daily Log for " + data.getName() + " (Day " + day + ") ===\n")
                 .formatted(Formatting.GOLD);
             
             message = message.append(Text.literal("Activities (" + dailyLog.getActivities().size() + " total):\n")
@@ -192,7 +194,7 @@ public class VillagerActivityCommands {
         }
 
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== Recent Activity for " + data.getName() + " (Last " + days + " days) ===\n")
+            MutableText message = Text.literal("=== Recent Activity for " + data.getName() + " (Last " + days + " days) ===\n")
                 .formatted(Formatting.GOLD);
             
             for (DailyActivityTracker.DailyLog log : recentLogs) {
@@ -247,7 +249,7 @@ public class VillagerActivityCommands {
         }
 
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== Weekly Activity Summary for " + data.getName() + " ===\n")
+            MutableText message = Text.literal("=== Weekly Activity Summary for " + data.getName() + " ===\n")
                 .formatted(Formatting.GOLD);
             
             long totalTime = weeklySummary.values().stream().mapToLong(Long::longValue).sum();
@@ -297,7 +299,7 @@ public class VillagerActivityCommands {
         }
 
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== Activity Patterns for " + data.getName() + " ===\n")
+            MutableText message = Text.literal("=== Activity Patterns for " + data.getName() + " ===\n")
                 .formatted(Formatting.GOLD);
             
             for (String pattern : patterns) {
@@ -313,7 +315,7 @@ public class VillagerActivityCommands {
 
     private static int listAllVillagersActivity(CommandContext<ServerCommandSource> context) {
         context.getSource().sendFeedback(() -> {
-            Text message = Text.literal("=== All Villagers Current Activity ===\n")
+            MutableText message = Text.literal("=== All Villagers Current Activity ===\n")
                 .formatted(Formatting.GOLD);
             
             for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
@@ -348,7 +350,7 @@ public class VillagerActivityCommands {
         String villagerName = StringArgumentType.getString(context, "villager");
         int days = IntegerArgumentType.getInteger(context, "days");
 
-        VillagerEntity villager = ServerVillagerManager.getInstance().getAllTrackedVillagers().stream()
+        VillagerEntity villager = StreamSupport.stream(ServerVillagerManager.getInstance().getAllTrackedVillagers().spliterator(), false)
             .filter(v -> {
                 VillagerData data = v.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
                 return data != null && data.getName().equalsIgnoreCase(villagerName);

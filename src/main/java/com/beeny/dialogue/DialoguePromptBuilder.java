@@ -66,7 +66,7 @@ public class DialoguePromptBuilder {
         env.append("and the weather is ").append(context.weather).append(". ");
         
         // Biome
-        String biome = context.biome.replace("_", " ");
+        String biome = context.worldContextInfo.biome.replace("_", " ");
         env.append("You live in a ").append(biome).append(" biome. ");
         
         return env.toString();
@@ -112,9 +112,11 @@ public class DialoguePromptBuilder {
         String playerUuid = context.player.getUuidAsString();
         
         // Player-specific memories
-        String playerMemory = data.getPlayerMemory(playerUuid);
-        if (!playerMemory.isEmpty()) {
-            memory.append("You remember: ").append(playerMemory).append(" ");
+        if (data != null) {
+            String playerMemory = data.getPlayerMemory(playerUuid);
+            if (!playerMemory.isEmpty()) {
+                memory.append("You remember: ").append(playerMemory).append(" ");
+            }
         }
         
         // Recent conversation history

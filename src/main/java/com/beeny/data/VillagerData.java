@@ -30,15 +30,10 @@ public class VillagerData {
             Codec.list(Codec.STRING).fieldOf("childrenIds").forGetter(VillagerData::getChildrenIds),
             Codec.list(Codec.STRING).fieldOf("childrenNames").forGetter(VillagerData::getChildrenNames),
             Codec.STRING.optionalFieldOf("favoriteFood", "").forGetter(VillagerData::getFavoriteFood),
-            Codec.STRING.optionalFieldOf("hobby", "").forGetter(VillagerData::getHobby),
-            Codec.LONG.fieldOf("birthTime").forGetter(VillagerData::getBirthTime),
-            Codec.STRING.fieldOf("birthPlace").forGetter(VillagerData::getBirthPlace),
-            Codec.STRING.fieldOf("notes").forGetter(VillagerData::getNotes),
-            Codec.LONG.fieldOf("deathTime").forGetter(VillagerData::getDeathTime),
             Codec.BOOL.fieldOf("isAlive").forGetter(VillagerData::isAlive)
         ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId,
             professionHistory, playerRelations, familyMembers, spouseName, spouseId, childrenIds,
-            childrenNames, favoriteFood, hobby, birthTime, birthPlace, notes, deathTime, isAlive) -> {
+            childrenNames, favoriteFood, isAlive) -> {
                 VillagerData data = new VillagerData();
                 data.name = name;
                 data.age = age;
@@ -55,12 +50,13 @@ public class VillagerData {
                 data.childrenIds = new ArrayList<>(childrenIds);
                 data.childrenNames = new ArrayList<>(childrenNames);
                 data.favoriteFood = favoriteFood;
-                data.hobby = hobby;
-                data.birthTime = birthTime;
-                data.birthPlace = birthPlace;
-                data.notes = notes;
-                data.deathTime = deathTime;
                 data.isAlive = isAlive;
+                // Set defaults for excluded fields
+                data.hobby = "";
+                data.birthTime = 0L;
+                data.birthPlace = "";
+                data.notes = "";
+                data.deathTime = 0L;
                 // Initialize new fields with defaults - they won't be persisted via codec
                 data.playerMemories = new HashMap<>();
                 data.topicFrequency = new HashMap<>();
