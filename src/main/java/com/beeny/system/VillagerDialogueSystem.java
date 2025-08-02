@@ -41,32 +41,56 @@ public class VillagerDialogueSystem {
         public final int playerReputation;
         public final VillagerScheduleManager.TimeOfDay timeOfDay;
         public final String weather;
-        public final String biome;
-        
+        private WorldContextInfo worldContextInfo;
+
+        /**
+         * Constructs a DialogueContext representing the state of a conversation between a villager and a player.
+         * Initializes context information such as villager data, player reputation, time of day, world context, and weather.
+         *
+         * @param villager the VillagerEntity participating in the dialogue
+         * @param player the PlayerEntity interacting with the villager
+         */
         public DialogueContext(VillagerEntity villager, PlayerEntity player) {
             this.villager = villager;
             this.player = player;
             this.villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-            this.playerReputation = villagerData != null ? 
+            this.playerReputation = villagerData != null ?
                 villagerData.getPlayerReputation(player.getUuidAsString()) : 0;
-            
+
             long worldTime = villager.getWorld().getTimeOfDay();
             this.timeOfDay = VillagerScheduleManager.TimeOfDay.fromWorldTime(worldTime);
-            
-            this.weather = getWeatherString(villager.getWorld());
-            this.biome = getBiomeString(villager.getWorld(), villager.getBlockPos());
+
+            this.worldContextInfo = new WorldContextInfo(villager.getWorld(), villager.getBlockPos());
+            this.weather = worldContextInfo.weather;
         }
-        
-        private static String getWeatherString(World world) {
-            if (world.isThundering()) return "stormy";
-            if (world.isRaining()) return "rainy";
-            return "clear";
+
+        public String getBiome() {
+            return worldContextInfo.biome;
         }
-        
-        private static String getBiomeString(World world, BlockPos pos) {
-            return world.getBiome(pos).getKey()
-                .map(key -> key.getValue().getPath())
-                .orElse("unknown");
+
+        /**
+         * Helper class to encapsulate weather and biome retrieval logic.
+         */
+        private static class WorldContextInfo {
+            public final String weather;
+            public final String biome;
+
+            public WorldContextInfo(World world, BlockPos pos) {
+                this.weather = getWeatherString(world);
+                this.biome = getBiomeString(world, pos);
+            }
+
+            private static String getWeatherString(World world) {
+                if (world.isThundering()) return "stormy";
+                if (world.isRaining()) return "rainy";
+                return "clear";
+            }
+
+            private static String getBiomeString(World world, BlockPos pos) {
+                return world.getBiome(pos).getKey()
+                    .map(key -> key.getValue().getPath())
+                    .orElse("unknown");
+            }
         }
     }
     
@@ -525,8 +549,9 @@ public class VillagerDialogueSystem {
         }
         
         
-        if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
-            context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
+        if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK ||
+             context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) &&
+            mainCategory != DialogueCategory.FAREWELL) {
             conversation.add(generateDialogue(context, DialogueCategory.FAREWELL));
         }
         
@@ -556,8 +581,9 @@ public class VillagerDialogueSystem {
         }
         
         
-        if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
-            context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
+        if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK ||
+             context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) &&
+            mainCategory != DialogueCategory.FAREWELL) {
             futureDialogues.add(generateDialogueAsync(context, DialogueCategory.FAREWELL));
         }
         

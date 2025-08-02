@@ -35,7 +35,6 @@ public class LLMDialogueManager {
             case "openrouter" -> new OpenRouterDialogueProvider();
             case "local" -> new LocalLLMProvider();
             default -> throw new IllegalArgumentException("Unknown LLM provider: " + provider);
-            }
         };
     }
     

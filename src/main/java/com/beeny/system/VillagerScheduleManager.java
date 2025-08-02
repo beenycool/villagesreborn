@@ -94,6 +94,7 @@ public class VillagerScheduleManager {
     }
     
     private static final Map<String, Schedule> PROFESSION_SCHEDULES = new HashMap<>();
+    private static long lastProcessedDay = -1;
     
     static {
         
@@ -353,12 +354,30 @@ public class VillagerScheduleManager {
     }
     
     public static void updateSchedules(ServerWorld world) {
+        // Check for day change
+        long currentTime = world.getTimeOfDay();
+        long currentDay = currentTime / 24000;
+        if (lastProcessedDay != currentDay) {
+            DailyActivityTracker.onDayChange(world);
+            lastProcessedDay = currentDay;
+        }
+        
         // Use ServerVillagerManager instead of scanning the entire world
         for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
             // Only update villagers in the same world
             if (villager.getWorld() != world) continue;
             
             Activity currentActivity = getCurrentActivity(villager);
+            
+            // Track activity changes
+            String villagerId = villager.getUuidAsString();
+            DailyActivityTracker.ActivityEntry trackedActivity = DailyActivityTracker.getCurrentActivity(villagerId);
+            
+            if (trackedActivity == null || !trackedActivity.getActivity().equals(currentActivity.description)) {
+                String details = generateActivityDetails(villager, currentActivity);
+                DailyActivityTracker.startActivity(villager, currentActivity, details);
+            }
+            
             updateVillagerBehavior(villager, currentActivity);
             
             
@@ -448,6 +467,55 @@ public class VillagerScheduleManager {
                 .formatted(getActivityFormatting(current))));
         
         return info;
+    }
+    
+    private static String generateActivityDetails(VillagerEntity villager, Activity activity) {
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) return "";
+        
+        StringBuilder details = new StringBuilder();
+        
+        switch (activity) {
+            case WORK -> {
+                String profession = villager.getVillagerData().profession().getKey()
+                    .map(key -> key.getValue().toString()).orElse("unknown");
+                details.append("Working as ").append(profession.replace("minecraft:", ""));
+            }
+            case SOCIALIZE -> {
+                long nearbyVillagers = villager.getWorld().getEntitiesByClass(VillagerEntity.class, 
+                    villager.getBoundingBox().expand(10), v -> v != villager).size();
+                details.append("With ").append(nearbyVillagers).append(" other villagers");
+            }
+            case EAT -> {
+                details.append("Enjoying ").append(data.getFavoriteFood().isEmpty() ? "food" : data.getFavoriteFood());
+            }
+            case HOBBY -> {
+                details.append("Enjoying ").append(data.getHobby());
+            }
+            case RELAX -> {
+                details.append("Happiness: ").append(data.getHappiness()).append("/100");
+            }
+            case SLEEP -> {
+                details.append("Getting rest");
+            }
+            case STUDY -> {
+                details.append("Reading and learning");
+            }
+            case EXERCISE -> {
+                details.append("Staying fit");
+            }
+            case SHOP -> {
+                details.append("Looking for supplies");
+            }
+            case PRAY -> {
+                details.append("At place of worship");
+            }
+            default -> {
+                details.append("Age: ").append(data.getAge()).append(" days");
+            }
+        }
+        
+        return details.toString();
     }
     
     

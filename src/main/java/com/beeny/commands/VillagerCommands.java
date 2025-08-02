@@ -48,6 +48,7 @@ public class VillagerCommands {
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             registerVillagerCommand(dispatcher, registryAccess);
+            VillagerActivityCommands.register(dispatcher, registryAccess);
             DialogueCommands.register(dispatcher, registryAccess);
             DialogueSetupCommands.register(dispatcher, registryAccess);
         });
