@@ -239,10 +239,10 @@ public class DialogueConfigScreen extends Screen {
     
     private void saveAndClose() {
         // Validate settings
-        if (tempEnabled && apiKeyField.getText().trim().isEmpty()) {
-            setStatusMessage(Text.literal("API key is required when dynamic dialogue is enabled"), Formatting.RED);
-            return;
-        }
+if (tempEnabled && !tempProvider.equals("local") && apiKeyField.getText().trim().isEmpty()) {
+    setStatusMessage(Text.literal("API key is required for this provider"), Formatting.RED);
+    return;
+}
         
         // Apply settings
         VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = tempEnabled;
