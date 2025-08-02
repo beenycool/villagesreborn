@@ -3,6 +3,7 @@ package com.beeny;
 import com.beeny.commands.VillagerCommands;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
+import com.beeny.dialogue.LLMDialogueManager;
 import com.beeny.network.VillagerTeleportPacket;
 import com.beeny.network.UpdateVillagerNotesPacket;
 import com.beeny.network.VillagerMarriagePacket;
@@ -79,6 +80,25 @@ public class Villagersreborn implements ModInitializer {
 		// Initialize ServerVillagerManager on server start
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			ServerVillagerManager.getInstance().initialize(server);
+			// Initialize LLM dialogue system
+			try {
+				LLMDialogueManager.initialize();
+			} catch (Exception e) {
+				System.err.println("Failed to initialize LLMDialogueManager: " + e.getMessage());
+				e.printStackTrace();
+				// Optionally, add further handling here if needed
+			}
+		});
+		
+		// Shutdown LLM on server stop
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			try {
+				LLMDialogueManager.shutdown();
+			} catch (Exception e) {
+				System.err.println("Failed to shutdown LLMDialogueManager: " + e.getMessage());
+				e.printStackTrace();
+				// Optionally, add further handling here if needed
+			}
 		});
 		
 		

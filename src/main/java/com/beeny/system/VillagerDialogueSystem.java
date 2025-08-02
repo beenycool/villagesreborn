@@ -2,6 +2,9 @@ package com.beeny.system;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.dialogue.LLMDialogueManager;
+import com.beeny.dialogue.VillagerMemoryManager;
+import com.beeny.config.VillagersRebornConfig;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
@@ -11,6 +14,8 @@ import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.World;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class VillagerDialogueSystem {
     
@@ -37,32 +42,56 @@ public class VillagerDialogueSystem {
         public final int playerReputation;
         public final VillagerScheduleManager.TimeOfDay timeOfDay;
         public final String weather;
-        public final String biome;
-        
+        public WorldContextInfo worldContextInfo;
+
+        /**
+         * Constructs a DialogueContext representing the state of a conversation between a villager and a player.
+         * Initializes context information such as villager data, player reputation, time of day, world context, and weather.
+         *
+         * @param villager the VillagerEntity participating in the dialogue
+         * @param player the PlayerEntity interacting with the villager
+         */
         public DialogueContext(VillagerEntity villager, PlayerEntity player) {
             this.villager = villager;
             this.player = player;
             this.villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-            this.playerReputation = villagerData != null ? 
+            this.playerReputation = villagerData != null ?
                 villagerData.getPlayerReputation(player.getUuidAsString()) : 0;
-            
+
             long worldTime = villager.getWorld().getTimeOfDay();
             this.timeOfDay = VillagerScheduleManager.TimeOfDay.fromWorldTime(worldTime);
-            
-            this.weather = getWeatherString(villager.getWorld());
-            this.biome = getBiomeString(villager.getWorld(), villager.getBlockPos());
+
+            this.worldContextInfo = new WorldContextInfo(villager.getWorld(), villager.getBlockPos());
+            this.weather = worldContextInfo.weather;
         }
-        
-        private static String getWeatherString(World world) {
-            if (world.isThundering()) return "stormy";
-            if (world.isRaining()) return "rainy";
-            return "clear";
+
+        public String getBiome() {
+            return worldContextInfo.biome;
         }
-        
-        private static String getBiomeString(World world, BlockPos pos) {
-            return world.getBiome(pos).getKey()
-                .map(key -> key.getValue().getPath())
-                .orElse("unknown");
+
+        /**
+         * Helper class to encapsulate weather and biome retrieval logic.
+         */
+        public static class WorldContextInfo {
+            public final String weather;
+            public final String biome;
+
+            public WorldContextInfo(World world, BlockPos pos) {
+                this.weather = getWeatherString(world);
+                this.biome = getBiomeString(world, pos);
+            }
+
+            private static String getWeatherString(World world) {
+                if (world.isThundering()) return "stormy";
+                if (world.isRaining()) return "rainy";
+                return "clear";
+            }
+
+            private static String getBiomeString(World world, BlockPos pos) {
+                return world.getBiome(pos).getKey()
+                    .map(key -> key.getValue().getPath())
+                    .orElse("unknown");
+            }
         }
     }
     
@@ -239,11 +268,66 @@ public class VillagerDialogueSystem {
     }
     
     
-    public static Text generateDialogue(DialogueContext context, DialogueCategory category) {
+    // Add SLF4J logger
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerDialogueSystem.class);
+
+    /**
+     * Asynchronous dialogue generation. Returns a placeholder immediately,
+     * and invokes the provided callback with the generated dialogue when ready.
+     */
+    public static Text generateDialogue(DialogueContext context, DialogueCategory category, java.util.function.Consumer<Text> onDialogueReady) {
         if (context.villagerData == null) {
+            onDialogueReady.accept(Text.literal("...").formatted(Formatting.GRAY));
             return Text.literal("...").formatted(Formatting.GRAY);
         }
+
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            LLMDialogueManager.generateDialogueAsync(context, category)
+                .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .whenComplete((llmDialogue, throwable) -> {
+                    if (throwable != null) {
+                        LOGGER.warn("LLM dialogue generation failed or timed out, falling back to static", throwable);
+                        onDialogueReady.accept(null);
+                    } else if (llmDialogue != null) {
+                        onDialogueReady.accept(llmDialogue);
+                    } else {
+                        onDialogueReady.accept(null);
+                    }
+                });
+            // Return placeholder immediately; actual dialogue will be provided via callback
+            return Text.literal("...").formatted(Formatting.GRAY);
+        }
+
+        // Fall back to static dialogue system
+        return generateStaticDialogue(context, category);
+    }
+    
+    public static CompletableFuture<Text> generateDialogueAsync(DialogueContext context, DialogueCategory category) {
+        if (context.villagerData == null) {
+            return CompletableFuture.completedFuture(Text.literal("...").formatted(Formatting.GRAY));
+        }
         
+        // Try LLM generation first if enabled
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            return LLMDialogueManager.generateDialogueAsync(context, category)
+                .thenCompose(llmDialogue -> {
+                    if (llmDialogue != null) {
+                        return CompletableFuture.completedFuture(llmDialogue);
+                    } else {
+                        // Fall back to static dialogue
+                        return CompletableFuture.completedFuture(generateStaticDialogue(context, category));
+                    }
+                })
+                .exceptionally(throwable -> {
+                    System.err.println("Async LLM dialogue generation failed, falling back to static: " + throwable.getMessage());
+                    return generateStaticDialogue(context, category);
+                });
+        } else {
+            return CompletableFuture.completedFuture(generateStaticDialogue(context, category));
+        }
+    }
+    
+    private static Text generateStaticDialogue(DialogueContext context, DialogueCategory category) {
         
         String personality = context.villagerData.getPersonality();
         Map<DialogueCategory, List<String>> personalityDialogues = 
@@ -284,7 +368,12 @@ public class VillagerDialogueSystem {
         
         Formatting formatting = getDialogueFormatting(context);
         
-        return Text.literal(processedDialogue).formatted(formatting);
+        // Update memory for static dialogue too
+        VillagerMemoryManager.addVillagerResponse(
+            context.villager, context.player, processedDialogue, category.name()
+        );
+        
+        return (Text) Text.literal(processedDialogue).formatted(formatting);
     }
     
     
@@ -295,7 +384,7 @@ public class VillagerDialogueSystem {
         replacements.put("{player}", context.player.getName().getString());
         replacements.put("{timeOfDay}", context.timeOfDay.name.toLowerCase());
         replacements.put("{weather}", context.weather);
-        replacements.put("{biome}", formatBiomeName(context.biome));
+        replacements.put("{biome}", formatBiomeName(context.worldContextInfo.biome));
         replacements.put("{profession}", "villager");
         
         
@@ -369,7 +458,7 @@ public class VillagerDialogueSystem {
             case FAREWELL -> "Goodbye!";
         };
         
-        return Text.literal(message).formatted(Formatting.GRAY);
+        return (Text) Text.literal(message).formatted(Formatting.GRAY);
     }
     
     
@@ -454,31 +543,65 @@ public class VillagerDialogueSystem {
     public static List<Text> generateConversation(VillagerEntity villager, PlayerEntity player) {
         DialogueContext context = new DialogueContext(villager, player);
         List<Text> conversation = new ArrayList<>();
+
+        DialogueCategory openingCategory = RANDOM.nextBoolean()
+            ? DialogueCategory.GREETING
+            : DialogueCategory.MOOD;
+        conversation.add(generateDialogue(context, openingCategory, t -> {}));
+
+        DialogueCategory mainCategory = chooseDialogueCategory(context);
+        if (mainCategory != openingCategory) {
+            conversation.add(generateDialogue(context, mainCategory, t -> {}));
+        }
+
+        if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
+            DialogueCategory followUp = RANDOM.nextBoolean()
+                ? DialogueCategory.GOSSIP
+                : DialogueCategory.ADVICE;
+            conversation.add(generateDialogue(context, followUp, t -> {}));
+        }
+
+        if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK
+            || context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT)
+            && mainCategory != DialogueCategory.FAREWELL) {
+            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, t -> {}));
+        }
+
+        return conversation;
+    }
+    public static CompletableFuture<List<Text>> generateConversationAsync(VillagerEntity villager, PlayerEntity player) {
+        DialogueContext context = new DialogueContext(villager, player);
+        List<CompletableFuture<Text>> futureDialogues = new ArrayList<>();
         
         
         DialogueCategory openingCategory = RANDOM.nextBoolean() ? 
             DialogueCategory.GREETING : DialogueCategory.MOOD;
-        conversation.add(generateDialogue(context, openingCategory));
+        futureDialogues.add(generateDialogueAsync(context, openingCategory));
         
         
         DialogueCategory mainCategory = chooseDialogueCategory(context);
         if (mainCategory != openingCategory) {
-            conversation.add(generateDialogue(context, mainCategory));
+            futureDialogues.add(generateDialogueAsync(context, mainCategory));
         }
         
         
         if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
             DialogueCategory followUp = RANDOM.nextBoolean() ? 
                 DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
-            conversation.add(generateDialogue(context, followUp));
+            futureDialogues.add(generateDialogueAsync(context, followUp));
         }
         
         
-        if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
-            context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
-            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL));
+        if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK ||
+             context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) &&
+            mainCategory != DialogueCategory.FAREWELL) {
+            futureDialogues.add(generateDialogueAsync(context, DialogueCategory.FAREWELL));
         }
         
-        return conversation;
+        // Combine all futures
+        return CompletableFuture.allOf(futureDialogues.toArray(new CompletableFuture[0]))
+            .thenApply(v -> futureDialogues.stream()
+                .map(CompletableFuture::join)
+                .collect(java.util.stream.Collectors.toList()));
     }
 }

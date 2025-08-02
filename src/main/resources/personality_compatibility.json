@@ -1,0 +1,20 @@
+{
+  "high": {
+    "Friendly": ["Cheerful", "Energetic"],
+    "Cheerful": ["Friendly", "Energetic"],
+    "Energetic": ["Friendly", "Cheerful"],
+    "Serious": ["Curious", "Confident"],
+    "Curious": ["Serious", "Confident"],
+    "Confident": ["Serious", "Curious"],
+    "Lazy": ["Nervous", "Shy"],
+    "Nervous": ["Lazy", "Shy"],
+    "Shy": ["Nervous", "Lazy"]
+  },
+  "low": [
+    ["Grumpy", "Cheerful"],
+    ["Shy", "Energetic"],
+    ["Lazy", "Energetic"],
+    ["Nervous", "Confident"],
+    ["Lazy", "Confident"]
+  ]
+}

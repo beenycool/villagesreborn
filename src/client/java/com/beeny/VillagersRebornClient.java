@@ -5,6 +5,7 @@ import com.beeny.network.VillagerTeleportPacketClient;
 import com.beeny.network.OpenFamilyTreePacketClient;
 import com.beeny.network.FamilyTreeDataPacketClient;
 import com.beeny.network.RequestVillagerListPacketClient;
+import com.beeny.commands.ClientDialogueCommands;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -26,6 +27,9 @@ public class VillagersRebornClient implements ClientModInitializer {
         OpenFamilyTreePacketClient.register();
         FamilyTreeDataPacketClient.register();
         RequestVillagerListPacketClient.register();
+        
+        // Register client commands
+        ClientDialogueCommands.register();
         
         
         openJournalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(

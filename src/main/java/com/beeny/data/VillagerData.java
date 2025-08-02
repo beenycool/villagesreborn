@@ -9,8 +9,10 @@ import net.minecraft.nbt.NbtString;
 import net.minecraft.util.Identifier;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class VillagerData {
+    // Use ThreadLocalRandom for thread-safe random generation
     public static final Codec<VillagerData> CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
             Codec.STRING.fieldOf("name").forGetter(VillagerData::getName),
@@ -28,10 +30,10 @@ public class VillagerData {
             Codec.list(Codec.STRING).fieldOf("childrenIds").forGetter(VillagerData::getChildrenIds),
             Codec.list(Codec.STRING).fieldOf("childrenNames").forGetter(VillagerData::getChildrenNames),
             Codec.STRING.optionalFieldOf("favoriteFood", "").forGetter(VillagerData::getFavoriteFood),
-            Codec.STRING.optionalFieldOf("hobby", "").forGetter(VillagerData::getHobby)
-        ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId, 
-            professionHistory, playerRelations, familyMembers, spouseName, spouseId, childrenIds, 
-            childrenNames, favoriteFood, hobby) -> {
+            Codec.BOOL.fieldOf("isAlive").forGetter(VillagerData::isAlive)
+        ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId,
+            professionHistory, playerRelations, familyMembers, spouseName, spouseId, childrenIds,
+            childrenNames, favoriteFood, isAlive) -> {
                 VillagerData data = new VillagerData();
                 data.name = name;
                 data.age = age;
@@ -48,7 +50,18 @@ public class VillagerData {
                 data.childrenIds = new ArrayList<>(childrenIds);
                 data.childrenNames = new ArrayList<>(childrenNames);
                 data.favoriteFood = favoriteFood;
-                data.hobby = hobby;
+                data.isAlive = isAlive;
+                // Set defaults for excluded fields
+                data.hobby = "";
+                data.birthTime = 0L;
+                data.birthPlace = "";
+                data.notes = "";
+                data.deathTime = 0L;
+                // Initialize new fields with defaults - they won't be persisted via codec
+                data.playerMemories = new HashMap<>();
+                data.topicFrequency = new HashMap<>();
+                data.recentEvents = new ArrayList<>();
+                data.lastConversationTime = 0;
                 return data;
             })
     );
@@ -84,6 +97,11 @@ public class VillagerData {
     private long deathTime;
     private boolean isAlive;
     
+    private Map<String, String> playerMemories;
+    private Map<String, Integer> topicFrequency;
+    private List<String> recentEvents;
+    private long lastConversationTime;
+    
     
     public static final String[] PERSONALITIES = {
         "Friendly", "Grumpy", "Shy", "Energetic", "Lazy", 
@@ -101,7 +119,7 @@ public class VillagerData {
         this.name = "";
         this.age = 0;
         this.gender = "Unknown";
-        this.personality = PERSONALITIES[new Random().nextInt(PERSONALITIES.length)];
+        this.personality = PERSONALITIES[ThreadLocalRandom.current().nextInt(PERSONALITIES.length)];
         this.happiness = 50;
         this.totalTrades = 0;
         this.favoritePlayerId = "";
@@ -113,12 +131,16 @@ public class VillagerData {
         this.childrenIds = new ArrayList<>();
         this.childrenNames = new ArrayList<>();
         this.favoriteFood = "";
-        this.hobby = HOBBIES[new Random().nextInt(HOBBIES.length)];
+        this.hobby = HOBBIES[ThreadLocalRandom.current().nextInt(HOBBIES.length)];
         this.birthTime = System.currentTimeMillis();
         this.birthPlace = "";
         this.notes = "";
         this.deathTime = 0;
         this.isAlive = true;
+        this.playerMemories = new HashMap<>();
+        this.topicFrequency = new HashMap<>();
+        this.recentEvents = new ArrayList<>();
+        this.lastConversationTime = 0;
     }
     
     
@@ -149,6 +171,10 @@ public class VillagerData {
         this.notes = notes;
         this.deathTime = deathTime;
         this.isAlive = isAlive;
+        this.playerMemories = new HashMap<>();
+        this.topicFrequency = new HashMap<>();
+        this.recentEvents = new ArrayList<>();
+        this.lastConversationTime = 0;
     }
     
     
@@ -291,5 +317,38 @@ public class VillagerData {
         if (happiness >= 40) return "Content";
         if (happiness >= 20) return "Unhappy";
         return "Miserable";
+    }
+    
+    public Map<String, String> getPlayerMemories() { return new HashMap<>(playerMemories); }
+    public void setPlayerMemory(String playerUuid, String memory) { 
+        this.playerMemories.put(playerUuid, memory);
+    }
+    public String getPlayerMemory(String playerUuid) {
+        return playerMemories.getOrDefault(playerUuid, "");
+    }
+    
+    public Map<String, Integer> getTopicFrequency() { return new HashMap<>(topicFrequency); }
+    public void incrementTopicFrequency(String topic) {
+        topicFrequency.put(topic, topicFrequency.getOrDefault(topic, 0) + 1);
+    }
+    public int getTopicFrequency(String topic) {
+        return topicFrequency.getOrDefault(topic, 0);
+    }
+    
+    public List<String> getRecentEvents() { return new ArrayList<>(recentEvents); }
+    public void addRecentEvent(String event) {
+        recentEvents.add(0, event);
+        // Keep only the last 5 events
+        if (recentEvents.size() > 5) {
+            recentEvents.remove(5);
+        }
+    }
+    
+    public long getLastConversationTime() { return lastConversationTime; }
+    public void setLastConversationTime(long time) { this.lastConversationTime = time; }
+    public void updateLastConversationTime() { this.lastConversationTime = System.currentTimeMillis(); }
+    
+    public boolean hasRecentConversation(long withinMillis) {
+        return (System.currentTimeMillis() - lastConversationTime) < withinMillis;
     }
 }
