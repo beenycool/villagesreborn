@@ -340,7 +340,7 @@ public class VillagerData {
         recentEvents.add(0, event);
         // Keep only the last 5 events
         if (recentEvents.size() > 5) {
-            recentEvents = new ArrayList<>(recentEvents.subList(0, 5));
+            recentEvents.remove(5);
         }
     }
     
