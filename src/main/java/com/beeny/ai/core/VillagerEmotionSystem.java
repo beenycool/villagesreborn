@@ -313,18 +313,18 @@ public class VillagerEmotionSystem {
     public static void loadEmotionsFromNbt(VillagerEntity villager, NbtCompound nbt) {
         if (!nbt.contains("emotions")) return;
         
-        NbtCompound emotionsNbt = nbt.getCompound("emotions");
+        NbtCompound emotionsNbt = nbt.getCompound("emotions").orElse(null);
         EmotionalState state = new EmotionalState();
         
         for (EmotionType type : EmotionType.values()) {
             if (emotionsNbt.contains(type.name())) {
-                float value = emotionsNbt.getFloat(type.name());
+                float value = emotionsNbt.getFloat(type.name()).orElse(0f);
                 state.emotions.put(type, value);
             }
         }
         
         if (emotionsNbt.contains("emotional_stability")) {
-            state.setEmotionalStability(emotionsNbt.getFloat("emotional_stability"));
+            state.setEmotionalStability(emotionsNbt.getFloat("emotional_stability").orElse(0f));
         }
         
         villagerEmotions.put(villager.getUuidAsString(), state);

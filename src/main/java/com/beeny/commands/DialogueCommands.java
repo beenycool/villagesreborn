@@ -129,7 +129,7 @@ public class DialogueCommands {
         }
         
         // Test static fallback
-        Text staticDialogue = VillagerDialogueSystem.generateDialogue(dialogueContext, category);
+        Text staticDialogue = VillagerDialogueSystem.generateDialogue(dialogueContext, category, t -> {});
         source.sendFeedback(() -> 
             Text.literal("Static Result: ").formatted(Formatting.BLUE)
                 .append(staticDialogue), false);
@@ -242,12 +242,16 @@ public class DialogueCommands {
         source.sendFeedback(() -> 
             Text.literal("Testing LLM connection...").formatted(Formatting.YELLOW), false);
         
-        LLMDialogueManager.testConnection()
-            .thenAccept(success -> {
-                if (success) {
-                    source.sendFeedback(() -> 
-                        Text.literal("Connection test PASSED!").formatted(Formatting.GREEN), false);
-                } else {
+        LLMDialogueManager.testConnection(
+            com.beeny.config.VillagersRebornConfig.LLM_PROVIDER,
+            com.beeny.config.VillagersRebornConfig.LLM_API_KEY,
+            com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT,
+            com.beeny.config.VillagersRebornConfig.LLM_MODEL
+        ).thenAccept(success -> {
+            if (success) {
+                source.sendFeedback(() ->
+                    Text.literal("Connection test PASSED!").formatted(Formatting.GREEN), false);
+            } else {
                     source.sendFeedback(() -> 
                         Text.literal("Connection test FAILED!").formatted(Formatting.RED), false);
                 }

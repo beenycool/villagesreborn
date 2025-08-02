@@ -31,46 +31,47 @@ public class VillagerUtilityAI {
                 .getResourceAsStream("personality_compatibility.json")) {
             if (is == null) {
                 LOGGER.severe("personality_compatibility.json not found in resources.");
-                return;
-            }
+            } else {
             Map<String, Object> config = mapper.readValue(is, new TypeReference<Map<String, Object>>() {});
             // Validate structure
             if (!config.containsKey("high") || !(config.get("high") instanceof Map)) {
                 LOGGER.severe("Missing or invalid 'high' key in personality_compatibility.json");
-                return;
+            } else {
+                // Parse high compatibility
+                Map<String, List<String>> high = (Map<String, List<String>>) config.get("high");
+                if (high == null || high.isEmpty()) {
+                    LOGGER.warning("'high' compatibility map is empty.");
+                } else {
+                    for (Map.Entry<String, List<String>> entry : high.entrySet()) {
+                        if (entry.getKey() == null || entry.getValue() == null) {
+                            LOGGER.warning("Null key or value in 'high' compatibility map.");
+                            continue;
+                        }
+                        highCompatibility.put(entry.getKey(), new HashSet<>(entry.getValue()));
+                    }
+                }
             }
+
             if (!config.containsKey("low") || !(config.get("low") instanceof List)) {
                 LOGGER.severe("Missing or invalid 'low' key in personality_compatibility.json");
-                return;
-            }
-            // Parse high compatibility
-            Map<String, List<String>> high = (Map<String, List<String>>) config.get("high");
-            if (high == null || high.isEmpty()) {
-                LOGGER.warning("'high' compatibility map is empty.");
             } else {
-                for (Map.Entry<String, List<String>> entry : high.entrySet()) {
-                    if (entry.getKey() == null || entry.getValue() == null) {
-                        LOGGER.warning("Null key or value in 'high' compatibility map.");
-                        continue;
+                // Parse low compatibility
+                List<List<String>> low = (List<List<String>>) config.get("low");
+                if (low == null || low.isEmpty()) {
+                    LOGGER.warning("'low' compatibility list is empty.");
+                } else {
+                    for (List<String> pair : low) {
+                        if (pair == null || pair.size() != 2 || pair.get(0) == null || pair.get(1) == null) {
+                            LOGGER.warning("Invalid pair in 'low' compatibility list: " + pair);
+                            continue;
+                        }
+                        // Store both orders for symmetry
+                        lowCompatibility.add(pair);
+                        lowCompatibility.add(Arrays.asList(pair.get(1), pair.get(0)));
                     }
-                    highCompatibility.put(entry.getKey(), new HashSet<>(entry.getValue()));
                 }
             }
-            // Parse low compatibility
-            List<List<String>> low = (List<List<String>>) config.get("low");
-            if (low == null || low.isEmpty()) {
-                LOGGER.warning("'low' compatibility list is empty.");
-            } else {
-                for (List<String> pair : low) {
-                    if (pair == null || pair.size() != 2 || pair.get(0) == null || pair.get(1) == null) {
-                        LOGGER.warning("Invalid pair in 'low' compatibility list: " + pair);
-                        continue;
-                    }
-                    // Store both orders for symmetry
-                    lowCompatibility.add(pair);
-                    lowCompatibility.add(Arrays.asList(pair.get(1), pair.get(0)));
-                }
-            }
+        }
         } catch (Exception e) {
             LOGGER.severe("Failed to load personality compatibility config: " + e.getMessage());
         }

@@ -52,7 +52,13 @@ public class VillagerActivityCommands {
     }
 
     private static int showCurrentActivity(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+        ServerPlayerEntity player;
+        try {
+            player = context.getSource().getPlayerOrThrow();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendError(net.minecraft.text.Text.literal("This command can only be used by a player."));
+            return 0;
+        }
         VillagerEntity villager = getTargetedVillager(player);
         
         if (villager == null) {
@@ -101,7 +107,13 @@ public class VillagerActivityCommands {
     }
 
     private static int showDailyLog(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+        ServerPlayerEntity player;
+        try {
+            player = context.getSource().getPlayerOrThrow();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendError(net.minecraft.text.Text.literal("This command can only be used by a player."));
+            return 0;
+        }
         int day = IntegerArgumentType.getInteger(context, "day");
         VillagerEntity villager = getTargetedVillager(player);
         
@@ -167,7 +179,13 @@ public class VillagerActivityCommands {
     }
 
     private static int showRecentLogs(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+        ServerPlayerEntity player;
+        try {
+            player = context.getSource().getPlayerOrThrow();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendError(net.minecraft.text.Text.literal("This command can only be used by a player."));
+            return 0;
+        }
         int days = IntegerArgumentType.getInteger(context, "days");
         VillagerEntity villager = getTargetedVillager(player);
         
@@ -223,7 +241,13 @@ public class VillagerActivityCommands {
     }
 
     private static int showWeeklySummary(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+        ServerPlayerEntity player;
+        try {
+            player = context.getSource().getPlayerOrThrow();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendError(net.minecraft.text.Text.literal("This command can only be used by a player."));
+            return 0;
+        }
         VillagerEntity villager = getTargetedVillager(player);
         
         if (villager == null) {
@@ -273,7 +297,13 @@ public class VillagerActivityCommands {
     }
 
     private static int showActivityPatterns(CommandContext<ServerCommandSource> context) {
-        ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+        ServerPlayerEntity player;
+        try {
+            player = context.getSource().getPlayerOrThrow();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException e) {
+            context.getSource().sendError(net.minecraft.text.Text.literal("This command can only be used by a player."));
+            return 0;
+        }
         VillagerEntity villager = getTargetedVillager(player);
         
         if (villager == null) {

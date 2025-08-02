@@ -542,27 +542,31 @@ public class VillagerLearningSystem {
     public static void loadLearningDataFromNbt(VillagerEntity villager, NbtCompound nbt) {
         if (!nbt.contains("learning_data")) return;
         
-        NbtCompound learningNbt = nbt.getCompound("learning_data");
+        NbtCompound learningNbt = nbt.getCompound("learning_data").orElse(null);
         VillagerLearningProfile profile = new VillagerLearningProfile();
         
         // Load preferences
         if (learningNbt.contains("preferences")) {
-            NbtCompound preferencesNbt = learningNbt.getCompound("preferences");
-            for (String key : preferencesNbt.getKeys()) {
-                profile.preferences.put(key, preferencesNbt.getFloat(key));
+            NbtCompound preferencesNbt = learningNbt.getCompound("preferences").orElse(null);
+            if (preferencesNbt != null) {
+                for (String key : preferencesNbt.getKeys()) {
+                    profile.preferences.put(key, preferencesNbt.getFloat(key).orElse(0f));
+                }
             }
         }
         
         // Load behavior counts
         if (learningNbt.contains("behaviors")) {
-            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors");
-            for (String key : behaviorsNbt.getKeys()) {
-                profile.behaviorCounts.put(key, behaviorsNbt.getInt(key));
+            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors").orElse(null);
+            if (behaviorsNbt != null) {
+                for (String key : behaviorsNbt.getKeys()) {
+                    profile.behaviorCounts.put(key, behaviorsNbt.getInt(key).orElse(0));
+                }
             }
         }
         
-        if (learningNbt.contains("learning_rate")) {
-            profile.learningRate = learningNbt.getFloat("learning_rate");
+        if (learningNbt != null && learningNbt.contains("learning_rate")) {
+            profile.learningRate = learningNbt.getFloat("learning_rate").orElse(0f);
         }
         
         learningProfiles.put(villager.getUuidAsString(), profile);

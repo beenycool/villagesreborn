@@ -21,6 +21,28 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DialogueSetupCommands {
     
     private static final Map<String, SetupSession> setupSessions = new ConcurrentHashMap<>();
+
+    // Periodic cleanup for expired sessions to prevent memory leaks
+    private static final java.util.concurrent.ScheduledExecutorService SESSION_CLEANUP_EXECUTOR =
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "DialogueSetupSessionCleanup");
+            t.setDaemon(true);
+            return t;
+        });
+
+    static {
+        // Run cleanup every minute
+        SESSION_CLEANUP_EXECUTOR.scheduleAtFixedRate(
+            DialogueSetupCommands::cleanupExpiredSessions,
+            1, 1, java.util.concurrent.TimeUnit.MINUTES
+        );
+        // Optional: Add shutdown hook to cleanly stop executor
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> SESSION_CLEANUP_EXECUTOR.shutdown()));
+    }
+
+    private static void cleanupExpiredSessions() {
+        setupSessions.entrySet().removeIf(entry -> entry.getValue().isExpired());
+    }
     
     private static class SetupSession {
         String playerUuid;
@@ -312,19 +334,24 @@ public class DialogueSetupCommands {
     }
     
     private static void testConnectionAndReport(ServerCommandSource source) {
-        LLMDialogueManager.testConnection().thenAccept(success -> {
+        LLMDialogueManager.testConnection(
+            com.beeny.config.VillagersRebornConfig.LLM_PROVIDER,
+            com.beeny.config.VillagersRebornConfig.LLM_API_KEY,
+            com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT,
+            com.beeny.config.VillagersRebornConfig.LLM_MODEL
+        ).thenAccept(success -> {
             if (success) {
-                source.sendFeedback(() -> 
+                source.sendFeedback(() ->
                     Text.literal("✓ Connection test successful!").formatted(Formatting.GREEN), false);
             } else {
-                source.sendFeedback(() -> 
+                source.sendFeedback(() ->
                     Text.literal("⚠ Connection test failed. Please check your API key and try again.").formatted(Formatting.RED), false);
                 
-                source.sendFeedback(() -> 
+                source.sendFeedback(() ->
                     Text.literal("You can run the setup again with: /dialogue-setup").formatted(Formatting.GRAY), false);
             }
         }).exceptionally(throwable -> {
-            source.sendFeedback(() -> 
+            source.sendFeedback(() ->
                 Text.literal("⚠ Connection error: " + throwable.getMessage()).formatted(Formatting.RED), false);
             return null;
         });

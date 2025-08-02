@@ -23,7 +23,6 @@ Download the latest release from [llama.cpp releases](https://github.com/ggergan
 git clone https://github.com/ggerganov/llama.cpp.git
 cd llama.cpp
 make
-```
 
 ### 2. Download a Model
 

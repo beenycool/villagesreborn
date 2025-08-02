@@ -16,94 +16,80 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-public class LocalLLMProvider implements LLMDialogueProvider {
+public class LocalLLMProvider extends BaseLLMProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger("VillagersReborn/LocalLLM");
     private final HttpClient httpClient;
-    private final Gson gson;
-    
+
     public LocalLLMProvider() {
+        super(
+            "", // No API key for local
+            VillagersRebornConfig.LLM_LOCAL_URL,
+            VillagersRebornConfig.LLM_MODEL
+        );
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(VillagersRebornConfig.LLM_REQUEST_TIMEOUT))
             .build();
-        this.gson = new Gson();
     }
-    
+
     @Override
     public CompletableFuture<String> generateDialogue(DialogueRequest request) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return generateLocalResponse(request);
+                // Use DialoguePromptBuilder for contextual prompt
+                String prompt = DialoguePromptBuilder.buildContextualPrompt(
+                    request.context,
+                    request.category,
+                    request.conversationHistory
+                );
+                return generateLocalResponse(prompt);
             } catch (Exception e) {
                 LOGGER.error("Failed to generate dialogue with local LLM", e);
                 throw new RuntimeException("Local LLM generation failed", e);
             }
         });
     }
+
+    // Required by BaseLLMProvider, but not used for local provider
+    @Override
+    public okhttp3.Request buildRequest(LLMDialogueProvider.DialogueRequest request) {
+        throw new UnsupportedOperationException("LocalLLMProvider does not use OkHttp requests.");
+    }
+
+    @Override
+    public String parseResponse(String responseBody) {
+        throw new UnsupportedOperationException("LocalLLMProvider does not use OkHttp responses.");
+    }
     
-    private String generateLocalResponse(DialogueRequest request) throws IOException, InterruptedException {
-        String apiUrl = VillagersRebornConfig.LLM_LOCAL_URL + "/completion";
-        
-        // Build the prompt with context
-        StringBuilder fullPrompt = new StringBuilder();
-        fullPrompt.append("You are a villager in Minecraft. ");
-        fullPrompt.append("Your profession is ").append(request.context.villager.getVillagerData().profession().toString().replace("minecraft:", "")).append(". ");
-        fullPrompt.append("Your personality is ").append(request.context.villagerData.getPersonality()).append(". ");
-        fullPrompt.append("The current weather is ").append(request.context.weather).append(". ");
-        fullPrompt.append("The time is ").append(request.context.timeOfDay.name().toLowerCase()).append(". ");
-        
-        if (request.context.playerReputation != 0) {
-            fullPrompt.append("Your relationship with the player is ");
-            if (request.context.playerReputation > 50) {
-                fullPrompt.append("very positive");
-            } else if (request.context.playerReputation > 0) {
-                fullPrompt.append("positive");
-            } else if (request.context.playerReputation < -20) {
-                fullPrompt.append("negative");
-            } else {
-                fullPrompt.append("neutral");
-            }
-            fullPrompt.append(". ");
-        }
-        
-        if (request.conversationHistory != null && !request.conversationHistory.isEmpty()) {
-            fullPrompt.append("Recent conversation: ").append(request.conversationHistory).append(". ");
-        }
-        
-        fullPrompt.append("Respond naturally as a villager would. Keep responses brief (1-2 sentences). ");
-        fullPrompt.append("Category: ").append(request.category.name().toLowerCase()).append(". ");
-        fullPrompt.append("Prompt: ").append(request.prompt);
-        
-        // Build the request payload
+    // Overloaded to accept prompt string directly
+    private String generateLocalResponse(String prompt) throws IOException, InterruptedException {
         JsonObject payload = new JsonObject();
-        payload.addProperty("prompt", fullPrompt.toString());
+        payload.addProperty("prompt", prompt);
         payload.addProperty("temperature", VillagersRebornConfig.LLM_TEMPERATURE);
         payload.addProperty("max_tokens", VillagersRebornConfig.LLM_MAX_TOKENS);
-        payload.addProperty("top_p", 0.9);
-        payload.addProperty("top_k", 40);
         payload.addProperty("repeat_penalty", 1.1);
         payload.addProperty("stream", false);
-        
+
         // Add stop sequences to prevent runaway generation
         JsonArray stopSequences = new JsonArray();
         stopSequences.add("\n\n");
         stopSequences.add("Player:");
         stopSequences.add("Villager:");
         payload.add("stop", stopSequences);
-        
-        String requestBody = gson.toJson(payload);
-        
+
+        String body = new Gson().toJson(payload);
+
         HttpRequest httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl))
+            .uri(URI.create(endpoint))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofMillis(VillagersRebornConfig.LLM_REQUEST_TIMEOUT))
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .POST(HttpRequest.BodyPublishers.ofString(body))
             .build();
-        
+
         HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        
+
         if (response.statusCode() == 200) {
-            JsonObject responseJson = gson.fromJson(response.body(), JsonObject.class);
-            
+            JsonObject responseJson = new Gson().fromJson(response.body(), JsonObject.class);
+
             // Handle different response formats
             if (responseJson.has("choices") && responseJson.getAsJsonArray("choices").size() > 0) {
                 JsonObject choice = responseJson.getAsJsonArray("choices").get(0).getAsJsonObject();
@@ -118,7 +104,7 @@ public class LocalLLMProvider implements LLMDialogueProvider {
                     return cleanResponse(data.get("text").getAsString());
                 }
             }
-            
+
             throw new RuntimeException("Unexpected response format from llama.cpp");
         } else {
             throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());

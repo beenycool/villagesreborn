@@ -81,7 +81,8 @@ public class DialogueConfigScreen extends Screen {
         currentY += 35;
         
         // Provider selection
-        List<String> providers = Arrays.asList("gemini", "openrouter");
+        // Add "local" provider for local LLM integration
+        List<String> providers = Arrays.asList("gemini", "openrouter", "local");
         this.providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Provider: " + value.toUpperCase()))
             .values(providers)
             .initially(tempProvider)
@@ -260,8 +261,13 @@ public class DialogueConfigScreen extends Screen {
     }
     
     private void saveConfigToFile() {
-        // This would ideally trigger a config save, but for now we'll just apply runtime settings
-        // In a full implementation, you'd want to save the config back to the JSON file
+        // Persist settings to villagersreborn.json
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            setStatusMessage(Text.literal("✓ Settings saved!"), Formatting.GREEN);
+        } catch (Exception e) {
+            setStatusMessage(Text.literal("✗ Failed to save settings: " + e.getMessage()), Formatting.RED);
+        }
     }
     
     private void setStatusMessage(Text message, Formatting color) {

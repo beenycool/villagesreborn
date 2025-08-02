@@ -245,7 +245,7 @@ public class VillagerMemoryManager {
             if (playerMemory.contains("conversations")) {
                 NbtList conversationList = playerMemory.getList("conversations").orElse(null);
                 if (conversationList == null) continue;
-                
+
                 List<ConversationEntry> entries = new ArrayList<>();
                 for (int i = 0; i < conversationList.size(); i++) {
                     NbtCompound entryNbt = conversationList.getCompound(i).orElse(null);

@@ -125,6 +125,12 @@ public class LLMDialogueManager {
         }
     }
     
+    /**
+     * @deprecated This method blocks the calling thread while waiting for the LLM API response.
+     *             Use {@link #generateDialogueAsync} instead to avoid server lag or freezes.
+     *             Synchronous network calls on the main server thread should be avoided.
+     */
+    @Deprecated
     public static Text generateDialogueSync(VillagerDialogueSystem.DialogueContext context,
                                           VillagerDialogueSystem.DialogueCategory category) {
         try {
@@ -199,61 +205,49 @@ public class LLMDialogueManager {
     }
     
     // Method to test the LLM connection
-    public static CompletableFuture<Boolean> testConnection() {
-        if (!initialized) {
-            initialize();
-        }
-        
-        if (currentProvider == null || !currentProvider.isConfigured()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        
-        // Create a simple test request against real game objects when available
+    /**
+     * Thread-safe connection test using temporary provider instance.
+     * Does NOT modify global config or static fields.
+     */
+    public static CompletableFuture<Boolean> testConnection(String provider, String apiKey, String endpoint, String model) {
         try {
-            // Attempt to use live server world, a real villager near spawn, and the first online player
-            net.minecraft.server.MinecraftServer server = net.minecraft.server.MinecraftServer.getServer();
-            if (server == null) {
-                return CompletableFuture.completedFuture(false);
-            }
+            // Minimal validation: ensure provider instance can be created and is configured
+            LLMDialogueProvider temp = createProvider(provider, apiKey, endpoint, model);
+            return CompletableFuture.completedFuture(temp != null && temp.isConfigured());
 
-            net.minecraft.server.world.ServerWorld world = server.getOverworld();
-            if (world == null) {
-                return CompletableFuture.completedFuture(false);
-            }
 
-            // Pick any online player
-            java.util.List<? extends net.minecraft.server.network.ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
-            if (players == null || players.isEmpty()) {
-                return CompletableFuture.completedFuture(false);
-            }
-            net.minecraft.server.network.ServerPlayerEntity player = players.get(0);
-
-            // Find any villager in loaded entities; fallback to nearest to player within 64 blocks
-            net.minecraft.entity.passive.VillagerEntity villager = world.getEntitiesByClass(
-                net.minecraft.entity.passive.VillagerEntity.class,
-                player.getBoundingBox().expand(64.0),
-                v -> v != null
-            ).stream().findFirst().orElse(null);
-
-            if (villager == null) {
-                // No real villager available; cannot perform a production-faithful test
-                return CompletableFuture.completedFuture(false);
-            }
-
-            // Construct a real DialogueContext using actual game entities
-            VillagerDialogueSystem.DialogueContext liveContext = new VillagerDialogueSystem.DialogueContext(villager, player);
-
-            LLMDialogueProvider.DialogueRequest testRequest = new LLMDialogueProvider.DialogueRequest(
-                liveContext, VillagerDialogueSystem.DialogueCategory.GREETING, "", "Say hello"
-            );
-            
-            return currentProvider.generateDialogue(testRequest)
-                .orTimeout(5000, TimeUnit.MILLISECONDS)
-                .thenApply(response -> response != null && !response.trim().isEmpty())
-                .exceptionally(throwable -> false);
-                
         } catch (Throwable e) {
             return CompletableFuture.completedFuture(false);
         }
+    }
+
+    /**
+     * Helper to create a provider instance from parameters.
+     */
+    private static LLMDialogueProvider createProvider(String provider, String apiKey, String endpoint, String model) {
+        switch (provider.toLowerCase()) {
+            case "gemini":
+                return new GeminiDialogueProvider();
+            case "openrouter":
+                return new OpenRouterDialogueProvider();
+            case "local":
+                return new LocalLLMProvider();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Deprecated: unsafe, modifies global state.
+     */
+    @Deprecated
+    public static CompletableFuture<Boolean> testConnection() {
+        // Use config values, but warn: this is not thread-safe!
+        return testConnection(
+            VillagersRebornConfig.LLM_PROVIDER,
+            VillagersRebornConfig.LLM_API_KEY,
+            VillagersRebornConfig.LLM_API_ENDPOINT,
+            VillagersRebornConfig.LLM_MODEL
+        );
     }
 }

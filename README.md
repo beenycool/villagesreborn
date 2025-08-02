@@ -51,8 +51,8 @@ You can tweak settings in `config/villagersreborn.json`:
 - `enableDynamicDialogue`: Turn AI chat on or off
 - `llmProvider`: Choose "gemini", "local", or "openrouter"
 - `llmApiKey`: Your API key (required for "gemini" and "openrouter")
-- `llmLocalUrl`: The local API endpoint for "local" provider (e.g., "http://localhost:11434/v1/chat/completions")
-- `llmApiEndpoint`: Optional override for the API endpoint (used with "gemini" or "openrouter")
+- `llmLocalUrl`: The local API endpoint for "local" provider (e.g., Ollama: `http://localhost:11434/v1/chat/completions`, llama.cpp: `http://localhost:8080`)
+- `llmApiEndpoint`: Optional override for remote API endpoints (used with "gemini" or "openrouter" if you need a custom URL)
 - `llmModel`: Which model to use
 - `llmTemperature`: How creative the responses are (0.0–2.0)
 - `llmMaxTokens`: Max response length
@@ -60,9 +60,13 @@ You can tweak settings in `config/villagersreborn.json`:
 
 ### Local LLM Support
 You can use local AI models like Ollama or llama.cpp:
-- Set `llmProvider` to "local"
-- Set `llmApiEndpoint` to your local API (like "http://localhost:11434/v1/chat/completions")
+- Set `llmProvider` to `"local"`
+- Set `llmLocalUrl` to your local API endpoint:
+  - Ollama: `http://localhost:11434/v1/chat/completions`
+  - llama.cpp: `http://localhost:8080`
 - Set `llmModel` to your model's name
+
+For remote providers ("gemini", "openrouter"), use `llmApiEndpoint` only if you need to override the default API URL.
 
 ## How to Install
 

@@ -13,6 +13,11 @@ public class DialogueCache {
     // Synchronized LRU cache with automatic eviction
     private static final int CACHE_SIZE_LIMIT = VillagersRebornConfig.DIALOGUE_CACHE_SIZE;
     private static final LinkedHashMap<String, CacheEntry> cache = new LinkedHashMap<String, CacheEntry>(CACHE_SIZE_LIMIT, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
+            return size() > CACHE_SIZE_LIMIT;
+        }
+    };
     private static final ScheduledExecutorService cleanupExecutor = Executors.newSingleThreadScheduledExecutor();
     
     static {

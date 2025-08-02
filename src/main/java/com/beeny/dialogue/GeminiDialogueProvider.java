@@ -18,6 +18,14 @@ public class GeminiDialogueProvider extends BaseLLMProvider {
             (VillagersRebornConfig.LLM_MODEL == null || VillagersRebornConfig.LLM_MODEL.isEmpty()) ? "gemini-1.5-flash" : VillagersRebornConfig.LLM_MODEL
         );
     }
+
+    public GeminiDialogueProvider(String apiKey, String endpoint, String model) {
+        super(
+            apiKey != null ? apiKey : VillagersRebornConfig.LLM_API_KEY,
+            (endpoint == null || endpoint.isEmpty()) ? DEFAULT_ENDPOINT : endpoint,
+            (model == null || model.isEmpty()) ? "gemini-1.5-flash" : model
+        );
+    }
     
     @Override
     public String getProviderName() {
@@ -70,13 +78,12 @@ public class GeminiDialogueProvider extends BaseLLMProvider {
         }
         requestBody.add("safetySettings", safetySettings);
         
-        String url = endpoint + "/" + model + ":generateContent";
+        String url = endpoint + "/" + model + ":generateContent?key=" + apiKey;
         
         return new Request.Builder()
             .url(url)
             .post(RequestBody.create(gson.toJson(requestBody), JSON))
             .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", "Bearer " + apiKey)
             .build();
     }
     

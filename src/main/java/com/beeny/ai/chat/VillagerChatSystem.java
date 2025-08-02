@@ -410,17 +410,19 @@ public class VillagerChatSystem {
         private static String generateUnknownResponse(ChatContext context) {
             // Try to use LLM for unknown intents if available
             if (LLMDialogueManager.isConfigured()) {
-                VillagerDialogueSystem.DialogueContext dialogueContext = 
+                VillagerDialogueSystem.DialogueContext dialogueContext =
                     new VillagerDialogueSystem.DialogueContext(context.villager, context.player);
-                
-                Text llmResponse = LLMDialogueManager.generateDialogueSync(dialogueContext, 
-                    VillagerDialogueSystem.DialogueCategory.GREETING);
-                
-                if (llmResponse != null) {
-                    return llmResponse.getString();
-                }
+
+                // Asynchronous: deliver LLM result via callback/event
+                VillagerDialogueSystem.generateDialogue(dialogueContext, VillagerDialogueSystem.DialogueCategory.GREETING, llmResponse -> {
+                    if (llmResponse != null) {
+                        // TODO: Update chat UI or send packet to player with llmResponse.getString()
+                        // This requires integration with the chat system to deliver the async result.
+                    }
+                });
             }
-            
+
+            // Return personality-based fallback immediately
             return switch (context.villagerData.getPersonality()) {
                 case "Curious" -> "That's interesting! I'm not sure I understand completely, but tell me more!";
                 case "Shy" -> "Um... I'm not sure what you mean...";
@@ -509,7 +511,7 @@ public class VillagerChatSystem {
         
         // Fall back to standard dialogue system
         return VillagerDialogueSystem.generateDialogue(
-            new VillagerDialogueSystem.DialogueContext(villager, player), category);
+            new VillagerDialogueSystem.DialogueContext(villager, player), category, t -> {});
     }
     
     private static String generateContextualResponse(ChatContext context, VillagerDialogueSystem.DialogueCategory category, String recentContext) {
