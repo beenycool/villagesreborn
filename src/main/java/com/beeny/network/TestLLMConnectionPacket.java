@@ -13,10 +13,25 @@ public record TestLLMConnectionPacket(String provider, String apiKey, String end
 
     public static final PacketCodec<RegistryByteBuf, TestLLMConnectionPacket> CODEC = PacketCodec.of(
         (value, buf) -> {
-            buf.writeString(value.provider);
-            buf.writeString(value.apiKey);
-            buf.writeString(value.endpoint);
-            buf.writeString(value.model);
+-            buf.writeString(value.provider);
+-            buf.writeString(value.apiKey);
+-            buf.writeString(value.endpoint);
+-            buf.writeString(value.model);
++            buf.writeString(value.provider, 32767); // Max string length
++            buf.writeString(value.apiKey, 32767);
++            buf.writeString(value.endpoint, 32767);
++            buf.writeString(value.model, 32767);
+        },
+        buf -> new TestLLMConnectionPacket(
+-            buf.readString(),
+-            buf.readString(),
+-            buf.readString(),
+-            buf.readString()
++            buf.readString(32767),
++            buf.readString(32767),
++            buf.readString(32767),
++            buf.readString(32767)
+        )
         },
         buf -> new TestLLMConnectionPacket(
             buf.readString(),
