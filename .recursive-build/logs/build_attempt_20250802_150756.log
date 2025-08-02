@@ -1,0 +1,123 @@
+[0;34m2025-08-02 15:07:56 INFO: 🚀 Starting Recursive Gradle Build System[0m
+[0;34m2025-08-02 15:07:56 INFO: Creating project backups...[0m
+2025-08-02 15:07:56 ✓ Backed up build.gradle
+2025-08-02 15:07:56 ✓ Backed up gradle.properties
+2025-08-02 15:07:56 ✓ Backed up settings.gradle
+[0;34m2025-08-02 15:07:56 INFO: === RECURSIVE BUILD ATTEMPT #1/20 ===[0m
+[0;34m2025-08-02 15:07:56 INFO: Testing build: current configuration[0m
+2025-08-02 15:07:56 Command: ./gradlew build 
+[0;31m2025-08-02 15:07:59 ERROR: Build failed: current configuration[0m
+[0;34m2025-08-02 15:08:02 INFO: Build failed. Error type detected: FABRIC_LOOM_NOT_FOUND[0m
+[0;31m2025-08-02 15:08:02 ERROR: FAILURE: Build failed with an exception.[0m
+[0;31m2025-08-02 15:08:02 ERROR: Plugin [id: 'fabric-loom', version: '1.11-SNAPSHOT'] was not found in any of the following sources:[0m
+[0;34m2025-08-02 15:08:02 INFO: Detected fabric-loom issue. Applying fabric-loom fixes...[0m
+[0;34m2025-08-02 15:08:02 INFO: 🔧 Applying fabric-loom fixes...[0m
+2025-08-02 15:08:02 Testing fabric-loom versions via property overrides (preserves gradle.properties)...
+2025-08-02 15:08:02   Trying fabric-loom 1.+...
+[0;34m2025-08-02 15:08:02 INFO: Testing build: fabric-loom 1.+ override[0m
+2025-08-02 15:08:02 Command: ./gradlew build -Ploom_version=1.+
+[0;31m2025-08-02 15:08:03 ERROR: Build failed: fabric-loom 1.+ override[0m
+2025-08-02 15:08:03   Trying fabric-loom 1.8.+...
+[0;34m2025-08-02 15:08:03 INFO: Testing build: fabric-loom 1.8.+ override[0m
+2025-08-02 15:08:03 Command: ./gradlew build -Ploom_version=1.8.+
+[0;31m2025-08-02 15:08:05 ERROR: Build failed: fabric-loom 1.8.+ override[0m
+2025-08-02 15:08:05   Trying fabric-loom 1.7.+...
+[0;34m2025-08-02 15:08:05 INFO: Testing build: fabric-loom 1.7.+ override[0m
+2025-08-02 15:08:05 Command: ./gradlew build -Ploom_version=1.7.+
+[0;31m2025-08-02 15:08:06 ERROR: Build failed: fabric-loom 1.7.+ override[0m
+2025-08-02 15:08:06   Trying fabric-loom 1.6.+...
+[0;34m2025-08-02 15:08:06 INFO: Testing build: fabric-loom 1.6.+ override[0m
+2025-08-02 15:08:06 Command: ./gradlew build -Ploom_version=1.6.+
+[0;31m2025-08-02 15:08:08 ERROR: Build failed: fabric-loom 1.6.+ override[0m
+2025-08-02 15:08:08   Trying fabric-loom 1.5.+...
+[0;34m2025-08-02 15:08:08 INFO: Testing build: fabric-loom 1.5.+ override[0m
+2025-08-02 15:08:08 Command: ./gradlew build -Ploom_version=1.5.+
+[0;31m2025-08-02 15:08:10 ERROR: Build failed: fabric-loom 1.5.+ override[0m
+2025-08-02 15:08:10   Trying fabric-loom 1.8.19...
+[0;34m2025-08-02 15:08:10 INFO: Testing build: fabric-loom 1.8.19 override[0m
+2025-08-02 15:08:10 Command: ./gradlew build -Ploom_version=1.8.19
+[0;31m2025-08-02 15:08:11 ERROR: Build failed: fabric-loom 1.8.19 override[0m
+2025-08-02 15:08:11   Trying fabric-loom 1.8.18...
+[0;34m2025-08-02 15:08:11 INFO: Testing build: fabric-loom 1.8.18 override[0m
+2025-08-02 15:08:11 Command: ./gradlew build -Ploom_version=1.8.18
+[0;31m2025-08-02 15:08:13 ERROR: Build failed: fabric-loom 1.8.18 override[0m
+2025-08-02 15:08:13   Trying fabric-loom 1.8.17...
+[0;34m2025-08-02 15:08:13 INFO: Testing build: fabric-loom 1.8.17 override[0m
+2025-08-02 15:08:13 Command: ./gradlew build -Ploom_version=1.8.17
+[0;31m2025-08-02 15:08:14 ERROR: Build failed: fabric-loom 1.8.17 override[0m
+2025-08-02 15:08:14   Trying fabric-loom 1.8.16...
+[0;34m2025-08-02 15:08:14 INFO: Testing build: fabric-loom 1.8.16 override[0m
+2025-08-02 15:08:14 Command: ./gradlew build -Ploom_version=1.8.16
+[0;31m2025-08-02 15:08:15 ERROR: Build failed: fabric-loom 1.8.16 override[0m
+2025-08-02 15:08:15   Trying fabric-loom 1.8.15...
+[0;34m2025-08-02 15:08:15 INFO: Testing build: fabric-loom 1.8.15 override[0m
+2025-08-02 15:08:15 Command: ./gradlew build -Ploom_version=1.8.15
+[0;31m2025-08-02 15:08:17 ERROR: Build failed: fabric-loom 1.8.15 override[0m
+2025-08-02 15:08:17   Trying fabric-loom 1.8.14...
+[0;34m2025-08-02 15:08:17 INFO: Testing build: fabric-loom 1.8.14 override[0m
+2025-08-02 15:08:17 Command: ./gradlew build -Ploom_version=1.8.14
+[0;31m2025-08-02 15:08:19 ERROR: Build failed: fabric-loom 1.8.14 override[0m
+2025-08-02 15:08:19   Trying fabric-loom 1.8.13...
+[0;34m2025-08-02 15:08:19 INFO: Testing build: fabric-loom 1.8.13 override[0m
+2025-08-02 15:08:19 Command: ./gradlew build -Ploom_version=1.8.13
+[0;31m2025-08-02 15:08:21 ERROR: Build failed: fabric-loom 1.8.13 override[0m
+2025-08-02 15:08:21   Trying fabric-loom 1.8.12...
+[0;34m2025-08-02 15:08:21 INFO: Testing build: fabric-loom 1.8.12 override[0m
+2025-08-02 15:08:21 Command: ./gradlew build -Ploom_version=1.8.12
+[0;31m2025-08-02 15:08:23 ERROR: Build failed: fabric-loom 1.8.12 override[0m
+2025-08-02 15:08:23   Trying fabric-loom 1.7.19...
+[0;34m2025-08-02 15:08:23 INFO: Testing build: fabric-loom 1.7.19 override[0m
+2025-08-02 15:08:23 Command: ./gradlew build -Ploom_version=1.7.19
+[0;31m2025-08-02 15:08:24 ERROR: Build failed: fabric-loom 1.7.19 override[0m
+2025-08-02 15:08:24   Trying fabric-loom 1.7.18...
+[0;34m2025-08-02 15:08:24 INFO: Testing build: fabric-loom 1.7.18 override[0m
+2025-08-02 15:08:24 Command: ./gradlew build -Ploom_version=1.7.18
+[0;31m2025-08-02 15:08:25 ERROR: Build failed: fabric-loom 1.7.18 override[0m
+2025-08-02 15:08:25   Trying fabric-loom 1.7.17...
+[0;34m2025-08-02 15:08:25 INFO: Testing build: fabric-loom 1.7.17 override[0m
+2025-08-02 15:08:25 Command: ./gradlew build -Ploom_version=1.7.17
+[0;31m2025-08-02 15:08:27 ERROR: Build failed: fabric-loom 1.7.17 override[0m
+2025-08-02 15:08:27   Trying fabric-loom 1.7.16...
+[0;34m2025-08-02 15:08:27 INFO: Testing build: fabric-loom 1.7.16 override[0m
+2025-08-02 15:08:27 Command: ./gradlew build -Ploom_version=1.7.16
+[0;31m2025-08-02 15:08:28 ERROR: Build failed: fabric-loom 1.7.16 override[0m
+2025-08-02 15:08:28   Trying fabric-loom 1.7.15...
+[0;34m2025-08-02 15:08:28 INFO: Testing build: fabric-loom 1.7.15 override[0m
+2025-08-02 15:08:28 Command: ./gradlew build -Ploom_version=1.7.15
+[0;31m2025-08-02 15:08:30 ERROR: Build failed: fabric-loom 1.7.15 override[0m
+2025-08-02 15:08:30   Trying fabric-loom 1.7.14...
+[0;34m2025-08-02 15:08:30 INFO: Testing build: fabric-loom 1.7.14 override[0m
+2025-08-02 15:08:30 Command: ./gradlew build -Ploom_version=1.7.14
+[0;31m2025-08-02 15:08:31 ERROR: Build failed: fabric-loom 1.7.14 override[0m
+2025-08-02 15:08:31   Trying fabric-loom 1.7.13...
+[0;34m2025-08-02 15:08:31 INFO: Testing build: fabric-loom 1.7.13 override[0m
+2025-08-02 15:08:31 Command: ./gradlew build -Ploom_version=1.7.13
+[0;31m2025-08-02 15:08:33 ERROR: Build failed: fabric-loom 1.7.13 override[0m
+2025-08-02 15:08:33   Trying fabric-loom 1.7.12...
+[0;34m2025-08-02 15:08:33 INFO: Testing build: fabric-loom 1.7.12 override[0m
+2025-08-02 15:08:33 Command: ./gradlew build -Ploom_version=1.7.12
+[0;31m2025-08-02 15:08:35 ERROR: Build failed: fabric-loom 1.7.12 override[0m
+2025-08-02 15:08:35   Trying fabric-loom 1.6.14...
+[0;34m2025-08-02 15:08:35 INFO: Testing build: fabric-loom 1.6.14 override[0m
+2025-08-02 15:08:35 Command: ./gradlew build -Ploom_version=1.6.14
+[0;31m2025-08-02 15:08:37 ERROR: Build failed: fabric-loom 1.6.14 override[0m
+2025-08-02 15:08:37   Trying fabric-loom 1.5.14...
+[0;34m2025-08-02 15:08:37 INFO: Testing build: fabric-loom 1.5.14 override[0m
+2025-08-02 15:08:37 Command: ./gradlew build -Ploom_version=1.5.14
+[0;31m2025-08-02 15:08:38 ERROR: Build failed: fabric-loom 1.5.14 override[0m
+2025-08-02 15:08:38   Trying fabric-loom 1.4.10...
+[0;34m2025-08-02 15:08:38 INFO: Testing build: fabric-loom 1.4.10 override[0m
+2025-08-02 15:08:38 Command: ./gradlew build -Ploom_version=1.4.10
+[0;31m2025-08-02 15:08:40 ERROR: Build failed: fabric-loom 1.4.10 override[0m
+2025-08-02 15:08:40   Trying fabric-loom 1.3.12...
+[0;34m2025-08-02 15:08:40 INFO: Testing build: fabric-loom 1.3.12 override[0m
+2025-08-02 15:08:40 Command: ./gradlew build -Ploom_version=1.3.12
+[0;31m2025-08-02 15:08:41 ERROR: Build failed: fabric-loom 1.3.12 override[0m
+2025-08-02 15:08:41   Trying fabric-loom 1.2.14...
+[0;34m2025-08-02 15:08:41 INFO: Testing build: fabric-loom 1.2.14 override[0m
+2025-08-02 15:08:41 Command: ./gradlew build -Ploom_version=1.2.14
+[0;34m2025-08-02 15:12:57 INFO: Restoring original project files...[0m
+2025-08-02 15:12:57 ✓ Restored build.gradle
+2025-08-02 15:12:57 ✓ Restored gradle.properties
+2025-08-02 15:12:57 ✓ Restored settings.gradle
+[0;34m2025-08-02 15:12:57 INFO: 🧹 Cleanup completed.[0m

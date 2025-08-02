@@ -1,0 +1,100 @@
+2025-08-02 15:05:16 🔧 Initializing adaptive build system...
+2025-08-02 15:05:16 ✓ Backed up build.gradle
+2025-08-02 15:05:16 ✓ Backed up gradle.properties
+2025-08-02 15:05:16 ✓ Backed up settings.gradle
+2025-08-02 15:05:16 🚀 Starting adaptive recursive build process...
+2025-08-02 15:05:16 
+2025-08-02 15:05:16 === ATTEMPT #1/30 ===
+2025-08-02 15:05:16 Testing build with args: 
+2025-08-02 15:05:18 Build failed. Error analysis:
+2025-08-02 15:05:18   FAILURE: Build failed with an exception.
+2025-08-02 15:05:18   > Could not read workspace metadata from /home/runner/.gradle/caches/8.14.2/groovy-dsl/6a03b287e33a9415b8c71245d15f88f9/metadata.bin
+2025-08-02 15:05:18 Phase 5: Last resort attempts...
+2025-08-02 15:05:18 🔧 Systematic fabric-loom version testing...
+2025-08-02 15:05:18   Testing fabric-loom version: 1.8.19
+2025-08-02 15:05:18 Testing build with args: -Ploom_version=1.8.19
+2025-08-02 15:05:19   Testing fabric-loom version: 1.8.18
+2025-08-02 15:05:19 Testing build with args: -Ploom_version=1.8.18
+2025-08-02 15:05:20   Testing fabric-loom version: 1.8.17
+2025-08-02 15:05:20 Testing build with args: -Ploom_version=1.8.17
+2025-08-02 15:05:20   Testing fabric-loom version: 1.8.16
+2025-08-02 15:05:20 Testing build with args: -Ploom_version=1.8.16
+2025-08-02 15:05:21   Testing fabric-loom version: 1.8.15
+2025-08-02 15:05:21 Testing build with args: -Ploom_version=1.8.15
+2025-08-02 15:05:22   Testing fabric-loom version: 1.7.19
+2025-08-02 15:05:22 Testing build with args: -Ploom_version=1.7.19
+2025-08-02 15:05:23   Testing fabric-loom version: 1.7.18
+2025-08-02 15:05:23 Testing build with args: -Ploom_version=1.7.18
+2025-08-02 15:05:24   Testing fabric-loom version: 1.7.17
+2025-08-02 15:05:24 Testing build with args: -Ploom_version=1.7.17
+2025-08-02 15:05:24   Testing fabric-loom version: 1.7.16
+2025-08-02 15:05:24 Testing build with args: -Ploom_version=1.7.16
+2025-08-02 15:05:25   Testing fabric-loom version: 1.7.15
+2025-08-02 15:05:25 Testing build with args: -Ploom_version=1.7.15
+2025-08-02 15:05:26   Testing fabric-loom version: 1.8.+
+2025-08-02 15:05:26 Testing build with args: -Ploom_version=1.8.+
+2025-08-02 15:05:27   Testing fabric-loom version: 1.7.+
+2025-08-02 15:05:27 Testing build with args: -Ploom_version=1.7.+
+2025-08-02 15:05:27   Testing fabric-loom version: 1.6.+
+2025-08-02 15:05:27 Testing build with args: -Ploom_version=1.6.+
+2025-08-02 15:05:28   Testing fabric-loom version: 1.5.+
+2025-08-02 15:05:28 Testing build with args: -Ploom_version=1.5.+
+2025-08-02 15:05:29   Testing fabric-loom version: 1.8.19
+2025-08-02 15:05:29 Testing build with args: -Ploom_version=1.8.19
+2025-08-02 15:05:30   Testing fabric-loom version: 1.7.19
+2025-08-02 15:05:30 Testing build with args: -Ploom_version=1.7.19
+2025-08-02 15:05:30   Testing fabric-loom version: 1.6.19
+2025-08-02 15:05:30 Testing build with args: -Ploom_version=1.6.19
+2025-08-02 15:05:31   Testing fabric-loom version: 1.5.19
+2025-08-02 15:05:31 Testing build with args: -Ploom_version=1.5.19
+2025-08-02 15:05:32 🔧 Attempting environment fixes...
+2025-08-02 15:05:32   Cleaning all caches and temporary files...
+2025-08-02 15:05:33 Testing build with args: --refresh-dependencies
+2025-08-02 15:05:33   Trying offline mode...
+2025-08-02 15:05:33 Testing build with args: --offline
+2025-08-02 15:05:34   Trying with gradle wrapper refresh...
+2025-08-02 15:05:35 Testing build with args: 
+2025-08-02 15:05:35   Trying with different JVM settings...
+2025-08-02 15:05:35 Testing build with args: -Dorg.gradle.jvmargs=-Xmx2G
+2025-08-02 15:05:43 ❌ Attempt #1 failed. Preparing for next attempt...
+2025-08-02 15:05:43 ✓ Restored build.gradle
+2025-08-02 15:05:43 ✓ Restored gradle.properties
+2025-08-02 15:05:43 ✓ Restored settings.gradle
+2025-08-02 15:05:43 
+2025-08-02 15:05:43 === ATTEMPT #2/30 ===
+2025-08-02 15:05:43 Testing build with args: 
+2025-08-02 15:05:48 Build failed. Error analysis:
+2025-08-02 15:05:48   FAILURE: Build failed with an exception.
+2025-08-02 15:05:48   Plugin [id: 'fabric-loom', version: '1.11-SNAPSHOT'] was not found in any of the following sources:
+2025-08-02 15:05:48 Phase 5: Last resort attempts...
+2025-08-02 15:05:48 🔧 Systematic fabric-loom version testing...
+2025-08-02 15:05:48   Testing fabric-loom version: 1.8.19
+2025-08-02 15:05:48 Testing build with args: -Ploom_version=1.8.19
+2025-08-02 15:05:50   Testing fabric-loom version: 1.8.18
+2025-08-02 15:05:50 Testing build with args: -Ploom_version=1.8.18
+2025-08-02 15:05:52   Testing fabric-loom version: 1.8.17
+2025-08-02 15:05:52 Testing build with args: -Ploom_version=1.8.17
+2025-08-02 15:05:53   Testing fabric-loom version: 1.8.16
+2025-08-02 15:05:53 Testing build with args: -Ploom_version=1.8.16
+2025-08-02 15:05:55   Testing fabric-loom version: 1.8.15
+2025-08-02 15:05:55 Testing build with args: -Ploom_version=1.8.15
+2025-08-02 15:05:57   Testing fabric-loom version: 1.7.19
+2025-08-02 15:05:57 Testing build with args: -Ploom_version=1.7.19
+2025-08-02 15:05:59   Testing fabric-loom version: 1.7.18
+2025-08-02 15:05:59 Testing build with args: -Ploom_version=1.7.18
+2025-08-02 15:06:01   Testing fabric-loom version: 1.7.17
+2025-08-02 15:06:01 Testing build with args: -Ploom_version=1.7.17
+2025-08-02 15:06:02   Testing fabric-loom version: 1.7.16
+2025-08-02 15:06:02 Testing build with args: -Ploom_version=1.7.16
+2025-08-02 15:06:04   Testing fabric-loom version: 1.7.15
+2025-08-02 15:06:04 Testing build with args: -Ploom_version=1.7.15
+2025-08-02 15:06:06   Testing fabric-loom version: 1.8.+
+2025-08-02 15:06:06 Testing build with args: -Ploom_version=1.8.+
+2025-08-02 15:06:08   Testing fabric-loom version: 1.7.+
+2025-08-02 15:06:08 Testing build with args: -Ploom_version=1.7.+
+2025-08-02 15:06:10   Testing fabric-loom version: 1.6.+
+2025-08-02 15:06:10 Testing build with args: -Ploom_version=1.6.+
+2025-08-02 15:06:11   Testing fabric-loom version: 1.5.+
+2025-08-02 15:06:11 Testing build with args: -Ploom_version=1.5.+
+2025-08-02 15:06:13   Testing fabric-loom version: 1.8.19
+2025-08-02 15:06:13 Testing build with args: -Ploom_version=1.8.19
