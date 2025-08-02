@@ -329,7 +329,7 @@ public class VillagerUtilityAI {
             float utility = marriageDecision.calculateUtility(villager, potential);
             float threshold = getMarriageThreshold(villager);
             
-            return utility > threshold && ThreadLocalRandom.current().nextFloat() < (utility * 0.1f);
+            return utility > threshold && ThreadLocalRandom.current().nextFloat() < (utility * PROPOSAL_PROBABILITY_MODIFIER);
         }
         
         private float getMarriageThreshold(VillagerEntity villager) {
