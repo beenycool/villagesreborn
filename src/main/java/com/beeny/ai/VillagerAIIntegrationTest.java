@@ -137,7 +137,7 @@ public class VillagerAIIntegrationTest {
             
             // Test emotional contagion
             VillagerEmotionSystem.processEmotionalEvent(villager,
-                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.FEAR, 30.0f, "test_fear", false));
+                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.FEAR, 30.0f, "test_fear", true));
             
             float fearLevel = emotions.getEmotion(VillagerEmotionSystem.EmotionType.FEAR);
             float stressLevel = emotions.getEmotion(VillagerEmotionSystem.EmotionType.STRESS);

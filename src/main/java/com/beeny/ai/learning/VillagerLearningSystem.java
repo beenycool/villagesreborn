@@ -587,6 +587,83 @@ public class VillagerLearningSystem {
             }
         }
         
+        // Load experiences
+        if (learningNbt.contains("experiences")) {
+            NbtList experiencesNbt = learningNbt.getList("experiences", 10); // 10 = Compound
+            for (int i = 0; i < experiencesNbt.size(); i++) {
+                NbtCompound expNbt = experiencesNbt.getCompound(i);
+                
+                // Reconstruct parameters
+                Map<String, Object> parameters = new HashMap<>();
+                if (expNbt.contains("parameters")) {
+                    NbtCompound paramsNbt = expNbt.getCompound("parameters").orElse(null);
+                    if (paramsNbt != null) {
+                        for (String key : paramsNbt.getKeys()) {
+                            if (paramsNbt.contains(key, 8)) {            // String
+                                parameters.put(key, paramsNbt.getString(key));
+                            } else if (paramsNbt.contains(key, 5)) {     // Float
+                                parameters.put(key, paramsNbt.getFloat(key).orElse(0f));
+                            } else if (paramsNbt.contains(key, 3)) {     // Int
+                                parameters.put(key, paramsNbt.getInt(key).orElse(0));
+                            }
+                        }
+                    }
+                }
+                
+                Experience exp = new Experience(
+                    ExperienceType.valueOf(expNbt.getString("type")),
+                    expNbt.getString("context"),
+                    parameters,
+                    expNbt.getFloat("outcome").orElse(0f)
+                );
+                
+                // Restore reinforcement count
+                int reinforcements = expNbt.getInt("reinforcements").orElse(1);
+                for (int j = 1; j < reinforcements; j++) {
+                    exp.reinforce(exp.getOutcome());
+                }
+                
+                profile.experiences.add(exp);
+            }
+        }
+        
+        // Load patterns
+        if (learningNbt.contains("patterns")) {
+            NbtList patternsNbt = learningNbt.getList("patterns", 10);
+            for (int i = 0; i < patternsNbt.size(); i++) {
+                NbtCompound patNbt = patternsNbt.getCompound(i);
+                
+                LearnedPattern pattern = new LearnedPattern(
+                    patNbt.getString("pattern_id"),
+                    patNbt.getString("description")
+                );
+                pattern.confidence     = patNbt.getFloat("confidence").orElse(0.1f);
+                pattern.timesObserved  = patNbt.getInt("times_observed").orElse(0);
+                
+                // Load conditions
+                if (patNbt.contains("conditions")) {
+                    NbtCompound condNbt = patNbt.getCompound("conditions").orElse(null);
+                    if (condNbt != null) {
+                        for (String key : condNbt.getKeys()) {
+                            pattern.conditions.put(key, condNbt.getFloat(key).orElse(0f));
+                        }
+                    }
+                }
+                
+                // Load outcomes
+                if (patNbt.contains("outcomes")) {
+                    NbtCompound outNbt = patNbt.getCompound("outcomes").orElse(null);
+                    if (outNbt != null) {
+                        for (String key : outNbt.getKeys()) {
+                            pattern.outcomes.put(key, outNbt.getFloat(key).orElse(0f));
+                        }
+                    }
+                }
+                
+                profile.patterns.put(pattern.patternId, pattern);
+            }
+        }
+        
         if (learningNbt != null && learningNbt.contains("learning_rate")) {
             profile.learningRate = learningNbt.getFloat("learning_rate").orElse(0f);
         }

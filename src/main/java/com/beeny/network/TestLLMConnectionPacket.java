@@ -58,16 +58,16 @@ public record TestLLMConnectionPacket(String provider, String apiKey, String end
 
     public static final PacketCodec<RegistryByteBuf, TestLLMConnectionPacket> CODEC = PacketCodec.of(
         (value, buf) -> {
-            buf.writeString(value.provider);
-            buf.writeString(encrypt(value.apiKey)); // Encrypt apiKey before sending
-            buf.writeString(value.endpoint);
-            buf.writeString(value.model);
+            buf.writeString(value.provider, 32767); // Max string length
+            buf.writeString(encrypt(value.apiKey), 32767); // Encrypt apiKey before sending
+            buf.writeString(value.endpoint, 32767);
+            buf.writeString(value.model, 32767);
         },
         buf -> new TestLLMConnectionPacket(
-            buf.readString(),
-            decrypt(buf.readString()), // Decrypt apiKey after receiving
-            buf.readString(),
-            buf.readString()
+            buf.readString(32767),
+            decrypt(buf.readString(32767)), // Decrypt apiKey after receiving
+            buf.readString(32767),
+            buf.readString(32767)
         )
     );
 
