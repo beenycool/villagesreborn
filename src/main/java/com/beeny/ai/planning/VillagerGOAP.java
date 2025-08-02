@@ -87,22 +87,12 @@ public class VillagerGOAP {
             for (String key : goal.getKeys()) {
                 if (!hasKey(key)) return false;
 
-                boolean match = false;
-                // Try bool
-                if (goal.getBool(key) || !goal.getBool(key) == getBool(key)) {
-                    match = Objects.equals(goal.getBool(key), getBool(key));
-                } else if (goal.getInt(key) != 0 || getInt(key) != 0) {
-                    match = Objects.equals(goal.getInt(key), getInt(key));
-                } else if (goal.getFloat(key) != 0.0f || getFloat(key) != 0.0f) {
-                    match = Objects.equals(goal.getFloat(key), getFloat(key));
-                } else if (goal.getString(key) != null || getString(key) != null) {
-                    match = Objects.equals(goal.getString(key), getString(key));
-                } else {
-                    // If all getters fail, fallback to false
-                    match = false;
-                }
-
-                if (!match) {
+                // Get the actual stored objects to determine type and compare directly
+                Object goalValue = ((SimpleWorldState) goal).state.get(key);
+                Object currentValue = this.state.get(key);
+                
+                // Compare objects directly - this handles all types correctly
+                if (!Objects.equals(goalValue, currentValue)) {
                     return false;
                 }
             }
