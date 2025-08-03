@@ -666,13 +666,15 @@ public class VillagerLearningSystem {
     }
     
     // Global learning system management
-    public static void updateGlobalLearning() {
-        // Cleanup old learning profiles
-        learningProfiles.entrySet().removeIf(entry -> {
-            VillagerLearningProfile profile = entry.getValue();
-            return (System.currentTimeMillis() - profile.lastLearningUpdate) > 86400000; // 24 hours
-        });
-    }
+ public void addExperience(Experience experience) {
+     experiences.add(experience);
+     this.lastLearningUpdate = System.currentTimeMillis();
+ 
+     // Limit experience history to prevent memory issues
+     if (experiences.size() > EXPERIENCE_LIMIT) {
+         experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
+     }
+ }
     
     // Analytics and debugging
     public static Map<String, Object> getLearningAnalytics(VillagerEntity villager) {
