@@ -29,9 +29,7 @@ public record TestLLMConnectionPacket(String provider, String apiKey, String end
     // --- SECURITY NOTE ---
     // The apiKey field is now encrypted using AES before transmission.
     // For real security, use proper key management and exchange.
-    private static final String AES_SECRET = System.getenv("VILLAGERS_REBORN_AES_SECRET") != null
-        ? System.getenv("VILLAGERS_REBORN_AES_SECRET")
-        : "villagersrebornAES"; // fallback, but should be set in env for production
+    private static final String AES_SECRET = "villagersrebornAES"; // 16 chars for AES-128
 
     private static String encrypt(String plainText) {
         try {
@@ -80,32 +78,5 @@ public record TestLLMConnectionPacket(String provider, String apiKey, String end
 
     public static void register() {
         PayloadTypeRegistry.playC2S().register(ID, CODEC);
-        
-        ServerPlayNetworking.registerGlobalReceiver(ID, (payload, context) -> {
-            context.server().execute(() -> {
-                // Test the LLM connection with the provided parameters
-                com.beeny.dialogue.LLMDialogueManager.testConnection(
-                    payload.provider(),
-                    payload.apiKey(),
-                    payload.endpoint(),
-                    payload.model()
-                ).whenComplete((success, throwable) -> {
-                    String message;
-                    boolean result;
-                    
-                    if (throwable != null) {
-                        result = false;
-                        message = "Connection test failed: " + throwable.getMessage();
-                    } else {
-                        result = success;
-                        message = success ? "Connection successful!" : "Connection failed - please check your configuration";
-                    }
-                    
-                    // Send result back to client
-                    TestLLMConnectionResultPacket resultPacket = new TestLLMConnectionResultPacket(result, message);
-                    ServerPlayNetworking.send(context.player(), resultPacket);
-                });
-            });
-        });
     }
 }

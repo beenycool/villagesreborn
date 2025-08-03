@@ -714,9 +714,9 @@ public class VillagerProfessionManager {
             }
 
             // Filter based on village needs
+            VillagerUtilityAI.VillageNeedsConsideration villageNeeds = new VillagerUtilityAI.VillageNeedsConsideration();
             return unique.stream()
                 .filter(prof -> {
-                    VillagerUtilityAI.VillageNeedsConsideration villageNeeds = new VillagerUtilityAI.VillageNeedsConsideration();
                     // Use the registry ID string consistently for needs evaluation
                     String key = Registries.VILLAGER_PROFESSION.getId(prof).toString();
                     return villageNeeds.getValue(villager, key) > VILLAGE_NEED_FILTER_THRESHOLD;

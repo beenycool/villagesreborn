@@ -54,12 +54,12 @@ public class VillagerData {
             data.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
             data.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
             data.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
+            data.lastConversationTime = 0;
             data.hobby = "";
             data.birthTime = 0L;
             data.birthPlace = "";
             data.notes = "";
             data.deathTime = 0L;
-            data.lastConversationTime = 0;
             return data;
         })
     );

@@ -1,5 +1,6 @@
 package com.beeny.ai.learning;
 
+import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -102,7 +103,7 @@ public class VillagerLearningSystem {
             this.timesObserved = 0;
         }
         
-        public void updatePattern(Map<String, Float> observedConditions, float outcome) {
+        public synchronized void updatePattern(Map<String, Float> observedConditions, float outcome) {
             timesObserved++;
             
             // Update confidence based on consistency
@@ -172,7 +173,7 @@ public class VillagerLearningSystem {
             experiences.add(experience);
             
             // Limit experience history to prevent memory issues
-            if (experiences.size() > 200) {
+            if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
                 experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
             }
             
@@ -605,8 +606,14 @@ public class VillagerLearningSystem {
                         }
                     }
                 }
+                ExperienceType expType;
+                try {
+                    expType = ExperienceType.valueOf(expNbt.getString("type").orElse("PLAYER_INTERACTION"));
+                } catch (IllegalArgumentException e) {
+                    expType = ExperienceType.PLAYER_INTERACTION; // Default fallback
+                }
                 Experience exp = new Experience(
-                    ExperienceType.valueOf(expNbt.getString("type").orElse("GENERAL")),
+                    expType,
                     expNbt.getString("context").orElse(""),
                     parameters,
                     expNbt.getFloat("outcome").orElse(0f)

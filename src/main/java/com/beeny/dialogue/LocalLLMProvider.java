@@ -20,16 +20,8 @@ public class LocalLLMProvider extends BaseLLMProvider {
     public LocalLLMProvider() {
         super(
             "", // no API key for local usage
-            VillagersRebornConfig.LLM_LOCAL_URL,
+            VillagersRebornConfig.LLM_LOCAL_ENDPOINT,
             VillagersRebornConfig.LLM_MODEL
-        );
-    }
-
-    public LocalLLMProvider(String apiKey, String endpoint, String model) {
-        super(
-            apiKey != null ? apiKey : "", // no API key needed for local usage
-            (endpoint == null || endpoint.isEmpty()) ? VillagersRebornConfig.LLM_LOCAL_URL : endpoint,
-            (model == null || model.isEmpty()) ? VillagersRebornConfig.LLM_MODEL : model
         );
     }
 
@@ -98,11 +90,9 @@ public class LocalLLMProvider extends BaseLLMProvider {
 
     @Override
     public boolean isConfigured() {
-        // Local LLM only needs a valid endpoint
-        return endpoint != null
-            && !endpoint.isEmpty()
-            && VillagersRebornConfig.LLM_LOCAL_URL != null
-            && !VillagersRebornConfig.LLM_LOCAL_URL.isEmpty();
+        return "local".equals(VillagersRebornConfig.LLM_PROVIDER)
+            && VillagersRebornConfig.LLM_LOCAL_ENDPOINT != null
+            && !VillagersRebornConfig.LLM_LOCAL_ENDPOINT.isEmpty();
     }
 
     @Override

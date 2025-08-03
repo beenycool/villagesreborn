@@ -14,6 +14,7 @@ public class VillagersRebornConfig {
     
     public static boolean ENABLE_DYNAMIC_DIALOGUE = true;
     public static String LLM_PROVIDER = "gemini"; // "gemini", "openrouter", or "local"
+    // API key is now read from environment variable VILLAGERS_REBORN_API_KEY
     public static String LLM_API_KEY = "";
     public static String LLM_API_ENDPOINT = "";
     public static String LLM_MODEL = "";
@@ -24,12 +25,12 @@ public class VillagersRebornConfig {
     public static boolean ENABLE_DIALOGUE_CACHE = true;
     public static int DIALOGUE_CACHE_SIZE = 1000;
     public static int CONVERSATION_HISTORY_LIMIT = 10;
-    
+    public static int MAX_EXPERIENCE_HISTORY = 200;
+
     // Local LLM settings (when LLM_PROVIDER = "local")
     // Renamed for naming consistency with other llm* keys
     public static String LLM_LOCAL_URL = "http://localhost:8080";
-    
-    
+    public static String LLM_LOCAL_ENDPOINT = "http://localhost:8080";    
     public static int getBoundingBoxSize() {
         return VILLAGER_SCAN_CHUNK_RADIUS * 16;
     }

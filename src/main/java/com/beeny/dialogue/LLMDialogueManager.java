@@ -71,10 +71,7 @@ public class LLMDialogueManager {
             
             // Check cache first
             String cacheKey = DialogueCache.generateCacheKey(context, category, conversationHistory);
-            String cachedDialogue;
-            synchronized (DialogueCache.class) {
-                cachedDialogue = DialogueCache.get(cacheKey);
-            }
+            String cachedDialogue = DialogueCache.get(cacheKey);
             if (cachedDialogue != null) {
                 return CompletableFuture.completedFuture(
                     Text.literal(cachedDialogue).formatted(getDialogueFormatting(context))
@@ -215,20 +212,11 @@ public class LLMDialogueManager {
      */
     public static CompletableFuture<Boolean> testConnection(String provider, String apiKey, String endpoint, String model) {
         try {
-            // Create a temporary provider instance with the provided parameters
+            // Minimal validation: ensure provider instance can be created and is configured
             LLMDialogueProvider temp = createProvider(provider, apiKey, endpoint, model);
-            if (temp == null) {
-                return CompletableFuture.completedFuture(false);
-            }
-            
-            // Check if the provider is properly configured
-            if (!temp.isConfigured()) {
-                return CompletableFuture.completedFuture(false);
-            }
-            
-            // For a more thorough test, we could try to make a simple request
-            // but for now, just checking configuration is sufficient
-            return CompletableFuture.completedFuture(true);
+            return CompletableFuture.completedFuture(temp != null && temp.isConfigured());
+
+
         } catch (Throwable e) {
             return CompletableFuture.completedFuture(false);
         }
@@ -238,20 +226,15 @@ public class LLMDialogueManager {
      * Helper to create a provider instance from parameters.
      */
     private static LLMDialogueProvider createProvider(String provider, String apiKey, String endpoint, String model) {
-        try {
-            switch (provider.toLowerCase()) {
-                case "gemini":
-                    return new GeminiDialogueProvider(apiKey, endpoint, model);
-                case "openrouter":
-                    return new OpenRouterDialogueProvider(apiKey, endpoint, model);
-                case "local":
-                    return new LocalLLMProvider(apiKey, endpoint, model);
-                default:
-                    return null;
-            }
-        } catch (Exception e) {
-            System.err.println("Failed to create LLM provider: " + e.getMessage());
-            return null;
+        switch (provider.toLowerCase()) {
+            case "gemini":
+                return new GeminiDialogueProvider();
+            case "openrouter":
+                return new OpenRouterDialogueProvider();
+            case "local":
+                return new LocalLLMProvider();
+            default:
+                return null;
         }
     }
 

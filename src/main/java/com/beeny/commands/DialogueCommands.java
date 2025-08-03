@@ -262,7 +262,7 @@ public class DialogueCommands {
         
         LLMDialogueManager.testConnection(
             com.beeny.config.VillagersRebornConfig.LLM_PROVIDER,
-            com.beeny.config.VillagersRebornConfig.LLM_API_KEY,
+            System.getenv("VILLAGERS_REBORN_API_KEY"),
             com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT,
             com.beeny.config.VillagersRebornConfig.LLM_MODEL
         ).thenAccept(success -> {

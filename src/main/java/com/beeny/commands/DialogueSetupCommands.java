@@ -260,11 +260,14 @@ public class DialogueSetupCommands {
                 Text.literal("3. Go to Keys section and create an API key").formatted(Formatting.WHITE), false);
         }
         
-        source.sendFeedback(() -> 
+        source.sendFeedback(() ->
             Text.literal("\n→ Type: ").formatted(Formatting.WHITE)
                 .append(Text.literal("/setup-response YOUR_API_KEY_HERE").formatted(Formatting.YELLOW)
                     .styled(style -> style.withClickEvent(new ClickEvent.SuggestCommand("/setup-response "))
-                        .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click to enter your API key"))))), false);
+                        .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click to enter your API key\n§cWarning: This may be logged!"))))), false);
+        
+        source.sendFeedback(() ->
+            Text.literal("⚠ Security Note: API keys entered here may appear in server logs!").formatted(Formatting.YELLOW), false);
     }
     
     private static void handleApiKeyInput(ServerCommandSource source, SetupSession session, String response) {
@@ -291,9 +294,13 @@ public class DialogueSetupCommands {
         // Apply configuration
         VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = true;
         VillagersRebornConfig.LLM_PROVIDER = session.provider;
-        VillagersRebornConfig.LLM_API_KEY = apiKey;
+        // API key is now read from environment variable
         VillagersRebornConfig.LLM_API_ENDPOINT = "";
         VillagersRebornConfig.LLM_MODEL = defaultModel;
+        
+        // Security warning about storing API key in config
+        source.sendFeedback(() ->
+            Text.literal("⚠ Security Warning: API key stored in config file. Consider using environment variables for better security.").formatted(Formatting.YELLOW), false);
         
         LLMDialogueManager.initialize();
         
@@ -342,7 +349,7 @@ public class DialogueSetupCommands {
     private static void testConnectionAndReport(ServerCommandSource source) {
         LLMDialogueManager.testConnection(
             com.beeny.config.VillagersRebornConfig.LLM_PROVIDER,
-            com.beeny.config.VillagersRebornConfig.LLM_API_KEY,
+            System.getenv("VILLAGERS_REBORN_API_KEY"),
             com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT,
             com.beeny.config.VillagersRebornConfig.LLM_MODEL
         ).thenAccept(success -> {

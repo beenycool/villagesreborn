@@ -23,6 +23,7 @@ import java.util.*;
  * Tests the interoperability and data flow between different AI systems
  */
 public class VillagerAIIntegrationTest {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerAIIntegrationTest.class);
     
     public static class IntegrationTestResult {
         public final String testName;
@@ -553,7 +554,7 @@ public class VillagerAIIntegrationTest {
                    learningProfile != null;
                    
         } catch (Exception e) {
-            System.err.println("AI Health Check Failed: " + e.getMessage());
+            LOGGER.error("AI Health Check Failed: {}", e.getMessage(), e);
             return false;
         }
     }

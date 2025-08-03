@@ -587,49 +587,24 @@ public class VillagerDialogueSystem {
         DialogueCategory openingCategory = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
             ? DialogueCategory.GREETING
             : DialogueCategory.MOOD;
-        conversation.add(generateDialogue(context, openingCategory, dialogue -> {
-            // Store the opening dialogue in memory for context
-            if (dialogue != null) {
-                VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
-                    "Conversation started with " + openingCategory.name().toLowerCase());
-            }
-        }));
+        conversation.add(generateDialogue(context, openingCategory, t -> {}));
 
         DialogueCategory mainCategory = chooseDialogueCategory(context);
         if (mainCategory != openingCategory) {
-            conversation.add(generateDialogue(context, mainCategory, dialogue -> {
-                // Update villager's topic frequency when dialogue is generated
-                if (dialogue != null && context.villagerData != null) {
-                    context.villagerData.incrementTopicFrequency(mainCategory.name());
-                }
-            }));
+            conversation.add(generateDialogue(context, mainCategory, t -> {}));
         }
 
         if (context.playerReputation > 30 && java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
             DialogueCategory followUp = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
                 ? DialogueCategory.GOSSIP
                 : DialogueCategory.ADVICE;
-            conversation.add(generateDialogue(context, followUp, dialogue -> {
-                // High reputation players get better relationship building
-                if (dialogue != null && context.villagerData != null) {
-                    context.villagerData.adjustPlayerReputation(context.player.getUuidAsString(), 1);
-                    VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
-                        "Shared " + followUp.name().toLowerCase());
-                }
-            }));
+            conversation.add(generateDialogue(context, followUp, t -> {}));
         }
 
         if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK
             || context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT)
             && mainCategory != DialogueCategory.FAREWELL) {
-            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, dialogue -> {
-                // End conversation properly and update conversation time
-                if (dialogue != null && context.villagerData != null) {
-                    context.villagerData.updateLastConversationTime();
-                    VillagerMemoryManager.addPlayerMessage(context.villager, context.player, 
-                        "Conversation ended");
-                }
-            }));
+            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, t -> {}));
         }
 
         return conversation;

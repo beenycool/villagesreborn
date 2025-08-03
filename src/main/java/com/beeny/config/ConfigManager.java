@@ -31,7 +31,7 @@ public class ConfigManager {
         // LLM dialogue settings
         config.addProperty("enableDynamicDialogue", VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE);
         config.addProperty("llmProvider", VillagersRebornConfig.LLM_PROVIDER);
-        config.addProperty("llmApiKey", VillagersRebornConfig.LLM_API_KEY);
+        // API key is no longer stored in config; read from environment variable
         config.addProperty("llmApiEndpoint", VillagersRebornConfig.LLM_API_ENDPOINT);
         config.addProperty("llmModel", VillagersRebornConfig.LLM_MODEL);
         config.addProperty("llmTemperature", VillagersRebornConfig.LLM_TEMPERATURE);
@@ -97,9 +97,7 @@ public class ConfigManager {
                 VillagersRebornConfig.LLM_PROVIDER = config.get("llmProvider").getAsString();
             }
             
-            if (config.has("llmApiKey")) {
-                VillagersRebornConfig.LLM_API_KEY = config.get("llmApiKey").getAsString();
-            }
+            // API key is no longer loaded from config; read from environment variable
             
             if (config.has("llmApiEndpoint")) {
                 VillagersRebornConfig.LLM_API_ENDPOINT = config.get("llmApiEndpoint").getAsString();
@@ -155,7 +153,7 @@ public class ConfigManager {
             VillagersRebornConfig.HAPPINESS_RECOVERY_RATE,
             VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE,
             VillagersRebornConfig.LLM_PROVIDER,
-            VillagersRebornConfig.LLM_API_KEY,
+            System.getenv("VILLAGERS_REBORN_API_KEY"),
             VillagersRebornConfig.LLM_API_ENDPOINT,
             VillagersRebornConfig.LLM_MODEL,
             VillagersRebornConfig.LLM_TEMPERATURE,

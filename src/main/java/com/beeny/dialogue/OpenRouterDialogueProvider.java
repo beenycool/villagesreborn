@@ -13,7 +13,7 @@ public class OpenRouterDialogueProvider extends BaseLLMProvider {
     
     public OpenRouterDialogueProvider() {
         super(
-            VillagersRebornConfig.LLM_API_KEY,
+            System.getenv("VILLAGERS_REBORN_API_KEY"),
             VillagersRebornConfig.LLM_API_ENDPOINT.isEmpty() ? DEFAULT_ENDPOINT : VillagersRebornConfig.LLM_API_ENDPOINT,
             VillagersRebornConfig.LLM_MODEL.isEmpty() ? "openai/gpt-3.5-turbo" : VillagersRebornConfig.LLM_MODEL
         );
@@ -21,7 +21,7 @@ public class OpenRouterDialogueProvider extends BaseLLMProvider {
 
     public OpenRouterDialogueProvider(String apiKey, String endpoint, String model) {
         super(
-            apiKey != null ? apiKey : VillagersRebornConfig.LLM_API_KEY,
+            apiKey != null ? apiKey : System.getenv("VILLAGERS_REBORN_API_KEY"),
             (endpoint == null || endpoint.isEmpty()) ? DEFAULT_ENDPOINT : endpoint,
             (model == null || model.isEmpty()) ? "openai/gpt-3.5-turbo" : model
         );
