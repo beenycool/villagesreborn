@@ -54,6 +54,7 @@ public class VillagerAIManager {
         public int goapPlanningInterval = 10; // seconds
         public int learningUpdateInterval = 300; // seconds
         public int questGenerationInterval = 600; // seconds
+        public int utilityAIUpdateInterval = 20; // seconds (default)
         
         public float emotionIntensityMultiplier = 1.0f;
         public float gossipSpreadMultiplier = 1.0f;
@@ -62,8 +63,26 @@ public class VillagerAIManager {
     }
     
     private static AIConfig config = new AIConfig();
-    private static final int DEFAULT_AI_THREAD_POOL_SIZE = Math.max(2, Runtime.getRuntime().availableProcessors());
-    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(DEFAULT_AI_THREAD_POOL_SIZE);
+    private static int getConfiguredThreadPoolSize() {
+        String env = System.getenv("VILLAGERS_REBORN_AI_POOL_SIZE");
+        if (env != null) {
+            try {
+                int size = Integer.parseInt(env);
+                if (size > 0) return size;
+            } catch (NumberFormatException ignored) {}
+        }
+        return Math.max(2, Runtime.getRuntime().availableProcessors());
+    }
+    private static volatile ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(getConfiguredThreadPoolSize());
+    
+    public static synchronized void reconfigureThreadPool() {
+        int newSize = getConfiguredThreadPoolSize();
+        if (scheduler != null) {
+            scheduler.shutdown();
+        }
+        scheduler = Executors.newScheduledThreadPool(newSize);
+        logger.info("VillagerAIManager thread pool reconfigured to size: " + newSize);
+    }
     private static final Map<String, Long> lastAIUpdate = new ConcurrentHashMap<>();
     private static final Map<String, VillagerAIState> villagerAIStates = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> playerLastInteractionTimestamps = new ConcurrentHashMap<>();
@@ -78,6 +97,7 @@ public class VillagerAIManager {
         public String currentGoal = "";
         public String currentAction = "";
         public boolean isAIActive = true;
+        public long lastUtilityUpdate = 0;
         public Map<String, Object> contextData = new ConcurrentHashMap<>();
         
         public void setContext(String key, Object value) {
@@ -182,9 +202,10 @@ public class VillagerAIManager {
         }
         
         // Update utility AI decisions
-        if (config.enableUtilityAI) {
+        if (config.enableUtilityAI && shouldUpdateUtilityAI(state, currentTime)) {
             try {
                 updateUtilityDecisions(villager, state);
+                state.lastUtilityUpdate = System.currentTimeMillis();
             } catch (Exception e) {
                 logger.error("Error updating utility decisions for villager {}", uuid, e);
             }
@@ -235,6 +256,10 @@ public class VillagerAIManager {
     
     private static boolean shouldCheckQuests(VillagerAIState state, long currentTime) {
         return (currentTime - state.lastQuestCheck) >= (config.questGenerationInterval * 1000);
+    }
+    
+    private static boolean shouldUpdateUtilityAI(VillagerAIState state, long currentTime) {
+        return (currentTime - state.lastUtilityUpdate) >= (config.utilityAIUpdateInterval * 1000);
     }
     
     private static void updateEmotionalState(VillagerEntity villager, VillagerAIState state) {

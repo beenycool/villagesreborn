@@ -108,10 +108,16 @@ public class DialogueSetupCommands {
     private static int quickSetup(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         String provider = StringArgumentType.getString(context, "provider").toLowerCase();
-        String apiKey = StringArgumentType.getString(context, "apikey");
+        String apiKey = System.getenv("VILLAGERS_REBORN_LLM_API_KEY");
+        
+        if (apiKey == null || apiKey.isEmpty()) {
+            source.sendFeedback(() ->
+                Text.literal("API key must be set in environment variable VILLAGERS_REBORN_LLM_API_KEY.").formatted(Formatting.RED), false);
+            return 0;
+        }
         
         if (!provider.equals("gemini") && !provider.equals("openrouter")) {
-            source.sendFeedback(() -> 
+            source.sendFeedback(() ->
                 Text.literal("Invalid provider. Use 'gemini' or 'openrouter'").formatted(Formatting.RED), false);
             return 0;
         }
@@ -119,14 +125,14 @@ public class DialogueSetupCommands {
         // Apply settings
         VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = true;
         VillagersRebornConfig.LLM_PROVIDER = provider;
-        VillagersRebornConfig.LLM_API_KEY = apiKey;
+        // Do NOT store API key in config, only use from env
         VillagersRebornConfig.LLM_API_ENDPOINT = "";
         VillagersRebornConfig.LLM_MODEL = provider.equals("gemini") ? "gemini-1.5-flash" : "openai/gpt-3.5-turbo";
         
         // Initialize and test
         LLMDialogueManager.initialize();
         
-        source.sendFeedback(() -> 
+        source.sendFeedback(() ->
             Text.literal("✓ Quick setup complete! Testing connection...").formatted(Formatting.GREEN), false);
         
         testConnectionAndReport(source);

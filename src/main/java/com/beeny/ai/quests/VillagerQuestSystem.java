@@ -195,7 +195,8 @@ public class VillagerQuestSystem {
             if (data == null) return null;
             
             // Determine what item to fetch based on villager's profession and needs
-            String professionId = net.minecraft.registry.Registries.VILLAGER_PROFESSION.getId(villager.getVillagerData().profession()).getPath();
+            var profEntry = villager.getVillagerData().profession();
+            String professionId = net.minecraft.registry.Registries.VILLAGER_PROFESSION.getId(profEntry.value()).getPath();
             Map<String, String> itemMap = switch (professionId) {
                 case "farmer" -> Map.of(
                     "Seeds", "I need some seeds to expand my farm",

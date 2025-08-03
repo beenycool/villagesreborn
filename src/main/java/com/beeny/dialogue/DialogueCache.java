@@ -4,13 +4,13 @@ import com.beeny.config.VillagersRebornConfig;
 import com.beeny.system.VillagerDialogueSystem;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class DialogueCache {
-    // Synchronized LRU cache with automatic eviction
     private static final int CACHE_SIZE_LIMIT = VillagersRebornConfig.DIALOGUE_CACHE_SIZE;
     private static final LinkedHashMap<String, CacheEntry> cache = new LinkedHashMap<String, CacheEntry>(CACHE_SIZE_LIMIT, 0.75f, true) {
         @Override
@@ -18,6 +18,36 @@ public class DialogueCache {
             return size() > CACHE_SIZE_LIMIT;
         }
     };
+    
+    // Synchronized cache access
+    public static String get(String key) {
+        synchronized (cache) {
+            CacheEntry entry = cache.get(key);
+            if (entry == null || entry.isExpired()) {
+                cache.remove(key);
+                return null;
+            }
+            return entry.dialogue;
+        }
+    }
+    
+    public static void put(String key, String dialogue, long ttl) {
+        synchronized (cache) {
+            cache.put(key, new CacheEntry(dialogue, ttl));
+        }
+    }
+    
+    public static void cleanup() {
+        synchronized (cache) {
+            Iterator<Map.Entry<String, CacheEntry>> it = cache.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, CacheEntry> entry = it.next();
+                if (entry.getValue().isExpired()) {
+                    it.remove();
+                }
+            }
+        }
+    }
     private static final ScheduledExecutorService cleanupExecutor = Executors.newSingleThreadScheduledExecutor();
     
     static {
@@ -91,26 +121,7 @@ public class DialogueCache {
         put(key, dialogue, getDefaultTTL());
     }
     
-    public static void put(String key, String dialogue, long ttlMillis) {
-        if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) return;
-        synchronized (cache) {
-            cache.put(key, new CacheEntry(dialogue, ttlMillis));
-        }
-    }
-    
-    public static String get(String key) {
-        if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) return null;
-        synchronized (cache) {
-            CacheEntry entry = cache.get(key);
-            if (entry == null || entry.isExpired()) {
-                if (entry != null) {
-                    cache.remove(key); // Clean up expired entry
-                }
-                return null;
-            }
-            return entry.dialogue;
-        }
-    }
+    // removed duplicate put(key, dialogue, long) definition to avoid overload collision
     
     public static boolean contains(String key) {
         if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) return false;
@@ -144,11 +155,7 @@ public class DialogueCache {
         }
     }
     
-    public static void cleanup() {
-        synchronized (cache) {
-            cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
-        }
-    }
+    // duplicate cleanup removed (single cleanup method defined above)
     
     public static int size() {
         synchronized (cache) {

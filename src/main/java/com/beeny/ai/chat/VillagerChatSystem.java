@@ -421,7 +421,7 @@ public class VillagerChatSystem {
                 // Asynchronously request an LLM response and deliver it to the player when ready
                 VillagerDialogueSystem.generateDialogue(dialogueContext, VillagerDialogueSystem.DialogueCategory.GREETING, llmResponse -> {
                     if (llmResponse != null && context.player != null) {
-                        context.player.sendMessage(Text.literal(llmResponse), false);
+                        context.player.sendMessage(Text.of(llmResponse), false);
                     }
                 });
             }

@@ -71,7 +71,10 @@ public class LLMDialogueManager {
             
             // Check cache first
             String cacheKey = DialogueCache.generateCacheKey(context, category, conversationHistory);
-            String cachedDialogue = DialogueCache.get(cacheKey);
+            String cachedDialogue;
+            synchronized (DialogueCache.class) {
+                cachedDialogue = DialogueCache.get(cacheKey);
+            }
             if (cachedDialogue != null) {
                 return CompletableFuture.completedFuture(
                     Text.literal(cachedDialogue).formatted(getDialogueFormatting(context))

@@ -31,39 +31,37 @@ public class VillagerData {
             Codec.list(Codec.STRING).fieldOf("childrenNames").forGetter(VillagerData::getChildrenNames),
             Codec.STRING.optionalFieldOf("favoriteFood", "").forGetter(VillagerData::getFavoriteFood),
             Codec.BOOL.fieldOf("isAlive").forGetter(VillagerData::isAlive)
-        ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId,
-            professionHistory, playerRelations, familyMembers, spouseName, spouseId, childrenIds,
-            childrenNames, favoriteFood, isAlive) -> {
-                VillagerData data = new VillagerData();
-                data.name = name;
-                data.age = age;
-                data.gender = gender;
-                data.personality = personality;
-                data.happiness = happiness;
-                data.totalTrades = totalTrades;
-                data.favoritePlayerId = favoritePlayerId;
-                data.professionHistory = new ArrayList<>(professionHistory);
-                data.playerRelations = new HashMap<>(playerRelations);
-                data.familyMembers = new ArrayList<>(familyMembers);
-                data.spouseName = spouseName;
-                data.spouseId = spouseId;
-                data.childrenIds = new ArrayList<>(childrenIds);
-                data.childrenNames = new ArrayList<>(childrenNames);
-                data.favoriteFood = favoriteFood;
-                data.isAlive = isAlive;
-                // Set defaults for excluded fields
-                data.hobby = "";
-                data.birthTime = 0L;
-                data.birthPlace = "";
-                data.notes = "";
-                data.deathTime = 0L;
-                // Initialize new fields with defaults - they won't be persisted via codec
-                data.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
-                data.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
-                data.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
-                data.lastConversationTime = 0;
-                return data;
-            })
+        ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId, professionHistory,
+                          playerRelations, familyMembers, spouseName, spouseId, childrenIds, childrenNames,
+                          favoriteFood, isAlive) -> {
+            VillagerData data = new VillagerData();
+            data.name = name;
+            data.age = age;
+            data.gender = gender;
+            data.personality = personality;
+            data.happiness = happiness;
+            data.totalTrades = totalTrades;
+            data.favoritePlayerId = favoritePlayerId;
+            data.professionHistory = new ArrayList<>(professionHistory);
+            data.playerRelations = new HashMap<>(playerRelations);
+            data.familyMembers = new ArrayList<>(familyMembers);
+            data.spouseName = spouseName;
+            data.spouseId = spouseId;
+            data.childrenIds = new ArrayList<>(childrenIds);
+            data.childrenNames = new ArrayList<>(childrenNames);
+            data.favoriteFood = favoriteFood;
+            data.isAlive = isAlive;
+            data.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
+            data.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
+            data.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
+            data.hobby = "";
+            data.birthTime = 0L;
+            data.birthPlace = "";
+            data.notes = "";
+            data.deathTime = 0L;
+            data.lastConversationTime = 0;
+            return data;
+        })
     );
     
     

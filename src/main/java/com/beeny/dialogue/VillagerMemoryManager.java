@@ -223,15 +223,11 @@ public class VillagerMemoryManager {
             
             // Restore discussedTopics
             if (playerMemory.contains("discussedTopics")) {
-                NbtList topicsList = playerMemory.getList("discussedTopics");
+                NbtList topicsList = playerMemory.getList("discussedTopics").orElse(new NbtList());
                 Set<String> topics = new HashSet<>();
-                if (topicsList != null) {
-                    for (int i = 0; i < topicsList.size(); i++) {
-                        String topic = topicsList.getString(i).orElse("");
-                        if (!topic.isEmpty()) {
-                            topics.add(topic);
-                        }
-                    }
+                for (int i = 0; i < topicsList.size(); i++) {
+                    String topic = topicsList.getString(i).orElse("");
+                    if (!topic.isEmpty()) topics.add(topic);
                 }
                 history.setDiscussedTopics(topics);
             }
@@ -243,13 +239,10 @@ public class VillagerMemoryManager {
             }
             
             if (playerMemory.contains("conversations")) {
-                NbtList conversationList = playerMemory.getList("conversations");
-                if (conversationList == null) continue;
-
+                NbtList conversationList = playerMemory.getList("conversations").orElse(new NbtList());
                 List<ConversationEntry> entries = new ArrayList<>();
                 for (int i = 0; i < conversationList.size(); i++) {
-                    NbtCompound entryNbt = conversationList.getCompound(i).orElse(null);
-                    if (entryNbt == null) continue;
+                    NbtCompound entryNbt = conversationList.getCompound(i).orElse(new NbtCompound());
                     String speaker = entryNbt.getString("speaker").orElse("");
                     String message = entryNbt.getString("message").orElse("");
                     long timestamp = entryNbt.getLong("timestamp").orElse(0L);
@@ -262,12 +255,8 @@ public class VillagerMemoryManager {
                     );
                     entries.add(entry);
                 }
-                
-                // Add entries in reverse order to maintain chronological order
                 Collections.reverse(entries);
-                for (ConversationEntry entry : entries) {
-                    history.addEntry(entry);
-                }
+                for (ConversationEntry entry : entries) history.addEntry(entry);
             }
             
             villagerMemory.put(playerUuid, history);

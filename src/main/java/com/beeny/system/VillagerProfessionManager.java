@@ -465,7 +465,8 @@ public class VillagerProfessionManager {
                 }
                 case "blacksmith", "armorer", "weaponsmith", "toolsmith" -> {
                     net.minecraft.item.Item it = item.getItem();
-                    if (it instanceof net.minecraft.item.ToolItem) yield "tool_crafting";
+                    // In modern mappings there is no ToolItem/MiningToolItem; check by component or item classes
+                    if (it.getComponents().contains(net.minecraft.component.DataComponentTypes.TOOL)) yield "tool_crafting";
                     if (it.getComponents().contains(net.minecraft.component.DataComponentTypes.EQUIPPABLE)) yield "armor_crafting";
                     yield "metalworking";
                 }
@@ -657,48 +658,48 @@ public class VillagerProfessionManager {
                     // Active, outdoors, and production-heavy roles
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD));
                 }
                 case "Friendly" -> {
                     // Social-forward roles with frequent player interaction
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC));
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.LIBRARIAN));
                 }
                 case "Serious" -> {
                     // Disciplined and precise roles
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON));
                 }
                 case "Confident" -> {
                     // High-agency crafting roles
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH));
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.TOOLSMITH));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER));
                 }
                 case "Cheerful" -> {
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FARMER));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.SHEPHERD));
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
                 }
                 case "Shy" -> {
                     // Lower-social-contact roles
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FISHERMAN));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER);
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.MASON));
                 }
                 case "Grumpy" -> {
                     // Independent craftsmanship
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.TOOLSMITH));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH);
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.WEAPONSMITH));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.ARMORER));
                 }
                 case "Nervous" -> {
                     // Calm, predictable environments
                     recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.LIBRARIAN));
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC);
-                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER);
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.CLERIC));
+                    recommendations.add(net.minecraft.registry.Registries.VILLAGER_PROFESSION.get(net.minecraft.village.VillagerProfession.FLETCHER));
                 }
                 default -> {
                     // Generic fallback

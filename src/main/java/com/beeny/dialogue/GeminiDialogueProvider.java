@@ -73,7 +73,7 @@ public class GeminiDialogueProvider extends BaseLLMProvider {
         for (String category : categories) {
             JsonObject setting = new JsonObject();
             setting.addProperty("category", category);
-            setting.addProperty("threshold", "BLOCK_NONE");
+            setting.addProperty("threshold", "BLOCK_MEDIUM_AND_ABOVE");
             safetySettings.add(setting);
         }
         requestBody.add("safetySettings", safetySettings);

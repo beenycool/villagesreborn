@@ -84,9 +84,12 @@ public class VillagerGOAP {
         }
         
         public boolean satisfies(WorldState goal) {
-            for (String key : goal.getKeys()) {
+            Set<String> goalKeys = goal.getKeys();
+            if (goalKeys.isEmpty()) return false; // Defensive: empty goal should not be satisfied
+        
+            for (String key : goalKeys) {
                 if (!hasKey(key)) return false;
-
+        
                 // Get the actual stored objects to determine type and compare directly
                 Object goalValue = ((SimpleWorldState) goal).state.get(key);
                 Object currentValue = this.state.get(key);

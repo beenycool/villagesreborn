@@ -399,7 +399,7 @@ public class VillagerLearningSystem {
 
         double totalWeightedOutcome = 0.0;
         double totalWeight = 0.0;
-        for (LearningExperience exp : relevantExperiences) {
+        for (Experience exp : relevantExperiences) {
             double weight = exp.getRelevanceScore();
             totalWeightedOutcome += exp.getOutcome() * weight;
             totalWeight += weight;
@@ -564,12 +564,12 @@ public class VillagerLearningSystem {
     public static void loadLearningDataFromNbt(VillagerEntity villager, NbtCompound nbt) {
         if (!nbt.contains("learning_data")) return;
         
-        NbtCompound learningNbt = nbt.getCompound("learning_data").orElse(null);
+        NbtCompound learningNbt = nbt.getCompound("learning_data").orElse(new NbtCompound());
         VillagerLearningProfile profile = new VillagerLearningProfile();
         
         // Load preferences
         if (learningNbt.contains("preferences")) {
-            NbtCompound preferencesNbt = learningNbt.getCompound("preferences").orElse(null);
+            NbtCompound preferencesNbt = learningNbt.getCompound("preferences").orElse(new NbtCompound());
             if (preferencesNbt != null) {
                 for (String key : preferencesNbt.getKeys()) {
                     profile.preferences.put(key, preferencesNbt.getFloat(key).orElse(0f));
@@ -579,7 +579,7 @@ public class VillagerLearningSystem {
         
         // Load behavior counts
         if (learningNbt.contains("behaviors")) {
-            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors").orElse(null);
+            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors").orElse(new NbtCompound());
             if (behaviorsNbt != null) {
                 for (String key : behaviorsNbt.getKeys()) {
                     profile.behaviorCounts.put(key, behaviorsNbt.getInt(key).orElse(0));
@@ -589,60 +589,50 @@ public class VillagerLearningSystem {
         
         // Load experiences
         if (learningNbt.contains("experiences")) {
-            NbtList experiencesNbt = learningNbt.getList("experiences", 10); // 10 = Compound
+            NbtList experiencesNbt = learningNbt.getList("experiences").orElse(new NbtList());
             for (int i = 0; i < experiencesNbt.size(); i++) {
-                NbtCompound expNbt = experiencesNbt.getCompound(i);
-                
-                // Reconstruct parameters
+                NbtCompound expNbt = experiencesNbt.getCompound(i).orElse(new NbtCompound());
                 Map<String, Object> parameters = new HashMap<>();
                 if (expNbt.contains("parameters")) {
-                    NbtCompound paramsNbt = expNbt.getCompound("parameters").orElse(null);
-                    if (paramsNbt != null) {
-                        for (String key : paramsNbt.getKeys()) {
-                            if (paramsNbt.contains(key, 8)) {            // String
-                                parameters.put(key, paramsNbt.getString(key));
-                            } else if (paramsNbt.contains(key, 5)) {     // Float
-                                parameters.put(key, paramsNbt.getFloat(key).orElse(0f));
-                            } else if (paramsNbt.contains(key, 3)) {     // Int
-                                parameters.put(key, paramsNbt.getInt(key).orElse(0));
-                            }
+                    NbtCompound paramsNbt = expNbt.getCompound("parameters").orElse(new NbtCompound());
+                    for (String key : paramsNbt.getKeys()) {
+                        if (paramsNbt.getString(key).isPresent()) {
+                            parameters.put(key, paramsNbt.getString(key).orElse(""));
+                        } else if (paramsNbt.getFloat(key).isPresent()) {
+                            parameters.put(key, paramsNbt.getFloat(key).orElse(0f));
+                        } else if (paramsNbt.getInt(key).isPresent()) {
+                            parameters.put(key, paramsNbt.getInt(key).orElse(0));
                         }
                     }
                 }
-                
                 Experience exp = new Experience(
-                    ExperienceType.valueOf(expNbt.getString("type")),
-                    expNbt.getString("context"),
+                    ExperienceType.valueOf(expNbt.getString("type").orElse("GENERAL")),
+                    expNbt.getString("context").orElse(""),
                     parameters,
                     expNbt.getFloat("outcome").orElse(0f)
                 );
-                
-                // Restore reinforcement count
                 int reinforcements = expNbt.getInt("reinforcements").orElse(1);
-                for (int j = 1; j < reinforcements; j++) {
-                    exp.reinforce(exp.getOutcome());
-                }
-                
+                for (int j = 1; j < reinforcements; j++) exp.reinforce(exp.getOutcome());
                 profile.experiences.add(exp);
             }
         }
         
         // Load patterns
         if (learningNbt.contains("patterns")) {
-            NbtList patternsNbt = learningNbt.getList("patterns", 10);
+            NbtList patternsNbt = learningNbt.getList("patterns").orElseGet(NbtList::new);
             for (int i = 0; i < patternsNbt.size(); i++) {
-                NbtCompound patNbt = patternsNbt.getCompound(i);
+                NbtCompound patNbt = patternsNbt.getCompound(i).orElse(new NbtCompound());
                 
                 LearnedPattern pattern = new LearnedPattern(
-                    patNbt.getString("pattern_id"),
-                    patNbt.getString("description")
+                    patNbt.getString("pattern_id").orElse(""),
+                    patNbt.getString("description").orElse("")
                 );
                 pattern.confidence     = patNbt.getFloat("confidence").orElse(0.1f);
                 pattern.timesObserved  = patNbt.getInt("times_observed").orElse(0);
                 
                 // Load conditions
                 if (patNbt.contains("conditions")) {
-                    NbtCompound condNbt = patNbt.getCompound("conditions").orElse(null);
+                    NbtCompound condNbt = patNbt.getCompound("conditions").orElse(new NbtCompound());
                     if (condNbt != null) {
                         for (String key : condNbt.getKeys()) {
                             pattern.conditions.put(key, condNbt.getFloat(key).orElse(0f));
@@ -652,7 +642,7 @@ public class VillagerLearningSystem {
                 
                 // Load outcomes
                 if (patNbt.contains("outcomes")) {
-                    NbtCompound outNbt = patNbt.getCompound("outcomes").orElse(null);
+                    NbtCompound outNbt = patNbt.getCompound("outcomes").orElse(new NbtCompound());
                     if (outNbt != null) {
                         for (String key : outNbt.getKeys()) {
                             pattern.outcomes.put(key, outNbt.getFloat(key).orElse(0f));

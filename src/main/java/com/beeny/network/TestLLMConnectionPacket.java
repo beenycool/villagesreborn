@@ -29,7 +29,9 @@ public record TestLLMConnectionPacket(String provider, String apiKey, String end
     // --- SECURITY NOTE ---
     // The apiKey field is now encrypted using AES before transmission.
     // For real security, use proper key management and exchange.
-    private static final String AES_SECRET = "villagersrebornAES"; // 16 chars for AES-128
+    private static final String AES_SECRET = System.getenv("VILLAGERS_REBORN_AES_SECRET") != null
+        ? System.getenv("VILLAGERS_REBORN_AES_SECRET")
+        : "villagersrebornAES"; // fallback, but should be set in env for production
 
     private static String encrypt(String plainText) {
         try {
