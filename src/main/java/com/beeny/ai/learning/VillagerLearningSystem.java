@@ -66,7 +66,6 @@ public class VillagerLearningSystem {
             reinforcements.incrementAndGet();
         }
         
-        private static final long RECENT_THRESHOLD_MS = 3600000L; // 1 hour
         public boolean isRecent() {
             return (System.currentTimeMillis() - timestamp) < RECENT_THRESHOLD_MS;
         }
