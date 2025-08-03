@@ -542,13 +542,14 @@ public class VillagerAIManager {
         
         // Load AI state
         if (nbt.contains("ai_state")) {
-            NbtCompound aiStateNbt = nbt.getCompound("ai_state").orElse(null);
+            NbtCompound aiStateNbt = nbt.getCompound("ai_state");
             if (aiStateNbt != null) {
                 VillagerAIState state = new VillagerAIState();
-                state.currentGoal = aiStateNbt.getString("current_goal").orElse("");
-                state.currentAction = aiStateNbt.getString("current_action").orElse("");
-                state.isAIActive = aiStateNbt.getBoolean("is_ai_active").orElse(true);
+                state.currentGoal = aiStateNbt.getString("current_goal");
+                state.currentAction = aiStateNbt.getString("current_action");
+                state.isAIActive = aiStateNbt.getBoolean("is_ai_active");
                 villagerAIStates.put(villager.getUuidAsString(), state);
+            }
             }
         }
     }
