@@ -67,7 +67,6 @@ public class VillagerLearningSystem {
             reinforcements.incrementAndGet();
         }
         
-        private static final long RECENT_THRESHOLD_MS = 3600000L; // 1 hour
         public boolean isRecent() {
             return (System.currentTimeMillis() - timestamp) < RECENT_THRESHOLD_MS;
         }
@@ -159,7 +158,7 @@ public class VillagerLearningSystem {
         private float learningRate; // How quickly they adapt (0.0 to 1.0)
         private long lastLearningUpdate;
         
-        private static final float EXPERIENCE_LIMIT = 100.0f;
+        private static final int EXPERIENCE_LIMIT = 200;
         public VillagerLearningProfile() {
             this.experiences = Collections.synchronizedList(new ArrayList<>());
             this.patterns = new ConcurrentHashMap<>();
@@ -173,9 +172,10 @@ public class VillagerLearningSystem {
             experiences.add(experience);
             
             // Limit experience history to prevent memory issues
-            if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
-                experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
-            }
+           if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
+               experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
+           }
+       }
             
             // Trigger pattern learning
             updatePatterns(experience);
@@ -673,13 +673,15 @@ public class VillagerLearningSystem {
     }
     
     // Global learning system management
-    public static void updateGlobalLearning() {
-        // Cleanup old learning profiles
-        learningProfiles.entrySet().removeIf(entry -> {
-            VillagerLearningProfile profile = entry.getValue();
-            return (System.currentTimeMillis() - profile.lastLearningUpdate) > 86400000; // 24 hours
-        });
-    }
+ public void addExperience(Experience experience) {
+     experiences.add(experience);
+     this.lastLearningUpdate = System.currentTimeMillis();
+ 
+     // Limit experience history to prevent memory issues
+     if (experiences.size() > EXPERIENCE_LIMIT) {
+         experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
+     }
+ }
     
     // Analytics and debugging
     public static Map<String, Object> getLearningAnalytics(VillagerEntity villager) {
