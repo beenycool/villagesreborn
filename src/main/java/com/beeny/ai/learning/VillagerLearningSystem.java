@@ -157,7 +157,7 @@ public class VillagerLearningSystem {
         private float learningRate; // How quickly they adapt (0.0 to 1.0)
         private long lastLearningUpdate;
         
-        private static final float EXPERIENCE_LIMIT = 100.0f;
+        private static final int EXPERIENCE_LIMIT = 200;
         public VillagerLearningProfile() {
             this.experiences = Collections.synchronizedList(new ArrayList<>());
             this.patterns = new ConcurrentHashMap<>();
@@ -171,9 +171,10 @@ public class VillagerLearningSystem {
             experiences.add(experience);
             
             // Limit experience history to prevent memory issues
-            if (experiences.size() > 200) {
+            if (experiences.size() > EXPERIENCE_LIMIT) {
                 experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
             }
+        }
             
             // Trigger pattern learning
             updatePatterns(experience);
