@@ -186,7 +186,7 @@ public class VillagerProfessionManager {
             
             // Check if villager is not novice level (has no trades yet)
             if (villager.getOffers().size() > 0) {
-                VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+                VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().getEmotionalState(villager);
                 if (emotions == null) return false;
                 float boredom = emotions.getEmotion(VillagerEmotionSystem.EmotionType.BOREDOM);
                 if (boredom < BOREDOM_THRESHOLD_CHANGE) return false;
@@ -237,14 +237,14 @@ public class VillagerProfessionManager {
             data.addProfession(newProfessionId);
             
             // Emotional reactions
-            VillagerEmotionSystem.processEmotionalEvent(villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.EXCITEMENT, 30.0f, "career_change", false));
-            VillagerEmotionSystem.processEmotionalEvent(villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.BOREDOM, -40.0f, "career_change", false));
             
             // Create gossip about career change
-            VillagerGossipNetwork.createGossip(villager, villager.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.MYSTERIOUS_BEHAVIOR,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(villager, villager.getUuidAsString(),
+                VillagerGossipManager.GossipType.MYSTERIOUS_BEHAVIOR,
                 "changed careers from " + oldProfessionId + " to " + newProfessionId);
             
             // Find and claim appropriate workstation
@@ -407,8 +407,8 @@ public class VillagerProfessionManager {
         private static void suggestWorkstationPlacement(VillagerEntity villager, Block workstation) {
             // This could integrate with a building/construction system
             // For now, just create gossip about needing a workstation
-            VillagerGossipNetwork.createGossip(villager, villager.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.MYSTERIOUS_BEHAVIOR,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(villager, villager.getUuidAsString(),
+                VillagerGossipManager.GossipType.MYSTERIOUS_BEHAVIOR,
                 "needs a " + workstation.getTranslationKey() + " to work properly");
         }
     }
@@ -438,7 +438,7 @@ public class VillagerProfessionManager {
                 VillagerEmotionSystem.EmotionalEvent.SUCCESSFUL_TRADE :
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.STRESS, 10.0f, "failed_trade", false);
             
-            VillagerEmotionSystem.processEmotionalEvent(villager, event);
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager, event);
             
             // Check for skill milestones
             checkSkillMilestones(villager, profData);
@@ -472,15 +472,15 @@ public class VillagerProfessionManager {
             
             if (competency >= 25.0f && competency < 30.0f) {
                 unlockAdvancedTrades(villager, profData);
-                VillagerEmotionSystem.processEmotionalEvent(villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 15.0f, "skill_milestone", false));
             } else if (competency >= 50.0f && competency < 55.0f) {
                 becomeMaster(villager, profData);
-                VillagerEmotionSystem.processEmotionalEvent(villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 25.0f, "master_level", false));
             } else if (competency >= 75.0f && competency < 80.0f) {
                 becomeInnovator(villager, profData);
-                VillagerEmotionSystem.processEmotionalEvent(villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.EXCITEMENT, 30.0f, "innovation_unlock", false));
             }
         }
@@ -490,8 +490,8 @@ public class VillagerProfessionManager {
             profData.innovation += 0.1f;
             profData.updateSatisfaction(10.0f, "advanced_trades_unlocked");
             
-            VillagerGossipNetwork.createGossip(villager, villager.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.ACHIEVEMENT,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(villager, villager.getUuidAsString(),
+                VillagerGossipManager.GossipType.ACHIEVEMENT,
                 "has become more skilled in their profession");
         }
         
@@ -502,8 +502,8 @@ public class VillagerProfessionManager {
             // Masters can teach other villagers
             enableTeachingAbility(villager, profData);
             
-            VillagerGossipNetwork.createGossip(villager, villager.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.ACHIEVEMENT,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(villager, villager.getUuidAsString(),
+                VillagerGossipManager.GossipType.ACHIEVEMENT,
                 "has achieved master level in their profession");
         }
         
@@ -514,8 +514,8 @@ public class VillagerProfessionManager {
             // Innovators can create unique trade offers
             enableInnovation(villager, profData);
             
-            VillagerGossipNetwork.createGossip(villager, villager.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.ACHIEVEMENT,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(villager, villager.getUuidAsString(),
+                VillagerGossipManager.GossipType.ACHIEVEMENT,
                 "has become an innovator in their field");
         }
         
@@ -550,8 +550,8 @@ public class VillagerProfessionManager {
             mentorData.updateSatisfaction(5.0f, "teaching");
             apprenticeData.updateSatisfaction(8.0f, "learning");
             
-            VillagerGossipNetwork.createGossip(mentor, apprentice.getUuidAsString(),
-                VillagerGossipNetwork.GossipType.POSITIVE_INTERACTION,
+            ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().createGossip(mentor, apprentice.getUuidAsString(),
+                VillagerGossipManager.GossipType.POSITIVE_INTERACTION,
                 "is teaching " + apprentice.getName().getString());
         }
         
@@ -581,13 +581,13 @@ public class VillagerProfessionManager {
         ProfessionData profData = getProfessionData(villager);
         if (profData == null) return;
         
-        VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+        VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().getEmotionalState(villager);
         
         // Professional satisfaction affects emotional state
         float satisfactionDelta = (profData.satisfaction - 50.0f) / 50.0f; // -1 to 1
         
-        VillagerEmotionSystem.processEmotionalEvent(villager,
-            new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.CONTENTMENT, 
+        ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
+            new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.CONTENTMENT,
                 satisfactionDelta * 5.0f, "professional_satisfaction", false));
         
         // High boredom suggests career change
@@ -625,7 +625,7 @@ public class VillagerProfessionManager {
         
         public static List<VillagerProfession> recommendProfessions(VillagerEntity villager) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().getEmotionalState(villager);
 
             if (data == null || emotions == null) return new ArrayList<>();
 

@@ -641,7 +641,7 @@ public class VillagerQuestSystem {
             }
             
             // Emotional impact on quest giver
-            VillagerEmotionSystem.processEmotionalEvent(quest.questGiver,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(quest.questGiver,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 25.0f, "quest_completed", false));
         }
         

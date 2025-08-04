@@ -2,215 +2,99 @@ package com.beeny.data;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.util.Identifier;
-
+import com.beeny.constants.VillagerConstants;
+import com.beeny.constants.VillagerConstants.PersonalityType;
+import com.beeny.constants.VillagerConstants.HobbyType;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class VillagerData {
-    // Use ThreadLocalRandom for thread-safe random generation
-    // Rework codec to avoid exceeding arity by mapping to/from NbtCompound directly.
-    public static final Codec<VillagerData> CODEC = Codec.PASSTHROUGH.comapFlatMap(
-        dyn -> {
-            try {
-                net.minecraft.nbt.NbtElement elt = (net.minecraft.nbt.NbtElement) dyn.getValue();
-                if (!(elt instanceof net.minecraft.nbt.NbtCompound nbt)) {
-                    return com.mojang.serialization.DataResult.error(() -> "Expected NbtCompound");
-                }
-                VillagerData v = new VillagerData();
-                v.name = nbt.contains("name") ? nbt.getString("name").orElse("") : "";
-                v.age = nbt.contains("age") ? nbt.getInt("age").orElse(0) : 0;
-                v.gender = nbt.contains("gender") ? nbt.getString("gender").orElse("Unknown") : "Unknown";
-                v.personality = nbt.contains("personality") ? nbt.getString("personality").orElse("Friendly") : "Friendly";
-                v.happiness = nbt.contains("happiness") ? nbt.getInt("happiness").orElse(50) : 50;
-                v.totalTrades = nbt.contains("totalTrades") ? nbt.getInt("totalTrades").orElse(0) : 0;
-                v.favoritePlayerId = nbt.contains("favoritePlayerId") ? nbt.getString("favoritePlayerId").orElse("") : "";
-                v.professionHistory = new java.util.ArrayList<>();
-                if (nbt.contains("professionHistory")) {
-                    net.minecraft.nbt.NbtList lst = nbt.getList("professionHistory").orElse(new net.minecraft.nbt.NbtList());
-                    for (net.minecraft.nbt.NbtElement e : lst) v.professionHistory.add(e.asString().orElse(""));
-                }
-                v.playerRelations = new java.util.HashMap<>();
-                if (nbt.contains("playerRelations")) {
-                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("playerRelations").orElse(new net.minecraft.nbt.NbtCompound());
-                    for (String k : rel.getKeys()) v.playerRelations.put(k, rel.getInt(k).orElse(0));
-                }
-                v.familyMembers = new java.util.ArrayList<>();
-                if (nbt.contains("familyMembers")) {
-                    net.minecraft.nbt.NbtList lst = nbt.getList("familyMembers").orElse(new net.minecraft.nbt.NbtList());
-                    for (net.minecraft.nbt.NbtElement e : lst) v.familyMembers.add(e.asString().orElse(""));
-                }
-                v.spouseName = nbt.contains("spouseName") ? nbt.getString("spouseName").orElse("") : "";
-                v.spouseId = nbt.contains("spouseId") ? nbt.getString("spouseId").orElse("") : "";
-                v.childrenIds = new java.util.ArrayList<>();
-                if (nbt.contains("childrenIds")) {
-                    net.minecraft.nbt.NbtList lst = nbt.getList("childrenIds").orElse(new net.minecraft.nbt.NbtList());
-                    for (net.minecraft.nbt.NbtElement e : lst) v.childrenIds.add(e.asString().orElse(""));
-                }
-                v.childrenNames = new java.util.ArrayList<>();
-                if (nbt.contains("childrenNames")) {
-                    net.minecraft.nbt.NbtList lst = nbt.getList("childrenNames").orElse(new net.minecraft.nbt.NbtList());
-                    for (net.minecraft.nbt.NbtElement e : lst) v.childrenNames.add(e.asString().orElse(""));
-                }
-                v.favoriteFood = nbt.contains("favoriteFood") ? nbt.getString("favoriteFood").orElse("") : "";
-                v.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
-                if (nbt.contains("playerMemories")) {
-                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("playerMemories").orElse(new net.minecraft.nbt.NbtCompound());
-                    for (String k : rel.getKeys()) v.playerMemories.put(k, rel.getString(k).orElse(""));
-                }
-                v.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
-                if (nbt.contains("topicFrequency")) {
-                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("topicFrequency").orElse(new net.minecraft.nbt.NbtCompound());
-                    for (String k : rel.getKeys()) v.topicFrequency.put(k, rel.getInt(k).orElse(0));
-                }
-                v.recentEvents = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
-                if (nbt.contains("recentEvents")) {
-                    net.minecraft.nbt.NbtList lst = nbt.getList("recentEvents").orElse(new net.minecraft.nbt.NbtList());
-                    for (net.minecraft.nbt.NbtElement e : lst) v.recentEvents.add(e.asString().orElse(""));
-                }
-                v.lastConversationTime = nbt.contains("lastConversationTime") ? nbt.getLong("lastConversationTime").orElse(0L) : 0L;
-                v.isAlive = nbt.contains("isAlive") ? nbt.getBoolean("isAlive").orElse(true) : true;
-                return com.mojang.serialization.DataResult.success(v);
-            } catch (Exception ex) {
-                return com.mojang.serialization.DataResult.error(() -> "Failed to decode VillagerData: " + ex.getMessage());
-            }
-        },
-        v -> {
-            net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
-            nbt.putString("name", v.getName());
-            nbt.putInt("age", v.getAge());
-            nbt.putString("gender", v.getGender());
-            nbt.putString("personality", v.getPersonality());
-            nbt.putInt("happiness", v.getHappiness());
-            nbt.putInt("totalTrades", v.getTotalTrades());
-            if (!v.getFavoritePlayerId().isEmpty()) nbt.putString("favoritePlayerId", v.getFavoritePlayerId());
-            net.minecraft.nbt.NbtList prof = new net.minecraft.nbt.NbtList();
-            for (String s : v.getProfessionHistory()) prof.add(net.minecraft.nbt.NbtString.of(s));
-            nbt.put("professionHistory", prof);
-            net.minecraft.nbt.NbtCompound rel = new net.minecraft.nbt.NbtCompound();
-            for (java.util.Map.Entry<String, Integer> e : v.getPlayerRelations().entrySet()) rel.putInt(e.getKey(), e.getValue());
-            nbt.put("playerRelations", rel);
-            net.minecraft.nbt.NbtList fam = new net.minecraft.nbt.NbtList();
-            for (String s : v.getFamilyMembers()) fam.add(net.minecraft.nbt.NbtString.of(s));
-            nbt.put("familyMembers", fam);
-            if (!v.getSpouseName().isEmpty()) nbt.putString("spouseName", v.getSpouseName());
-            if (!v.getSpouseId().isEmpty()) nbt.putString("spouseId", v.getSpouseId());
-            net.minecraft.nbt.NbtList cids = new net.minecraft.nbt.NbtList();
-            for (String s : v.getChildrenIds()) cids.add(net.minecraft.nbt.NbtString.of(s));
-            nbt.put("childrenIds", cids);
-            net.minecraft.nbt.NbtList cnames = new net.minecraft.nbt.NbtList();
-            for (String s : v.getChildrenNames()) cnames.add(net.minecraft.nbt.NbtString.of(s));
-            nbt.put("childrenNames", cnames);
-            if (!v.getFavoriteFood().isEmpty()) nbt.putString("favoriteFood", v.getFavoriteFood());
-            net.minecraft.nbt.NbtCompound mem = new net.minecraft.nbt.NbtCompound();
-            for (java.util.Map.Entry<String, String> e : v.playerMemories.entrySet()) mem.putString(e.getKey(), e.getValue());
-            nbt.put("playerMemories", mem);
-            net.minecraft.nbt.NbtCompound topics = new net.minecraft.nbt.NbtCompound();
-            for (java.util.Map.Entry<String, Integer> e : v.topicFrequency.entrySet()) topics.putInt(e.getKey(), e.getValue());
-            nbt.put("topicFrequency", topics);
-            net.minecraft.nbt.NbtList events = new net.minecraft.nbt.NbtList();
-            for (String s : v.recentEvents) events.add(net.minecraft.nbt.NbtString.of(s));
-            nbt.put("recentEvents", events);
-            nbt.putLong("lastConversationTime", v.lastConversationTime);
-            nbt.putBoolean("isAlive", v.isAlive);
-            return new com.mojang.serialization.Dynamic<>(net.minecraft.nbt.NbtOps.INSTANCE, nbt);
-        }
-    ).xmap(
-        obj -> (VillagerData) obj,
-        v -> v
+    public static final Codec<VillagerData> CODEC = RecordCodecBuilder.create(instance ->
+        instance.group(
+            EmotionalState.CODEC.fieldOf("emotionalState").orElse(new EmotionalState()).forGetter(VillagerData::getEmotionalState),
+            AIState.CODEC.fieldOf("aiState").orElse(new AIState()).forGetter(VillagerData::getAiState),
+            LearningProfile.CODEC.fieldOf("learningProfile").orElse(new LearningProfile()).forGetter(VillagerData::getLearningProfile),
+            ProfessionData.CODEC.fieldOf("professionData").orElse(new ProfessionData()).forGetter(VillagerData::getProfessionData),
+            Codec.STRING.fieldOf("name").orElse(VillagerConstants.Defaults.NAME).forGetter(VillagerData::getName),
+            Codec.INT.fieldOf("age").orElse(VillagerConstants.Defaults.AGE).forGetter(VillagerData::getAge),
+            Codec.STRING.fieldOf("gender").orElse(VillagerConstants.Defaults.GENDER).forGetter(VillagerData::getGender),
+            Codec.STRING.fieldOf("personality")
+                .orElse(PersonalityType.FRIENDLY.name())
+                .xmap(PersonalityType::fromString, PersonalityType::name)
+                .forGetter(VillagerData::getPersonality),
+            Codec.INT.fieldOf("happiness").orElse(VillagerConstants.Defaults.HAPPINESS).forGetter(VillagerData::getHappiness),
+            Codec.INT.fieldOf("totalTrades").orElse(VillagerConstants.Defaults.TOTAL_TRADES).forGetter(VillagerData::getTotalTrades),
+            Codec.STRING.fieldOf("favoritePlayerId").orElse(VillagerConstants.Defaults.FAVORITE_PLAYER_ID).forGetter(VillagerData::getFavoritePlayerId),
+            Codec.list(Codec.STRING).fieldOf("professionHistory").orElse(Collections.emptyList()).forGetter(VillagerData::getProfessionHistory),
+            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("playerRelations").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerRelations),
+            Codec.list(Codec.STRING).fieldOf("familyMembers").orElse(Collections.emptyList()).forGetter(VillagerData::getFamilyMembers),
+            Codec.STRING.fieldOf("spouseName").orElse(VillagerConstants.Defaults.SPOUSE_NAME).forGetter(VillagerData::getSpouseName),
+            Codec.STRING.fieldOf("spouseId").orElse(VillagerConstants.Defaults.SPOUSE_ID).forGetter(VillagerData::getSpouseId),
+            Codec.list(Codec.STRING).fieldOf("childrenIds").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenIds),
+            Codec.list(Codec.STRING).fieldOf("childrenNames").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenNames),
+            Codec.STRING.fieldOf("favoriteFood").orElse(VillagerConstants.Defaults.FAVORITE_FOOD).forGetter(VillagerData::getFavoriteFood),
+            Codec.STRING.fieldOf("hobby")
+                .orElse(HobbyType.GARDENING.name())
+                .xmap(HobbyType::fromString, HobbyType::name)
+                .forGetter(VillagerData::getHobby),
+            Codec.LONG.fieldOf("birthTime").orElse(System.currentTimeMillis()).forGetter(VillagerData::getBirthTime),
+            Codec.STRING.fieldOf("birthPlace").orElse(VillagerConstants.Defaults.BIRTH_PLACE).forGetter(VillagerData::getBirthPlace),
+            Codec.STRING.fieldOf("notes").orElse(VillagerConstants.Defaults.NOTES).forGetter(VillagerData::getNotes),
+            Codec.LONG.fieldOf("deathTime").orElse(VillagerConstants.Defaults.DEATH_TIME).forGetter(VillagerData::getDeathTime),
+            Codec.BOOL.fieldOf("isAlive").orElse(true).forGetter(VillagerData::isAlive),
+            Codec.unboundedMap(Codec.STRING, Codec.STRING).fieldOf("playerMemories").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerMemories),
+            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("topicFrequency").orElse(Collections.emptyMap()).forGetter(VillagerData::getTopicFrequency),
+            Codec.list(Codec.STRING).fieldOf("recentEvents").orElse(Collections.emptyList()).forGetter(VillagerData::getRecentEvents),
+            Codec.LONG.fieldOf("lastConversationTime").orElse(0L).forGetter(VillagerData::getLastConversationTime)
+        ).apply(instance, VillagerData::new)
     );
-    
-    
+
+    private EmotionalState emotionalState;
+    private AIState aiState;
+    private LearningProfile learningProfile;
+    private ProfessionData professionData;
     private String name;
-    private int age; 
+    private int age;
     private String gender;
-    private String personality;
-    
-    
-    private int happiness; 
+    private PersonalityType personality;
+    private int happiness;
     private int totalTrades;
     private String favoritePlayerId;
-    
-    
     private List<String> professionHistory;
-    private Map<String, Integer> playerRelations; 
-    
-    
+    private Map<String, Integer> playerRelations;
     private List<String> familyMembers;
     private String spouseName;
     private String spouseId;
     private List<String> childrenIds;
     private List<String> childrenNames;
-    
-    
-    private String favoriteFood; 
-    private String hobby;
+    private String favoriteFood;
+    private HobbyType hobby;
     private long birthTime;
     private String birthPlace;
     private String notes;
     private long deathTime;
     private boolean isAlive;
-    
     private Map<String, String> playerMemories;
     private Map<String, Integer> topicFrequency;
     private List<String> recentEvents;
     private long lastConversationTime;
-    
-    
-    public static final String[] PERSONALITIES = {
-        "Friendly", "Grumpy", "Shy", "Energetic", "Lazy", 
-        "Curious", "Serious", "Cheerful", "Nervous", "Confident"
-    };
-    
-    
-    public static final String[] HOBBIES = {
-        "Gardening", "Reading", "Fishing", "Cooking", "Singing",
-        "Dancing", "Crafting", "Exploring", "Collecting", "Gossiping"
-    };
-    
-    
-    public VillagerData() {
-        this.name = "";
-        this.age = 0;
-        this.gender = "Unknown";
-        this.personality = PERSONALITIES[ThreadLocalRandom.current().nextInt(PERSONALITIES.length)];
-        this.happiness = 50;
-        this.totalTrades = 0;
-        this.favoritePlayerId = "";
-        this.professionHistory = new ArrayList<>();
-        this.playerRelations = new HashMap<>();
-        this.familyMembers = new ArrayList<>();
-        this.spouseName = "";
-        this.spouseId = "";
-        this.childrenIds = new ArrayList<>();
-        this.childrenNames = new ArrayList<>();
-        this.favoriteFood = "";
-        this.hobby = HOBBIES[ThreadLocalRandom.current().nextInt(HOBBIES.length)];
-        this.birthTime = System.currentTimeMillis();
-        this.birthPlace = "";
-        this.notes = "";
-        this.deathTime = 0;
-        this.isAlive = true;
-        this.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
-        this.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
-        this.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
-        this.lastConversationTime = 0;
-    }
-    
-    
-    public VillagerData(String name, int age, String gender, String personality, int happiness,
-                       int totalTrades, String favoritePlayerId, List<String> professionHistory,
-                       Map<String, Integer> playerRelations, List<String> familyMembers,
-                       String spouseName, String spouseId, List<String> childrenIds, List<String> childrenNames,
-                       String favoriteFood, String hobby, long birthTime, String birthPlace,
-                       String notes, long deathTime, boolean isAlive) {
+
+    public VillagerData(EmotionalState emotionalState, AIState aiState, LearningProfile learningProfile, ProfessionData professionData,
+                       String name, int age, String gender, PersonalityType personality, int happiness, int totalTrades,
+                       String favoritePlayerId, List<String> professionHistory, Map<String, Integer> playerRelations,
+                       List<String> familyMembers, String spouseName, String spouseId, List<String> childrenIds,
+                       List<String> childrenNames, String favoriteFood, HobbyType hobby, long birthTime, String birthPlace,
+                       String notes, long deathTime, boolean isAlive, Map<String, String> playerMemories,
+                       Map<String, Integer> topicFrequency, List<String> recentEvents, long lastConversationTime) {
+        this.emotionalState = emotionalState != null ? emotionalState : new EmotionalState();
+        this.aiState = aiState != null ? aiState : new AIState();
+        this.learningProfile = learningProfile != null ? learningProfile : new LearningProfile();
+        this.professionData = professionData != null ? professionData : new ProfessionData();
         this.name = name;
         this.age = age;
         this.gender = gender;
@@ -232,188 +116,117 @@ public class VillagerData {
         this.notes = notes;
         this.deathTime = deathTime;
         this.isAlive = isAlive;
-        this.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
-        this.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
-        this.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
-        this.lastConversationTime = 0;
+        this.playerMemories = new HashMap<>(playerMemories);
+        this.topicFrequency = new HashMap<>(topicFrequency);
+        this.recentEvents = new ArrayList<>(recentEvents);
+        this.lastConversationTime = lastConversationTime;
     }
-    
-    
-    public void incrementAge() {
-        this.age++;
-    }
-    
-    public void adjustHappiness(int amount) {
-        this.happiness = Math.max(0, Math.min(100, this.happiness + amount));
-    }
-    
-    public void addProfession(String profession) {
-        if (!professionHistory.contains(profession)) {
-            professionHistory.add(profession);
-        }
-    }
-    
-    public void updatePlayerRelation(String playerUuid, int change) {
-        playerRelations.put(playerUuid, playerRelations.getOrDefault(playerUuid, 0) + change);
-    }
-    
-    public int getPlayerReputation(String playerUuid) {
-        return playerRelations.getOrDefault(playerUuid, 0);
-    }
-    
-    public void adjustPlayerReputation(String playerUuid, int change) {
-        updatePlayerRelation(playerUuid, change);
-    }
-    
-    public void marry(String spouseId) {
-        this.spouseId = spouseId;
-        this.happiness = Math.min(100, this.happiness + 20);
-    }
-    
-    public void marry(String spouseName, String spouseId) {
-        this.spouseName = spouseName;
-        this.spouseId = spouseId;
-        this.happiness = Math.min(100, this.happiness + 20);
-    }
-    
-    public void setWidowed() {
-        this.spouseName = "";
-        this.spouseId = "";
-        this.notes = "Widowed";
-    }
-    
-    public void addChild(String childId) {
-        if (!childrenIds.contains(childId)) {
-            childrenIds.add(childId);
-            this.happiness = Math.min(100, this.happiness + 10);
-        }
-    }
-    
-    public void addChild(String childName, String childId) {
-        if (!childrenIds.contains(childId)) {
-            childrenIds.add(childId);
-            childrenNames.add(childName);
-            this.happiness = Math.min(100, this.happiness + 10);
-        }
-    }
-    
-    public void addFamilyMember(String memberId) {
-        if (!familyMembers.contains(memberId)) {
-            familyMembers.add(memberId);
-        }
-    }
-    
-    public void addFamilyMember(String memberName, String memberId) {
-        if (!familyMembers.contains(memberId)) {
-            familyMembers.add(memberId);
-        }
-    }
-    
-    
+
+    // Getters
+    public EmotionalState getEmotionalState() { return emotionalState; }
+    public AIState getAiState() { return aiState; }
+    public LearningProfile getLearningProfile() { return learningProfile; }
+    public ProfessionData getProfessionData() { return professionData; }
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
     public int getAge() { return age; }
-    public void setAge(int age) { this.age = age; }
-    
     public String getGender() { return gender; }
-    public void setGender(String gender) { this.gender = gender; }
-    
-    public String getPersonality() { return personality; }
-    public void setPersonality(String personality) { this.personality = personality; }
-    
+    public PersonalityType getPersonality() { return personality; }
     public int getHappiness() { return happiness; }
-    public void setHappiness(int happiness) { this.happiness = happiness; }
-    
     public int getTotalTrades() { return totalTrades; }
-    public void incrementTrades() { this.totalTrades++; }
-    
-    public String getSpouseId() { return spouseId; }
-    public String getSpouseName() { return spouseName; }
-    
-    public List<String> getChildrenIds() { return new ArrayList<>(childrenIds); }
-    public List<String> getChildrenNames() { return new ArrayList<>(childrenNames); }
-    public List<String> getFamilyMembers() { return new ArrayList<>(familyMembers); }
-    public List<String> getProfessionHistory() { return new ArrayList<>(professionHistory); }
-    
-    public Map<String, Integer> getPlayerRelations() { return new HashMap<>(playerRelations); }
-    
-    public String getFavoriteFood() { return favoriteFood; }
-    public void setFavoriteFood(String favoriteFood) { this.favoriteFood = favoriteFood; }
-    
-    public String getHobby() { return hobby; }
-    public void setHobby(String hobby) { this.hobby = hobby; }
-    
-    public long getBirthTime() { return birthTime; }
-    public void setBirthTime(long birthTime) { this.birthTime = birthTime; }
-    
-    public String getBirthPlace() { return birthPlace; }
-    public void setBirthPlace(String birthPlace) { this.birthPlace = birthPlace; }
-    
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
-    
-    public long getDeathTime() { return deathTime; }
-    public void setDeathTime(long deathTime) { this.deathTime = deathTime; this.isAlive = false; }
-    
-    public boolean isAlive() { return isAlive; }
-    public void setAlive(boolean alive) { this.isAlive = alive; }
-    
     public String getFavoritePlayerId() { return favoritePlayerId; }
+    public List<String> getProfessionHistory() { return Collections.unmodifiableList(professionHistory); }
+    public Map<String, Integer> getPlayerRelations() { return Collections.unmodifiableMap(playerRelations); }
+    public List<String> getFamilyMembers() { return Collections.unmodifiableList(familyMembers); }
+    public String getSpouseName() { return spouseName; }
+    public String getSpouseId() { return spouseId; }
+    public List<String> getChildrenIds() { return Collections.unmodifiableList(childrenIds); }
+    public List<String> getChildrenNames() { return Collections.unmodifiableList(childrenNames); }
+    public String getFavoriteFood() { return favoriteFood; }
+    public HobbyType getHobby() { return hobby; }
+    public long getBirthTime() { return birthTime; }
+    public String getBirthPlace() { return birthPlace; }
+    public String getNotes() { return notes; }
+    public long getDeathTime() { return deathTime; }
+    public boolean isAlive() { return isAlive; }
+    public Map<String, String> getPlayerMemories() { return Collections.unmodifiableMap(playerMemories); }
+    public Map<String, Integer> getTopicFrequency() { return Collections.unmodifiableMap(topicFrequency); }
+    public List<String> getRecentEvents() { return Collections.unmodifiableList(recentEvents); }
+    public long getLastConversationTime() { return lastConversationTime; }
+
+    // Setters
+    public void setEmotionalState(EmotionalState emotionalState) { this.emotionalState = emotionalState; }
+    public void setAiState(AIState aiState) { this.aiState = aiState; }
+    public void setLearningProfile(LearningProfile learningProfile) { this.learningProfile = learningProfile; }
+    public void setProfessionData(ProfessionData professionData) { this.professionData = professionData; }
+    public void setName(String name) { this.name = name; }
+    public void setAge(int age) { this.age = age; }
+    public void setGender(String gender) { this.gender = gender; }
+    public void setPersonality(PersonalityType personality) { this.personality = personality; }
+    public void setHappiness(int happiness) { this.happiness = Math.max(0, Math.min(100, happiness)); }
+    public void setTotalTrades(int totalTrades) { this.totalTrades = Math.max(0, totalTrades); }
     public void setFavoritePlayerId(String favoritePlayerId) { this.favoritePlayerId = favoritePlayerId; }
-    
-    
-    public String getAgeInDays() {
-        if (age < 20) {
-            return age + " days (Baby)";
-        } else if (age < 100) {
-            return age + " days (Young Adult)";
-        } else if (age < 300) {
-            return age + " days (Adult)";
-        } else {
-            return age + " days (Elder)";
+    public void setProfessionHistory(List<String> professionHistory) { this.professionHistory = new ArrayList<>(professionHistory); }
+    public void setPlayerRelations(Map<String, Integer> playerRelations) { this.playerRelations = new HashMap<>(playerRelations); }
+    public void setFamilyMembers(List<String> familyMembers) { this.familyMembers = new ArrayList<>(familyMembers); }
+    public void setSpouseName(String spouseName) { this.spouseName = spouseName; }
+    public void setSpouseId(String spouseId) { this.spouseId = spouseId; }
+    public void setChildrenIds(List<String> childrenIds) { this.childrenIds = new ArrayList<>(childrenIds); }
+    public void setChildrenNames(List<String> childrenNames) { this.childrenNames = new ArrayList<>(childrenNames); }
+    public void setFavoriteFood(String favoriteFood) { this.favoriteFood = favoriteFood; }
+    public void setHobby(HobbyType hobby) { this.hobby = hobby; }
+    public void setBirthTime(long birthTime) { this.birthTime = birthTime; }
+    public void setBirthPlace(String birthPlace) { this.birthPlace = birthPlace; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public void setDeathTime(long deathTime) { this.deathTime = deathTime; }
+    public void setAlive(boolean alive) { isAlive = alive; }
+    public void setPlayerMemories(Map<String, String> playerMemories) { this.playerMemories = new HashMap<>(playerMemories); }
+    public void setTopicFrequency(Map<String, Integer> topicFrequency) { this.topicFrequency = new HashMap<>(topicFrequency); }
+    public void setRecentEvents(List<String> recentEvents) { this.recentEvents = new ArrayList<>(recentEvents); }
+    public void setLastConversationTime(long lastConversationTime) { this.lastConversationTime = lastConversationTime; }
+
+    // Utility methods
+    public void addProfession(String profession) {
+        professionHistory.add(profession);
+    }
+
+    public void addFamilyMember(String member) {
+        familyMembers.add(member);
+    }
+
+    public void addChild(String childId, String childName) {
+        childrenIds.add(childId);
+        childrenNames.add(childName);
+    }
+
+    public void addRecentEvent(String event) {
+        recentEvents.add(event);
+        if (recentEvents.size() > 10) {
+            recentEvents.remove(0);
         }
     }
-    
-    
-    public String getHappinessDescription() {
-        if (happiness >= 80) return "Very Happy";
-        if (happiness >= 60) return "Happy";
-        if (happiness >= 40) return "Content";
-        if (happiness >= 20) return "Unhappy";
-        return "Miserable";
+
+    public void incrementPlayerRelation(String playerId) {
+        playerRelations.put(playerId, playerRelations.getOrDefault(playerId, 0) + 1);
     }
-    
-    public Map<String, String> getPlayerMemories() { return new HashMap<>(playerMemories); }
-    public void setPlayerMemory(String playerUuid, String memory) { 
-        this.playerMemories.put(playerUuid, memory);
+
+    public void addPlayerMemory(String playerId, String memory) {
+        playerMemories.put(playerId, memory);
     }
-    public String getPlayerMemory(String playerUuid) {
-        return playerMemories.getOrDefault(playerUuid, "");
-    }
-    
-    public Map<String, Integer> getTopicFrequency() { return new HashMap<>(topicFrequency); }
+
     public void incrementTopicFrequency(String topic) {
         topicFrequency.put(topic, topicFrequency.getOrDefault(topic, 0) + 1);
     }
-    public int getTopicFrequency(String topic) {
-        return topicFrequency.getOrDefault(topic, 0);
-    }
-    
-    public List<String> getRecentEvents() { return new ArrayList<>(recentEvents); }
-    public void addRecentEvent(String event) {
-        recentEvents.add(0, event);
-        // Keep only the last 5 events
-        if (recentEvents.size() > 5) {
-            recentEvents.remove(5);
-        }
-    }
-    
-    public long getLastConversationTime() { return lastConversationTime; }
-    public void setLastConversationTime(long time) { this.lastConversationTime = time; }
-    public void updateLastConversationTime() { this.lastConversationTime = System.currentTimeMillis(); }
-    
-    public boolean hasRecentConversation(long withinMillis) {
-        return (System.currentTimeMillis() - lastConversationTime) < withinMillis;
+
+    public VillagerData copy() {
+        return new VillagerData(
+            emotionalState.copy(), aiState.copy(), learningProfile.copy(), professionData.copy(),
+            name, age, gender, personality, happiness, totalTrades, favoritePlayerId,
+            new ArrayList<>(professionHistory), new HashMap<>(playerRelations),
+            new ArrayList<>(familyMembers), spouseName, spouseId,
+            new ArrayList<>(childrenIds), new ArrayList<>(childrenNames),
+            favoriteFood, hobby, birthTime, birthPlace, notes, deathTime, isAlive,
+            new HashMap<>(playerMemories), new HashMap<>(topicFrequency),
+            new ArrayList<>(recentEvents), lastConversationTime
+        );
     }
 }

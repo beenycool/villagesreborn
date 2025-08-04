@@ -16,10 +16,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 public class VillagerRelationshipManager {
-    private static final double MARRIAGE_RANGE = 10.0;
-    private static final int MIN_MARRIAGE_AGE = 100; 
-    private static final int MARRIAGE_COOLDOWN = 1000; 
-    private static final int PROPOSAL_TIME_THRESHOLD = 12000; 
+    // Relationship constants moved to VillagerConstants.Relationship
     
     
     private static final Map<String, Set<String>> PERSONALITY_COMPATIBILITIES = Map.of(
@@ -49,7 +46,7 @@ public class VillagerRelationshipManager {
         if (data1 == null || data2 == null) return false;
         
         
-        if (data1.getAge() < MIN_MARRIAGE_AGE || data2.getAge() < MIN_MARRIAGE_AGE) return false;
+        if (data1.getAge() < VillagerConstants.Relationship.MIN_MARRIAGE_AGE || data2.getAge() < VillagerConstants.Relationship.MIN_MARRIAGE_AGE) return false;
         
         
         if (!data1.getSpouseId().isEmpty() || !data2.getSpouseId().isEmpty()) return false;
@@ -62,7 +59,7 @@ public class VillagerRelationshipManager {
         
         
         double distance = villager1.getPos().distanceTo(villager2.getPos());
-        if (distance > MARRIAGE_RANGE) return false;
+        if (distance > VillagerConstants.Relationship.MARRIAGE_RANGE) return false;
         
         
         return arePersonalitiesCompatible(data1.getPersonality(), data2.getPersonality());
@@ -117,16 +114,28 @@ public class VillagerRelationshipManager {
         
         if (villager1.getWorld() instanceof ServerWorld serverWorld) {
             
+            // Heart particles
             serverWorld.spawnParticles(ParticleTypes.HEART,
                 villager1.getX(), villager1.getY() + 2, villager1.getZ(),
                 10, 0.5, 0.5, 0.5, 0.1);
             serverWorld.spawnParticles(ParticleTypes.HEART,
                 villager2.getX(), villager2.getY() + 2, villager2.getZ(),
                 10, 0.5, 0.5, 0.5, 0.1);
-            
-            
+
+            // Confetti/happy particles
+            serverWorld.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
+                villager1.getX(), villager1.getY() + 2, villager1.getZ(),
+                15, 0.7, 0.7, 0.7, 0.2);
+            serverWorld.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
+                villager2.getX(), villager2.getY() + 2, villager2.getZ(),
+                15, 0.7, 0.7, 0.7, 0.2);
+
+            // Festive sound (bell + celebration)
             serverWorld.playSound(null, villager1.getBlockPos(),
                 SoundEvents.BLOCK_BELL_USE, SoundCategory.NEUTRAL, 1.0f, 1.0f);
+            serverWorld.playSound(null, villager1.getBlockPos(),
+                SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 0.8f, 1.2f);
+            
             
             
             serverWorld.getPlayers().forEach(player -> {
@@ -138,25 +147,54 @@ public class VillagerRelationshipManager {
         }
         
         
-        villager1.setCustomName(Text.literal(data1.getName() + " ❤").formatted(Formatting.RED));
-        villager2.setCustomName(Text.literal(data2.getName() + " ❤").formatted(Formatting.RED));
+        villager1.setCustomName(Text.literal(data1.getName() + " (Married)").formatted(Formatting.LIGHT_PURPLE));
+        villager2.setCustomName(Text.literal(data2.getName() + " (Married)").formatted(Formatting.LIGHT_PURPLE));
     }
-    
     
     public static void onVillagerBreed(VillagerEntity parent1, VillagerEntity parent2, VillagerEntity child) {
         VillagerData parentData1 = parent1.getAttached(Villagersreborn.VILLAGER_DATA);
         VillagerData parentData2 = parent2.getAttached(Villagersreborn.VILLAGER_DATA);
         VillagerData childData = child.getAttached(Villagersreborn.VILLAGER_DATA);
-        
+
         if (parentData1 == null || parentData2 == null || childData == null) return;
-        
+
         String childUuid = child.getUuidAsString();
         String parentUuid1 = parent1.getUuidAsString();
         String parentUuid2 = parent2.getUuidAsString();
-        
-        
+
         parentData1.addChild(childUuid);
         parentData2.addChild(childUuid);
+
+        // Birth feedback: particles, sound, name tags
+        if (parent1.getWorld() instanceof ServerWorld serverWorld) {
+            // Heart/happy particles around parents and child
+            serverWorld.spawnParticles(ParticleTypes.HEART,
+                parent1.getX(), parent1.getY() + 2, parent1.getZ(),
+                8, 0.5, 0.5, 0.5, 0.1);
+            serverWorld.spawnParticles(ParticleTypes.HEART,
+                parent2.getX(), parent2.getY() + 2, parent2.getZ(),
+                8, 0.5, 0.5, 0.5, 0.1);
+            serverWorld.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
+                child.getX(), child.getY() + 2, child.getZ(),
+                12, 0.7, 0.7, 0.7, 0.2);
+
+            // Birth sound
+            serverWorld.playSound(null, child.getBlockPos(),
+                SoundEvents.ENTITY_VILLAGER_CELEBRATE, SoundCategory.NEUTRAL, 1.0f, 1.0f);
+
+            // Update parent name tags
+            parent1.setCustomName(Text.literal(parentData1.getName() + " (Parent)").formatted(Formatting.GREEN));
+            parent2.setCustomName(Text.literal(parentData2.getName() + " (Parent)").formatted(Formatting.GREEN));
+
+            // Notify nearby players
+            serverWorld.getPlayers().forEach(player -> {
+                if (player.getPos().distanceTo(child.getPos()) < 50) {
+                    player.sendMessage(Text.literal("👶 " + parentData1.getName() + " and " +
+                        parentData2.getName() + " had a child!").formatted(Formatting.YELLOW), false);
+                }
+            });
+        }
+        
         
         
         childData.addFamilyMember(parentUuid1);
@@ -338,19 +376,18 @@ public class VillagerRelationshipManager {
     
     public static List<VillagerEntity> findPotentialPartners(VillagerEntity villager) {
         if (villager.getWorld() == null) return List.of();
-        
-        // Use ServerVillagerManager for efficient lookup instead of world scanning
-        List<VillagerEntity> marriageCandidates = new java.util.ArrayList<>();
-        for (VillagerEntity potential : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
-            if (potential != villager && canMarry(villager, potential)) {
-                // Check distance from villager
-                double distance = villager.getPos().distanceTo(potential.getPos());
-                if (distance <= MARRIAGE_RANGE) {
-                    marriageCandidates.add(potential);
-                }
-            }
-        }
-        return marriageCandidates;
+    
+        // Use world.getEntitiesByClass for efficient lookup
+        double range = MARRIAGE_RANGE;
+        Box searchBox = new Box(
+            villager.getX() - range, villager.getY() - range, villager.getZ() - range,
+            villager.getX() + range, villager.getY() + range, villager.getZ() + range
+        );
+        return villager.getWorld().getEntitiesByClass(
+            VillagerEntity.class,
+            searchBox,
+            potential -> potential != villager && canMarry(villager, potential)
+        );
     }
     
     

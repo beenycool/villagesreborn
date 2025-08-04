@@ -206,23 +206,22 @@ public class LLMDialogueManager {
         initialized = false;
     }
     
-    // Method to test the LLM connection
     /**
-     * Thread-safe connection test using temporary provider instance.
-     * Does NOT modify global config or static fields.
+     * Server-side connection test using the server's stored configuration.
+     * This is the secure way to test connections - no sensitive data from client.
      */
-    public static CompletableFuture<Boolean> testConnection(String provider, String apiKey, String endpoint, String model) {
+    public static CompletableFuture<Boolean> testConnectionSecure() {
         try {
-            // Minimal validation: ensure provider instance can be created and is configured
-            LLMDialogueProvider temp = createProvider(provider, apiKey, endpoint, model);
+            // Use the server's own configuration to test
+            LLMDialogueProvider temp = createProvider();
             return CompletableFuture.completedFuture(temp != null && temp.isConfigured());
-
-
         } catch (Throwable e) {
             logger.error("LLM connection test failed", e);
             return CompletableFuture.completedFuture(false);
         }
     }
+
+    // Removed deprecated insecure connection test method. All connection tests are now server-side only.
 
     /**
      * Helper to create a provider instance from parameters.

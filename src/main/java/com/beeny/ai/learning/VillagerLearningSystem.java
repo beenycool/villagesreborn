@@ -304,10 +304,10 @@ public class VillagerLearningSystem {
         
         // Update emotional response based on learned patterns
         if (outcome > 0.5f) {
-            VillagerEmotionSystem.processEmotionalEvent(villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 15.0f, "positive_interaction", false));
         } else if (outcome < -0.5f) {
-            VillagerEmotionSystem.processEmotionalEvent(villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 10.0f, "negative_interaction", false));
         }
     }

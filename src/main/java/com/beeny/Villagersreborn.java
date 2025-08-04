@@ -10,6 +10,8 @@ import com.beeny.network.VillagerMarriagePacket;
 import com.beeny.network.OpenFamilyTreePacket;
 import com.beeny.network.FamilyTreeDataPacket;
 import com.beeny.network.RequestVillagerListPacket;
+import com.beeny.network.TestLLMConnectionPacket;
+import com.beeny.network.TestLLMConnectionResultPacket;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import com.beeny.registry.ModItems;
 import com.beeny.system.VillagerRelationshipManager;
@@ -112,6 +114,20 @@ public class Villagersreborn implements ModInitializer {
 		OpenFamilyTreePacket.register();
 		FamilyTreeDataPacket.register();
 		RequestVillagerListPacket.register();
+		TestLLMConnectionPacket.register();
+		TestLLMConnectionResultPacket.register();
+		
+		// Register secure LLM connection test handler
+		ServerPlayNetworking.registerGlobalReceiver(TestLLMConnectionPacket.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				// Test connection using server's stored configuration
+				LLMDialogueManager.testConnectionSecure().thenAccept(success -> {
+					String message = success ? "Connection successful!" : "Connection failed. Check server configuration.";
+					TestLLMConnectionResultPacket result = new TestLLMConnectionResultPacket(success, message);
+					ServerPlayNetworking.send(context.player(), result);
+				});
+			});
+		});
 		
 		
 		registerEvents();
@@ -159,9 +175,13 @@ public class Villagersreborn implements ModInitializer {
 	private void registerEvents() {
 		
 		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-			if (entity instanceof VillagerEntity villager && !world.isClient) {
-				ItemStack heldItem = player.getStackInHand(hand);
-				VillagerData data = villager.getAttached(VILLAGER_DATA);
+		    if (entity instanceof VillagerEntity villager && !world.isClient) {
+		        world.getServer().execute(() -> {
+		            ItemStack heldItem = player.getStackInHand(hand);
+		            VillagerData data = villager.getAttached(VILLAGER_DATA);
+		            // ... rest of logic ...
+		        });
+		    }
 				
 				if (data == null) return ActionResult.PASS;
 				

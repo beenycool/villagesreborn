@@ -96,7 +96,7 @@ public class VillagerChatSystem {
             this.villager = villager;
             this.player = player;
             this.villagerData = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            this.emotionalState = VillagerEmotionSystem.getEmotionalState(villager);
+            this.emotionalState = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().getEmotionalState(villager);
             this.lastPlayerMessage = playerMessage;
             this.detectedIntent = ChatIntent.classifyIntent(playerMessage);
             this.extractedEntities = extractEntities(playerMessage);
@@ -344,7 +344,7 @@ public class VillagerChatSystem {
         }
         
         private static String generateComplimentResponse(ChatContext context) {
-            VillagerEmotionSystem.processEmotionalEvent(context.villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 20.0f, "compliment", false));
             
             return switch (context.villagerData.getPersonality()) {
@@ -358,7 +358,7 @@ public class VillagerChatSystem {
         }
         
         private static String generateInsultResponse(ChatContext context) {
-            VillagerEmotionSystem.processEmotionalEvent(context.villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, 25.0f, "insult", false));
             
             if (context.villagerData != null) {

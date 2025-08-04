@@ -341,10 +341,10 @@ public class VillagerGOAP {
                 VillagerEntity target = nearby.get(villager.getWorld().getRandom().nextInt(nearby.size()));
                 
                 // Emotional effects of socializing
-                VillagerEmotionSystem.processEmotionalEvent(villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 10.0f, "socializing", false));
                 
-                VillagerEmotionSystem.processEmotionalEvent(villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.LONELINESS, -15.0f, "socializing", false));
                 
                 state.setBool("has_socialized", true);

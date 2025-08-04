@@ -79,13 +79,7 @@ public class RequestVillagerListPacket implements CustomPayload {
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 withDataCount++;
-                villagerDataList.add(new VillagerDataPacket(
-                    villager.getId(),
-                    data.getName(),
-                    villager.getBlockPos(),
-                    data.getProfessionHistory().isEmpty() ? "None" : data.getProfessionHistory().get(0),
-                    data.getHappiness()
-                ));
+                villagerDataList.add(VillagerDataPacket.fromVillagerData(data, villager.getUuid()));
                 Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}", 
                     data.getName(), villager.getBlockPos());
             }
@@ -97,73 +91,20 @@ public class RequestVillagerListPacket implements CustomPayload {
         ServerPlayNetworking.send(player, new ResponsePacket(villagerDataList));
     }
 
-    public static class VillagerDataPacket {
-        private final int entityId;
-        private final String name;
-        private final int x, y, z;
-        private final String profession;
-        private final int happiness;
-
-        public VillagerDataPacket(int entityId, String name, int x, int y, int z, String profession, int happiness) {
-            this.entityId = entityId;
-            this.name = name;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.profession = profession;
-            this.happiness = happiness;
-        }
-        
-        public VillagerDataPacket(int entityId, String name, net.minecraft.util.math.BlockPos pos, String profession, int happiness) {
-            this(entityId, name, pos.getX(), pos.getY(), pos.getZ(), profession, happiness);
-        }
-
-        public void toPacket(RegistryByteBuf buf) {
-            buf.writeInt(entityId);
-            buf.writeString(name);
-            buf.writeInt(x);
-            buf.writeInt(y);
-            buf.writeInt(z);
-            buf.writeString(profession);
-            buf.writeInt(happiness);
-        }
-
-        public static VillagerDataPacket fromPacket(RegistryByteBuf buf) {
-            int entityId = buf.readInt();
-            String name = buf.readString();
-            int x = buf.readInt();
-            int y = buf.readInt();
-            int z = buf.readInt();
-            String profession = buf.readString();
-            int happiness = buf.readInt();
-            
-            return new VillagerDataPacket(entityId, name, x, y, z, profession, happiness);
-        }
-
-        // Getters
-        public int getEntityId() { return entityId; }
-        public String getName() { return name; }
-        public int getX() { return x; }
-        public int getY() { return y; }
-        public int getZ() { return z; }
-        public String getProfession() { return profession; }
-        public int getHappiness() { return happiness; }
-    }
-
     public static class ResponsePacket implements CustomPayload {
         public static final CustomPayload.Id<ResponsePacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, "villager_list_response"));
         public static final PacketCodec<RegistryByteBuf, ResponsePacket> CODEC = PacketCodec.of(
             (value, buf) -> {
                 buf.writeInt(value.villagerDataList.size());
                 for (VillagerDataPacket villagerData : value.villagerDataList) {
-                    villagerData.toPacket(buf);
+                    VillagerDataPacket.CODEC.encode(buf, villagerData);
                 }
             },
             buf -> {
                 int size = buf.readInt();
                 List<VillagerDataPacket> list = new ArrayList<>();
                 for (int i = 0; i < size; i++) {
-                    list.add(VillagerDataPacket.fromPacket(buf));
+                    list.add(VillagerDataPacket.CODEC.decode(buf));
                 }
                 return new ResponsePacket(list);
             }

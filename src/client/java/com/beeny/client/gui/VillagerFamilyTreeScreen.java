@@ -5,9 +5,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import com.beeny.Villagersreborn;
-import com.beeny.data.VillagerData;
 import com.beeny.network.FamilyTreeDataPacket;
-import com.beeny.system.VillagerAncestryManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -35,12 +33,10 @@ public class VillagerFamilyTreeScreen extends Screen {
     private static final int GRANDPARENT_COLOR = 0xFF2ECC71;      // Light Green
     private static final int GRANDCHILD_COLOR = 0xFFE67E22;       // Dark Orange
     
-    private final VillagerEntity currentVillager;
     private final long villagerId;
     private final Map<String, FamilyMember> familyTree;
-    private final Map<String, VillagerData> ancestors;
-    private final List<FamilyMember> displayedMembers;
     private final List<FamilyTreeDataPacket.FamilyMemberData> serverFamilyMembers;
+    private final List<FamilyMember> displayedMembers;
     private ButtonWidget closeButton;
     private ButtonWidget backButton;
     
@@ -48,26 +44,19 @@ public class VillagerFamilyTreeScreen extends Screen {
     private int treeOffsetY = 0;
     private float animationTick = 0;
     
+    /**
+     * Deprecated constructor. Only use the packet-based constructor.
+     */
+    @Deprecated
     public VillagerFamilyTreeScreen(VillagerEntity villager) {
         super(Text.literal("Family Tree"));
-        LOGGER.info("[VillagerFamilyTreeScreen] Constructor called for villager: " + villager.getId());
-        this.currentVillager = villager;
-        this.villagerId = villager.getId();
-        this.familyTree = new HashMap<>();
-        this.ancestors = VillagerAncestryManager.generateAncestors(villager, 4); // 4 generations
-        this.displayedMembers = new ArrayList<>();
-        this.serverFamilyMembers = new ArrayList<>();
-        LOGGER.info("[VillagerFamilyTreeScreen] Ancestors generated: " + ancestors.size());
-        buildFamilyTree();
-        LOGGER.info("[VillagerFamilyTreeScreen] Family tree built with " + displayedMembers.size() + " members");
+        throw new UnsupportedOperationException("Client must use server-provided data via packet.");
     }
     
     public VillagerFamilyTreeScreen(long villagerId, List<FamilyTreeDataPacket.FamilyMemberData> familyMembers) {
         super(Text.literal("Family Tree"));
-        this.currentVillager = null;
         this.villagerId = villagerId;
         this.familyTree = new HashMap<>();
-        this.ancestors = new HashMap<>();
         this.displayedMembers = new ArrayList<>();
         this.serverFamilyMembers = familyMembers;
         buildFamilyTreeFromServerData();
@@ -99,41 +88,12 @@ public class VillagerFamilyTreeScreen extends Screen {
         calculateTreeLayout();
     }
     
+    /**
+     * Deprecated: All family tree logic is now server-side.
+     */
+    @Deprecated
     private void buildFamilyTree() {
-        if (client == null || client.world == null) {
-            LOGGER.warn("[FamilyTree] Client or world is null!");
-            return;
-        }
-        
-        if (currentVillager == null) {
-            // This is server data, handled by buildFamilyTreeFromServerData
-            return;
-        }
-        
-        VillagerData currentData = currentVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (currentData == null) {
-            LOGGER.warn("[FamilyTree] No VillagerData attached to current villager!");
-            // Try to create a basic VillagerData if none exists
-            currentData = new VillagerData();
-            currentData.setName("Villager_" + currentVillager.getId());
-            currentVillager.setAttached(Villagersreborn.VILLAGER_DATA, currentData);
-        }
-        
-        LOGGER.info("[FamilyTree] Building tree for: " + currentData.getName());
-        
-        // Deprecated: client-side scans removed. Family trees are now server-computed.
-        // Start with current villager box and rely on serverFamilyMembers provided via packet.
-        FamilyMember current = new FamilyMember(currentVillager, RelationshipType.CURRENT);
-        familyTree.put(currentVillager.getUuidAsString(), current);
-        displayedMembers.add(current);
-
-        // Build from server-provided data if available
-        if (!serverFamilyMembers.isEmpty()) {
-            buildFamilyTreeFromServerData();
-        }
-
-        // Sort members by generation for display
-        displayedMembers.sort((a, b) -> Integer.compare(a.generation, b.generation));
+        throw new UnsupportedOperationException("Client must use server-provided data via packet.");
     }
     
     private void buildFamilyTreeFromServerData() {
@@ -148,29 +108,12 @@ public class VillagerFamilyTreeScreen extends Screen {
         displayedMembers.sort((a, b) -> Integer.compare(a.generation, b.generation));
     }
     
-    private void buildRelationshipsFromVillagers(List<VillagerEntity> villagers, VillagerData currentData) {
-        if (currentVillager == null) return;
-        
-        String currentUuid = currentVillager.getUuidAsString();
-        
-        for (VillagerEntity villager : villagers) {
-            if (villager.equals(currentVillager)) continue;
-            
-            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-            if (data == null) continue;
-            
-            String villagerUuid = villager.getUuidAsString();
-            RelationshipType relationship = determineRelationship(currentData, data, currentUuid, villagerUuid);
-            
-            if (relationship != RelationshipType.NONE) {
-                FamilyMember member = new FamilyMember(villager, relationship);
-                familyTree.put(villagerUuid, member);
-                displayedMembers.add(member);
-            }
-        }
-        
-        // Set generation levels
-        setGenerationLevels();
+    /**
+     * Deprecated: All relationship logic is now server-side.
+     */
+    @Deprecated
+    private void buildRelationshipsFromVillagers(List<VillagerEntity> villagers, Object currentData) {
+        throw new UnsupportedOperationException("Client must use server-provided data via packet.");
     }
     
     private void addAncestorsToTree() {

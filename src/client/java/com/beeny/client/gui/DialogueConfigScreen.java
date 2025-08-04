@@ -40,19 +40,31 @@ public class DialogueConfigScreen extends Screen {
     public DialogueConfigScreen(Screen parent) {
         super(Text.literal("Dynamic Dialogue Configuration"));
         this.parent = parent;
-        
-        // Load current settings
+    }
+    
+    @Override
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Prevent blur effect to avoid "Can only blur once per frame" error
+        if (this.client != null && this.client.world != null) {
+            // Draw a simple gradient background without blur
+            context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
+        } else {
+            super.renderBackground(context, mouseX, mouseY, delta);
+        }
+        // Only draw background, do not set config values or status message here.
+    }
+    
+    @Override
+    protected void init() {
+        // Load current settings ONCE when screen is initialized
         this.tempProvider = VillagersRebornConfig.LLM_PROVIDER;
         this.tempEnabled = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE;
         this.tempApiKey = VillagersRebornConfig.LLM_API_KEY;
         this.tempEndpoint = VillagersRebornConfig.LLM_API_ENDPOINT;
         this.tempModel = VillagersRebornConfig.LLM_MODEL;
-        
         this.statusMessage = Text.literal("Configure your AI dialogue settings below");
-    }
-    
-    @Override
-    protected void init() {
+        this.statusColor = Formatting.WHITE;
+
         int centerX = this.width / 2;
         int centerY = this.height / 2;
         int panelLeft = centerX - PANEL_WIDTH / 2;
@@ -65,7 +77,7 @@ public class DialogueConfigScreen extends Screen {
         this.enabledButton = CyclingButtonWidget.<Boolean>builder(enabled -> enabled ? Text.literal("Dynamic Dialogue: Enabled") : Text.literal("Dynamic Dialogue: Disabled"))
             .values(true, false)
             .initially(tempEnabled)
-            .build(panelLeft + 20, currentY, 240, 20, Text.literal("Dynamic Dialogue"), 
+            .build(panelLeft + 20, currentY, 240, 20, Text.literal("Dynamic Dialogue"),
                    (button, enabled) -> {
                        this.tempEnabled = enabled;
                        updateFieldStates();
@@ -86,7 +98,7 @@ public class DialogueConfigScreen extends Screen {
         this.providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Provider: " + value.toUpperCase()))
             .values(providers)
             .initially(tempProvider)
-            .build(panelLeft + 20, currentY, 200, 20, Text.literal("LLM Provider"), 
+            .build(panelLeft + 20, currentY, 200, 20, Text.literal("LLM Provider"),
                    (button, provider) -> {
                        this.tempProvider = provider;
                        updateModelField();
@@ -162,14 +174,17 @@ public class DialogueConfigScreen extends Screen {
     
     private void updateModelField() {
         if (modelField != null) {
-            String defaultModel = switch (tempProvider) {
-                case "gemini" -> "gemini-1.5-flash";
-                case "openrouter" -> "openai/gpt-3.5-turbo";
-                default -> "";
-            };
+            String defaultModel = "";
+            if (tempProvider != null) {
+                defaultModel = switch (tempProvider) {
+                    case "gemini" -> "gemini-1.5-flash";
+                    case "openrouter" -> "openai/gpt-3.5-turbo";
+                    default -> "";
+                };
+            }
             
-            if (modelField.getText().isEmpty() || 
-                modelField.getText().equals("gemini-1.5-flash") || 
+            if (modelField.getText().isEmpty() ||
+                modelField.getText().equals("gemini-1.5-flash") ||
                 modelField.getText().equals("openai/gpt-3.5-turbo")) {
                 modelField.setText(defaultModel);
                 tempModel = defaultModel;
@@ -211,30 +226,13 @@ public class DialogueConfigScreen extends Screen {
     }
     
     private void testConnection() {
-        if (apiKeyField.getText().trim().isEmpty()) {
-            setStatusMessage(Text.literal("Please enter an API key first"), Formatting.RED);
-            return;
-        }
-
         setStatusMessage(Text.literal("Testing connection..."), Formatting.YELLOW);
 
-        // Prepare temporary settings for testing
-        String provider = tempProvider;
-        String apiKey = apiKeyField.getText().trim();
-        String endpoint = endpointField.getText().trim();
-        String model = modelField.getText().trim();
+        // Send a simple connection test request to the server
+        TestLLMConnectionPacket packet = new TestLLMConnectionPacket();
+        ClientPlayNetworking.send(packet);
 
-        // Pass temporary settings directly to the test method
-        LLMDialogueManager.testConnection(provider, apiKey, endpoint, model).thenAccept(success -> {
-            if (success) {
-                setStatusMessage(Text.literal("✓ Connection successful!"), Formatting.GREEN);
-            } else {
-                setStatusMessage(Text.literal("✗ Connection failed. Check your settings."), Formatting.RED);
-            }
-        }).exceptionally(throwable -> {
-            setStatusMessage(Text.literal("✗ Connection error: " + throwable.getMessage()), Formatting.RED);
-            return null;
-        });
+        // The result will be handled by the packet handler, which should update the UI accordingly.
     }
     
     private void saveAndClose() {
@@ -297,7 +295,7 @@ public class DialogueConfigScreen extends Screen {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Draw background
+        // Render background
         this.renderBackground(context, mouseX, mouseY, delta);
 
         int centerX = this.width / 2;

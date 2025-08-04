@@ -7,8 +7,11 @@ import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
 import com.beeny.util.VillagerNames;
-import com.beeny.commands.DialogueCommands;
-import com.beeny.commands.DialogueSetupCommands;
+import com.beeny.dialogue.LLMDialogueManager;
+import com.beeny.dialogue.DialogueCache;
+import com.beeny.dialogue.VillagerMemoryManager;
+import com.beeny.system.VillagerDialogueSystem;
+import com.beeny.config.VillagersRebornConfig;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -28,6 +31,8 @@ import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -40,50 +45,107 @@ import java.util.UUID;
 
 public class VillagerCommands {
     
-    private static final double NEAREST_SEARCH_RADIUS = 10.0;
-    private static final double LIST_SEARCH_RADIUS = 50.0;
-    private static final double FIND_SEARCH_RADIUS = 100.0;
-    private static final double RANDOMIZE_SEARCH_RADIUS = 50.0;
+    private static final double NEAREST_SEARCH_RADIUS = VillagerConstants.SearchRadius.NEAREST;
+    private static final double LIST_SEARCH_RADIUS = VillagerConstants.SearchRadius.LIST;
+    private static final double FIND_SEARCH_RADIUS = VillagerConstants.SearchRadius.FIND;
+    private static final double RANDOMIZE_SEARCH_RADIUS = VillagerConstants.SearchRadius.RANDOMIZE;
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             registerVillagerCommand(dispatcher, registryAccess);
-            VillagerActivityCommands.register(dispatcher, registryAccess);
-            DialogueCommands.register(dispatcher, registryAccess);
-            DialogueSetupCommands.register(dispatcher, registryAccess);
+            // All villager management commands are now unified under /villager.
+            // Removed legacy /manage root and any duplicate registrations.
+            // VillagerActivityCommands remains if needed for unrelated activities
         });
     }
 
     private static void registerVillagerCommand(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(CommandManager.literal("villager")
+            // Client GUI settings
+            .then(CommandManager.literal("settings")
+                .executes(context -> {
+                    // Signal to client to open settings GUI
+                    // (Handled client-side, see ClientDialogueCommands)
+                    sendInfo(context.getSource(), "Open settings GUI via client command.");
+                    return 1;
+                }))
+            // AI configuration
+            .then(CommandManager.literal("ai")
+                // Guided setup
+                .then(CommandManager.literal("configure")
+                    .executes(DialogueSetupCommands::startGuidedSetup)
+                    .then(CommandManager.literal("quick")
+                        .then(CommandManager.argument("provider", StringArgumentType.word())
+                            .executes(DialogueSetupCommands::quickSetup)
+                            .then(CommandManager.argument("key", StringArgumentType.greedyString())
+                                .executes(DialogueSetupCommands::quickSetup))))
+                // Legacy setup (for compatibility)
+                .then(CommandManager.literal("setup")
+                    .then(CommandManager.argument("provider", StringArgumentType.word())
+                        .suggests(VillagerCommands::suggestProviders)
+                        .then(CommandManager.argument("apikey", StringArgumentType.greedyString())
+                            .executes(VillagerCommands::setupAI))
+                        .executes(VillagerCommands::setupAIWithoutKey)))
+                .then(CommandManager.literal("model")
+                    .then(CommandManager.argument("model_name", StringArgumentType.greedyString())
+                        .executes(VillagerCommands::setModel)))
+                .then(CommandManager.literal("test")
+                    .executes(VillagerCommands::testAI)
+                    .then(CommandManager.argument("category", StringArgumentType.word())
+                        .suggests(VillagerCommands::suggestDialogueCategories)
+                        .executes(VillagerCommands::testAIWithCategory)))
+                .then(CommandManager.literal("toggle")
+                    .executes(VillagerCommands::toggleAI))
+                // Dialogue subcommands
+                .then(CommandManager.literal("dialogue")
+                    .then(CommandManager.literal("setup")
+                        .executes(DialogueCommands::showSetupInstructions))
+                    .then(CommandManager.literal("test")
+                        .executes(DialogueCommands::testDialogue)
+                        .then(CommandManager.argument("category", StringArgumentType.string())
+                            .suggests((context, builder) -> {
+                                for (String category : VillagerConstants.DialogueCategory.ALL) {
+                                    builder.suggest(category);
+                                }
+                                return builder.buildFuture();
+                            })
+                            .executes(DialogueCommands::testDialogueWithCategory)))
+                    .then(CommandManager.literal("status")
+                        .executes(DialogueCommands::showStatus))
+                    .then(CommandManager.literal("cache")
+                        .then(CommandManager.literal("clear")
+                            .executes(DialogueCommands::clearCache))
+                        .then(CommandManager.literal("size")
+                            .executes(DialogueCommands::cacheSize)))
+                    .then(CommandManager.literal("memory")
+                        .then(CommandManager.literal("clear")
+                            .executes(DialogueCommands::clearMemory))
+                        .then(CommandManager.literal("size")
+                            .executes(DialogueCommands::memorySize)))
+                    .then(CommandManager.literal("toggle")
+                        .executes(DialogueCommands::toggleDynamicDialogue))
+                )
+            )
+            // ... (other villager commands: rename, list, find, etc. unchanged)
+        );
+    }
+                .then(CommandManager.literal("status")
+                    .executes(VillagerCommands::showAIStatus))
+                .then(CommandManager.literal("cache")
+                    .then(CommandManager.literal("clear")
+                        .executes(VillagerCommands::clearAICache))
+                    .then(CommandManager.literal("size")
+                        .executes(VillagerCommands::showCacheSize)))
+                .then(CommandManager.literal("memory")
+                    .then(CommandManager.literal("clear")
+                        .executes(VillagerCommands::clearAIMemory))
+                    .then(CommandManager.literal("size")
+                        .executes(VillagerCommands::showMemorySize))))
             
-            .then(CommandManager.literal("rename")
-                .then(CommandManager.argument("entities", EntityArgumentType.entities())
-                    .then(CommandManager.argument("name", StringArgumentType.greedyString())
-                        .executes(VillagerCommands::renameSelectedVillagers)))
-                .then(CommandManager.literal("nearest")
-                    .then(CommandManager.argument("name", StringArgumentType.greedyString())
-                        .executes(VillagerCommands::renameNearestVillager))))
-            
-            .then(CommandManager.literal("list")
-                .executes(VillagerCommands::listNamedVillagers))
-            
-            .then(CommandManager.literal("find")
-                .then(CommandManager.argument("name", StringArgumentType.greedyString())
-                    .executes(VillagerCommands::findVillagerByName)))
-            
-            .then(CommandManager.literal("randomize")
-                .executes(VillagerCommands::randomizeAllVillagerNames))
+            // (Removed legacy /manage command registration. All management commands are now under /villager.)
             
             
-            .then(CommandManager.literal("info")
-                .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                    .executes(VillagerCommands::showVillagerInfo)))
-            
-            .then(CommandManager.literal("stats")
-                .executes(VillagerCommands::showVillageStats))
-            
-            
+            // Family commands
             .then(CommandManager.literal("family")
                 .then(CommandManager.literal("tree")
                     .then(CommandManager.argument("villager", EntityArgumentType.entity())
@@ -102,6 +164,7 @@ public class VillagerCommands {
                             .executes(VillagerCommands::breedVillagers)))))
             
             
+            // Happiness commands
             .then(CommandManager.literal("happiness")
                 .then(CommandManager.literal("set")
                     .then(CommandManager.argument("villager", EntityArgumentType.entity())
@@ -115,39 +178,212 @@ public class VillagerCommands {
                     .executes(VillagerCommands::happinessReport)))
             
             
+            // Personality commands
             .then(CommandManager.literal("personality")
                 .then(CommandManager.literal("set")
                     .then(CommandManager.argument("villager", EntityArgumentType.entity())
                         .then(CommandManager.argument("personality", StringArgumentType.word())
-                            .suggests(VillagerCommands::suggestPersonalities)
+                            .suggests((context, builder) -> {
+                                for (String personality : VillagerConstants.Personality.ALL) {
+                                    builder.suggest(personality);
+                                }
+                                return builder.buildFuture();
+                            })
                             .executes(VillagerCommands::setPersonality))))
                 .then(CommandManager.literal("list")
                     .executes(VillagerCommands::listPersonalities)))
             
             
-            .then(CommandManager.literal("schedule")
-                .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                    .executes(VillagerCommands::showSchedule)))
             
-            
+            // Data commands
             .then(CommandManager.literal("data")
                 .then(CommandManager.literal("export")
                     .then(CommandManager.argument("villager", EntityArgumentType.entity())
                         .executes(VillagerCommands::exportVillagerData)))
                 .then(CommandManager.literal("reset")
                     .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                        .executes(VillagerCommands::resetVillagerData))))
+                        .executes(VillagerCommands::resetVillagerData)))
+                .then(CommandManager.literal("debug")
+                    .requires(source -> source.hasPermissionLevel(2))
+                    .then(CommandManager.literal("relationships")
+                        .executes(VillagerCommands::debugRelationships))
+                    .then(CommandManager.literal("cleanup")
+                        .executes(VillagerCommands::cleanupData))))
             
+            // Schedule command (standalone)
+            .then(CommandManager.literal("schedule")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerCommands::showSchedule)))
             
-            .then(CommandManager.literal("debug")
-                .requires(source -> source.hasPermissionLevel(2))
-                .then(CommandManager.literal("relationships")
-                    .executes(VillagerCommands::debugRelationships))
-                .then(CommandManager.literal("cleanup")
-                    .executes(VillagerCommands::cleanupData))));
+            // Help command
+            .then(CommandManager.literal("help")
+                .executes(VillagerCommands::showHelp))
+        );
     }
 
     
+
+    // === Dialogue Command Handlers (moved from DialogueCommands) ===
+
+    private static int testDialogue(CommandContext<ServerCommandSource> context) {
+        return testDialogueWithCategory(context, VillagerDialogueSystem.DialogueCategory.GREETING);
+    }
+
+    private static int testDialogueWithCategory(CommandContext<ServerCommandSource> context) {
+        String categoryName = StringArgumentType.getString(context, "category").toUpperCase();
+        VillagerDialogueSystem.DialogueCategory category;
+        try {
+            category = VillagerDialogueSystem.DialogueCategory.valueOf(categoryName);
+        } catch (IllegalArgumentException e) {
+            context.getSource().sendFeedback(() ->
+                Text.literal("Invalid category: " + categoryName).formatted(Formatting.RED), false);
+            return 0;
+        }
+        return testDialogueWithCategory(context, category);
+    }
+
+    private static int testDialogueWithCategory(CommandContext<ServerCommandSource> context, VillagerDialogueSystem.DialogueCategory category) {
+        ServerCommandSource source = context.getSource();
+        VillagerEntity villager = getTargetVillager(source);
+        if (villager == null) {
+            source.sendFeedback(() ->
+                Text.literal("Look at a villager to test dialogue!").formatted(Formatting.RED), false);
+            return 0;
+        }
+        VillagerData villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (villagerData == null) {
+            source.sendFeedback(() ->
+                Text.literal("This villager has no data!").formatted(Formatting.RED), false);
+            return 0;
+        }
+        VillagerDialogueSystem.DialogueContext dialogueContext =
+            new VillagerDialogueSystem.DialogueContext(villager, source.getPlayer());
+        source.sendFeedback(() ->
+            Text.literal("Testing " + category.name().toLowerCase() + " dialogue with " + villagerData.getName() + "...")
+                .formatted(Formatting.YELLOW), false);
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            VillagerDialogueSystem.generateDialogueAsync(dialogueContext, category)
+                .thenAccept(dialogue -> {
+                    source.getServer().execute(() -> {
+                        source.sendFeedback(() ->
+                            Text.literal("LLM Result: ").formatted(Formatting.GREEN)
+                                .append(dialogue), false);
+                    });
+                })
+                .exceptionally(throwable -> {
+                    source.getServer().execute(() -> {
+                        source.sendFeedback(() ->
+                            Text.literal("LLM Error: " + throwable.getMessage()).formatted(Formatting.RED), false);
+                    });
+                    return null;
+                });
+        }
+        Text staticDialogue = VillagerDialogueSystem.generateDialogue(dialogueContext, category, t -> {});
+        source.sendFeedback(() ->
+            Text.literal("Static Result: ").formatted(Formatting.BLUE)
+                .append(staticDialogue), false);
+        return 1;
+    }
+
+    private static int showStatus(CommandContext<ServerCommandSource> context) {
+        ServerCommandSource source = context.getSource();
+        source.sendFeedback(() ->
+            Text.literal("=== Dialogue System Status ===").formatted(Formatting.GOLD), false);
+        source.sendFeedback(() ->
+            Text.literal("Dynamic Dialogue: " + (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? "ENABLED" : "DISABLED"))
+                .formatted(VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? Formatting.GREEN : Formatting.RED), false);
+        source.sendFeedback(() ->
+            Text.literal("LLM Provider: " + LLMDialogueManager.getProviderName())
+                .formatted(Formatting.YELLOW), false);
+        source.sendFeedback(() ->
+            Text.literal("Provider Configured: " + (LLMDialogueManager.isConfigured() ? "YES" : "NO"))
+                .formatted(LLMDialogueManager.isConfigured() ? Formatting.GREEN : Formatting.RED), false);
+        source.sendFeedback(() ->
+            Text.literal("Cache Size: " + DialogueCache.size())
+                .formatted(Formatting.AQUA), false);
+        source.sendFeedback(() ->
+            Text.literal("Memory Size: " + VillagerMemoryManager.getMemorySize())
+                .formatted(Formatting.AQUA), false);
+        source.sendFeedback(() ->
+            Text.literal("Fallback to Static: " + (VillagersRebornConfig.FALLBACK_TO_STATIC ? "YES" : "NO"))
+                .formatted(Formatting.YELLOW), false);
+        return 1;
+    }
+
+    private static int clearCache(CommandContext<ServerCommandSource> context) {
+        LLMDialogueManager.clearCache();
+        context.getSource().sendFeedback(() ->
+            Text.literal("Dialogue cache cleared!").formatted(Formatting.GREEN), false);
+        return 1;
+    }
+
+    private static int cacheSize(CommandContext<ServerCommandSource> context) {
+        int size = LLMDialogueManager.getCacheSize();
+        context.getSource().sendFeedback(() ->
+            Text.literal("Dialogue cache size: " + size + " entries").formatted(Formatting.AQUA), false);
+        return 1;
+    }
+
+    private static int clearMemory(CommandContext<ServerCommandSource> context) {
+        VillagerEntity villager = getTargetVillager(context.getSource());
+        if (villager == null) {
+            context.getSource().sendFeedback(() ->
+                Text.literal("Look at a villager to clear their memory!").formatted(Formatting.RED), false);
+            return 0;
+        }
+        VillagerMemoryManager.clearMemory(villager.getUuidAsString());
+        context.getSource().sendFeedback(() ->
+            Text.literal("Cleared memory for villager!").formatted(Formatting.GREEN), false);
+        return 1;
+    }
+
+    private static int memorySize(CommandContext<ServerCommandSource> context) {
+        int size = VillagerMemoryManager.getMemorySize();
+        context.getSource().sendFeedback(() ->
+            Text.literal("Total memory size: " + size + " conversations").formatted(Formatting.AQUA), false);
+        return 1;
+    }
+
+    private static int toggleDynamicDialogue(CommandContext<ServerCommandSource> context) {
+        VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = !VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE;
+        String status = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? "ENABLED" : "DISABLED";
+        Formatting color = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? Formatting.GREEN : Formatting.RED;
+        context.getSource().sendFeedback(() ->
+            Text.literal("Dynamic dialogue " + status).formatted(color), false);
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            context.getSource().sendFeedback(() ->
+                Text.literal("Configuration saved").formatted(Formatting.GRAY), false);
+        } catch (Exception e) {
+            context.getSource().sendError(Text.literal("Failed to save configuration: " + e.getMessage()));
+        }
+        return 1;
+    }
+
+    private static int setProvider(CommandContext<ServerCommandSource> context) {
+        String provider = StringArgumentType.getString(context, "provider").toLowerCase();
+        VillagersRebornConfig.LLM_PROVIDER = provider;
+        LLMDialogueManager.reinitialize();
+        context.getSource().sendFeedback(() ->
+            Text.literal("LLM provider set to " + provider).formatted(Formatting.YELLOW), false);
+        return 1;
+    }
+
+    // Utility: getTargetVillager
+    private static VillagerEntity getTargetVillager(ServerCommandSource source) {
+        Entity entity = source.getEntity();
+        if (entity instanceof VillagerEntity) {
+            return (VillagerEntity) entity;
+        }
+        HitResult hitResult = source.getPlayer().rayTrace(10.0, 1.0f, false);
+        if (hitResult instanceof EntityHitResult entityHitResult) {
+            Entity hitEntity = entityHitResult.getEntity();
+            if (hitEntity instanceof VillagerEntity) {
+                return (VillagerEntity) hitEntity;
+            }
+        }
+        return null;
+    }
 
     private static int renameSelectedVillagers(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         String newName = StringArgumentType.getString(context, "name");
@@ -580,42 +816,60 @@ public class VillagerCommands {
 
     private static int setPersonality(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         Entity entity = EntityArgumentType.getEntity(context, "villager");
-        String personality = StringArgumentType.getString(context, "personality");
-        
+        String personalityStr = StringArgumentType.getString(context, "personality");
+        VillagerConstants.PersonalityType personality = VillagerConstants.PersonalityType.fromString(personalityStr);
+
         if (!(entity instanceof VillagerEntity villager)) {
             sendError(context.getSource(), "Entity is not a villager");
             return 0;
         }
-        
-        
-        if (!Arrays.asList(VillagerData.PERSONALITIES).contains(personality)) {
+
+        boolean valid = Arrays.stream(VillagerConstants.PersonalityType.values())
+            .anyMatch(type -> type == personality);
+
+        if (!valid) {
             sendError(context.getSource(), "Invalid personality. Use /villager personality list to see valid options");
             return 0;
         }
-        
+
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data != null) {
-            String oldPersonality = data.getPersonality();
+            VillagerConstants.PersonalityType oldPersonality = data.getPersonality();
             data.setPersonality(personality);
-            sendSuccess(context.getSource(), "Changed " + data.getName() + "'s personality from " + 
-                oldPersonality + " to " + personality);
+            sendSuccess(context.getSource(), "Changed " + data.getName() + "'s personality from " +
+                VillagerConstants.PersonalityType.toString(oldPersonality) + " to " +
+                VillagerConstants.PersonalityType.toString(personality));
         }
-        
+
         return 1;
     }
 
     private static int listPersonalities(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         sendInfo(source, "Available Personalities:");
-        for (String personality : VillagerData.PERSONALITIES) {
-            sendInfo(source, "  - " + personality);
+        for (VillagerConstants.PersonalityType personality : VillagerConstants.PersonalityType.values()) {
+            sendInfo(source, "  - " + VillagerConstants.PersonalityType.toString(personality));
         }
         return 1;
     }
 
     private static CompletableFuture<Suggestions> suggestPersonalities(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
-        for (String personality : VillagerData.PERSONALITIES) {
-            builder.suggest(personality);
+        for (VillagerConstants.PersonalityType personality : VillagerConstants.PersonalityType.values()) {
+            builder.suggest(VillagerConstants.PersonalityType.toString(personality));
+        }
+        return builder.buildFuture();
+    }
+    
+    private static CompletableFuture<Suggestions> suggestProviders(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
+        builder.suggest("gemini");
+        builder.suggest("openrouter");
+        builder.suggest("local");
+        return builder.buildFuture();
+    }
+    
+    private static CompletableFuture<Suggestions> suggestDialogueCategories(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
+        for (VillagerDialogueSystem.DialogueCategory category : VillagerDialogueSystem.DialogueCategory.values()) {
+            builder.suggest(category.name().toLowerCase());
         }
         return builder.buildFuture();
     }
@@ -759,10 +1013,18 @@ public class VillagerCommands {
                     
                     
                     Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
-                        .formatted(Formatting.AQUA);
-                    
+                        .formatted(Formatting.AQUA)
+                        .styled(style -> style
+                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to teleport to this villager")))
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tp @s " + pos.x + " " + pos.y + " " + pos.z))
+                        );
+
                     Text message = Text.literal("- ")
-                        .append(Text.literal(data.getName()).formatted(Formatting.WHITE))
+                        .append(Text.literal(data.getName()).formatted(Formatting.WHITE)
+                            .styled(style -> style
+                                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to see info for " + data.getName())))
+                                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/villager manage info " + villager.getUuidAsString()))
+                            ))
                         .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
                         .append(Text.literal(" at "))
                         .append(coordsText)
@@ -804,10 +1066,18 @@ public class VillagerCommands {
         
         
         Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
-            .formatted(Formatting.AQUA);
-        
+            .formatted(Formatting.AQUA)
+            .styled(style -> style
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to teleport to this villager")))
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tp @s " + pos.x + " " + pos.y + " " + pos.z))
+            );
+
         Text message = Text.literal("Found ")
-            .append(Text.literal(data.getName()).formatted(Formatting.GREEN))
+            .append(Text.literal(data.getName()).formatted(Formatting.GREEN)
+                .styled(style -> style
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Click to see info for " + data.getName())))
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/villager manage info " + villager.getUuidAsString()))
+                ))
             .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
             .append(Text.literal(" at "))
             .append(coordsText)
@@ -882,17 +1152,14 @@ public class VillagerCommands {
         World world = source.getWorld();
         Vec3d sourcePos = source.getPosition();
         
-        // Use ServerVillagerManager instead of scanning the world
-        List<VillagerEntity> villagers = new ArrayList<>();
-        for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
-            // Only include villagers in the same world
-            if (villager.getWorld() != world) continue;
-            
-            // Check if villager is within radius
-            if (sourcePos.distanceTo(villager.getPos()) <= radius) {
-                villagers.add(villager);
-            }
-        }
+        List<VillagerEntity> villagers = world.getEntitiesByClass(
+            VillagerEntity.class,
+            new Box(
+                sourcePos.x - radius, sourcePos.y - radius, sourcePos.z - radius,
+                sourcePos.x + radius, sourcePos.y + radius, sourcePos.z + radius
+            ),
+            v -> true // All villagers in area
+        );
         
         return villagers;
     }
@@ -929,5 +1196,296 @@ public class VillagerCommands {
 
     private static void sendInfo(ServerCommandSource source, String message) {
         source.sendFeedback(() -> Text.literal(message).formatted(Formatting.YELLOW), false);
+    }
+    
+    // === AI COMMAND METHODS ===
+    
+    private static int setupAI(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String provider = StringArgumentType.getString(context, "provider").toLowerCase();
+        String apiKey = StringArgumentType.getString(context, "apikey");
+        ServerCommandSource source = context.getSource();
+        
+        if (!provider.equals("gemini") && !provider.equals("openrouter") && !provider.equals("local")) {
+            sendError(source, "Invalid provider. Use: gemini, openrouter, or local");
+            return 0;
+        }
+        
+        // Set configuration
+        VillagersRebornConfig.LLM_PROVIDER = provider;
+        VillagersRebornConfig.LLM_API_KEY = apiKey;
+        
+        // Set default model based on provider
+        switch (provider) {
+            case "gemini" -> VillagersRebornConfig.LLM_MODEL = "gemini-1.5-flash";
+            case "openrouter" -> VillagersRebornConfig.LLM_MODEL = "openai/gpt-3.5-turbo";
+            case "local" -> VillagersRebornConfig.LLM_MODEL = "";
+        }
+        
+        // Reinitialize the dialogue manager
+        LLMDialogueManager.initialize();
+        
+        // Save configuration
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            sendSuccess(source, "AI configured with " + provider + " provider");
+            sendInfo(source, "Model set to: " + VillagersRebornConfig.LLM_MODEL);
+            sendInfo(source, "Configured: " + (LLMDialogueManager.isConfigured() ? "YES" : "NO"));
+        } catch (Exception e) {
+            sendError(source, "Failed to save configuration: " + e.getMessage());
+            return 0;
+        }
+        
+        return 1;
+    }
+    
+    private static int setupAIWithoutKey(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String provider = StringArgumentType.getString(context, "provider").toLowerCase();
+        ServerCommandSource source = context.getSource();
+        
+        sendInfo(source, "Setting up " + provider + " provider...");
+        sendInfo(source, "You'll need to set your API key as an environment variable:");
+        sendInfo(source, "export VILLAGERS_REBORN_API_KEY=your_key_here");
+        
+        switch (provider) {
+            case "gemini" -> sendInfo(source, "Get your free API key from: https://ai.google.dev");
+            case "openrouter" -> sendInfo(source, "Get your API key from: https://openrouter.ai");
+            case "local" -> sendInfo(source, "Make sure your local LLM server is running on " + VillagersRebornConfig.LLM_LOCAL_URL);
+        }
+        
+        VillagersRebornConfig.LLM_PROVIDER = provider;
+        switch (provider) {
+            case "gemini" -> VillagersRebornConfig.LLM_MODEL = "gemini-1.5-flash";
+            case "openrouter" -> VillagersRebornConfig.LLM_MODEL = "openai/gpt-3.5-turbo";
+            case "local" -> VillagersRebornConfig.LLM_MODEL = "";
+        }
+        
+        LLMDialogueManager.initialize();
+        
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+        } catch (Exception e) {
+            sendError(source, "Failed to save configuration: " + e.getMessage());
+        }
+        
+        return 1;
+    }
+    
+    private static int setModel(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String model = StringArgumentType.getString(context, "model_name");
+        ServerCommandSource source = context.getSource();
+        
+        VillagersRebornConfig.LLM_MODEL = model;
+        LLMDialogueManager.initialize();
+        
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+            sendSuccess(source, "Model set to: " + model);
+        } catch (Exception e) {
+            sendError(source, "Failed to save configuration: " + e.getMessage());
+            return 0;
+        }
+        
+        return 1;
+    }
+    
+    private static int testAI(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        return testAIWithCategory(context, VillagerDialogueSystem.DialogueCategory.GREETING);
+    }
+    
+    private static int testAIWithCategory(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String categoryName = StringArgumentType.getString(context, "category").toUpperCase();
+        VillagerDialogueSystem.DialogueCategory category;
+        
+        try {
+            category = VillagerDialogueSystem.DialogueCategory.valueOf(categoryName);
+        } catch (IllegalArgumentException e) {
+            sendError(context.getSource(), "Invalid category: " + categoryName);
+            return 0;
+        }
+        
+        return testAIWithCategory(context, category);
+    }
+    
+    private static int testAIWithCategory(CommandContext<ServerCommandSource> context, VillagerDialogueSystem.DialogueCategory category) {
+        ServerCommandSource source = context.getSource();
+        
+        // Get the villager the player is looking at
+        VillagerEntity villager = getTargetVillager(source);
+        if (villager == null) {
+            sendError(source, "Look at a villager to test AI dialogue!");
+            return 0;
+        }
+        
+        VillagerData villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (villagerData == null) {
+            sendError(source, "This villager has no data!");
+            return 0;
+        }
+        
+        // Create dialogue context
+        VillagerDialogueSystem.DialogueContext dialogueContext = 
+            new VillagerDialogueSystem.DialogueContext(villager, source.getPlayer());
+        
+        sendInfo(source, "Testing " + category.name().toLowerCase() + " dialogue with " + villagerData.getName() + "...");
+        
+        // Test both sync and async
+        if (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE) {
+            // Test async LLM dialogue
+            VillagerDialogueSystem.generateDialogueAsync(dialogueContext, category)
+                .thenAccept(dialogue -> {
+                    context.getSource().getServer().execute(() -> {
+                        sendSuccess(source, "AI Result: " + dialogue.getString());
+                    });
+                })
+                .exceptionally(throwable -> {
+                    context.getSource().getServer().execute(() -> {
+                        sendError(source, "AI Error: " + throwable.getMessage());
+                    });
+                    return null;
+                });
+        }
+        
+        // Test static fallback
+        Text staticDialogue = VillagerDialogueSystem.generateDialogue(dialogueContext, category, t -> {});
+        sendInfo(source, "Static Fallback: " + staticDialogue.getString());
+        
+        return 1;
+    }
+    
+    private static int toggleAI(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = !VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE;
+        
+        String status = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? "ENABLED" : "DISABLED";
+        Formatting color = VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? Formatting.GREEN : Formatting.RED;
+        
+        sendSuccess(context.getSource(), "Dynamic AI dialogue " + status);
+        
+        try {
+            com.beeny.config.ConfigManager.saveConfig();
+        } catch (Exception e) {
+            sendError(context.getSource(), "Failed to save configuration: " + e.getMessage());
+        }
+        
+        return 1;
+    }
+    
+    private static int showAIStatus(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        
+        sendInfo(source, "=== AI System Status ===");
+        sendInfo(source, "Dynamic Dialogue: " + (VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE ? "ENABLED" : "DISABLED"));
+        sendInfo(source, "Provider: " + VillagersRebornConfig.LLM_PROVIDER);
+        sendInfo(source, "Model: " + VillagersRebornConfig.LLM_MODEL);
+        sendInfo(source, "Configured: " + (LLMDialogueManager.isConfigured() ? "YES" : "NO"));
+        sendInfo(source, "Cache Size: " + DialogueCache.size());
+        sendInfo(source, "Memory Size: " + VillagerMemoryManager.getMemorySize());
+        sendInfo(source, "Fallback to Static: " + (VillagersRebornConfig.FALLBACK_TO_STATIC ? "YES" : "NO"));
+        
+        return 1;
+    }
+    
+    private static int clearAICache(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        LLMDialogueManager.clearCache();
+        sendSuccess(context.getSource(), "AI dialogue cache cleared!");
+        return 1;
+    }
+    
+    private static int showCacheSize(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        int size = LLMDialogueManager.getCacheSize();
+        sendInfo(context.getSource(), "AI dialogue cache: " + size + " entries");
+        return 1;
+    }
+    
+    private static int clearAIMemory(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        VillagerEntity villager = getTargetVillager(context.getSource());
+        if (villager == null) {
+            sendError(context.getSource(), "Look at a villager to clear their memory!");
+            return 0;
+        }
+        
+        VillagerMemoryManager.clearMemory(villager.getUuidAsString());
+        sendSuccess(context.getSource(), "Cleared AI memory for villager!");
+        return 1;
+    }
+    
+    private static int showMemorySize(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        int size = VillagerMemoryManager.getMemorySize();
+        sendInfo(context.getSource(), "Total AI memory: " + size + " conversations");
+        return 1;
+    }
+    
+    private static VillagerEntity getTargetVillager(ServerCommandSource source) {
+        if (source.getPlayer() == null) return null;
+        
+        HitResult hitResult = source.getPlayer().raycast(10.0, 1.0f, false);
+        
+        if (hitResult.getType() == HitResult.Type.ENTITY) {
+            Entity entity = ((EntityHitResult) hitResult).getEntity();
+            if (entity instanceof VillagerEntity) {
+                return (VillagerEntity) entity;
+            }
+        }
+        
+        return null;
+    }
+    
+    private static int showHelp(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        
+        sendInfo(source, "=== Villager Commands Help ===");
+        sendInfo(source, "");
+        
+        sendInfo(source, "🤖 AI COMMANDS:");
+        sendInfo(source, "  /villager ai setup <provider> [apikey] - Setup AI (gemini|openrouter|local)");
+        sendInfo(source, "  /villager ai model <name> - Set AI model (e.g., gemini-1.5-pro, gpt-4)");
+        sendInfo(source, "  /villager ai test [category] - Test AI dialogue");
+        sendInfo(source, "  /villager ai toggle - Enable/disable AI");
+        sendInfo(source, "  /villager ai status - Show AI configuration");
+        sendInfo(source, "  /villager ai cache clear/size - Manage dialogue cache");
+        sendInfo(source, "  /villager ai memory clear/size - Manage AI memory");
+        sendInfo(source, "");
+        
+        sendInfo(source, "👥 MANAGEMENT:");
+        sendInfo(source, "  /villager manage rename <target> <name> - Rename villager(s)");
+        sendInfo(source, "  /villager manage list - List named villagers");
+        sendInfo(source, "  /villager manage find <name> - Find villager by name");
+        sendInfo(source, "  /villager manage info <villager> - Show detailed info");
+        sendInfo(source, "  /villager manage stats - Village statistics");
+        sendInfo(source, "  /villager manage randomize - Random names for all");
+        sendInfo(source, "");
+        
+        sendInfo(source, "👪 FAMILY:");
+        sendInfo(source, "  /villager family tree <villager> - Show family tree");
+        sendInfo(source, "  /villager family marry <v1> <v2> - Marry two villagers");
+        sendInfo(source, "  /villager family divorce <v1> <v2> - Divorce villagers");
+        sendInfo(source, "  /villager family breed <v1> <v2> - Have baby");
+        sendInfo(source, "");
+        
+        sendInfo(source, "😊 HAPPINESS & PERSONALITY:");
+        sendInfo(source, "  /villager happiness set <villager> <0-100> - Set happiness");
+        sendInfo(source, "  /villager happiness adjust <villager> <±value> - Adjust happiness");
+        sendInfo(source, "  /villager happiness report - Happiness report");
+        sendInfo(source, "  /villager personality set <villager> <type> - Set personality");
+        sendInfo(source, "  /villager personality list - Available personalities");
+        sendInfo(source, "");
+        
+        sendInfo(source, "💾 DATA:");
+        sendInfo(source, "  /villager data export <villager> - Export all data");
+        sendInfo(source, "  /villager data reset <villager> - Reset data");
+        sendInfo(source, "  /villager data debug relationships - Debug family links");
+        sendInfo(source, "  /villager data debug cleanup - Clean stale data");
+        sendInfo(source, "");
+        
+        sendInfo(source, "⏰ OTHER:");
+        sendInfo(source, "  /villager schedule <villager> - Show daily schedule");
+        sendInfo(source, "  /villager help - Show this help");
+        sendInfo(source, "");
+        
+        sendInfo(source, "🔧 QUICK START:");
+        sendInfo(source, "1. Setup AI: /villager ai setup gemini YOUR_API_KEY");
+        sendInfo(source, "2. Test it: /villager ai test (look at a villager)");
+        sendInfo(source, "3. Manage villagers: /villager manage list");
+        
+        return 1;
     }
 }

@@ -2,6 +2,7 @@ package com.beeny.system;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.ai.AIWorldManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.entity.Entity;
@@ -18,6 +19,7 @@ public class ServerVillagerManager {
     private static ServerVillagerManager instance;
     private final Map<UUID, VillagerEntity> trackedVillagers = new ConcurrentHashMap<>();
     private MinecraftServer server;
+    private AIWorldManager aiWorldManager;
 
     private ServerVillagerManager() {
     }
@@ -31,8 +33,13 @@ public class ServerVillagerManager {
 
     public void initialize(MinecraftServer server) {
         this.server = server;
+        
+        // Initialize the AI World Manager
+        this.aiWorldManager = new AIWorldManager(server);
+        this.aiWorldManager.start();
+        
         registerEvents();
-        Villagersreborn.LOGGER.info("ServerVillagerManager initialized");
+        Villagersreborn.LOGGER.info("ServerVillagerManager initialized with AI World Manager");
     }
 
     private void registerEvents() {
@@ -87,14 +94,26 @@ public class ServerVillagerManager {
     }
 
     private void onServerStopping(MinecraftServer server) {
+        // Shutdown AI World Manager first
+        if (aiWorldManager != null) {
+            aiWorldManager.shutdown();
+            aiWorldManager = null;
+        }
+        
         trackedVillagers.clear();
-        Villagersreborn.LOGGER.info("Cleared tracked villagers on server stop");
+        Villagersreborn.LOGGER.info("Cleared tracked villagers and shut down AI systems");
     }
 
     public void trackVillager(VillagerEntity villager) {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data != null) {
             trackedVillagers.put(villager.getUuid(), villager);
+            
+            // Initialize AI for the new villager
+            if (aiWorldManager != null) {
+                aiWorldManager.initializeVillagerAI(villager);
+            }
+            
             Villagersreborn.LOGGER.debug("Tracking new villager: {} ({})", data.getName(), villager.getUuid());
         }
     }
@@ -102,6 +121,11 @@ public class ServerVillagerManager {
     public void untrackVillager(UUID villagerUuid) {
         VillagerEntity removed = trackedVillagers.remove(villagerUuid);
         if (removed != null) {
+            // Cleanup AI for the removed villager
+            if (aiWorldManager != null) {
+                aiWorldManager.cleanupVillagerAI(villagerUuid.toString());
+            }
+            
             VillagerData data = removed.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 Villagersreborn.LOGGER.debug("Untracking villager: {} ({})", data.getName(), villagerUuid);
@@ -119,5 +143,12 @@ public class ServerVillagerManager {
 
     public int getTrackedVillagerCount() {
         return trackedVillagers.size();
+    }
+    
+    /**
+     * Get the AI World Manager for this server instance
+     */
+    public AIWorldManager getAIWorldManager() {
+        return aiWorldManager;
     }
 }

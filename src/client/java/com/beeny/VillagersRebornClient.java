@@ -6,6 +6,7 @@ import com.beeny.network.OpenFamilyTreePacketClient;
 import com.beeny.network.FamilyTreeDataPacketClient;
 import com.beeny.network.RequestVillagerListPacketClient;
 import com.beeny.commands.ClientDialogueCommands;
+import com.beeny.client.gui.SimpleConfigScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -19,6 +20,7 @@ import org.lwjgl.glfw.GLFW;
 @Environment(EnvType.CLIENT)
 public class VillagersRebornClient implements ClientModInitializer {
     private static KeyBinding openJournalKey;
+    private static KeyBinding openSettingsKey;
 
     @Override
     public void onInitializeClient() {
@@ -39,11 +41,31 @@ public class VillagersRebornClient implements ClientModInitializer {
             "category.villagersreborn.general"
         ));
         
+        openSettingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            "key.villagersreborn.open_settings",
+            InputUtil.Type.KEYSYM,
+            GLFW.GLFW_KEY_V,
+            "category.villagersreborn.general"
+        ));
+        
         
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openJournalKey.wasPressed()) {
                 if (client.player != null && client.world != null) {
                     VillagerJournalItemClient.openVillagerJournal(client.world, client.player);
+                }
+            }
+            
+            while (openSettingsKey.wasPressed()) {
+                if (client.player != null) {
+                    try {
+                        client.execute(() -> {
+                            client.setScreen(new SimpleConfigScreen(client.currentScreen));
+                        });
+                    } catch (Exception e) {
+                        client.player.sendMessage(Text.literal("Error opening settings: " + e.getMessage()), false);
+                        e.printStackTrace();
+                    }
                 }
             }
         });
