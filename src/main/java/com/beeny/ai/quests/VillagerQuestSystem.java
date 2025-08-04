@@ -73,7 +73,7 @@ public class VillagerQuestSystem {
         public final long timeLimit; // 0 for no time limit
         public final long creationTime;
         
-        private QuestStatus status;
+        private volatile QuestStatus status;
         private Map<String, Object> progress;
         private String failureReason;
         
@@ -532,9 +532,9 @@ public class VillagerQuestSystem {
                 playerQuests.computeIfAbsent(player.getUuidAsString(), k -> new ArrayList<>()).add(quest);
                 
                 // Create gossip about the quest
-                // Gossip creation temporarily disabled to match current API and compile
-                // VillagerGossipNetwork.createGossip(villager, player.getUuidAsString(), VillagerGossipNetwork.GossipType.SOME_TYPE,
-                //     "Gave " + player.getName().getString() + " a task to help the village");
+                VillagerGossipNetwork.createGossip(villager, player.getUuidAsString(),
+                    VillagerGossipNetwork.GossipType.ACHIEVEMENT,
+                    "Gave " + player.getName().getString() + " a task to help the village");
             }
             
             return quest;

@@ -59,30 +59,17 @@ jar {
 		rename { "${it}_${inputs.properties.archivesName}"}
 	}
 	
-	// Handle duplicate entries
-	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-// Create a shadow jar with relocated dependencies
-shadowJar {
-	archiveClassifier = "shadow"
-	
-	// Relocate OkHttp to avoid conflicts with other mods
-	relocate 'okhttp3', 'com.beeny.shadow.okhttp3'
-	relocate 'okio', 'com.beeny.shadow.okio'
-	
-	// Include the OkHttp dependency in the shadow JAR
-	dependencies {
-		include(dependency('com.squareup.okhttp3:okhttp:5.1.0'))
-		include(dependency('com.google.code.gson:gson:2.13.1'))
+	// Include dependencies in the JAR
+	from {
+		configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
 	}
 	
 	// Handle duplicate entries
 	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+	
+	// Exclude META-INF files that can cause issues
+	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
 }
-
-// Make the shadow jar the default output
-assemble.dependsOn shadowJar
 
 processResources {
 	inputs.property "version", project.version

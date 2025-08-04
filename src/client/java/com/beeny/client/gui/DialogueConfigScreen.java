@@ -251,7 +251,6 @@ public class DialogueConfigScreen extends Screen {
         VillagersRebornConfig.LLM_API_ENDPOINT = endpointField.getText().trim();
         VillagersRebornConfig.LLM_MODEL = modelField.getText().trim();
         if ("local".equalsIgnoreCase(tempProvider)) {
-            // Keep both in sync for now; JSON uses llmLocalEndpoint key
             VillagersRebornConfig.LLM_LOCAL_URL = endpointField.getText().trim().isEmpty()
                 ? VillagersRebornConfig.LLM_LOCAL_URL
                 : endpointField.getText().trim();

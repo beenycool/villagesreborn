@@ -20,6 +20,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.CompletableFuture;
 
 public class VillagerDialogueSystem {
+    private static final int DIALOGUE_TIMEOUT_SECONDS = 2;
     
     
     public enum DialogueCategory {
@@ -298,16 +299,19 @@ public class VillagerDialogueSystem {
                     false,
                     System.currentTimeMillis()
                 );
-                // Note: Need to implement ServerPlayNetworking.send for AsyncVillagerChatPacket
-                // serverPlayer.networkHandler.sendPacket(interimPacket);
+                // Send interim packet to client using CustomPayload
+                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                    serverPlayer,
+                    interimPacket
+                );
             }
 
             LLMDialogueManager.generateDialogueAsync(context, category)
-                .orTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+                .orTimeout(DIALOGUE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
                 .whenComplete((llmDialogue, throwable) -> {
                     if (throwable != null) {
                         LOGGER.warn("LLM dialogue generation failed or timed out, falling back to static", throwable);
-                        onDialogueReady.accept(null);
+                        onDialogueReady.accept(net.minecraft.text.Text.literal("...").formatted(net.minecraft.util.Formatting.GRAY));
                     } else if (llmDialogue != null) {
                         // Send final packet on the server thread
                         if (context.player instanceof ServerPlayerEntity) {
@@ -324,8 +328,10 @@ public class VillagerDialogueSystem {
                                         true,
                                         System.currentTimeMillis()
                                     );
-                                    // Note: Need to implement ServerPlayNetworking.send for AsyncVillagerChatPacket
-                                    // onlinePlayer.networkHandler.sendPacket(finalPacket);
+                                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(
+                                        onlinePlayer,
+                                        finalPacket
+                                    );
                                 }
                             });
                         }
@@ -581,33 +587,13 @@ public class VillagerDialogueSystem {
     
     
     public static List<Text> generateConversation(VillagerEntity villager, PlayerEntity player) {
-        DialogueContext context = new DialogueContext(villager, player);
-        List<Text> conversation = new ArrayList<>();
-
-        DialogueCategory openingCategory = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
-            ? DialogueCategory.GREETING
-            : DialogueCategory.MOOD;
-        conversation.add(generateDialogue(context, openingCategory, t -> {}));
-
-        DialogueCategory mainCategory = chooseDialogueCategory(context);
-        if (mainCategory != openingCategory) {
-            conversation.add(generateDialogue(context, mainCategory, t -> {}));
+        try {
+            return generateConversationAsync(villager, player)
+                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            LOGGER.error("Failed to generate conversation", e);
+            return java.util.List.of(net.minecraft.text.Text.literal("...").formatted(net.minecraft.util.Formatting.GRAY));
         }
-
-        if (context.playerReputation > 30 && java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
-            DialogueCategory followUp = java.util.concurrent.ThreadLocalRandom.current().nextBoolean()
-                ? DialogueCategory.GOSSIP
-                : DialogueCategory.ADVICE;
-            conversation.add(generateDialogue(context, followUp, t -> {}));
-        }
-
-        if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK
-            || context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT)
-            && mainCategory != DialogueCategory.FAREWELL) {
-            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL, t -> {}));
-        }
-
-        return conversation;
     }
     public static CompletableFuture<List<Text>> generateConversationAsync(VillagerEntity villager, PlayerEntity player) {
         DialogueContext context = new DialogueContext(villager, player);

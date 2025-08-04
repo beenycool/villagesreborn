@@ -30,12 +30,12 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Central manager for all villager AI systems
- * Coordinates emotions, gossip, GOAP planning, utility AI, learning, and quests
- */
 public class VillagerAIManager {
 
+    /**
+     * Central manager for all villager AI systems
+     * Coordinates emotions, gossip, GOAP planning, utility AI, learning, and quests
+     */
     private static final Logger logger = LoggerFactory.getLogger(VillagerAIManager.class);
     
     // AI system configuration
@@ -495,7 +495,8 @@ public class VillagerAIManager {
         
         // Update global learning patterns
         if (config.enableLearning) {
-            VillagerLearningSystem.updateGlobalLearning();
+            // updateGlobalLearning does not exist; perform periodic learning maintenance by touching profiles or similar if needed
+            // For now, no-op to avoid compile error.
         }
         
         // Clean up inactive AI states
@@ -542,15 +543,12 @@ public class VillagerAIManager {
         
         // Load AI state
         if (nbt.contains("ai_state")) {
-            NbtCompound aiStateNbt = nbt.getCompound("ai_state");
-            if (aiStateNbt != null) {
-                VillagerAIState state = new VillagerAIState();
-                state.currentGoal = aiStateNbt.getString("current_goal");
-                state.currentAction = aiStateNbt.getString("current_action");
-                state.isAIActive = aiStateNbt.getBoolean("is_ai_active");
-                villagerAIStates.put(villager.getUuidAsString(), state);
-            }
-            }
+            NbtCompound aiStateNbt = nbt.getCompound("ai_state").orElse(new NbtCompound());
+            VillagerAIState state = new VillagerAIState();
+            state.currentGoal = aiStateNbt.getString("current_goal").orElse("");
+            state.currentAction = aiStateNbt.getString("current_action").orElse("");
+            state.isAIActive = aiStateNbt.getBoolean("is_ai_active").orElse(false);
+            villagerAIStates.put(villager.getUuidAsString(), state);
         }
     }
     

@@ -41,8 +41,7 @@ public class ConfigManager {
         config.addProperty("enableDialogueCache", VillagersRebornConfig.ENABLE_DIALOGUE_CACHE);
         config.addProperty("dialogueCacheSize", VillagersRebornConfig.DIALOGUE_CACHE_SIZE);
         config.addProperty("conversationHistoryLimit", VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT);
-        // keep JSON key stable for backward compatibility; map to new field
-        config.addProperty("llmLocalEndpoint", VillagersRebornConfig.LLM_LOCAL_URL);
+        config.addProperty("llmLocalUrl", VillagersRebornConfig.LLM_LOCAL_URL);
 
         Files.writeString(configPath, GSON.toJson(config));
     }
@@ -135,8 +134,8 @@ public class ConfigManager {
                 VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = config.get("conversationHistoryLimit").getAsInt();
             }
             
-            if (config.has("llmLocalEndpoint")) {
-                VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalEndpoint").getAsString();
+            if (config.has("llmLocalUrl")) {
+                VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalUrl").getAsString();
             }
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
@@ -153,7 +152,6 @@ public class ConfigManager {
             VillagersRebornConfig.HAPPINESS_RECOVERY_RATE,
             VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE,
             VillagersRebornConfig.LLM_PROVIDER,
-            System.getenv("VILLAGERS_REBORN_API_KEY"),
             VillagersRebornConfig.LLM_API_ENDPOINT,
             VillagersRebornConfig.LLM_MODEL,
             VillagersRebornConfig.LLM_TEMPERATURE,
@@ -179,7 +177,6 @@ public class ConfigManager {
         int happinessRecoveryRate,
         boolean enableDynamicDialogue,
         String llmProvider,
-        String llmApiKey,
         String llmApiEndpoint,
         String llmModel,
         double llmTemperature,
@@ -189,7 +186,7 @@ public class ConfigManager {
         boolean enableDialogueCache,
         int dialogueCacheSize,
         int conversationHistoryLimit,
-        String llmLocalEndpoint
+        String llmLocalUrl
     ) throws IOException {
         Path configPath = Paths.get("config", CONFIG_FILE_NAME);
         saveConfig(
@@ -199,7 +196,6 @@ public class ConfigManager {
             happinessRecoveryRate,
             enableDynamicDialogue,
             llmProvider,
-            llmApiKey,
             llmApiEndpoint,
             llmModel,
             llmTemperature,
@@ -209,7 +205,7 @@ public class ConfigManager {
             enableDialogueCache,
             dialogueCacheSize,
             conversationHistoryLimit,
-            llmLocalEndpoint,
+            llmLocalUrl,
             configPath
         );
     }
@@ -224,7 +220,6 @@ public class ConfigManager {
         int happinessRecoveryRate,
         boolean enableDynamicDialogue,
         String llmProvider,
-        String llmApiKey,
         String llmApiEndpoint,
         String llmModel,
         double llmTemperature,
@@ -234,17 +229,18 @@ public class ConfigManager {
         boolean enableDialogueCache,
         int dialogueCacheSize,
         int conversationHistoryLimit,
-        String llmLocalEndpoint,
+        String llmLocalUrl,
         Path configPath
     ) throws IOException {
         JsonObject config = new JsonObject();
+        config.addProperty("//", "Set your API key via environment variable VILLAGERS_REBORN_API_KEY");
         config.addProperty("villagerScanChunkRadius", villagerScanChunkRadius);
         config.addProperty("happinessNeutralThreshold", happinessNeutralThreshold);
         config.addProperty("happinessDecayRate", happinessDecayRate);
         config.addProperty("happinessRecoveryRate", happinessRecoveryRate);
         config.addProperty("enableDynamicDialogue", enableDynamicDialogue);
         config.addProperty("llmProvider", llmProvider);
-        config.addProperty("llmApiKey", llmApiKey);
+        config.addProperty("llmApiKey", ""); // Placeholder for user clarity, never used
         config.addProperty("llmApiEndpoint", llmApiEndpoint);
         config.addProperty("llmModel", llmModel);
         config.addProperty("llmTemperature", llmTemperature);
@@ -254,7 +250,7 @@ public class ConfigManager {
         config.addProperty("enableDialogueCache", enableDialogueCache);
         config.addProperty("dialogueCacheSize", dialogueCacheSize);
         config.addProperty("conversationHistoryLimit", conversationHistoryLimit);
-        config.addProperty("llmLocalEndpoint", llmLocalEndpoint);
+        config.addProperty("llmLocalUrl", llmLocalUrl);
         if (!Files.exists(configPath.getParent())) {
             Files.createDirectories(configPath.getParent());
         }

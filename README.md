@@ -70,7 +70,7 @@ For remote providers ("gemini", "openrouter"), use `llmApiEndpoint` only if you 
 
 ## How to Install
 
-1. Get [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.7
+1. Get [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.7 ([see supported version](gradle.properties:7))
 2. Download the latest mod release
 3. Grab [Fabric API](https://www.curseforge.com/minecraft/mc-mods/fabric-api)
 4. Put both mods in your `.minecraft/mods` folder
@@ -88,7 +88,7 @@ I built this mod with:
 - Java 21
 - Fabric Loader 0.16.14
 - Fabric API 0.129.0+1.21.7
-- Minecraft 1.21.7
+- Minecraft 1.21.7 ([see supported version](gradle.properties:7))
 
 ### Building
 

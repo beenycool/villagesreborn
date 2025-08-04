@@ -460,10 +460,8 @@ public class VillagerAIIntegrationTest {
             // Use accessor method to get experience count
             // Guard: if learningSystem or villagerUuid not in scope, compute via manager
             int experienceCountSafeguarded = 0;
-            try {
-                var lp = com.beeny.ai.learning.VillagerLearningSystem.getLearningProfile(villager);
-                experienceCountSafeguarded = lp != null ? lp.getExperienceCount() : 0;
-            } catch (Throwable ignored) {}
+            var lp = com.beeny.ai.learning.VillagerLearningSystem.getLearningProfile(villager);
+            experienceCountSafeguarded = lp != null ? lp.getExperienceCount() : 0;
             metrics.put("learning_experiences", experienceCountSafeguarded);
             metrics.put("ai_status_lines", aiStatus.size());
             metrics.put("dialogue_generated", dialogue != null);

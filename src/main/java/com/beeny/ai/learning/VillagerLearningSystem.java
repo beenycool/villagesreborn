@@ -158,7 +158,6 @@ public class VillagerLearningSystem {
         private float learningRate; // How quickly they adapt (0.0 to 1.0)
         private long lastLearningUpdate;
         
-        private static final int EXPERIENCE_LIMIT = 200;
         public VillagerLearningProfile() {
             this.experiences = Collections.synchronizedList(new ArrayList<>());
             this.patterns = new ConcurrentHashMap<>();
@@ -170,13 +169,15 @@ public class VillagerLearningSystem {
         
         public void addExperience(Experience experience) {
             experiences.add(experience);
-            
+        
+            // Update last learning update time
+            lastLearningUpdate = System.currentTimeMillis();
+        
             // Limit experience history to prevent memory issues
-           if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
-               experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
-           }
-       }
-            
+            if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
+                experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
+            }
+        
             // Trigger pattern learning
             updatePatterns(experience);
             updatePreferences(experience);
@@ -673,16 +674,7 @@ public class VillagerLearningSystem {
     }
     
     // Global learning system management
- public void addExperience(Experience experience) {
-     experiences.add(experience);
-     this.lastLearningUpdate = System.currentTimeMillis();
- 
-     // Limit experience history to prevent memory issues
-     if (experiences.size() > EXPERIENCE_LIMIT) {
-         experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
-     }
- }
-    
+
     // Analytics and debugging
     public static Map<String, Object> getLearningAnalytics(VillagerEntity villager) {
         VillagerLearningProfile profile = getLearningProfile(villager);

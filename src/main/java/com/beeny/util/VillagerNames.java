@@ -23,7 +23,6 @@ public class VillagerNames {
     
     private static final Map<String, Boolean> VILLAGER_GENDERS = new ConcurrentHashMap<>();
     
-    private static final Random RANDOM = new Random();
     
     static {
         
@@ -111,14 +110,14 @@ public class VillagerNames {
             return "Unnamed Villager";
         }
         
-        String firstName = firstNames.get(RANDOM.nextInt(firstNames.size()));
-        String surname = surnames.get(RANDOM.nextInt(surnames.size()));
+        String firstName = firstNames.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(firstNames.size()));
+        String surname = surnames.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(surnames.size()));
         
         return firstName + " " + surname;
     }
     
     private static boolean getOrAssignGender(VillagerEntity villager) {
-        return VILLAGER_GENDERS.computeIfAbsent(villager.getUuidAsString(), k -> RANDOM.nextBoolean());
+        return VILLAGER_GENDERS.computeIfAbsent(villager.getUuidAsString(), k -> java.util.concurrent.ThreadLocalRandom.current().nextBoolean());
     }
     
     private static String getBiomeKey(RegistryEntry<Biome> biomeEntry) {
@@ -186,7 +185,7 @@ public class VillagerNames {
     
     public static String getProfessionName(String professionKey) {
         List<String> names = PROFESSION_NAMES.getOrDefault(professionKey, Arrays.asList("Villager"));
-        return names.get(RANDOM.nextInt(names.size()));
+        return names.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(names.size()));
     }
     
     public static String extractSurname(String fullName) {
@@ -239,8 +238,8 @@ public class VillagerNames {
             return "Unnamed Villager";
         }
         
-        String firstName = firstNames.get(RANDOM.nextInt(firstNames.size()));
-        String surname = surnames.get(RANDOM.nextInt(surnames.size()));
+        String firstName = firstNames.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(firstNames.size()));
+        String surname = surnames.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(surnames.size()));
         
         return firstName + " " + surname;
     }
@@ -265,7 +264,7 @@ public class VillagerNames {
             return "Unnamed Villager";
         }
         
-        String firstName = firstNames.get(RANDOM.nextInt(firstNames.size()));
+        String firstName = firstNames.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(firstNames.size()));
         return firstName + " " + inheritedSurname;
     }
     

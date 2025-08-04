@@ -1,39 +1,42 @@
 package com.beeny.network;
 
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 import java.util.UUID;
 
-public class AsyncVillagerChatPacket {
+public record AsyncVillagerChatPacket(UUID conversationId, UUID villagerUuid, String villagerName, 
+                                     UUID playerUuid, String message, boolean isFinal, long timestamp) implements CustomPayload {
     public static final Identifier ID = Identifier.of("villagersreborn", "async_villager_chat");
+    public static final PacketCodec<PacketByteBuf, AsyncVillagerChatPacket> CODEC = PacketCodec.of(
+        AsyncVillagerChatPacket::write,
+        AsyncVillagerChatPacket::read
+    );
     
-    private final UUID conversationId;
-    private final UUID villagerUuid;
-    private final String villagerName;
-    private final UUID playerUuid;
-    private final String message;
-    private final boolean isFinal;
-    private final long timestamp;
-
-    public AsyncVillagerChatPacket(UUID conversationId, UUID villagerUuid, String villagerName, 
-                                  UUID playerUuid, String message, boolean isFinal, long timestamp) {
-        this.conversationId = conversationId;
-        this.villagerUuid = villagerUuid;
-        this.villagerName = villagerName;
-        this.playerUuid = playerUuid;
-        this.message = message;
-        this.isFinal = isFinal;
-        this.timestamp = timestamp;
+    @Override
+    public Id<? extends CustomPayload> getId() {
+        return new Id<>(ID);
     }
 
     public void write(PacketByteBuf buf) {
-        buf.writeUuid(conversationId);
-        buf.writeUuid(villagerUuid);
-        buf.writeString(villagerName);
-        buf.writeUuid(playerUuid);
-        buf.writeString(message);
-        buf.writeBoolean(isFinal);
-        buf.writeLong(timestamp);
+        buf.writeUuid(this.conversationId());
+        buf.writeUuid(this.villagerUuid());
+        buf.writeString(this.villagerName());
+        buf.writeUuid(this.playerUuid());
+        buf.writeString(this.message());
+        buf.writeBoolean(this.isFinal());
+        buf.writeLong(this.timestamp());
+    }
+
+    public static void write(PacketByteBuf buf, AsyncVillagerChatPacket packet) {
+        buf.writeUuid(packet.conversationId());
+        buf.writeUuid(packet.villagerUuid());
+        buf.writeString(packet.villagerName());
+        buf.writeUuid(packet.playerUuid());
+        buf.writeString(packet.message());
+        buf.writeBoolean(packet.isFinal());
+        buf.writeLong(packet.timestamp());
     }
 
     public static AsyncVillagerChatPacket read(PacketByteBuf buf) {
@@ -47,13 +50,4 @@ public class AsyncVillagerChatPacket {
             buf.readLong()
         );
     }
-
-    // Getters
-    public UUID getConversationId() { return conversationId; }
-    public UUID getVillagerUuid() { return villagerUuid; }
-    public String getVillagerName() { return villagerName; }
-    public UUID getPlayerUuid() { return playerUuid; }
-    public String getMessage() { return message; }
-    public boolean isFinal() { return isFinal; }
-    public long getTimestamp() { return timestamp; }
 }

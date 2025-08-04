@@ -1,5 +1,9 @@
 package com.beeny.data;
 
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.nbt.NbtCompound;
@@ -8,60 +12,119 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.util.Identifier;
 
-import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class VillagerData {
     // Use ThreadLocalRandom for thread-safe random generation
-    public static final Codec<VillagerData> CODEC = RecordCodecBuilder.create(instance ->
-        instance.group(
-            Codec.STRING.fieldOf("name").forGetter(VillagerData::getName),
-            Codec.INT.fieldOf("age").forGetter(VillagerData::getAge),
-            Codec.STRING.fieldOf("gender").forGetter(VillagerData::getGender),
-            Codec.STRING.fieldOf("personality").forGetter(VillagerData::getPersonality),
-            Codec.INT.fieldOf("happiness").forGetter(VillagerData::getHappiness),
-            Codec.INT.fieldOf("totalTrades").forGetter(VillagerData::getTotalTrades),
-            Codec.STRING.optionalFieldOf("favoritePlayerId", "").forGetter(VillagerData::getFavoritePlayerId),
-            Codec.list(Codec.STRING).fieldOf("professionHistory").forGetter(VillagerData::getProfessionHistory),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("playerRelations").forGetter(VillagerData::getPlayerRelations),
-            Codec.list(Codec.STRING).fieldOf("familyMembers").forGetter(VillagerData::getFamilyMembers),
-            Codec.STRING.optionalFieldOf("spouseName", "").forGetter(VillagerData::getSpouseName),
-            Codec.STRING.optionalFieldOf("spouseId", "").forGetter(VillagerData::getSpouseId),
-            Codec.list(Codec.STRING).fieldOf("childrenIds").forGetter(VillagerData::getChildrenIds),
-            Codec.list(Codec.STRING).fieldOf("childrenNames").forGetter(VillagerData::getChildrenNames),
-            Codec.STRING.optionalFieldOf("favoriteFood", "").forGetter(VillagerData::getFavoriteFood),
-            Codec.BOOL.fieldOf("isAlive").forGetter(VillagerData::isAlive)
-        ).apply(instance, (name, age, gender, personality, happiness, totalTrades, favoritePlayerId, professionHistory,
-                          playerRelations, familyMembers, spouseName, spouseId, childrenIds, childrenNames,
-                          favoriteFood, isAlive) -> {
-            VillagerData data = new VillagerData();
-            data.name = name;
-            data.age = age;
-            data.gender = gender;
-            data.personality = personality;
-            data.happiness = happiness;
-            data.totalTrades = totalTrades;
-            data.favoritePlayerId = favoritePlayerId;
-            data.professionHistory = new ArrayList<>(professionHistory);
-            data.playerRelations = new HashMap<>(playerRelations);
-            data.familyMembers = new ArrayList<>(familyMembers);
-            data.spouseName = spouseName;
-            data.spouseId = spouseId;
-            data.childrenIds = new ArrayList<>(childrenIds);
-            data.childrenNames = new ArrayList<>(childrenNames);
-            data.favoriteFood = favoriteFood;
-            data.isAlive = isAlive;
-            data.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
-            data.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
-            data.recentEvents = java.util.Collections.synchronizedList(new ArrayList<>());
-            data.lastConversationTime = 0;
-            data.hobby = "";
-            data.birthTime = 0L;
-            data.birthPlace = "";
-            data.notes = "";
-            data.deathTime = 0L;
-            return data;
-        })
+    // Rework codec to avoid exceeding arity by mapping to/from NbtCompound directly.
+    public static final Codec<VillagerData> CODEC = Codec.PASSTHROUGH.comapFlatMap(
+        dyn -> {
+            try {
+                net.minecraft.nbt.NbtElement elt = (net.minecraft.nbt.NbtElement) dyn.getValue();
+                if (!(elt instanceof net.minecraft.nbt.NbtCompound nbt)) {
+                    return com.mojang.serialization.DataResult.error(() -> "Expected NbtCompound");
+                }
+                VillagerData v = new VillagerData();
+                v.name = nbt.contains("name") ? nbt.getString("name").orElse("") : "";
+                v.age = nbt.contains("age") ? nbt.getInt("age").orElse(0) : 0;
+                v.gender = nbt.contains("gender") ? nbt.getString("gender").orElse("Unknown") : "Unknown";
+                v.personality = nbt.contains("personality") ? nbt.getString("personality").orElse("Friendly") : "Friendly";
+                v.happiness = nbt.contains("happiness") ? nbt.getInt("happiness").orElse(50) : 50;
+                v.totalTrades = nbt.contains("totalTrades") ? nbt.getInt("totalTrades").orElse(0) : 0;
+                v.favoritePlayerId = nbt.contains("favoritePlayerId") ? nbt.getString("favoritePlayerId").orElse("") : "";
+                v.professionHistory = new java.util.ArrayList<>();
+                if (nbt.contains("professionHistory")) {
+                    net.minecraft.nbt.NbtList lst = nbt.getList("professionHistory").orElse(new net.minecraft.nbt.NbtList());
+                    for (net.minecraft.nbt.NbtElement e : lst) v.professionHistory.add(e.asString().orElse(""));
+                }
+                v.playerRelations = new java.util.HashMap<>();
+                if (nbt.contains("playerRelations")) {
+                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("playerRelations").orElse(new net.minecraft.nbt.NbtCompound());
+                    for (String k : rel.getKeys()) v.playerRelations.put(k, rel.getInt(k).orElse(0));
+                }
+                v.familyMembers = new java.util.ArrayList<>();
+                if (nbt.contains("familyMembers")) {
+                    net.minecraft.nbt.NbtList lst = nbt.getList("familyMembers").orElse(new net.minecraft.nbt.NbtList());
+                    for (net.minecraft.nbt.NbtElement e : lst) v.familyMembers.add(e.asString().orElse(""));
+                }
+                v.spouseName = nbt.contains("spouseName") ? nbt.getString("spouseName").orElse("") : "";
+                v.spouseId = nbt.contains("spouseId") ? nbt.getString("spouseId").orElse("") : "";
+                v.childrenIds = new java.util.ArrayList<>();
+                if (nbt.contains("childrenIds")) {
+                    net.minecraft.nbt.NbtList lst = nbt.getList("childrenIds").orElse(new net.minecraft.nbt.NbtList());
+                    for (net.minecraft.nbt.NbtElement e : lst) v.childrenIds.add(e.asString().orElse(""));
+                }
+                v.childrenNames = new java.util.ArrayList<>();
+                if (nbt.contains("childrenNames")) {
+                    net.minecraft.nbt.NbtList lst = nbt.getList("childrenNames").orElse(new net.minecraft.nbt.NbtList());
+                    for (net.minecraft.nbt.NbtElement e : lst) v.childrenNames.add(e.asString().orElse(""));
+                }
+                v.favoriteFood = nbt.contains("favoriteFood") ? nbt.getString("favoriteFood").orElse("") : "";
+                v.playerMemories = new java.util.concurrent.ConcurrentHashMap<>();
+                if (nbt.contains("playerMemories")) {
+                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("playerMemories").orElse(new net.minecraft.nbt.NbtCompound());
+                    for (String k : rel.getKeys()) v.playerMemories.put(k, rel.getString(k).orElse(""));
+                }
+                v.topicFrequency = new java.util.concurrent.ConcurrentHashMap<>();
+                if (nbt.contains("topicFrequency")) {
+                    net.minecraft.nbt.NbtCompound rel = nbt.getCompound("topicFrequency").orElse(new net.minecraft.nbt.NbtCompound());
+                    for (String k : rel.getKeys()) v.topicFrequency.put(k, rel.getInt(k).orElse(0));
+                }
+                v.recentEvents = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+                if (nbt.contains("recentEvents")) {
+                    net.minecraft.nbt.NbtList lst = nbt.getList("recentEvents").orElse(new net.minecraft.nbt.NbtList());
+                    for (net.minecraft.nbt.NbtElement e : lst) v.recentEvents.add(e.asString().orElse(""));
+                }
+                v.lastConversationTime = nbt.contains("lastConversationTime") ? nbt.getLong("lastConversationTime").orElse(0L) : 0L;
+                v.isAlive = nbt.contains("isAlive") ? nbt.getBoolean("isAlive").orElse(true) : true;
+                return com.mojang.serialization.DataResult.success(v);
+            } catch (Exception ex) {
+                return com.mojang.serialization.DataResult.error(() -> "Failed to decode VillagerData: " + ex.getMessage());
+            }
+        },
+        v -> {
+            net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
+            nbt.putString("name", v.getName());
+            nbt.putInt("age", v.getAge());
+            nbt.putString("gender", v.getGender());
+            nbt.putString("personality", v.getPersonality());
+            nbt.putInt("happiness", v.getHappiness());
+            nbt.putInt("totalTrades", v.getTotalTrades());
+            if (!v.getFavoritePlayerId().isEmpty()) nbt.putString("favoritePlayerId", v.getFavoritePlayerId());
+            net.minecraft.nbt.NbtList prof = new net.minecraft.nbt.NbtList();
+            for (String s : v.getProfessionHistory()) prof.add(net.minecraft.nbt.NbtString.of(s));
+            nbt.put("professionHistory", prof);
+            net.minecraft.nbt.NbtCompound rel = new net.minecraft.nbt.NbtCompound();
+            for (java.util.Map.Entry<String, Integer> e : v.getPlayerRelations().entrySet()) rel.putInt(e.getKey(), e.getValue());
+            nbt.put("playerRelations", rel);
+            net.minecraft.nbt.NbtList fam = new net.minecraft.nbt.NbtList();
+            for (String s : v.getFamilyMembers()) fam.add(net.minecraft.nbt.NbtString.of(s));
+            nbt.put("familyMembers", fam);
+            if (!v.getSpouseName().isEmpty()) nbt.putString("spouseName", v.getSpouseName());
+            if (!v.getSpouseId().isEmpty()) nbt.putString("spouseId", v.getSpouseId());
+            net.minecraft.nbt.NbtList cids = new net.minecraft.nbt.NbtList();
+            for (String s : v.getChildrenIds()) cids.add(net.minecraft.nbt.NbtString.of(s));
+            nbt.put("childrenIds", cids);
+            net.minecraft.nbt.NbtList cnames = new net.minecraft.nbt.NbtList();
+            for (String s : v.getChildrenNames()) cnames.add(net.minecraft.nbt.NbtString.of(s));
+            nbt.put("childrenNames", cnames);
+            if (!v.getFavoriteFood().isEmpty()) nbt.putString("favoriteFood", v.getFavoriteFood());
+            net.minecraft.nbt.NbtCompound mem = new net.minecraft.nbt.NbtCompound();
+            for (java.util.Map.Entry<String, String> e : v.playerMemories.entrySet()) mem.putString(e.getKey(), e.getValue());
+            nbt.put("playerMemories", mem);
+            net.minecraft.nbt.NbtCompound topics = new net.minecraft.nbt.NbtCompound();
+            for (java.util.Map.Entry<String, Integer> e : v.topicFrequency.entrySet()) topics.putInt(e.getKey(), e.getValue());
+            nbt.put("topicFrequency", topics);
+            net.minecraft.nbt.NbtList events = new net.minecraft.nbt.NbtList();
+            for (String s : v.recentEvents) events.add(net.minecraft.nbt.NbtString.of(s));
+            nbt.put("recentEvents", events);
+            nbt.putLong("lastConversationTime", v.lastConversationTime);
+            nbt.putBoolean("isAlive", v.isAlive);
+            return new com.mojang.serialization.Dynamic<>(net.minecraft.nbt.NbtOps.INSTANCE, nbt);
+        }
+    ).xmap(
+        obj -> (VillagerData) obj,
+        v -> v
     );
     
     

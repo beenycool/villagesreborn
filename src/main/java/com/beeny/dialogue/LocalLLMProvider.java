@@ -90,9 +90,8 @@ public class LocalLLMProvider extends BaseLLMProvider {
 
     @Override
     public boolean isConfigured() {
-        return "local".equals(VillagersRebornConfig.LLM_PROVIDER)
-            && VillagersRebornConfig.LLM_LOCAL_ENDPOINT != null
-            && !VillagersRebornConfig.LLM_LOCAL_ENDPOINT.isEmpty();
+        // For local provider, only endpoint is required
+        return endpoint != null && !endpoint.isEmpty();
     }
 
     @Override

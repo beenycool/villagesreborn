@@ -33,15 +33,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
 @Mixin(VillagerEntity.class)
 public abstract class VillagerEntityMixin extends LivingEntity {
     @Shadow public abstract void setVillagerData(net.minecraft.village.VillagerData villagerData);
     
-    @Unique
-    private static final Random RANDOM = new Random();
     
     @Unique
     private int greetingCooldown = 0;
@@ -204,7 +202,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         if (data != null) {
             
             String[] dramaticPersonalities = {"Energetic", "Confident", "Cheerful"};
-            data.setPersonality(dramaticPersonalities[RANDOM.nextInt(dramaticPersonalities.length)]);
+            data.setPersonality(dramaticPersonalities[ThreadLocalRandom.current().nextInt(dramaticPersonalities.length)]);
             data.adjustHappiness(-20); 
         }
     }
@@ -367,7 +365,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
                 "Hello there!"
             };
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique
@@ -378,7 +376,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             case "Grumpy" -> new String[]{"What now?", "Yes?", "Hmph."};
             default -> new String[]{"Hello.", "Greetings.", "Good day."};
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique
@@ -400,7 +398,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
                 "Leave me alone."
             };
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique

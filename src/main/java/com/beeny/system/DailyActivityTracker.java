@@ -363,26 +363,48 @@ public class DailyActivityTracker {
     
     public static NbtCompound saveToNbt() {
         NbtCompound nbt = new NbtCompound();
-        
         NbtCompound logsNbt = new NbtCompound();
+
         for (Map.Entry<String, Map<Integer, DailyLog>> villagerEntry : VILLAGER_DAILY_LOGS.entrySet()) {
             NbtCompound villagerNbt = new NbtCompound();
             for (Map.Entry<Integer, DailyLog> dayEntry : villagerEntry.getValue().entrySet()) {
-                // Note: In a real implementation, you'd use proper NBT serialization with the codecs
-                villagerNbt.putString(dayEntry.getKey().toString(), dayEntry.getValue().toString());
+                NbtCompound dayNbt = new NbtCompound();
+                // Mojang NbtOps moved; ensure import usage is correct
+                // Use Minecraft NbtOps location in current mappings
+                DailyLog.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, dayEntry.getValue())
+                    .result()
+                    .ifPresent(nbtElement -> {
+                        if (nbtElement instanceof NbtCompound compound) {
+                            dayNbt.copyFrom(compound);
+                        }
+                    });
+                villagerNbt.put(dayEntry.getKey().toString(), dayNbt);
             }
             logsNbt.put(villagerEntry.getKey(), villagerNbt);
         }
         nbt.put("daily_logs", logsNbt);
-        
         return nbt;
     }
-    
+
     public static void loadFromNbt(NbtCompound nbt) {
-        // Note: In a real implementation, you'd use proper NBT deserialization with the codecs
         VILLAGER_DAILY_LOGS.clear();
         CURRENT_ACTIVITIES.clear();
         DAILY_HAPPINESS_START.clear();
         DAILY_SOCIAL_COUNT.clear();
+
+        if (nbt == null || !nbt.contains("daily_logs")) return;
+        NbtCompound logsNbt = nbt.getCompound("daily_logs").orElse(new NbtCompound());
+
+        for (String villagerId : logsNbt.getKeys()) {
+            NbtCompound villagerNbt = logsNbt.getCompound(villagerId).orElse(new NbtCompound());
+            Map<Integer, DailyLog> dayLogs = new ConcurrentHashMap<>();
+            for (String dayKey : villagerNbt.getKeys()) {
+                NbtCompound dayNbt = villagerNbt.getCompound(dayKey).orElse(new NbtCompound());
+                DailyLog.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, dayNbt)
+                    .result()
+                    .ifPresent(log -> dayLogs.put(Integer.parseInt(dayKey), log));
+            }
+            VILLAGER_DAILY_LOGS.put(villagerId, dayLogs);
+        }
     }
 }

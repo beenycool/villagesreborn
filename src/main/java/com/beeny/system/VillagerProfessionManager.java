@@ -270,17 +270,10 @@ public class VillagerProfessionManager {
         }
         
         // Static profession relationship matrix for experience transfer
-        private static final Map<String, Map<String, Float>> RELATIONSHIP_MATRIX = new HashMap<>();
-        static {
-            RELATIONSHIP_MATRIX.put("farmer", Map.of("shepherd", 0.3f, "fisherman", 0.2f, "leatherworker", 0.1f));
-            RELATIONSHIP_MATRIX.put("blacksmith", Map.of("armorer", 0.7f, "weaponsmith", 0.7f, "toolsmith", 0.8f));
-            RELATIONSHIP_MATRIX.put("librarian", Map.of("cartographer", 0.4f, "cleric", 0.2f));
-            RELATIONSHIP_MATRIX.put("fletcher", Map.of("toolsmith", 0.3f, "weaponsmith", 0.4f));
-            // ... add other mappings as needed
-        }
+        // Use class-level RELATIONSHIP_MATRIX from VillagerProfessionManager
 
         private static float calculateExperienceTransferRate(String oldProf, String newProf) {
-            return RELATIONSHIP_MATRIX.getOrDefault(oldProf, java.util.Collections.emptyMap())
+            return VillagerProfessionManager.RELATIONSHIP_MATRIX.getOrDefault(oldProf, java.util.Collections.emptyMap())
                 .getOrDefault(newProf, 0.0f);
         }
         

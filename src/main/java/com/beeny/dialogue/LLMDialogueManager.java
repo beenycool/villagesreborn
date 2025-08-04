@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class LLMDialogueManager {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LLMDialogueManager.class);
     private static volatile LLMDialogueProvider currentProvider;
     private static volatile boolean initialized = false;
     
@@ -218,6 +219,7 @@ public class LLMDialogueManager {
 
 
         } catch (Throwable e) {
+            logger.error("LLM connection test failed", e);
             return CompletableFuture.completedFuture(false);
         }
     }

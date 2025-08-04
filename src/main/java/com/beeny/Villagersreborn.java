@@ -44,13 +44,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Villagersreborn implements ModInitializer {
 	public static final String MOD_ID = "villagersreborn";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 	
-	private static final Random RANDOM = new Random();
 	private static int tickCounter = 0;
 
 	
@@ -70,7 +69,12 @@ public class Villagersreborn implements ModInitializer {
 		
 		
 		com.beeny.config.ConfigManager.loadConfig();
-		
+		// User-friendly API key check and instructions
+		String apiKey = System.getenv("VILLAGERS_REBORN_API_KEY");
+		if (apiKey == null || apiKey.isEmpty()) {
+			LOGGER.warn("Villagers Reborn API key is not set! Please set the environment variable VILLAGERS_REBORN_API_KEY before starting the server.");
+			LOGGER.warn("For user convenience, a placeholder 'llmApiKey' is present in the config file. Do NOT put your API key there; use the environment variable for security.");
+		}
 		
 		ModItems.initialize();
 		
@@ -281,7 +285,7 @@ public class Villagersreborn implements ModInitializer {
 				double distance = villager1.getPos().distanceTo(villager2.getPos());
 				if (distance <= 10.0) { 
 					
-					if (RANDOM.nextFloat() < 0.01f) {
+					if (ThreadLocalRandom.current().nextFloat() < 0.01f) {
 						VillagerRelationshipManager.attemptMarriage(villager1, villager2);
 					}
 				}
