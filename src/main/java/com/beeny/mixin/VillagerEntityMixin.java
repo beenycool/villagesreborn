@@ -100,7 +100,14 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         // Perform hobby activities
         if (updateCounter % 300 == 0) {
-            VillagerHobbySystem.performHobbyActivity(villager, data);
+            try {
+                com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.ai.AIWorldManagerRefactored.getInstance();
+                aiManager.getHobbySystem().performHobbyActivity(villager, data);
+            } catch (Exception e) {
+                // Fallback to direct call if AI manager not available
+                com.beeny.system.VillagerHobbySystem tempHobbySystem = new com.beeny.system.VillagerHobbySystem();
+                tempHobbySystem.performHobbyActivity(villager, data);
+            }
         }
         
         // Update emotional state

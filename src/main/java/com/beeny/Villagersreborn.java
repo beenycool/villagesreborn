@@ -34,6 +34,9 @@ public class Villagersreborn implements ModInitializer {
         // Initialize the mod directly since the separate ModInitializer was removed
         LOGGER.info("Initializing VillagersReborn mod...");
         
+        // Register commands
+        com.beeny.commands.VillagerCommandRegistry.register();
+        
         // Register network packets
         OpenFamilyTreePacket.register();
         FamilyTreeDataPacket.register();

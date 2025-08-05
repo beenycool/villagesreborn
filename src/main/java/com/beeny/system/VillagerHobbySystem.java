@@ -1,6 +1,7 @@
 package com.beeny.system;
 
 import com.beeny.Villagersreborn;
+import com.beeny.ai.core.AISubsystem;
 import com.beeny.data.VillagerData;
 import com.beeny.constants.VillagerConstants.HobbyType;
 import com.beeny.util.BoundingBoxUtils;
@@ -16,13 +17,72 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class VillagerHobbySystem {
+public class VillagerHobbySystem implements AISubsystem {
     
-    public static void performHobbyActivity(VillagerEntity villager, VillagerData data) {
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        // Hobby system doesn't need special initialization
+    }
+    
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) return;
+        
+        performHobbyActivity(villager, data);
+    }
+    
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        // No persistent state to clean up
+    }
+    
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        if (villager.getWorld().isClient) return false;
+        
+        ServerWorld world = (ServerWorld) villager.getWorld();
+        boolean isHobbyTime = VillagerUtils.isTimeOfDay(world, VillagerUtils.TimeOfDay.NOON) ||
+                             VillagerUtils.isTimeOfDay(world, VillagerUtils.TimeOfDay.AFTERNOON);
+        
+        return isHobbyTime && VillagerUtils.shouldPerformRandomAction(0.1f);
+    }
+    
+    @Override
+    public long getUpdateInterval() {
+        return 10000; // Update every 10 seconds
+    }
+    
+    @Override
+    public @NotNull Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("subsystem", "hobby");
+        return analytics;
+    }
+    
+    @Override
+    public void performMaintenance() {
+        // No maintenance needed
+    }
+    
+    @Override
+    public @NotNull String getSubsystemName() {
+        return "VillagerHobbySystem";
+    }
+    
+    @Override
+    public void shutdown() {
+        // No resources to clean up
+    }
+    
+    public void performHobbyActivity(VillagerEntity villager, VillagerData data) {
         if (villager.getWorld().isClient || data == null) return;
         
         HobbyType hobby = data.getHobby();

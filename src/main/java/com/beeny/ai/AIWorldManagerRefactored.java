@@ -6,6 +6,7 @@ import com.beeny.ai.learning.VillagerLearningSystem;
 import com.beeny.ai.social.VillagerGossipManager;
 import com.beeny.ai.planning.VillagerGOAPRefactored;
 import com.beeny.ai.quests.VillagerQuestSystem;
+import com.beeny.system.VillagerHobbySystem;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +38,7 @@ public class AIWorldManagerRefactored {
     private final VillagerGOAPRefactored planningSystem;
     private final VillagerQuestSystem questSystem;
     private final VillagerAIManager aiManager;
+    private final VillagerHobbySystem hobbySystem;
     
     private AIWorldManagerRefactored(@NotNull MinecraftServer server) {
         this.server = server;
@@ -49,12 +51,14 @@ public class AIWorldManagerRefactored {
         this.planningSystem = new VillagerGOAPRefactored();
         this.questSystem = new VillagerQuestSystem();
         this.aiManager = new VillagerAIManager();
+        this.hobbySystem = new VillagerHobbySystem();
         
         // Register subsystems with the manager (order matters for dependencies)
         subsystemManager.registerSubsystem(emotionSystem);    // High priority - affects others
         subsystemManager.registerSubsystem(aiManager);        // Medium priority - general state management
         subsystemManager.registerSubsystem(learningSystem);   // Medium priority
         subsystemManager.registerSubsystem(planningSystem);   // Medium priority
+        subsystemManager.registerSubsystem(hobbySystem);      // Low priority - entertainment/activity
         // questSystem currently does not implement AISubsystem; do not register to avoid type error
         // Note: gossipManager doesn't implement AISubsystem yet, would need refactoring
         
@@ -162,6 +166,14 @@ public class AIWorldManagerRefactored {
     @Nullable
     public VillagerEmotionSystem.EmotionalState getVillagerEmotionalState(@NotNull VillagerEntity villager) {
         return emotionSystem.getEmotionalState(villager);
+    }
+    
+    /**
+     * Get hobby system
+     */
+    @NotNull
+    public VillagerHobbySystem getHobbySystem() {
+        return hobbySystem;
     }
     
     /**
