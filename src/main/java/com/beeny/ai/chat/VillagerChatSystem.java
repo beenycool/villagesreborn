@@ -7,14 +7,20 @@ import com.beeny.ai.learning.VillagerLearningSystem;
 import com.beeny.dialogue.LLMDialogueManager;
 import com.beeny.dialogue.VillagerMemoryManager;
 import com.beeny.system.VillagerDialogueSystem;
+import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Natural language chat system for player-villager interactions
@@ -82,6 +88,59 @@ public class VillagerChatSystem {
         }
     }
     
+    // Build a set of known item names (registry/config driven)
+    private static Set<String> getKnownItemNames() {
+        Set<String> names = new HashSet<>();
+        // Try to gather from our mod's items
+        try {
+            // Pull field names and instances from ModItems to derive user-friendly names
+            for (Field f : com.beeny.registry.ModItems.class.getDeclaredFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                f.setAccessible(true);
+                Object value = f.get(null);
+                Item item = null;
+                if (value instanceof Item vItem) {
+                    item = vItem;
+                } else if (value instanceof java.util.function.Supplier<?> sup) {
+                    Object got = sup.get();
+                    if (got instanceof Item i) item = i;
+                }
+                String candidate = null;
+                if (item != null) {
+                    var id = Registries.ITEM.getId(item);
+                    if (id != null) {
+                        candidate = id.getPath().replace('_', ' ');
+                    }
+                }
+                if (candidate == null || candidate.isBlank()) {
+                    // fallback to field name as a readable candidate
+                    candidate = f.getName().toLowerCase(Locale.ROOT).replace('_', ' ');
+                }
+                if (candidate != null && !candidate.isBlank()) {
+                    names.add(candidate);
+                    // naive plurals for basic matching (e.g., "emeralds")
+                    names.add(candidate + "s");
+                }
+            }
+        } catch (Throwable ignored) {
+            // Safe fallback in test/limited environments
+        }
+
+        // Optionally augment with vanilla-common terms players might use
+        Collections.addAll(names,
+                "diamond", "diamond sword", "emerald", "emeralds", "iron", "gold", "bread",
+                "carrot", "potato", "book", "enchant", "food", "armor", "pickaxe", "axe", "shovel", "hoe");
+
+        // Remove blanks and normalize spacing
+        Set<String> cleaned = new HashSet<>();
+        for (String n : names) {
+            if (n == null) continue;
+            String t = n.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (!t.isEmpty()) cleaned.add(t);
+        }
+        return cleaned;
+    }
+
     // Chat context for maintaining conversation state
     public static class ChatContext {
         public final VillagerEntity villager;
@@ -92,24 +151,71 @@ public class VillagerChatSystem {
         public final ChatIntent detectedIntent;
         public final Map<String, Object> extractedEntities;
         
-        public ChatContext(VillagerEntity villager, PlayerEntity player, String playerMessage) {
+        public ChatContext(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, @Nullable String playerMessage) {
+            // Validate critical references to prevent NPEs at call sites
+            if (villager == null) {
+                throw new IllegalArgumentException("ChatContext requires a non-null villager");
+            }
+            if (player == null) {
+                throw new IllegalArgumentException("ChatContext requires a non-null player");
+            }
+
             this.villager = villager;
             this.player = player;
-            this.villagerData = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            this.emotionalState = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().getEmotionalState(villager);
-            this.lastPlayerMessage = playerMessage;
-            this.detectedIntent = ChatIntent.classifyIntent(playerMessage);
-            this.extractedEntities = extractEntities(playerMessage);
+
+            // Safely retrieve attached villager data; guard against null villager and null returns
+            VillagerData data = null;
+            try {
+                data = villager != null
+                    ? villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA)
+                    : null;
+            } catch (Throwable t) {
+                // Ignore and allow fallback below
+            }
+            if (data == null) {
+                // Assign a sensible default to prevent NPEs downstream
+                data = new com.beeny.data.VillagerData();
+            }
+            this.villagerData = data;
+
+            // Safely retrieve emotional state and ensure non-null default
+            VillagerEmotionSystem.EmotionalState state = null;
+            try {
+                state = (villager != null) ? VillagerEmotionSystem.getEmotionalState(villager) : null;
+            } catch (Throwable t) {
+                // Ignore and use default below
+            }
+            if (state == null) {
+                // Provide a sane default emotional state to avoid NPEs in response generation
+                state = new com.beeny.ai.core.VillagerEmotionSystem.EmotionalState();
+            }
+            this.emotionalState = state;
+
+            this.lastPlayerMessage = playerMessage != null ? playerMessage : "";
+            this.detectedIntent = ChatIntent.classifyIntent(this.lastPlayerMessage);
+            this.extractedEntities = extractEntities(this.lastPlayerMessage);
         }
         
-        private Map<String, Object> extractEntities(String message) {
+        private Map<String, Object> extractEntities(@NotNull String message) {
             Map<String, Object> entities = new HashMap<>();
             
-            // Extract item names
-            Pattern itemPattern = Pattern.compile("\\b(diamond|emerald|iron|gold|bread|carrot|potato|book|enchant)s?\\b", Pattern.CASE_INSENSITIVE);
-            Matcher itemMatcher = itemPattern.matcher(message);
-            if (itemMatcher.find()) {
-                entities.put("item", itemMatcher.group().toLowerCase());
+            // Extract item names using dynamic pattern from known items
+            Set<String> itemNames = getKnownItemNames();
+            if (!itemNames.isEmpty()) {
+                // Sort by length desc to prefer longest matches first
+                List<String> sorted = new ArrayList<>(itemNames);
+                sorted.sort(Comparator.comparingInt(String::length).reversed());
+
+                String alternation = String.join("|", sorted.stream()
+                        .map(Pattern::quote)
+                        .toList());
+
+                // Use custom boundaries to avoid partial token matches while supporting multi-word items
+                Pattern itemPattern = Pattern.compile("(?i)(?<!\\w)(" + alternation + ")(?!\\w)");
+                Matcher itemMatcher = itemPattern.matcher(message);
+                if (itemMatcher.find()) {
+                    entities.put("item", itemMatcher.group(1).toLowerCase());
+                }
             }
             
             // Extract numbers (for quantities, prices, etc.)
@@ -133,7 +239,7 @@ public class VillagerChatSystem {
     // Response generator for different intents
     public static class ResponseGenerator {
         
-        public static Text generateResponse(ChatContext context) {
+        public static Text generateResponse(@NotNull ChatContext context) {
             // Record the player message in memory
             VillagerMemoryManager.addPlayerMessage(context.villager, context.player, context.lastPlayerMessage);
             
@@ -156,7 +262,7 @@ public class VillagerChatSystem {
             return Text.literal(response).formatted(formatting);
         }
         
-        private static String generateResponseForIntent(ChatContext context) {
+        private static String generateResponseForIntent(@NotNull ChatContext context) {
             return switch (context.detectedIntent) {
                 case GREETING -> generateGreetingResponse(context);
                 case QUESTION_ABOUT_VILLAGER -> generateSelfInfoResponse(context);
@@ -180,28 +286,20 @@ public class VillagerChatSystem {
             
             if (context.villagerData != null) {
                 int reputation = context.villagerData.getPlayerReputation(context.player.getUuidAsString());
-                String personality = context.villagerData.getPersonality();
+                String personality = context.villagerData.getPersonality().name();
 
                 if (reputation > 50) {
-                    if (personality == null) {
-                        // Fallback to default greeting if personality is null
-                        return "Hello " + playerName + "! Good to see you.";
-                    }
                     return switch (personality) {
-                        case "Friendly" -> "Hello " + playerName + "! It's wonderful to see you again!";
-                        case "Energetic" -> "HEY " + playerName + "! Great to see you! What's up?!";
-                        case "Cheerful" -> "Hi there " + playerName + "! You always brighten my day!";
+                        case "FRIENDLY" -> "Hello " + playerName + "! It's wonderful to see you again!";
+                        case "ENERGETIC" -> "HEY " + playerName + "! Great to see you! What's up?!";
+                        case "CHEERFUL" -> "Hi there " + playerName + "! You always brighten my day!";
                         default -> "Hello " + playerName + "! Good to see you.";
                     };
                 } else if (reputation < -20) {
-                    if (personality == null) {
-                        // Fallback to default for negative reputation if personality is null
-                        return "Hello " + playerName + ".";
-                    }
                     return switch (personality) {
-                        case "Grumpy" -> "Oh. It's you, " + playerName + ". What do you want?";
-                        case "Shy" -> "*nervously* H-hello " + playerName + "...";
-                        case "Serious" -> "Good day, " + playerName + ". I hope you're here for honest business.";
+                        case "GRUMPY" -> "Oh. It's you, " + playerName + ". What do you want?";
+                        case "SHY" -> "*nervously* H-hello " + playerName + "...";
+                        case "SERIOUS" -> "Good day, " + playerName + ". I hope you're here for honest business.";
                         default -> "Hello " + playerName + ".";
                     };
                 }
@@ -225,7 +323,7 @@ public class VillagerChatSystem {
             }
             
             // Add personality-based details
-            String personality = context.villagerData != null ? context.villagerData.getPersonality() : null;
+            String personality = context.villagerData != null ? context.villagerData.getPersonality().name() : null;
             if (personality == null) {
                 response.append("I enjoy the simple pleasures of village life.");
             } else {
@@ -332,10 +430,10 @@ public class VillagerChatSystem {
             List<Text> gossipDialogue = VillagerGossipNetwork.generateGossipDialogue(context.villager, context.player);
             
             if (gossipDialogue.isEmpty() || gossipDialogue.get(0).getString().contains("don't have much news")) {
-                return switch (context.villagerData.getPersonality()) {
-                    case "Curious" -> "I wish I had some interesting news to share, but it's been quiet lately!";
-                    case "Grumpy" -> "I don't waste time with idle gossip.";
-                    case "Shy" -> "I... I don't really listen to gossip much...";
+                return switch (context.villagerData.getPersonality().name()) {
+                    case "CURIOUS" -> "I wish I had some interesting news to share, but it's been quiet lately!";
+                    case "GRUMPY" -> "I don't waste time with idle gossip.";
+                    case "SHY" -> "I... I don't really listen to gossip much...";
                     default -> "I haven't heard anything particularly interesting lately.";
                 };
             }
@@ -344,42 +442,42 @@ public class VillagerChatSystem {
         }
         
         private static String generateComplimentResponse(ChatContext context) {
-            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(context.villager,
+            VillagerEmotionSystem.processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 20.0f, "compliment", false));
             
-            return switch (context.villagerData.getPersonality()) {
-                case "Shy" -> "*blushes* Oh... th-thank you! That's very kind of you to say!";
-                case "Friendly" -> "Aww, thank you so much! You're very sweet!";
-                case "Energetic" -> "WOW! Thank you! You just made my whole day amazing!";
-                case "Cheerful" -> "That makes me so happy to hear! Thank you!";
-                case "Grumpy" -> "*grumbles* Well... I suppose that's... nice of you to say.";
+            return switch (context.villagerData.getPersonality().name()) {
+                case "SHY" -> "*blushes* Oh... th-thank you! That's very kind of you to say!";
+                case "FRIENDLY" -> "Aww, thank you so much! You're very sweet!";
+                case "ENERGETIC" -> "WOW! Thank you! You just made my whole day amazing!";
+                case "CHEERFUL" -> "That makes me so happy to hear! Thank you!";
+                case "GRUMPY" -> "*grumbles* Well... I suppose that's... nice of you to say.";
                 default -> "Thank you! That really means a lot to me.";
             };
         }
         
         private static String generateInsultResponse(ChatContext context) {
-            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(context.villager,
+            VillagerEmotionSystem.processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, 25.0f, "insult", false));
             
             if (context.villagerData != null) {
                 context.villagerData.updatePlayerRelation(context.player.getUuidAsString(), -20);
             }
             
-            return switch (context.villagerData.getPersonality()) {
-                case "Grumpy" -> "Well, I never! How dare you speak to me like that!";
-                case "Shy" -> "*starts crying* Why would you say something so mean?";
-                case "Confident" -> "Excuse me? I don't have to tolerate that kind of behavior!";
-                case "Serious" -> "That was completely uncalled for. Please leave me alone.";
+            return switch (context.villagerData.getPersonality().name()) {
+                case "GRUMPY" -> "Well, I never! How dare you speak to me like that!";
+                case "SHY" -> "*starts crying* Why would you say something so mean?";
+                case "CONFIDENT" -> "Excuse me? I don't have to tolerate that kind of behavior!";
+                case "SERIOUS" -> "That was completely uncalled for. Please leave me alone.";
                 default -> "That was very hurtful. I don't appreciate being spoken to that way.";
             };
         }
         
         private static String generateGoodbyeResponse(ChatContext context) {
-            return switch (context.villagerData.getPersonality()) {
-                case "Friendly" -> "Goodbye! It was lovely talking with you! Come back anytime!";
-                case "Energetic" -> "See you later! Take care and have an AMAZING day!";
-                case "Shy" -> "B-bye... it was nice talking with you...";
-                case "Grumpy" -> "Hmph. Goodbye then.";
+            return switch (context.villagerData.getPersonality().name()) {
+                case "FRIENDLY" -> "Goodbye! It was lovely talking with you! Come back anytime!";
+                case "ENERGETIC" -> "See you later! Take care and have an AMAZING day!";
+                case "SHY" -> "B-bye... it was nice talking with you...";
+                case "GRUMPY" -> "Hmph. Goodbye then.";
                 default -> "Farewell! Safe travels!";
             };
         }
@@ -427,14 +525,14 @@ public class VillagerChatSystem {
             }
 
              // Return personality-based fallback immediately
-             String personality = context.villagerData != null ? context.villagerData.getPersonality() : null;
+             String personality = context.villagerData != null ? context.villagerData.getPersonality().name() : null;
              if (personality == null) {
                  return "I'm not quite sure what you mean, but I'm listening!";
              }
              return switch (personality) {
-                 case "Curious" -> "That's interesting! I'm not sure I understand completely, but tell me more!";
-                 case "Shy" -> "Um... I'm not sure what you mean...";
-                 case "Grumpy" -> "I don't understand what you're getting at.";
+                 case "CURIOUS" -> "That's interesting! I'm not sure I understand completely, but tell me more!";
+                 case "SHY" -> "Um... I'm not sure what you mean...";
+                 case "GRUMPY" -> "I don't understand what you're getting at.";
                  default -> "I'm not quite sure what you mean, but I'm listening!";
              };
         }
@@ -489,7 +587,7 @@ public class VillagerChatSystem {
     }
 
     // Main chat processing method
-    public static Text processPlayerMessage(VillagerEntity villager, PlayerEntity player, String message) {
+    public static Text processPlayerMessage(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, @Nullable String message) {
         String validMessage = validateMessage(message);
         if (validMessage == null) {
             return Text.literal("...").formatted(Formatting.GRAY);
@@ -497,11 +595,25 @@ public class VillagerChatSystem {
 
         String sanitized = sanitizeMessage(validMessage);
         ChatContext context = new ChatContext(villager, player, sanitized);
-        return ResponseGenerator.generateResponse(context);
+        try {
+            return ResponseGenerator.generateResponse(context);
+        } catch (Exception e) {
+            // Log the error if a logger is available; fall back to stderr otherwise
+            try {
+                // Try common logger patterns without introducing new deps
+                java.util.logging.Logger.getLogger(VillagerChatSystem.class.getName())
+                    .log(java.util.logging.Level.SEVERE, "Error generating villager chat response", e);
+            } catch (Throwable ignore) {
+                java.util.logging.Logger.getLogger(VillagerChatSystem.class.getName())
+                    .log(java.util.logging.Level.SEVERE, "[SEVERE] [VillagerChatSystem] [generateVillagerResponse] - Error generating villager chat response", e);
+            }
+            // Safe fallback response to prevent crash
+            return Text.literal("...").formatted(Formatting.GRAY);
+        }
     }
     
     // Enhanced dialogue integration
-    public static Text generateEnhancedDialogue(VillagerEntity villager, PlayerEntity player, VillagerDialogueSystem.DialogueCategory category) {
+    public static Text generateEnhancedDialogue(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, @NotNull VillagerDialogueSystem.DialogueCategory category) {
         // Check if player has recent chat history
         String recentContext = VillagerMemoryManager.getRecentConversationContext(villager, player, 3);
         

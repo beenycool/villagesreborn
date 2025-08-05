@@ -36,14 +36,51 @@ public final class VillagerConstants {
         public static final String CURRENT_GOAL = "current_goal";
         public static final String CURRENT_ACTION = "current_action";
         public static final String IS_AI_ACTIVE = "is_ai_active";
-        }
+    }
     
-        public static final class Relationship {
-            public static final double MARRIAGE_RANGE = 10.0;
-            public static final int MIN_MARRIAGE_AGE = 100;
-            public static final int MARRIAGE_COOLDOWN = 1000;
-            public static final int PROPOSAL_TIME_THRESHOLD = 12000;
-        }
+    // Relationship constants
+    public static final class Relationship {
+        public static final double MARRIAGE_RANGE = 10.0;
+        public static final int MIN_MARRIAGE_AGE = 100;
+        public static final int MARRIAGE_COOLDOWN = 1000;
+        public static final int PROPOSAL_TIME_THRESHOLD = 12000;
+        // Interaction and effects
+        public static final int FAVORITE_FOOD_FIRST_TIME_HAPPINESS = 10;
+        public static final int FAVORITE_FOOD_REPEAT_HAPPINESS = 5;
+        public static final int NON_FAVORITE_FOOD_HAPPINESS = 1;
+        public static final int EMERALD_REPUTATION_DELTA = 5;
+        public static final int EMERALD_HAPPINESS_DELTA = 3;
+
+        // Particles
+        public static final double HEART_OFFSET_Y = 2.0;
+        public static final int HEART_COUNT = 5;
+        public static final double PARTICLE_SPREAD = 0.5;
+        public static final double PARTICLE_SPEED = 0.1;
+
+        public static final double HAPPY_VILLAGER_OFFSET_Y = 1.0;
+        public static final int HAPPY_VILLAGER_COUNT = 10;
+
+        // Server tick cadence (in ticks)
+        public static final int TICKS_MARRIAGE_CHECK = 100;
+        public static final int TICKS_AGE_UPDATE = 1200;
+        public static final int TICKS_SCHEDULE_UPDATE = 200;
+        public static final int TICKS_RELATIONSHIP_CLEANUP = 600;
+
+        // World limits
+        public static final int WORLD_MIN_Y = -64;
+        public static final int WORLD_MAX_Y = 320;
+
+        // Search/marriage logic
+        public static final double MARRIAGE_DISTANCE_THRESHOLD = 10.0;
+        public static final float MARRIAGE_RANDOM_CHANCE = 0.01f;
+
+        // Bounding box defaults
+        public static final int DEFAULT_EMPTY_BOX_MIN = 0;
+        public static final int DEFAULT_EMPTY_BOX_MAX = 0;
+
+        // Misc
+        public static final int ONE_ITEM = 1;
+    }
     
     // Personalities
     public enum PersonalityType {
@@ -56,17 +93,11 @@ public final class VillagerConstants {
         SERIOUS,
         CHEERFUL,
         NERVOUS,
-        CONFIDENT;
-    }
-
-    // Relationship constants
-    public static final class Relationship {
-        public static final double MARRIAGE_RANGE = 10.0;
-        public static final int MIN_MARRIAGE_AGE = 100;
-        public static final int MARRIAGE_COOLDOWN = 1000;
-        public static final int PROPOSAL_TIME_THRESHOLD = 12000;
-    }
-
+        CONFIDENT,
+        MELANCHOLY,
+        ANXIOUS,
+        CALM;
+        
         public static PersonalityType fromString(String value) {
             for (PersonalityType type : values()) {
                 if (type.name().equalsIgnoreCase(value)) {

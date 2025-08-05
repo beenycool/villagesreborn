@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import com.beeny.Villagersreborn;
+import com.beeny.data.VillagerData;
 import com.beeny.network.FamilyTreeDataPacket;
+import com.beeny.system.VillagerAncestryManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -37,6 +39,8 @@ public class VillagerFamilyTreeScreen extends Screen {
     private final Map<String, FamilyMember> familyTree;
     private final List<FamilyTreeDataPacket.FamilyMemberData> serverFamilyMembers;
     private final List<FamilyMember> displayedMembers;
+    private VillagerEntity currentVillager; // Current villager reference
+    private Map<String, VillagerData> ancestors; // Ancestors data
     private ButtonWidget closeButton;
     private ButtonWidget backButton;
     
@@ -46,11 +50,31 @@ public class VillagerFamilyTreeScreen extends Screen {
     
     /**
      * Deprecated constructor. Only use the packet-based constructor.
+     *
+     * Transitional behavior:
+     * - Logs a deprecation warning advising to switch to the packet-based constructor.
+     * - Provides a minimal fallback screen to avoid runtime breaks for a transition period.
+     *   The screen will render an informational message and a Close button, but contains no data.
+     *
+     * This fallback can be removed in a future release.
      */
     @Deprecated
     public VillagerFamilyTreeScreen(VillagerEntity villager) {
         super(Text.literal("Family Tree"));
-        throw new UnsupportedOperationException("Client must use server-provided data via packet.");
+        // Log deprecation warning
+        LOGGER.warn("[VillagerFamilyTreeScreen] Deprecated constructor used. "
+                + "Please switch to the packet-based constructor: VillagerFamilyTreeScreen(long villagerId, List<FamilyTreeDataPacket.FamilyMemberData>).");
+
+        // Fallback initialization: create an empty, read-only view to avoid immediate runtime breaks.
+        this.villagerId = villager != null ? villager.getUuid().getLeastSignificantBits() ^ villager.getUuid().getMostSignificantBits() : -1L;
+        this.familyTree = new HashMap<>();
+        this.displayedMembers = new ArrayList<>();
+        this.serverFamilyMembers = Collections.emptyList();
+        this.currentVillager = villager; // best-effort to show a title/name if available
+        this.ancestors = new HashMap<>();
+
+        // Do not attempt to build client-side trees; render() already handles empty state messaging.
+        // calculateTreeLayout() expects displayedMembers; calling it is safe with empty list.
     }
     
     public VillagerFamilyTreeScreen(long villagerId, List<FamilyTreeDataPacket.FamilyMemberData> familyMembers) {
@@ -59,6 +83,8 @@ public class VillagerFamilyTreeScreen extends Screen {
         this.familyTree = new HashMap<>();
         this.displayedMembers = new ArrayList<>();
         this.serverFamilyMembers = familyMembers;
+        this.currentVillager = null; // Initialize to null, will be set when needed
+        this.ancestors = new HashMap<>(); // Initialize empty ancestors map
         buildFamilyTreeFromServerData();
     }
     
@@ -538,7 +564,7 @@ public class VillagerFamilyTreeScreen extends Screen {
             birthTime = data.getBirthTime();
             deathTime = data.getDeathTime();
             isAlive = data.isAlive();
-            personality = data.getPersonality();
+            personality = data.getPersonality().toString();
             happiness = data.getHappiness();
             profession = !data.getProfessionHistory().isEmpty() ? data.getProfessionHistory().get(0) : "";
             spouseName = data.getSpouseName();

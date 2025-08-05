@@ -3,6 +3,8 @@ package com.beeny.ai.learning;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
+import com.beeny.system.ServerVillagerManager;
+import com.beeny.constants.VillagerConstants;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
@@ -11,12 +13,20 @@ import net.minecraft.nbt.NbtList;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Learning and adaptation system that allows villagers to learn from experiences
  * and adapt their behavior patterns over time
  */
 public class VillagerLearningSystem {
+
+    // Class-level logger
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerLearningSystem.class);
 
     // Time thresholds
     private static final long RECENT_THRESHOLD_MS = 60L * 60L * 1000L; // 1 hour
@@ -48,7 +58,7 @@ public class VillagerLearningSystem {
         public final long timestamp;
         private final java.util.concurrent.atomic.AtomicInteger reinforcements; // Thread-safe reinforcement count
         
-        public Experience(ExperienceType type, String context, Map<String, Object> parameters, float outcome) {
+        public Experience(@NotNull ExperienceType type, @NotNull String context, @NotNull Map<String, Object> parameters, float outcome) {
             this.type = type;
             this.context = context;
             this.parameters = new HashMap<>(parameters);
@@ -93,7 +103,7 @@ public class VillagerLearningSystem {
         public float confidence; // 0.0 to 1.0
         public int timesObserved;
         
-        public LearnedPattern(String patternId, String description) {
+        public LearnedPattern(@NotNull String patternId, @NotNull String description) {
             this.patternId = patternId;
             this.description = description;
             this.conditions = new ConcurrentHashMap<>();
@@ -102,7 +112,7 @@ public class VillagerLearningSystem {
             this.timesObserved = 0;
         }
         
-        public synchronized void updatePattern(Map<String, Float> observedConditions, float outcome) {
+        public synchronized void updatePattern(@NotNull Map<String, Float> observedConditions, float outcome) {
             timesObserved++;
             
             // Update confidence based on consistency
@@ -127,7 +137,7 @@ public class VillagerLearningSystem {
             outcomes.put(outcomeKey, outcomes.getOrDefault(outcomeKey, 0.0f) + 1.0f);
         }
         
-        public boolean matches(Map<String, Float> currentConditions) {
+        public boolean matches(@NotNull Map<String, Float> currentConditions) {
             for (Map.Entry<String, Float> entry : conditions.entrySet()) {
                 String condition = entry.getKey();
                 float threshold = entry.getValue();
@@ -151,15 +161,17 @@ public class VillagerLearningSystem {
     
     // Individual villager's learning profile
     public static class VillagerLearningProfile {
-        private final List<Experience> experiences;
+        private static final int MAX_EXPERIENCES = 1000;
+        private final Deque<Experience> experiences;
         private final Map<String, LearnedPattern> patterns;
         private final Map<String, Float> preferences; // Learned preferences
         private final Map<String, Integer> behaviorCounts; // Track behavior frequency
+        private final AtomicInteger experienceCount = new AtomicInteger(0);
         private float learningRate; // How quickly they adapt (0.0 to 1.0)
         private long lastLearningUpdate;
         
         public VillagerLearningProfile() {
-            this.experiences = Collections.synchronizedList(new ArrayList<>());
+            this.experiences = new LinkedBlockingDeque<>(MAX_EXPERIENCES);
             this.patterns = new ConcurrentHashMap<>();
             this.preferences = new ConcurrentHashMap<>();
             this.behaviorCounts = new ConcurrentHashMap<>();
@@ -167,23 +179,22 @@ public class VillagerLearningSystem {
             this.lastLearningUpdate = System.currentTimeMillis();
         }
         
-        public void addExperience(Experience experience) {
-            experiences.add(experience);
+        public void addExperience(@NotNull Experience experience) {
+            // Add to bounded deque - automatically removes oldest if full
+            while (!experiences.offer(experience)) {
+                experiences.poll(); // Remove oldest
+            }
+            experienceCount.incrementAndGet();
         
             // Update last learning update time
             lastLearningUpdate = System.currentTimeMillis();
-        
-            // Limit experience history to prevent memory issues
-            if (experiences.size() > VillagersRebornConfig.MAX_EXPERIENCE_HISTORY) {
-                experiences.removeIf(exp -> !exp.isRecent() && exp.reinforcements.get() < 3);
-            }
         
             // Trigger pattern learning
             updatePatterns(experience);
             updatePreferences(experience);
         }
         
-        private void updatePatterns(Experience experience) {
+        private void updatePatterns(@NotNull Experience experience) {
             String patternId = experience.type + "_" + experience.context;
             LearnedPattern pattern = patterns.computeIfAbsent(patternId, 
                 k -> new LearnedPattern(k, "Pattern for " + experience.type + " in " + experience.context));
@@ -199,7 +210,7 @@ public class VillagerLearningSystem {
             pattern.updatePattern(conditions, experience.getOutcome());
         }
         
-        private void updatePreferences(Experience experience) {
+        private void updatePreferences(@NotNull Experience experience) {
             // Learn preferences based on positive/negative outcomes
             String preferenceKey = experience.type + "_preference";
             float currentPreference = preferences.getOrDefault(preferenceKey, 0.0f);
@@ -210,7 +221,7 @@ public class VillagerLearningSystem {
             preferences.put(preferenceKey, newPreference);
         }
         
-        public float predictOutcome(ExperienceType type, String context, Map<String, Float> conditions) {
+        public float predictOutcome(@NotNull ExperienceType type, @NotNull String context, @NotNull Map<String, Float> conditions) {
             String patternId = type + "_" + context;
             LearnedPattern pattern = patterns.get(patternId);
             
@@ -221,26 +232,30 @@ public class VillagerLearningSystem {
             return 0.0f; // No prediction available
         }
         
-        public List<Experience> getRelevantExperiences(ExperienceType type, String context) {
-            return experiences.stream()
-                .filter(exp -> exp.type == type && exp.context.equals(context))
-                .sorted((a, b) -> Float.compare(b.getRelevanceScore(), a.getRelevanceScore()))
-                .limit(10)
-                .toList();
+        @NotNull
+        public List<Experience> getRelevantExperiences(@NotNull ExperienceType type, @NotNull String context) {
+            synchronized (experiences) {
+                return experiences.stream()
+                    .filter(exp -> exp.type == type && exp.context.equals(context))
+                    .sorted((a, b) -> Float.compare(b.getRelevanceScore(), a.getRelevanceScore()))
+                    .limit(10)
+                    .toList();
+            }
         }
         
-        public void adjustLearningRate(VillagerEntity villager) {
+        public void adjustLearningRate(@Nullable VillagerEntity villager) {
+            if (villager == null) return;
+            
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             if (data == null) return;
             
             // Personality affects learning rate
-            String personality = data.getPersonality();
-            if (personality == null) personality = "Unknown";
+            String personality = data.getPersonality() != null ? data.getPersonality().name() : "UNKNOWN";
             float personalityModifier = switch (personality) {
-                case "Curious" -> 1.5f; // Learns faster
-                case "Serious" -> 1.2f; // Methodical learning
-                case "Lazy" -> 0.7f; // Learns slower
-                case "Nervous" -> 0.8f; // Cautious learning
+                case "CURIOUS" -> 1.5f; // Learns faster
+                case "SERIOUS" -> 1.2f; // Methodical learning
+                case "LAZY" -> 0.7f; // Learns slower
+                case "NERVOUS" -> 0.8f; // Cautious learning
                 default -> 1.0f;
             };
             
@@ -250,31 +265,41 @@ public class VillagerLearningSystem {
             learningRate = Math.max(0.1f, Math.min(1.0f, 0.5f * personalityModifier * ageModifier));
         }
         
-        public void incrementBehaviorCount(String behavior) {
+        public void incrementBehaviorCount(@NotNull String behavior) {
             behaviorCounts.put(behavior, behaviorCounts.getOrDefault(behavior, 0) + 1);
         }
         
-        public int getBehaviorCount(String behavior) {
+        public int getBehaviorCount(@NotNull String behavior) {
             return behaviorCounts.getOrDefault(behavior, 0);
         }
         
-        public float getPreference(String preferenceType) {
+        public float getPreference(@NotNull String preferenceType) {
             return preferences.getOrDefault(preferenceType, 0.0f);
         }
         
+        @NotNull
         public Set<String> getLearnedPatternIds() {
             return new HashSet<>(patterns.keySet());
         }
         
-        public LearnedPattern getPattern(String patternId) {
+        @Nullable
+        public LearnedPattern getPattern(@NotNull String patternId) {
             return patterns.get(patternId);
         }
 
         /**
          * Gets the count of learning experiences for this villager.
-         * @return The number of learning experiences
+         * @return The number of learning experiences (total, not just current in memory)
          */
         public int getExperienceCount() {
+            return experienceCount.get();
+        }
+        
+        /**
+         * Gets the current number of experiences in memory.
+         * @return The number of experiences currently stored
+         */
+        public int getCurrentExperienceCount() {
             return experiences.size();
         }
     }
@@ -282,8 +307,13 @@ public class VillagerLearningSystem {
     // Global learning profiles for all villagers
     private static final Map<String, VillagerLearningProfile> learningProfiles = new ConcurrentHashMap<>();
     
-    public static VillagerLearningProfile getLearningProfile(VillagerEntity villager) {
+    @Nullable
+    public static VillagerLearningProfile getLearningProfile(@Nullable VillagerEntity villager) {
+        if (villager == null) return null;
+        
         String uuid = villager.getUuidAsString();
+        if (uuid == null) return null;
+        
         VillagerLearningProfile profile = learningProfiles.computeIfAbsent(uuid, k -> new VillagerLearningProfile());
         profile.adjustLearningRate(villager);
         return profile;
@@ -291,7 +321,11 @@ public class VillagerLearningSystem {
     
     // Learning event processors
     public static void processPlayerInteraction(VillagerEntity villager, PlayerEntity player, String interactionType, float outcome) {
+        if (villager == null || player == null || interactionType == null) return;
+        
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return;
+        
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         Map<String, Object> parameters = new HashMap<>();
@@ -303,17 +337,27 @@ public class VillagerLearningSystem {
         profile.addExperience(experience);
         
         // Update emotional response based on learned patterns
-        if (outcome > 0.5f) {
-            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
-                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 15.0f, "positive_interaction", false));
-        } else if (outcome < -0.5f) {
-            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
-                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 10.0f, "negative_interaction", false));
+        // Note: This should be refactored to use dependency injection instead of static access
+        // For now, keeping it working but marking for future refactoring
+        try {
+            if (outcome > 0.5f) {
+                VillagerEmotionSystem.processEmotionalEvent(villager,
+                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 15.0f, "positive_interaction", false));
+            } else if (outcome < -0.5f) {
+                VillagerEmotionSystem.processEmotionalEvent(villager,
+                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 10.0f, "negative_interaction", false));
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to process emotional event for villager {}: {}", villager.getUuidAsString(), e.getMessage());
         }
     }
     
     public static void processTradeOutcome(VillagerEntity villager, PlayerEntity player, boolean fair, int emeraldValue) {
+        if (villager == null || player == null) return;
+        
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return;
+        
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         Map<String, Object> parameters = new HashMap<>();
@@ -339,7 +383,11 @@ public class VillagerLearningSystem {
     }
     
     public static void processSocialOutcome(VillagerEntity villager, VillagerEntity other, String interactionType, float outcome) {
+        if (villager == null || other == null || interactionType == null) return;
+        
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return;
+        
         VillagerData villagerData = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         VillagerData otherData = other.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
@@ -362,10 +410,13 @@ public class VillagerLearningSystem {
         }
     }
     
-    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerLearningSystem.class);
 
     public static void processWorkOutcome(VillagerEntity villager, String workType, float satisfaction) {
+        if (villager == null || workType == null) return;
+        
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return;
+        
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         Map<String, Object> parameters = new HashMap<>();
@@ -433,16 +484,18 @@ public class VillagerLearningSystem {
         VillagerLearningProfile profile = getLearningProfile(villager);
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
-        if (data == null || profile.experiences.size() < 50) return; // Need enough experiences
+        if (data == null || profile.getCurrentExperienceCount() < 50) return; // Need enough experiences
         
         // Analyze patterns in recent experiences
         Map<String, Integer> emotionalTrends = new HashMap<>();
-        for (Experience exp : profile.experiences) {
-            if (exp.isRecent()) {
-                if (exp.getOutcome() > 0.5f) {
-                    emotionalTrends.put("positive", emotionalTrends.getOrDefault("positive", 0) + 1);
-                } else if (exp.getOutcome() < -0.5f) {
-                    emotionalTrends.put("negative", emotionalTrends.getOrDefault("negative", 0) + 1);
+        synchronized (profile.experiences) {
+            for (Experience exp : profile.experiences) {
+                if (exp.isRecent()) {
+                    if (exp.getOutcome() > 0.5f) {
+                        emotionalTrends.put("positive", emotionalTrends.getOrDefault("positive", 0) + 1);
+                    } else if (exp.getOutcome() < -0.5f) {
+                        emotionalTrends.put("negative", emotionalTrends.getOrDefault("negative", 0) + 1);
+                    }
                 }
             }
         }
@@ -450,22 +503,17 @@ public class VillagerLearningSystem {
         int positiveCount = emotionalTrends.getOrDefault("positive", 0);
         int negativeCount = emotionalTrends.getOrDefault("negative", 0);
         
-        // Personality shifts based on predominant experiences
-        String currentPersonality = data.getPersonality();
-        String[] personalities = VillagerData.PERSONALITIES;
+        // Personality shifts based on predominant experiences  
+        VillagerConstants.PersonalityType currentPersonality = data.getPersonality();
         
         // Very gradual personality evolution (1% chance with strong emotional trends)
-        if (positiveCount > negativeCount * 3 && !currentPersonality.equals("Cheerful")) {
+        if (positiveCount > negativeCount * 3 && currentPersonality != VillagerConstants.PersonalityType.CHEERFUL) {
             if (ThreadLocalRandom.current().nextFloat() < 0.01f) {
-                if (Arrays.asList(personalities).contains("Cheerful")) {
-                    data.setPersonality("Cheerful");
-                }
+                data.setPersonality(VillagerConstants.PersonalityType.CHEERFUL);
             }
-        } else if (negativeCount > positiveCount * 3 && !currentPersonality.equals("Grumpy")) {
+        } else if (negativeCount > positiveCount * 3 && currentPersonality != VillagerConstants.PersonalityType.GRUMPY) {
             if (ThreadLocalRandom.current().nextFloat() < 0.01f) {
-                if (Arrays.asList(personalities).contains("Grumpy")) {
-                    data.setPersonality("Grumpy");
-                }
+                data.setPersonality(VillagerConstants.PersonalityType.GRUMPY);
             }
         }
     }
@@ -491,43 +539,68 @@ public class VillagerLearningSystem {
         }
         learningNbt.put("behaviors", behaviorsNbt);
 
-        // Save recent experiences (limit to 50 most recent)
+        // Save recent experiences (limit to 20 most recent to reduce NBT size)
         NbtList experiencesNbt = new NbtList();
-        profile.experiences.stream()
-            .sorted((a, b) -> Long.compare(b.timestamp, a.timestamp))
-            .limit(50)
-            .forEach(exp -> {
+        synchronized (profile.experiences) {
+            profile.experiences.stream()
+                .sorted((a, b) -> Long.compare(b.timestamp, a.timestamp))
+                .limit(20) // Reduced from 50 to prevent NBT size issues
+                .forEach(exp -> {
                 NbtCompound expNbt = new NbtCompound();
+                
+                // Ensure strings are not too long to prevent NBT size issues
+                String contextStr = exp.context;
+                if (contextStr != null && contextStr.length() > 100) {
+                    contextStr = contextStr.substring(0, 100);
+                }
+                
                 expNbt.putString("type", exp.type.name());
-                expNbt.putString("context", exp.context);
+                expNbt.putString("context", contextStr != null ? contextStr : "");
                 expNbt.putFloat("outcome", exp.getOutcome());
                 expNbt.putLong("timestamp", exp.timestamp);
                 expNbt.putInt("reinforcements", exp.reinforcements.get());
 
-                // Serialize parameters (limit to 5 keys)
+                // Serialize parameters (limit to 3 keys to reduce size)
                 NbtCompound paramsNbt = new NbtCompound();
                 int paramCount = 0;
                 for (Map.Entry<String, Object> param : exp.parameters.entrySet()) {
-                    if (paramCount++ >= 5) break;
+                    if (paramCount++ >= 3) break; // Reduced from 5 to 3
                     Object value = param.getValue();
+                    String key = param.getKey();
+                    
+                    // Ensure key is not too long
+                    if (key != null && key.length() > 50) {
+                        key = key.substring(0, 50);
+                    }
+                    
                     if (value instanceof String) {
-                        paramsNbt.putString(param.getKey(), (String) value);
+                        String strValue = (String) value;
+                        if (strValue.length() > 100) {
+                            strValue = strValue.substring(0, 100);
+                        }
+                        paramsNbt.putString(key, strValue);
                     } else if (value instanceof Float) {
-                        paramsNbt.putFloat(param.getKey(), (Float) value);
+                        paramsNbt.putFloat(key, (Float) value);
                     } else if (value instanceof Integer) {
-                        paramsNbt.putInt(param.getKey(), (Integer) value);
-                    } // Add more types as needed
+                        paramsNbt.putInt(key, (Integer) value);
+                    } else if (value instanceof Double) {
+                        paramsNbt.putDouble(key, (Double) value);
+                    } else if (value instanceof Boolean) {
+                        paramsNbt.putBoolean(key, (Boolean) value);
+                    }
+                    // Skip other types to prevent serialization issues
                 }
                 expNbt.put("parameters", paramsNbt);
 
-                experiencesNbt.add(expNbt);
-            });
+                    experiencesNbt.add(expNbt);
+                });
+        }
         learningNbt.put("experiences", experiencesNbt);
 
-        // Save learned patterns (limit to 30, summarize if more)
+        // Save learned patterns (limit to 15 to reduce NBT size)
         NbtList patternsNbt = new NbtList();
         profile.patterns.entrySet().stream()
-            .limit(30)
+            .limit(15) // Reduced from 30
             .forEach(entry -> {
                 LearnedPattern pattern = entry.getValue();
                 NbtCompound patNbt = new NbtCompound();
@@ -536,21 +609,29 @@ public class VillagerLearningSystem {
                 patNbt.putFloat("confidence", pattern.confidence);
                 patNbt.putInt("times_observed", pattern.timesObserved);
 
-                // Serialize conditions (limit to 5 keys)
+                // Serialize conditions (limit to 3 keys to reduce size)
                 NbtCompound condNbt = new NbtCompound();
                 int condCount = 0;
                 for (Map.Entry<String, Float> cond : pattern.conditions.entrySet()) {
-                    if (condCount++ >= 5) break;
-                    condNbt.putFloat(cond.getKey(), cond.getValue());
+                    if (condCount++ >= 3) break; // Reduced from 5
+                    String key = cond.getKey();
+                    if (key != null && key.length() > 50) {
+                        key = key.substring(0, 50);
+                    }
+                    condNbt.putFloat(key, cond.getValue());
                 }
                 patNbt.put("conditions", condNbt);
 
-                // Serialize outcomes (limit to 3 keys)
+                // Serialize outcomes (limit to 2 keys to reduce size)
                 NbtCompound outNbt = new NbtCompound();
                 int outCount = 0;
                 for (Map.Entry<String, Float> out : pattern.outcomes.entrySet()) {
-                    if (outCount++ >= 3) break;
-                    outNbt.putFloat(out.getKey(), out.getValue());
+                    if (outCount++ >= 2) break; // Reduced from 3
+                    String key = out.getKey();
+                    if (key != null && key.length() > 50) {
+                        key = key.substring(0, 50);
+                    }
+                    outNbt.putFloat(key, out.getValue());
                 }
                 patNbt.put("outcomes", outNbt);
 
@@ -621,7 +702,10 @@ public class VillagerLearningSystem {
                 );
                 int reinforcements = expNbt.getInt("reinforcements").orElse(1);
                 for (int j = 1; j < reinforcements; j++) exp.reinforce(exp.getOutcome());
-                profile.experiences.add(exp);
+                while (!profile.experiences.offer(exp)) {
+                    profile.experiences.poll();
+                }
+                profile.experienceCount.incrementAndGet();
             }
         }
         
@@ -680,7 +764,8 @@ public class VillagerLearningSystem {
         VillagerLearningProfile profile = getLearningProfile(villager);
         Map<String, Object> analytics = new HashMap<>();
         
-        analytics.put("experience_count", profile.experiences.size());
+        analytics.put("experience_count", profile.getExperienceCount());
+        analytics.put("current_experience_count", profile.getCurrentExperienceCount());
         analytics.put("pattern_count", profile.patterns.size());
         analytics.put("learning_rate", profile.learningRate);
         analytics.put("top_preferences", profile.preferences.entrySet().stream()

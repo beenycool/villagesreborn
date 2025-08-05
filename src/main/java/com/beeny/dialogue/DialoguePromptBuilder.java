@@ -2,15 +2,18 @@ package com.beeny.dialogue;
 
 import com.beeny.system.VillagerDialogueSystem;
 import com.beeny.data.VillagerData;
+import com.beeny.constants.VillagerConstants;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.world.World;
 import java.util.Set;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class DialoguePromptBuilder {
     
-    public static String buildContextualPrompt(VillagerDialogueSystem.DialogueContext context, 
-                                             VillagerDialogueSystem.DialogueCategory category,
-                                             String conversationHistory) {
+    public static @NotNull String buildContextualPrompt(@NotNull VillagerDialogueSystem.DialogueContext context,
+                                             @NotNull VillagerDialogueSystem.DialogueCategory category,
+                                             @Nullable String conversationHistory) {
         StringBuilder prompt = new StringBuilder();
         
         // Basic character setup
@@ -24,7 +27,7 @@ public class DialoguePromptBuilder {
         return prompt.toString();
     }
     
-    private static String buildCharacterIntroduction(VillagerDialogueSystem.DialogueContext context) {
+    private static @NotNull String buildCharacterIntroduction(@NotNull VillagerDialogueSystem.DialogueContext context) {
         VillagerData data = context.villagerData;
         StringBuilder intro = new StringBuilder();
         
@@ -44,7 +47,7 @@ public class DialoguePromptBuilder {
         intro.append(" living in a Minecraft village. ");
         
         // Personality
-        intro.append("Your personality is ").append(data.getPersonality().toLowerCase()).append(". ");
+        intro.append("Your personality is ").append(VillagerConstants.PersonalityType.toString(data.getPersonality()).toLowerCase()).append(". ");
         
         // Profession
         String profession = context.villager.getVillagerData().profession().toString().replace("minecraft:", "");
@@ -56,7 +59,7 @@ public class DialoguePromptBuilder {
         return intro.toString();
     }
     
-    private static String buildEnvironmentalContext(VillagerDialogueSystem.DialogueContext context) {
+    private static @NotNull String buildEnvironmentalContext(@NotNull VillagerDialogueSystem.DialogueContext context) {
         StringBuilder env = new StringBuilder();
         
         // Time of day
@@ -72,7 +75,7 @@ public class DialoguePromptBuilder {
         return env.toString();
     }
     
-    private static String buildRelationshipContext(VillagerDialogueSystem.DialogueContext context) {
+    private static @NotNull String buildRelationshipContext(@NotNull VillagerDialogueSystem.DialogueContext context) {
         StringBuilder rel = new StringBuilder();
         VillagerData data = context.villagerData;
         String playerName = context.player.getName().getString();
@@ -106,39 +109,103 @@ public class DialoguePromptBuilder {
         return rel.toString();
     }
     
-    private static String buildMemoryContext(VillagerDialogueSystem.DialogueContext context, String conversationHistory) {
+    private static @NotNull String buildMemoryContext(@NotNull VillagerDialogueSystem.DialogueContext context, @Nullable String conversationHistory) {
         StringBuilder memory = new StringBuilder();
         VillagerData data = context.villagerData;
         String playerUuid = context.player.getUuidAsString();
         
-        // Player-specific memories
+        // Player-specific memories with emotional context
         if (data != null) {
             String playerMemory = data.getPlayerMemory(playerUuid);
             if (!playerMemory.isEmpty()) {
                 memory.append("You remember: ").append(playerMemory).append(" ");
+                
+                // Add emotional context to memories
+                int reputation = data.getPlayerReputation(playerUuid);
+                if (reputation > 50) {
+                    memory.append("These are fond memories. ");
+                } else if (reputation < -20) {
+                    memory.append("These memories still trouble you. ");
+                }
             }
         }
         
-        // Recent conversation history
+        // Recent conversation history with frequency analysis
         if (conversationHistory != null && !conversationHistory.trim().isEmpty()) {
             memory.append("Recent conversation: ").append(conversationHistory).append(" ");
+            
+            // Check topic frequency for conversation patterns
+            java.util.Map<String, Integer> topicFreq = data.getTopicFrequency();
+            if (!topicFreq.isEmpty()) {
+                String mostDiscussedTopic = topicFreq.entrySet().stream()
+                    .max(java.util.Map.Entry.comparingByValue())
+                    .map(java.util.Map.Entry::getKey)
+                    .orElse("");
+                
+                if (!mostDiscussedTopic.isEmpty() && topicFreq.get(mostDiscussedTopic) > 3) {
+                    memory.append("You often discuss ").append(mostDiscussedTopic.toLowerCase())
+                        .append(" with this player. ");
+                }
+            }
         }
         
-        // Recent events
+        // Recent events with emotional impact
         if (!data.getRecentEvents().isEmpty()) {
             memory.append("Recent events in your life: ");
-            memory.append(String.join(", ", data.getRecentEvents().subList(0, Math.min(3, data.getRecentEvents().size()))));
+            java.util.List<String> recentEvents = data.getRecentEvents().subList(0, Math.min(3, data.getRecentEvents().size()));
+            
+            for (int i = 0; i < recentEvents.size(); i++) {
+                String event = recentEvents.get(i);
+                memory.append(event);
+                
+                // Add emotional context to certain events
+                if (event.toLowerCase().contains("discovered") || event.toLowerCase().contains("found")) {
+                    memory.append(" (this excited you)");
+                } else if (event.toLowerCase().contains("lost") || event.toLowerCase().contains("died")) {
+                    memory.append(" (this saddened you)");
+                } else if (event.toLowerCase().contains("married") || event.toLowerCase().contains("birth")) {
+                    memory.append(" (this brought you great joy)");
+                }
+                
+                if (i < recentEvents.size() - 1) {
+                    memory.append(", ");
+                }
+            }
             memory.append(". ");
         }
         
-        // Hobby
-        memory.append("Your hobby is ").append(data.getHobby().toLowerCase()).append(". ");
+        // Hobby with recent activity context
+        memory.append("Your hobby is ").append(data.getHobby().name().toLowerCase());
+        
+        // Check if they've been doing their hobby recently
+        long timeSinceLastActivity = System.currentTimeMillis() - data.getLastConversationTime();
+        if (timeSinceLastActivity < 3600000) { // Less than 1 hour
+            memory.append(", which you've been enjoying recently");
+        } else if (timeSinceLastActivity > 86400000) { // More than 1 day
+            memory.append(", though you haven't had much time for it lately");
+        }
+        memory.append(". ");
+        
+        // Total trades context for experienced villagers
+        if (data.getTotalTrades() > 50) {
+            memory.append("As an experienced trader with ").append(data.getTotalTrades())
+                .append(" completed trades, you're confident in your business skills. ");
+        } else if (data.getTotalTrades() < 5) {
+            memory.append("You're still new to trading, having only completed ")
+                .append(data.getTotalTrades()).append(" trades. ");
+        }
+        
+        // Emotional state context
+        String dominantEmotion = data.getEmotionalState().getDominantEmotion();
+        if (!dominantEmotion.isEmpty() && !dominantEmotion.equals("neutral")) {
+            memory.append("Currently, you're feeling particularly ").append(dominantEmotion.toLowerCase()).append(". ");
+        }
         
         return memory.toString();
     }
     
-    private static String buildCategorySpecificInstructions(VillagerDialogueSystem.DialogueCategory category, 
-                                                          VillagerDialogueSystem.DialogueContext context) {
+    private static @NotNull String buildCategorySpecificInstructions(@NotNull VillagerDialogueSystem.DialogueCategory category,
+                                                          @NotNull VillagerDialogueSystem.DialogueContext context) {
         StringBuilder instructions = new StringBuilder();
         
         switch (category) {
@@ -177,7 +244,7 @@ public class DialoguePromptBuilder {
             }
             
             case HOBBY -> {
-                instructions.append("Talk enthusiastically about your hobby: ").append(context.villagerData.getHobby().toLowerCase()).append(". ");
+                instructions.append("Talk enthusiastically about your hobby: ").append(context.villagerData.getHobby().name().toLowerCase()).append(". ");
                 instructions.append("Share what you enjoy about it or something you've done recently. ");
             }
             
@@ -210,7 +277,7 @@ public class DialoguePromptBuilder {
         return instructions.toString();
     }
     
-    private static String buildResponseGuidelines() {
+    private static @NotNull String buildResponseGuidelines() {
         StringBuilder guidelines = new StringBuilder();
         
         guidelines.append("\nResponse guidelines:\n");
@@ -226,7 +293,7 @@ public class DialoguePromptBuilder {
         return guidelines.toString();
     }
     
-    public static String buildPersonalityPrompt(String personality) {
+    public static @NotNull String buildPersonalityPrompt(@NotNull String personality) {
         return switch (personality.toLowerCase()) {
             case "friendly" -> "Speak warmly and openly, use welcoming language, show genuine interest in others. ";
             case "grumpy" -> "Be somewhat irritable, use short responses, occasionally complain about things. ";
@@ -242,8 +309,8 @@ public class DialoguePromptBuilder {
         };
     }
     
-    public static String getAvoidOverusedTopics(VillagerData data, VillagerDialogueSystem.DialogueCategory category) {
-        int topicCount = data.getTopicFrequency(category.name());
+    public static @NotNull String getAvoidOverusedTopics(@NotNull VillagerData data, @NotNull VillagerDialogueSystem.DialogueCategory category) {
+        int topicCount = data.getTopicFrequency().getOrDefault(category.name(), 0);
         if (topicCount > 3) {
             return "You've talked about " + category.name().toLowerCase() + " quite a bit recently, so try to approach it from a fresh angle or mention something new. ";
         }

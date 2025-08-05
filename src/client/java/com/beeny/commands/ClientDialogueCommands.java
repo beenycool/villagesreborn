@@ -64,7 +64,7 @@ public class ClientDialogueCommands {
         });
         
         context.getSource().sendFeedback(
-            Text.literal("Opening Villages Reborn settings...").formatted(Formatting.GREEN)
+            Text.literal(com.beeny.constants.StringConstants.UI_OPENING_SETTINGS).formatted(Formatting.GREEN)
         );
         
         return 1;

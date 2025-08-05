@@ -178,13 +178,13 @@ public class VillagerScheduleManager {
     }
     
     private static int getPersonalityTimeOffset(VillagerData data) {
-        return switch (data.getPersonality()) {
-            case "Energetic" -> -2; // Early riser
-            case "Lazy" -> 3; // Late sleeper
-            case "Serious" -> -1; // Slightly early
-            case "Cheerful" -> -1; // Morning person
-            case "Grumpy" -> 2; // Not a morning person
-            case "Nervous" -> 1; // Irregular schedule
+        return switch (data.getPersonality().name()) {
+            case "ENERGETIC" -> -2; // Early riser
+            case "LAZY" -> 3; // Late sleeper
+            case "SERIOUS" -> -1; // Slightly early
+            case "CHEERFUL" -> -1; // Morning person
+            case "GRUMPY" -> 2; // Not a morning person
+            case "NERVOUS" -> 1; // Irregular schedule
             default -> 0; // Normal schedule
         };
     }
@@ -257,33 +257,33 @@ public class VillagerScheduleManager {
     }
     
     private static void applyPersonalityModifiers(Map<Activity, Float> weights, VillagerData data) {
-        switch (data.getPersonality()) {
-            case "Energetic" -> {
+        switch (data.getPersonality().name()) {
+            case "ENERGETIC" -> {
                 weights.replaceAll((k, v) -> k == Activity.EXERCISE || k == Activity.WORK ? v * 1.5f : v);
                 weights.replaceAll((k, v) -> k == Activity.SLEEP || k == Activity.RELAX ? v * 0.7f : v);
             }
-            case "Lazy" -> {
+            case "LAZY" -> {
                 weights.replaceAll((k, v) -> k == Activity.RELAX || k == Activity.SLEEP ? v * 1.4f : v);
                 weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.EXERCISE ? v * 0.6f : v);
             }
-            case "Friendly" -> {
+            case "FRIENDLY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 1.6f : v);
             }
-            case "Shy" -> {
+            case "SHY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.5f : v);
                 weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.HOBBY ? v * 1.3f : v);
             }
-            case "Curious" -> {
+            case "CURIOUS" -> {
                 weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.WANDER ? v * 1.4f : v);
             }
-            case "Serious" -> {
+            case "SERIOUS" -> {
                 weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.STUDY ? v * 1.3f : v);
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 0.8f : v);
             }
-            case "Cheerful" -> {
+            case "CHEERFUL" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 1.3f : v);
             }
-            case "Grumpy" -> {
+            case "GRUMPY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.6f : v);
                 weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 1.4f : v);
             }
@@ -490,7 +490,7 @@ public class VillagerScheduleManager {
                 details.append("Enjoying ").append(data.getFavoriteFood().isEmpty() ? "food" : data.getFavoriteFood());
             }
             case HOBBY -> {
-                details.append("Enjoying ").append(data.getHobby());
+                details.append("Enjoying ").append(com.beeny.system.VillagerHobbySystem.getHobbyActivityDescription(data.getHobby()));
             }
             case RELAX -> {
                 details.append("Happiness: ").append(data.getHappiness()).append("/100");

@@ -7,6 +7,8 @@ import okhttp3.*;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class BaseLLMProvider implements LLMDialogueProvider {
     protected final OkHttpClient client;
@@ -15,7 +17,7 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
     protected final String endpoint;
     protected final String model;
     
-    public BaseLLMProvider(String apiKey, String endpoint, String model) {
+    public BaseLLMProvider(@Nullable String apiKey, @Nullable String endpoint, @Nullable String model) {
         this.apiKey = apiKey;
         this.endpoint = endpoint;
         this.model = model;
@@ -29,7 +31,7 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
     }
     
     @Override
-    public CompletableFuture<String> generateDialogue(DialogueRequest request) {
+    public @NotNull CompletableFuture<String> generateDialogue(@NotNull DialogueRequest request) {
         if (!isConfigured()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -42,12 +44,12 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
             
             client.newCall(httpRequest).enqueue(new Callback() {
                 @Override
-                public void onFailure(Call call, IOException e) {
+                public void onFailure(@NotNull Call call, @NotNull IOException e) {
                     future.completeExceptionally(e);
                 }
                 
                 @Override
-                public void onResponse(Call call, Response response) throws IOException {
+                public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
                     try {
                         if (response.isSuccessful() && response.body() != null) {
                             String responseBody = response.body().string();
@@ -90,11 +92,11 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
         }
     }
     
-    protected abstract Request buildRequest(DialogueRequest request) throws Exception;
+    protected abstract @NotNull Request buildRequest(@NotNull DialogueRequest request) throws Exception;
+
+    protected abstract @NotNull String parseResponse(@NotNull String responseBody) throws Exception;
     
-    protected abstract String parseResponse(String responseBody) throws Exception;
-    
-    protected String cleanDialogue(String dialogue) {
+    protected @Nullable String cleanDialogue(@Nullable String dialogue) {
         if (dialogue == null) return null;
         
         return dialogue.trim()
@@ -104,7 +106,7 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
             .trim();
     }
     
-    protected JsonObject createBasePrompt(DialogueRequest request) {
+    protected @NotNull JsonObject createBasePrompt(@NotNull DialogueRequest request) {
         String contextualPrompt = DialoguePromptBuilder.buildContextualPrompt(
             request.context,
             request.category,

@@ -35,7 +35,7 @@ public class VillagersRebornConfigScreen extends Screen {
     private TextFieldWidget modelField;
     
     public VillagersRebornConfigScreen(Screen parent) {
-        super(Text.literal("Villages Reborn Settings"));
+        super(Text.literal(com.beeny.constants.StringConstants.UI_TITLE_SETTINGS));
         this.parent = parent;
         loadTempValues();
     }
@@ -65,23 +65,23 @@ public class VillagersRebornConfigScreen extends Screen {
         int currentY = startY;
         
         // Title
-        addDrawableChild(ButtonWidget.builder(Text.literal("Villages Reborn Settings").formatted(Formatting.GOLD, Formatting.BOLD), 
+        addDrawableChild(ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_TITLE_SETTINGS).formatted(Formatting.GOLD, Formatting.BOLD),
             button -> {}).dimensions(centerX - 100, 20, 200, 20).build()).active = false;
         
         // AI Settings Section
-        addDrawableChild(ButtonWidget.builder(Text.literal("🤖 AI Settings").formatted(Formatting.AQUA, Formatting.BOLD), 
+        addDrawableChild(ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_AI_SETTINGS).formatted(Formatting.AQUA, Formatting.BOLD),
             button -> {}).dimensions(centerX - 100, currentY, 200, 20).build()).active = false;
         currentY += spacing;
         
         // Enable Dynamic Dialogue
         addDrawableChild(CyclingButtonWidget.onOffBuilder(tempEnableDynamicDialogue)
             .build(centerX - 100, currentY, 200, 20, 
-                Text.literal("Dynamic Dialogue"), 
+                Text.literal(com.beeny.constants.StringConstants.UI_DYNAMIC_DIALOGUE),
                 (button, value) -> tempEnableDynamicDialogue = value));
         currentY += spacing;
         
         // LLM Provider
-        addDrawableChild(CyclingButtonWidget.builder((String provider) -> Text.literal("Provider: " + provider))
+        addDrawableChild(CyclingButtonWidget.builder((String provider) -> Text.literal(com.beeny.constants.StringConstants.UI_PROVIDER_LABEL_FN + provider))
             .values("gemini", "openrouter", "local")
             .initially(tempLlmProvider)
             .build(centerX - 100, currentY, 200, 20, 
@@ -90,7 +90,7 @@ public class VillagersRebornConfigScreen extends Screen {
         currentY += spacing;
         
         // Model Field
-        modelField = new TextFieldWidget(this.textRenderer, centerX - 100, currentY, 200, 20, Text.literal("Model"));
+        modelField = new TextFieldWidget(this.textRenderer, centerX - 100, currentY, 200, 20, Text.literal(com.beeny.constants.StringConstants.UI_MODEL));
         modelField.setText(tempLlmModel);
         modelField.setChangedListener(text -> tempLlmModel = text);
         addDrawableChild(modelField);
@@ -98,12 +98,12 @@ public class VillagersRebornConfigScreen extends Screen {
         
         // Temperature Slider
         addDrawableChild(new SliderWidget(centerX - 100, currentY, 200, 20, 
-            Text.literal("Temperature: " + String.format("%.2f", tempLlmTemperature)), 
+            Text.literal(com.beeny.constants.StringConstants.UI_TEMPERATURE_LABEL_FN + String.format("%.2f", tempLlmTemperature)),
             tempLlmTemperature) {
             @Override
             protected void updateMessage() {
                 tempLlmTemperature = this.value;
-                this.setMessage(Text.literal("Temperature: " + String.format("%.2f", tempLlmTemperature)));
+                this.setMessage(Text.literal(com.beeny.constants.StringConstants.UI_TEMPERATURE_LABEL_FN + String.format("%.2f", tempLlmTemperature)));
             }
             @Override
             protected void applyValue() {
@@ -114,12 +114,12 @@ public class VillagersRebornConfigScreen extends Screen {
         
         // Max Tokens Slider  
         addDrawableChild(new SliderWidget(centerX - 100, currentY, 200, 20, 
-            Text.literal("Max Tokens: " + tempLlmMaxTokens), 
+            Text.literal(com.beeny.constants.StringConstants.UI_MAX_TOKENS_LABEL_FN + tempLlmMaxTokens),
             (tempLlmMaxTokens - 50) / 450.0) {
             @Override
             protected void updateMessage() {
                 tempLlmMaxTokens = (int) (50 + this.value * 450);
-                this.setMessage(Text.literal("Max Tokens: " + tempLlmMaxTokens));
+                this.setMessage(Text.literal(com.beeny.constants.StringConstants.UI_MAX_TOKENS_LABEL_FN + tempLlmMaxTokens));
             }
             @Override
             protected void applyValue() {
@@ -131,19 +131,19 @@ public class VillagersRebornConfigScreen extends Screen {
         // Fallback to Static
         addDrawableChild(CyclingButtonWidget.onOffBuilder(tempFallbackToStatic)
             .build(centerX - 100, currentY, 200, 20, 
-                Text.literal("Fallback to Static"), 
+                Text.literal(com.beeny.constants.StringConstants.UI_FALLBACK_TO_STATIC),
                 (button, value) -> tempFallbackToStatic = value));
         currentY += spacing;
         
         // Enable Dialogue Cache
         addDrawableChild(CyclingButtonWidget.onOffBuilder(tempEnableDialogueCache)
             .build(centerX - 100, currentY, 200, 20, 
-                Text.literal("Enable Dialogue Cache"), 
+                Text.literal(com.beeny.constants.StringConstants.UI_ENABLE_DIALOGUE_CACHE),
                 (button, value) -> tempEnableDialogueCache = value));
         currentY += spacing + 10;
         
         // Villager Settings Section
-        addDrawableChild(ButtonWidget.builder(Text.literal("👥 Villager Settings").formatted(Formatting.GREEN, Formatting.BOLD), 
+        addDrawableChild(ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_VILLAGER_SETTINGS).formatted(Formatting.GREEN, Formatting.BOLD),
             button -> {}).dimensions(centerX - 100, currentY, 200, 20).build()).active = false;
         currentY += spacing;
         
@@ -201,12 +201,12 @@ public class VillagersRebornConfigScreen extends Screen {
                 MinecraftClient.getInstance().setScreen(new DialogueConfigScreen(this));
             }).dimensions(centerX - 205, currentY, 100, 20).build());
         
-        addDrawableChild(ButtonWidget.builder(Text.literal("Reset to Defaults"), 
+        addDrawableChild(ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_RESET_DEFAULTS),
             button -> {
                 resetToDefaults();
             }).dimensions(centerX - 100, currentY, 100, 20).build());
         
-        addDrawableChild(ButtonWidget.builder(Text.literal("Save & Apply"), 
+        addDrawableChild(ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_SAVE_APPLY),
             button -> {
                 saveSettings();
                 this.client.setScreen(parent);

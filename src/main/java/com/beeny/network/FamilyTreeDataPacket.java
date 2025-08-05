@@ -155,7 +155,7 @@ public class FamilyTreeDataPacket implements CustomPayload {
             data.getBirthTime(),
             data.getDeathTime(),
             derivedAlive,
-            data.getPersonality(),
+            data.getPersonality().name(),
             data.getHappiness(),
             !data.getProfessionHistory().isEmpty() ? data.getProfessionHistory().get(0) : "",
             data.getSpouseName(),

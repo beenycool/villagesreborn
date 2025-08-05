@@ -5,6 +5,7 @@ import com.beeny.ai.core.VillagerEmotionSystem;
 import com.beeny.ai.learning.VillagerLearningSystem;
 import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.ai.decision.VillagerUtilityAI;
+import com.beeny.ai.social.VillagerGossipManager;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -22,6 +23,7 @@ import net.minecraft.world.poi.PointOfInterestTypes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Enhanced profession management system that handles dynamic career changes,
@@ -176,6 +178,62 @@ public class VillagerProfessionManager {
     // Global profession data storage
     private static final Map<String, ProfessionData> villagerProfessionData = new ConcurrentHashMap<>();
     private static final Map<String, Set<String>> villageWorkstations = new ConcurrentHashMap<>();
+
+    // Monitoring & leak detection
+    // Thresholds can be tuned or later made configurable
+    private static final int MAP_WARN_THRESHOLD = 5_000;
+    private static final int MAP_ERROR_THRESHOLD = 20_000;
+
+    // Periodic monitor guard to avoid excessive logging; increments each time monitoring runs
+    private static final AtomicLong monitorTick = new AtomicLong(0);
+
+    /**
+     * Periodically monitor map sizes and emit warnings if thresholds are exceeded.
+     * This should be called from existing tick/update hooks that already run regularly,
+     * or opportunistically from frequently used public methods in this manager.
+     */
+    private static void monitorMapSizesIfNeeded() {
+        // Only run roughly every 256th call to reduce spam while still catching growth
+        if ((monitorTick.incrementAndGet() & 0xFFL) != 0L) return;
+
+        int profSize = villagerProfessionData.size();
+        int workstationVillageCount = villageWorkstations.size();
+        int workstationClaimCount = villageWorkstations.values().stream().mapToInt(Set::size).sum();
+
+        if (profSize > MAP_ERROR_THRESHOLD || workstationClaimCount > MAP_ERROR_THRESHOLD) {
+            LOGGER.error("[ERROR] [VillagerProfessionManager] [monitorMapSizesIfNeeded] - CRITICAL: Map sizes are very large. villagerProfessionData={} villageWorkstations(villages)={} villageWorkstations(claims)={} — potential memory leak. Initiating defensive cleanup scan.",
+                profSize, workstationVillageCount, workstationClaimCount);
+            defensiveCleanupScan();
+        } else if (profSize > MAP_WARN_THRESHOLD || workstationClaimCount > MAP_WARN_THRESHOLD) {
+            LOGGER.warn("[WARN] [VillagerProfessionManager] [monitorMapSizesIfNeeded] - Map sizes growing. villagerProfessionData={} villageWorkstations(villages)={} villageWorkstations(claims)={}",
+                profSize, workstationVillageCount, workstationClaimCount);
+        }
+    }
+
+    /**
+     * Remove obviously stale entries when possible.
+     * Currently removes empty workstation sets and logs anomalous workstation entries.
+     * Further heuristics can be added if we can detect dead villagers here.
+     */
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerProfessionManager.class);
+    private static void defensiveCleanupScan() {
+        // Clean empty workstation sets
+        int beforeVillages = villageWorkstations.size();
+        villageWorkstations.entrySet().removeIf(e -> e.getValue() == null || e.getValue().isEmpty());
+        int afterVillages = villageWorkstations.size();
+
+        if (afterVillages != beforeVillages) {
+            LOGGER.info("[INFO] [VillagerProfessionManager] [defensiveCleanupScan] - Cleanup: removed {} empty village workstation entries",
+                (beforeVillages - afterVillages));
+        }
+
+        // Nothing to remove from villagerProfessionData without an authoritative liveness check,
+        // but we can at least log its size for visibility.
+        LOGGER.info("[INFO] [VillagerProfessionManager] [defensiveCleanupScan] - Post-clean sizes: villagerProfessionData={} villageWorkstations(villages)={} villageWorkstations(claims)={}",
+            villagerProfessionData.size(),
+            villageWorkstations.size(),
+            villageWorkstations.values().stream().mapToInt(Set::size).sum());
+    }
     
     // Profession change system
     public static class ProfessionChangeManager {
@@ -458,9 +516,85 @@ public class VillagerProfessionManager {
                 }
                 case "blacksmith", "armorer", "weaponsmith", "toolsmith" -> {
                     net.minecraft.item.Item it = item.getItem();
-                    // In modern mappings there is no ToolItem/MiningToolItem; check by component or item classes
-                    if (it.getComponents().contains(net.minecraft.component.DataComponentTypes.TOOL)) yield "tool_crafting";
-                    if (it.getComponents().contains(net.minecraft.component.DataComponentTypes.EQUIPPABLE)) yield "armor_crafting";
+                    // Handle compatibility across MC versions:
+                    // Prefer DataComponentTypes when available (1.20.5+), otherwise fall back to legacy heuristics.
+                    try {
+                        // Reflectively access DataComponentTypes to avoid hard dependency on older MC versions
+                        Class<?> dct = Class.forName("net.minecraft.component.DataComponentTypes");
+                        Object TOOL = dct.getField("TOOL").get(null);
+                        Object EQUIPPABLE = dct.getField("EQUIPPABLE").get(null);
+
+                        // Item#getComponents() exists on modern versions; call reflectively for safety
+                        java.lang.reflect.Method getComponents = it.getClass().getMethod("getComponents");
+                        Object components = getComponents.invoke(it);
+
+                        boolean hasTool = false;
+                        boolean hasEquippable = false;
+
+                        try {
+                            // Preferred: components.contains(DataComponentType)
+                            java.lang.reflect.Method contains = components.getClass().getMethod("contains", Object.class);
+                            hasTool = (boolean) contains.invoke(components, TOOL);
+                            hasEquippable = (boolean) contains.invoke(components, EQUIPPABLE);
+                        } catch (NoSuchMethodException e) {
+                            // Some mappings expose contains(DataComponentType) as a different signature or via get(DataComponentType)
+                            try {
+                                java.lang.reflect.Method get = components.getClass().getMethod("get", Object.class);
+                                hasTool = get.invoke(components, TOOL) != null;
+                                hasEquippable = get.invoke(components, EQUIPPABLE) != null;
+                            } catch (NoSuchMethodException ignored) {
+                                // If neither method exists, fall back to legacy heuristics below
+                            }
+                        }
+
+                        if (hasTool) yield "tool_crafting";
+                        if (hasEquippable) yield "armor_crafting";
+                    } catch (ReflectiveOperationException ignored) {
+                        // DataComponentTypes or reflective access not available; fall through to legacy detection
+                    }
+
+                    // Legacy fallback: identify by item classes and registry names where possible
+                    // Try common legacy classes if present (ToolItem/MiningToolItem/ArmorItem)
+                    try {
+                        Class<?> armorItemCls = Class.forName("net.minecraft.item.ArmorItem");
+                        if (armorItemCls.isInstance(it)) yield "armor_crafting";
+                    } catch (ClassNotFoundException ignored) {
+                        // ArmorItem not present in very old env; ignore
+                    }
+
+                    try {
+                        // Many versions have ToolItem or MiningToolItem; check either if present
+                        Class<?> toolItemCls = null;
+                        try { toolItemCls = Class.forName("net.minecraft.item.ToolItem"); } catch (ClassNotFoundException ignored2) {}
+                        Class<?> miningToolItemCls = null;
+                        try { miningToolItemCls = Class.forName("net.minecraft.item.MiningToolItem"); } catch (ClassNotFoundException ignored2) {}
+
+                        if ((toolItemCls != null && toolItemCls.isInstance(it)) ||
+                            (miningToolItemCls != null && miningToolItemCls.isInstance(it))) {
+                            yield "tool_crafting";
+                        }
+                    } catch (SecurityException ignored) {
+                        // Reflection blocked; ignore
+                    }
+
+                    // Heuristic based on registry path keywords as a last resort
+                    try {
+                        net.minecraft.util.Identifier id = net.minecraft.registry.Registries.ITEM.getId(it);
+                        if (id != null) {
+                            String path = id.getPath();
+                            if (path.contains("sword") || path.contains("pickaxe") || path.contains("axe") ||
+                                path.contains("shovel") || path.contains("hoe") || path.contains("hammer")) {
+                                yield "tool_crafting";
+                            }
+                            if (path.contains("helmet") || path.contains("chestplate") || path.contains("leggings") ||
+                                path.contains("boots") || path.contains("shield")) {
+                                yield "armor_crafting";
+                            }
+                        }
+                    } catch (Throwable ignored) {
+                        // Registry access failed; continue to default
+                    }
+
                     yield "metalworking";
                 }
                 default -> "general";
@@ -632,7 +766,7 @@ public class VillagerProfessionManager {
             List<VillagerProfession> recommendations = new ArrayList<>();
             
             // Analyze personality and emotions for career fit
-            String personality = data.getPersonality();
+            String personality = data.getPersonality().name();
             float curiosity = emotions.getEmotion(VillagerEmotionSystem.EmotionType.CURIOSITY);
             float contentment = emotions.getEmotion(VillagerEmotionSystem.EmotionType.CONTENTMENT);
             

@@ -622,8 +622,19 @@ public class VillagerQuestSystem {
             for (Map.Entry<String, Object> reward : quest.rewards.entrySet()) {
                 switch (reward.getKey()) {
                     case "emeralds" -> {
-                        // This would integrate with economy system to give emeralds
-                        // For now, just improve reputation significantly
+                        // Extract emerald count from reward string and actually give emeralds
+                        String rewardValue = reward.getValue().toString();
+                        int emeraldCount = parseEmeraldAmount(rewardValue);
+                        if (emeraldCount > 0) {
+                            ItemStack emeralds = new ItemStack(Items.EMERALD, emeraldCount);
+                            if (!player.giveItemStack(emeralds)) {
+                                // If inventory is full, drop at player's location
+                                player.dropItem(emeralds, false);
+                            }
+                            player.sendMessage(Text.literal("Received " + emeraldCount + " emerald" + 
+                                (emeraldCount > 1 ? "s" : "") + "!").formatted(Formatting.GREEN), false);
+                        }
+                        // Also improve reputation
                         if (questGiverData != null) {
                             questGiverData.updatePlayerRelation(player.getUuidAsString(), 20);
                         }
@@ -631,18 +642,71 @@ public class VillagerQuestSystem {
                     case "reputation" -> {
                         if (questGiverData != null) {
                             questGiverData.updatePlayerRelation(player.getUuidAsString(), 30);
+                            player.sendMessage(Text.literal("Your reputation with " + questGiverData.getName() + 
+                                " has improved!").formatted(Formatting.AQUA), false);
                         }
                     }
                     case "special" -> {
-                        // Special rewards could include rare items, titles, etc.
-                        // Implementation would depend on specific reward systems
+                        // Give special rewards like rare items
+                        giveSpecialReward(player, reward.getValue().toString());
                     }
                 }
             }
             
             // Emotional impact on quest giver
-            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(quest.questGiver,
+            VillagerEmotionSystem.processEmotionalEvent(quest.questGiver,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 25.0f, "quest_completed", false));
+        }
+        
+        /**
+         * Parse emerald amount from reward string like "5 Emeralds" or "1 Emerald"
+         */
+        private static int parseEmeraldAmount(String rewardString) {
+            try {
+                String[] parts = rewardString.split(" ");
+                if (parts.length > 0) {
+                    return Integer.parseInt(parts[0]);
+                }
+            } catch (NumberFormatException e) {
+                // Default to 1 if parsing fails
+                return 1;
+            }
+            return 0;
+        }
+        
+        /**
+         * Give special rewards to player
+         */
+        private static void giveSpecialReward(PlayerEntity player, String rewardDescription) {
+            // Give some special items based on the reward description
+            ItemStack specialItem = null;
+            
+            if (rewardDescription.toLowerCase().contains("rare item") || 
+                rewardDescription.toLowerCase().contains("discovery")) {
+                // Give random rare item
+                ItemStack[] rareItems = {
+                    new ItemStack(Items.DIAMOND, 1),
+                    new ItemStack(Items.GOLD_INGOT, 3),
+                    new ItemStack(Items.ENDER_PEARL, 2),
+                    new ItemStack(Items.ENCHANTED_BOOK, 1),
+                    new ItemStack(Items.NAME_TAG, 1)
+                };
+                specialItem = rareItems[ThreadLocalRandom.current().nextInt(rareItems.length)];
+            } else if (rewardDescription.toLowerCase().contains("invitation")) {
+                // Give written book as invitation
+                specialItem = new ItemStack(Items.WRITTEN_BOOK, 1);
+            }
+            
+            if (specialItem != null) {
+                if (!player.giveItemStack(specialItem)) {
+                    player.dropItem(specialItem, false);
+                }
+                player.sendMessage(Text.literal("Received special reward: " + 
+                    specialItem.getItem().getName().getString() + "!").formatted(Formatting.LIGHT_PURPLE), false);
+            } else {
+                player.sendMessage(Text.literal("Received special reward: " + rewardDescription)
+                    .formatted(Formatting.LIGHT_PURPLE), false);
+            }
         }
         
         public static void updateQuestProgress(String questId, String progressKey, Object value) {

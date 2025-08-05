@@ -35,17 +35,17 @@ public class VillagersRebornClient implements ClientModInitializer {
         
         
         openJournalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.villagersreborn.open_journal",
+            com.beeny.constants.StringConstants.KB_OPEN_JOURNAL,
             InputUtil.Type.KEYSYM,
             GLFW.GLFW_KEY_J,
-            "category.villagersreborn.general"
+            com.beeny.constants.StringConstants.KB_CATEGORY_GENERAL
         ));
         
         openSettingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.villagersreborn.open_settings",
+            com.beeny.constants.StringConstants.KB_OPEN_SETTINGS,
             InputUtil.Type.KEYSYM,
             GLFW.GLFW_KEY_V,
-            "category.villagersreborn.general"
+            com.beeny.constants.StringConstants.KB_CATEGORY_GENERAL
         ));
         
         
@@ -63,7 +63,7 @@ public class VillagersRebornClient implements ClientModInitializer {
                             client.setScreen(new SimpleConfigScreen(client.currentScreen));
                         });
                     } catch (Exception e) {
-                        client.player.sendMessage(Text.literal("Error opening settings: " + e.getMessage()), false);
+                        client.player.sendMessage(Text.literal(com.beeny.constants.StringConstants.UI_ERROR_PREFIX + e.getMessage()), false);
                         e.printStackTrace();
                     }
                 }

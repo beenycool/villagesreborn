@@ -1,37 +1,53 @@
 package com.beeny.network;
 
-import com.beeny.constants.VillagerConstants;
-import com.beeny.constants.VillagerConstants.PersonalityType;
-import com.beeny.constants.VillagerConstants.HobbyType;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.util.Uuids;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public class VillagerDataPacket {
-    public static final PacketCodec<PacketByteBuf, VillagerDataPacket> CODEC = PacketCodec.tuple(
-        Uuids.PACKET_CODEC, VillagerDataPacket::getEntityId,
-        PacketCodecs.STRING, VillagerDataPacket::getName,
-        PacketCodecs.STRING, VillagerDataPacket::getProfession,
-        PacketCodecs.INTEGER, VillagerDataPacket::getHappiness,
-        PacketCodecs.STRING, VillagerDataPacket::getPersonality,
-        PacketCodecs.STRING, VillagerDataPacket::getHobby,
-        PacketCodecs.INTEGER, VillagerDataPacket::getAge,
-        PacketCodecs.STRING, VillagerDataPacket::getGender,
-        PacketCodecs.STRING, VillagerDataPacket::getFavoriteFood,
-        PacketCodecs.STRING, VillagerDataPacket::getNotes,
-        PacketCodecs.STRING, VillagerDataPacket::getSpouseName,
-        PacketCodecs.INTEGER, VillagerDataPacket::getTotalTrades,
-        PacketCodecs.STRING, VillagerDataPacket::getBirthPlace,
-        PacketCodecs.STRING, VillagerDataPacket::getCurrentGoal,
-        PacketCodecs.STRING, VillagerDataPacket::getCurrentAction,
-        PacketCodecs.STRING, VillagerDataPacket::getDominantEmotion,
-        PacketCodecs.STRING, VillagerDataPacket::getEmotionalDescription,
-        VillagerDataPacket::new
+    public static final PacketCodec<PacketByteBuf, VillagerDataPacket> CODEC = PacketCodec.of(
+        (value, buf) -> {
+            // Write VillagerDataPacket fields into the buffer
+            Uuids.PACKET_CODEC.encode(buf, value.getEntityId());
+            PacketCodecs.STRING.encode(buf, value.getName());
+            PacketCodecs.STRING.encode(buf, value.getProfession());
+            PacketCodecs.INTEGER.encode(buf, value.getHappiness());
+            PacketCodecs.STRING.encode(buf, value.getPersonality());
+            PacketCodecs.STRING.encode(buf, value.getHobby());
+            PacketCodecs.INTEGER.encode(buf, value.getAge());
+            PacketCodecs.STRING.encode(buf, value.getGender());
+            PacketCodecs.STRING.encode(buf, value.getFavoriteFood());
+            PacketCodecs.STRING.encode(buf, value.getNotes() != null ? value.getNotes() : "");
+            PacketCodecs.STRING.encode(buf, value.getSpouseName() != null ? value.getSpouseName() : "");
+            PacketCodecs.INTEGER.encode(buf, value.getTotalTrades());
+            PacketCodecs.STRING.encode(buf, value.getBirthPlace() != null ? value.getBirthPlace() : "");
+            PacketCodecs.STRING.encode(buf, value.getCurrentGoal());
+            PacketCodecs.STRING.encode(buf, value.getCurrentAction());
+            PacketCodecs.STRING.encode(buf, value.getDominantEmotion());
+            PacketCodecs.STRING.encode(buf, value.getEmotionalDescription());
+        },
+        buf -> new VillagerDataPacket(
+            Uuids.PACKET_CODEC.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.INTEGER.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.INTEGER.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.INTEGER.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf),
+            PacketCodecs.STRING.decode(buf)
+        )
     );
 
     private final UUID entityId;
@@ -43,14 +59,51 @@ public class VillagerDataPacket {
     private final int age;
     private final String gender;
     private final String favoriteFood;
-    private final String notes;
-    private final String spouseName;
+    private final String notes; // may be null
+    private final String spouseName; // may be null
     private final int totalTrades;
-    private final String birthPlace;
+    private final String birthPlace; // may be null
     private final String currentGoal;
     private final String currentAction;
     private final String dominantEmotion;
     private final String emotionalDescription;
+
+    public UUID getEntityId() { return entityId; }
+    public String getName() { return name; }
+    public String getProfession() { return profession; }
+    public int getHappiness() { return happiness; }
+    public String getPersonality() { return personality; }
+    public String getHobby() { return hobby; }
+    public int getAge() { return age; }
+    public String getGender() { return gender; }
+    public String getFavoriteFood() { return favoriteFood; }
+    public String getNotes() { return notes; }
+    public String getSpouseName() { return spouseName; }
+    public int getTotalTrades() { return totalTrades; }
+    public String getBirthPlace() { return birthPlace; }
+    public String getCurrentGoal() { return currentGoal; }
+    public String getCurrentAction() { return currentAction; }
+    public String getDominantEmotion() { return dominantEmotion; }
+    public String getEmotionalDescription() { return emotionalDescription; }
+
+    // Additional methods needed by GUI classes
+    public UUID getId() { return entityId; }
+    public String getSpouseId() { return spouseName; }
+    public int getAgeInDays() { return age; }
+    public String getHappinessDescription() {
+        if (happiness >= 80) return "Very Happy";
+        if (happiness >= 60) return "Happy";
+        if (happiness >= 40) return "Content";
+        if (happiness >= 20) return "Unhappy";
+        return "Very Unhappy";
+    }
+    public java.util.List<String> getChildrenNames() { return java.util.Collections.emptyList(); }
+    public java.util.List<String> getFamilyMembers() { return java.util.Collections.emptyList(); }
+    
+    // Mutable note setter for client-side modifications
+    private String mutableNotes;
+    public void setNotes(String notes) { this.mutableNotes = notes; }
+    public String getMutableNotes() { return mutableNotes != null ? mutableNotes : notes; }
 
     public VillagerDataPacket(UUID entityId, String name, String profession, int happiness, String personality,
                             String hobby, int age, String gender, String favoriteFood, String notes,
@@ -75,75 +128,17 @@ public class VillagerDataPacket {
         this.emotionalDescription = emotionalDescription;
     }
 
-    public UUID getEntityId() {
-        return entityId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getProfession() {
-        return profession;
-    }
-
-    public int getHappiness() {
-        return happiness;
-    }
-
-    public String getPersonality() {
-        return personality;
-    }
-
-    public String getHobby() {
-        return hobby;
-    }
-
-    public int getAge() {
-        return age;
-    }
-
-    public String getGender() {
-        return gender;
-    }
-
-    public String getFavoriteFood() {
-        return favoriteFood;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public String getSpouseName() {
-        return spouseName;
-    }
-
-    public int getTotalTrades() {
-        return totalTrades;
-    }
-
-    public String getBirthPlace() {
-        return birthPlace;
-    }
-
-    public String getCurrentGoal() {
-        return currentGoal;
-    }
-
-    public String getCurrentAction() {
-        return currentAction;
-    }
-
-    public String getDominantEmotion() {
-        return dominantEmotion;
-    }
-
-    public String getEmotionalDescription() {
-        return emotionalDescription;
-    }
 
     public static VillagerDataPacket fromVillagerData(com.beeny.data.VillagerData data, UUID entityId) {
+        // Safely handle potential null AIState and EmotionalState to avoid NPEs
+        com.beeny.data.AIState aiState = data.getAiState();
+        String safeCurrentGoal = (aiState != null && aiState.getCurrentGoal() != null) ? aiState.getCurrentGoal() : "";
+        String safeCurrentAction = (aiState != null && aiState.getCurrentAction() != null) ? aiState.getCurrentAction() : "";
+
+        com.beeny.data.EmotionalState emotionalState = data.getEmotionalState();
+        String safeDominantEmotion = (emotionalState != null && emotionalState.getDominantEmotion() != null) ? emotionalState.getDominantEmotion() : "";
+        String safeEmotionalDescription = (emotionalState != null && emotionalState.getEmotionalDescription() != null) ? emotionalState.getEmotionalDescription() : "";
+
         return new VillagerDataPacket(
             entityId,
             data.getName(),
@@ -158,10 +153,10 @@ public class VillagerDataPacket {
             data.getSpouseName(),
             data.getTotalTrades(),
             data.getBirthPlace(),
-            data.getAiState().getCurrentGoal(),
-            data.getAiState().getCurrentAction(),
-            data.getEmotionalState().getDominantEmotion(),
-            data.getEmotionalState().getEmotionalDescription()
+            safeCurrentGoal,
+            safeCurrentAction,
+            safeDominantEmotion,
+            safeEmotionalDescription
         );
     }
 }

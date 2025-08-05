@@ -14,16 +14,21 @@ import net.minecraft.world.chunk.WorldChunk;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class ServerVillagerManager {
     private static ServerVillagerManager instance;
     private final Map<UUID, VillagerEntity> trackedVillagers = new ConcurrentHashMap<>();
+    @Nullable
     private MinecraftServer server;
+    @Nullable
     private AIWorldManager aiWorldManager;
 
     private ServerVillagerManager() {
     }
 
+    @NotNull
     public static ServerVillagerManager getInstance() {
         if (instance == null) {
             instance = new ServerVillagerManager();
@@ -31,15 +36,22 @@ public class ServerVillagerManager {
         return instance;
     }
 
-    public void initialize(MinecraftServer server) {
+    public void initialize(@NotNull MinecraftServer server) {
         this.server = server;
         
         // Initialize the AI World Manager
-        this.aiWorldManager = new AIWorldManager(server);
-        this.aiWorldManager.start();
+        try {
+            this.aiWorldManager = new AIWorldManager(server);
+            this.aiWorldManager.start();
+            Villagersreborn.LOGGER.info("AI World Manager initialized and started successfully");
+        } catch (Exception e) {
+            this.aiWorldManager = null; // Ensure it's null on failure
+            Villagersreborn.LOGGER.error("Failed to initialize/start AI World Manager during server startup", e);
+            // Graceful handling: continue startup without AI systems
+        }
         
         registerEvents();
-        Villagersreborn.LOGGER.info("ServerVillagerManager initialized with AI World Manager");
+        Villagersreborn.LOGGER.info("ServerVillagerManager initialized (AI World Manager: {})", this.aiWorldManager != null ? "enabled" : "disabled due to error");
     }
 
     private void registerEvents() {

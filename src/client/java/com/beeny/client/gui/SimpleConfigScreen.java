@@ -11,7 +11,7 @@ public class SimpleConfigScreen extends Screen {
     private final Screen parent;
     
     public SimpleConfigScreen(Screen parent) {
-        super(Text.literal("Villages Reborn Settings"));
+        super(Text.literal(com.beeny.constants.StringConstants.UI_TITLE_SETTINGS));
         this.parent = parent;
     }
     
@@ -24,23 +24,24 @@ public class SimpleConfigScreen extends Screen {
         
         // Title
         addDrawableChild(ButtonWidget.builder(
-            Text.literal("Villages Reborn Settings").formatted(Formatting.GOLD), 
+            Text.literal(com.beeny.constants.StringConstants.UI_TITLE_SETTINGS).formatted(Formatting.GOLD),
             button -> {}).dimensions(centerX - 100, centerY - 60, 200, 20).build()).active = false;
         
         // Test button
         addDrawableChild(ButtonWidget.builder(
-            Text.literal("This is a test screen"), 
+            Text.literal(com.beeny.constants.StringConstants.UI_SIMPLE_TEST_SCREEN),
             button -> {}).dimensions(centerX - 100, centerY - 30, 200, 20).build()).active = false;
         
         // Open full settings
         addDrawableChild(ButtonWidget.builder(
-            Text.literal("Open Full Settings"), 
+            Text.literal(com.beeny.constants.StringConstants.UI_OPEN_FULL_SETTINGS),
             button -> {
                 try {
                     this.client.setScreen(new VillagersRebornConfigScreen(this.parent));
-                } catch (Exception e) {
-                    if (this.client.player != null) {
-                        this.client.player.sendMessage(Text.literal("Error: " + e.getMessage()).formatted(Formatting.RED), false);
+                } catch (IllegalStateException | NullPointerException e) {
+                    var player = this.client.player;
+                    if (player != null) {
+                        player.sendMessage(Text.literal(com.beeny.constants.StringConstants.UI_ERROR_PREFIX + e.getMessage()).formatted(Formatting.RED), false);
                     }
                     e.printStackTrace();
                 }

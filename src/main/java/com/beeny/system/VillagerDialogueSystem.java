@@ -375,9 +375,9 @@ public class VillagerDialogueSystem {
     
     private static Text generateStaticDialogue(DialogueContext context, DialogueCategory category) {
         
-        String personality = context.villagerData.getPersonality();
-        Map<DialogueCategory, List<String>> personalityDialogues = 
-            DIALOGUE_TEMPLATES.getOrDefault(personality, DIALOGUE_TEMPLATES.get("Friendly"));
+        String personality = context.villagerData.getPersonality().name();
+        Map<DialogueCategory, List<String>> personalityDialogues =
+            DIALOGUE_TEMPLATES.getOrDefault(personality, DIALOGUE_TEMPLATES.get("FRIENDLY"));
         
         
         String professionKey = "profession_" + context.villager.getVillagerData()
@@ -439,7 +439,7 @@ public class VillagerDialogueSystem {
         replacements.put("{activity}", currentActivity.description.toLowerCase());
         
         
-        replacements.put("{hobby}", context.villagerData.getHobby().toLowerCase());
+        replacements.put("{hobby}", context.villagerData.getHobby().name().toLowerCase());
         
         
         if (!context.villagerData.getSpouseName().isEmpty()) {

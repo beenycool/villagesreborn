@@ -3,20 +3,33 @@ package com.beeny.ai;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import com.beeny.ai.social.VillagerGossipManager;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.text.MutableText;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.ref.WeakReference;
+import java.util.UUID;
 
 /**
  * Central AI World Manager - replaces all static AI systems
@@ -32,7 +45,7 @@ public class AIWorldManager {
     private final ScheduledExecutorService scheduler;
     
     // AI System Components (instance-based, not static)
-    private final VillagerEmotionManager emotionManager;
+    private final VillagerEmotionSystem emotionManager;
     private final VillagerLearningManager learningManager;
     private final VillagerGossipManager gossipManager;
     private final VillagerPlanningManager planningManager;
@@ -57,11 +70,12 @@ public class AIWorldManager {
         public long lastUtilityUpdate = 0;
         public final Map<String, Object> contextData = new ConcurrentHashMap<>();
         
-        public void setContext(String key, Object value) {
+        public void setContext(@NotNull String key, @Nullable Object value) {
             contextData.put(key, value);
         }
         
-        public Object getContext(String key) {
+        @Nullable
+        public Object getContext(@NotNull String key) {
             return contextData.get(key);
         }
     }
@@ -90,7 +104,7 @@ public class AIWorldManager {
         public float questGenerationChance = 0.1f;
     }
     
-    public AIWorldManager(MinecraftServer server) {
+    public AIWorldManager(@NotNull MinecraftServer server) {
         this.server = server;
         this.config = new AIConfig();
         
@@ -99,7 +113,7 @@ public class AIWorldManager {
         this.scheduler = Executors.newScheduledThreadPool(threadPoolSize);
         
         // Initialize AI system managers
-        this.emotionManager = new VillagerEmotionManager(this);
+        this.emotionManager = new VillagerEmotionSystem();
         this.learningManager = new VillagerLearningManager(this);
         this.gossipManager = new VillagerGossipManager(this);
         this.planningManager = new VillagerPlanningManager(this);
@@ -163,7 +177,7 @@ public class AIWorldManager {
         }
         
         // Cleanup all AI managers
-        emotionManager.shutdown();
+        // Emotion system has no shutdown hook
         learningManager.shutdown();
         gossipManager.shutdown();
         planningManager.shutdown();
@@ -179,7 +193,7 @@ public class AIWorldManager {
     /**
      * Initialize AI for a specific villager
      */
-    public void initializeVillagerAI(VillagerEntity villager) {
+    public void initializeVillagerAI(@Nullable VillagerEntity villager) {
         if (villager == null) return;
         
         String uuid = villager.getUuidAsString();
@@ -190,7 +204,8 @@ public class AIWorldManager {
         if (data != null) {
             // Initialize individual AI subsystems
             if (config.enableEmotions) {
-                emotionManager.initializeVillagerEmotions(villager, data);
+                // Emotion system uses lazy state; no explicit initialization required
+                VillagerEmotionSystem.getEmotionalState(villager);
             }
             if (config.enableLearning) {
                 learningManager.initializeVillagerLearning(villager, data);
@@ -213,7 +228,7 @@ public class AIWorldManager {
     /**
      * Update AI for a specific villager
      */
-    public void updateVillagerAI(VillagerEntity villager) {
+    public void updateVillagerAI(@Nullable VillagerEntity villager) {
         if (villager == null || villager.getWorld().isClient) return;
         
         String uuid = villager.getUuidAsString();
@@ -235,10 +250,11 @@ public class AIWorldManager {
         
         // Thread-safe AI updates using server executor
         server.execute(() -> {
+            long startTime = System.currentTimeMillis();
             try {
                 // Update emotions
                 if (config.enableEmotions && shouldUpdateEmotion(finalState, finalCurrentTime)) {
-                    emotionManager.updateVillagerEmotions(villager);
+                    VillagerEmotionSystem.updateEmotionalDecay(villager);
                     finalState.lastEmotionUpdate = System.currentTimeMillis();
                 }
                 
@@ -267,8 +283,17 @@ public class AIWorldManager {
                 
                 lastAIUpdate.put(finalUuid, System.currentTimeMillis());
                 
+                // Record performance metrics
+                long executionTime = System.currentTimeMillis() - startTime;
+                performanceMetrics.recordOperation("villager_ai_update", executionTime);
+                
+                if (executionTime > 50) { // Log slow operations
+                    LOGGER.warn("Slow AI update for villager {}: {}ms", finalUuid, executionTime);
+                }
+                
             } catch (Exception e) {
                 LOGGER.error("Error updating AI for villager {}", finalUuid, e);
+                performanceMetrics.recordOperation("villager_ai_error", 1);
             }
         });
     }
@@ -276,10 +301,157 @@ public class AIWorldManager {
     /**
      * Staggered AI updates to prevent performance spikes
      */
-    // Staggered AI update state
-    private int staggeredVillagerIndex = 0;
+    private void performStaggeredAIUpdates() {
+        // Get all villagers from all worlds
+        List<VillagerEntity> allVillagers = new ArrayList<>();
+        
+        for (Map.Entry<String, VillagerAIState> entry : villagerStates.entrySet()) {
+            String uuid = entry.getKey();
+            WeakReference<VillagerEntity> ref = villagerCache.get(uuid);
+            if (ref != null) {
+                VillagerEntity villager = ref.get();
+                if (villager != null && !villager.getWorld().isClient) {
+                    allVillagers.add(villager);
+                }
+            }
+        }
+        
+        if (allVillagers.isEmpty()) return;
+        
+        // Update a batch of villagers each tick to distribute load
+        int updateCount = Math.min(MAX_UPDATES_PER_TICK, Math.max(MIN_UPDATES_PER_TICK, allVillagers.size() / 20));
+        int startIndex = staggeredVillagerIndex.get();
+        
+        for (int i = 0; i < updateCount; i++) {
+            int index = (startIndex + i) % allVillagers.size();
+            VillagerEntity villager = allVillagers.get(index);
+            try {
+                updateVillagerAI(villager);
+            } catch (Exception e) {
+                LOGGER.warn("Error updating AI for villager {}: {}", villager.getUuidAsString(), e.getMessage());
+            }
+        }
+        
+        // Update index for next tick
+        staggeredVillagerIndex.set((startIndex + updateCount) % allVillagers.size());
+    }
+    
+    // Staggered AI update state - thread safe
+    private final AtomicInteger staggeredVillagerIndex = new AtomicInteger(0);
     private static final int MIN_UPDATES_PER_TICK = 1;
     private static final int MAX_UPDATES_PER_TICK = 50; // configurable if needed
+    
+    // Villager cache for efficient lookups (package-private for VillagerEmotionManager access)
+    final Map<String, WeakReference<VillagerEntity>> villagerCache = new ConcurrentHashMap<>();
+    
+    // Simple time-based cache for performance optimization
+    private static class TimedCache<K, V> {
+        private final Map<K, CacheEntry<V>> cache = new ConcurrentHashMap<>();
+        private final long ttlMs;
+        private final int maxSize;
+        
+        private static class CacheEntry<V> {
+            final V value;
+            final long timestamp;
+            
+            CacheEntry(V value) {
+                this.value = value;
+                this.timestamp = System.currentTimeMillis();
+            }
+            
+            boolean isExpired(long ttlMs) {
+                return (System.currentTimeMillis() - timestamp) > ttlMs;
+            }
+        }
+        
+        public TimedCache(long ttlMs, int maxSize) {
+            this.ttlMs = ttlMs;
+            this.maxSize = maxSize;
+        }
+        
+        public V get(K key) {
+            CacheEntry<V> entry = cache.get(key);
+            if (entry != null && !entry.isExpired(ttlMs)) {
+                return entry.value;
+            }
+            cache.remove(key);
+            return null;
+        }
+        
+        public void put(K key, V value) {
+            if (cache.size() >= maxSize) {
+                // Simple LRU-like eviction - remove expired entries first
+                cache.entrySet().removeIf(e -> e.getValue().isExpired(ttlMs));
+                
+                // If still full, remove oldest entry
+                if (cache.size() >= maxSize) {
+                    cache.entrySet().stream()
+                        .min((e1, e2) -> Long.compare(e1.getValue().timestamp, e2.getValue().timestamp))
+                        .ifPresent(entry -> cache.remove(entry.getKey()));
+                }
+            }
+            cache.put(key, new CacheEntry<>(value));
+        }
+        
+        public void clear() {
+            cache.clear();
+        }
+        
+        public int size() {
+            return cache.size();
+        }
+    }
+    
+    // Performance caches
+    private final TimedCache<String, Map<String, Object>> analyticsCache = new TimedCache<>(30000, 100); // 30 second TTL
+    private final TimedCache<String, Boolean> validationCache = new TimedCache<>(60000, 200); // 1 minute TTL
+    
+    // Performance monitoring
+    private static class PerformanceMetrics {
+        private final Map<String, Long> operationCounts = new ConcurrentHashMap<>();
+        private final Map<String, Long> totalExecutionTime = new ConcurrentHashMap<>();
+        private final Map<String, Long> lastExecutionTime = new ConcurrentHashMap<>();
+        
+        public void recordOperation(String operation, long executionTimeMs) {
+            operationCounts.merge(operation, 1L, Long::sum);
+            totalExecutionTime.merge(operation, executionTimeMs, Long::sum);
+            lastExecutionTime.put(operation, executionTimeMs);
+        }
+        
+        public long getOperationCount(String operation) {
+            return operationCounts.getOrDefault(operation, 0L);
+        }
+        
+        public double getAverageExecutionTime(String operation) {
+            long count = operationCounts.getOrDefault(operation, 0L);
+            long total = totalExecutionTime.getOrDefault(operation, 0L);
+            return count > 0 ? (double) total / count : 0.0;
+        }
+        
+        public long getLastExecutionTime(String operation) {
+            return lastExecutionTime.getOrDefault(operation, 0L);
+        }
+        
+        public Map<String, Object> getMetrics() {
+            Map<String, Object> metrics = new HashMap<>();
+            for (String operation : operationCounts.keySet()) {
+                Map<String, Object> operationMetrics = new HashMap<>();
+                operationMetrics.put("count", getOperationCount(operation));
+                operationMetrics.put("avgTime", getAverageExecutionTime(operation));
+                operationMetrics.put("lastTime", getLastExecutionTime(operation));
+                metrics.put(operation, operationMetrics);
+            }
+            return metrics;
+        }
+        
+        public void reset() {
+            operationCounts.clear();
+            totalExecutionTime.clear();
+            lastExecutionTime.clear();
+        }
+    }
+    
+    private final PerformanceMetrics performanceMetrics = new PerformanceMetrics();
 
     /**
      * Called once per server tick to update a subset of villagers.
@@ -291,7 +463,7 @@ public class AIWorldManager {
 
         // Calculate how many villagers to update per tick (e.g., 1/20th per tick for 20 TPS)
         int updatesPerTick = Math.max(MIN_UPDATES_PER_TICK, Math.min(MAX_UPDATES_PER_TICK, totalVillagers / 20));
-        int startIdx = staggeredVillagerIndex;
+        int startIdx = staggeredVillagerIndex.get();
         int endIdx = Math.min(startIdx + updatesPerTick, totalVillagers);
 
         for (int i = startIdx; i < endIdx; i++) {
@@ -307,10 +479,7 @@ public class AIWorldManager {
             }
         }
 
-        staggeredVillagerIndex = endIdx;
-        if (staggeredVillagerIndex >= totalVillagers) {
-            staggeredVillagerIndex = 0;
-        }
+        staggeredVillagerIndex.set(endIdx >= totalVillagers ? 0 : endIdx);
     }
 
     /**
@@ -342,28 +511,46 @@ public class AIWorldManager {
     }
     
     /**
-     * Find villager by UUID across all server worlds
+     * Find villager by UUID using ServerVillagerManager's tracked map (O(1)).
+     * Falls back to previous cache only as a fast-path; no world scans.
      */
-    private VillagerEntity findVillagerByUuid(String uuid) {
-        for (ServerWorld world : server.getWorlds()) {
-            for (Entity entity : world.iterateEntities()) {
-                if (entity instanceof VillagerEntity villager && villager.getUuidAsString().equals(uuid)) {
-                    return villager;
-                }
+    @Nullable
+    private VillagerEntity findVillagerByUuid(@NotNull String uuid) {
+        // Check cache first
+        WeakReference<VillagerEntity> ref = villagerCache.get(uuid);
+        if (ref != null) {
+            VillagerEntity cached = ref.get();
+            if (cached != null && !cached.isRemoved()) {
+                return cached;
             }
+            villagerCache.remove(uuid);
         }
+
+        // Use ServerVillagerManager singleton for constant-time lookup
+        try {
+            java.util.UUID entityUuid = java.util.UUID.fromString(uuid);
+            com.beeny.system.ServerVillagerManager svm = com.beeny.system.ServerVillagerManager.getInstance();
+            VillagerEntity villager = svm.getVillager(entityUuid);
+            if (villager != null && !villager.isRemoved()) {
+                villagerCache.put(uuid, new java.lang.ref.WeakReference<>(villager));
+                return villager;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Invalid UUID string; no lookup possible
+        }
+
         return null;
     }
     
     /**
      * Cleanup AI data for a villager
      */
-    public void cleanupVillagerAI(String villagerUuid) {
+    public void cleanupVillagerAI(@NotNull String villagerUuid) {
         villagerStates.remove(villagerUuid);
         lastAIUpdate.remove(villagerUuid);
         
         // Cleanup in subsystems
-        emotionManager.cleanupVillager(villagerUuid);
+        VillagerEmotionSystem.clearEmotionalState(villagerUuid);
         learningManager.cleanupVillager(villagerUuid);
         gossipManager.cleanupVillager(villagerUuid);
         planningManager.cleanupVillager(villagerUuid);
@@ -384,7 +571,7 @@ public class AIWorldManager {
         });
         
         // Run subsystem maintenance
-        emotionManager.performMaintenance();
+        // Emotion system is stateless per-instance; decay/maintenance handled elsewhere if needed
         learningManager.performMaintenance();
         gossipManager.performMaintenance();
         planningManager.performMaintenance();
@@ -417,16 +604,18 @@ public class AIWorldManager {
     // Getters
     public MinecraftServer getServer() { return server; }
     public AIConfig getConfig() { return config; }
-    public VillagerEmotionManager getEmotionManager() { return emotionManager; }
+    public VillagerEmotionSystem getEmotionManager() { return emotionManager; }
     public VillagerLearningManager getLearningManager() { return learningManager; }
     public VillagerGossipManager getGossipManager() { return gossipManager; }
     public VillagerPlanningManager getPlanningManager() { return planningManager; }
     public VillagerQuestManager getQuestManager() { return questManager; }
     
-    public VillagerAIState getVillagerAIState(VillagerEntity villager) {
-        return villagerStates.get(villager.getUuidAsString());
+    @Nullable
+    public VillagerAIState getVillagerAIState(@Nullable VillagerEntity villager) {
+        return villager != null ? villagerStates.get(villager.getUuidAsString()) : null;
     }
     
+    @NotNull
     public Collection<VillagerEntity> getAllTrackedVillagers() {
         List<VillagerEntity> villagers = new ArrayList<>();
         for (String uuid : villagerStates.keySet()) {
@@ -441,22 +630,30 @@ public class AIWorldManager {
     /**
      * Get emotional state for a villager (compatibility method)
      */
-    public VillagerEmotionSystem.EmotionalState getVillagerEmotionalState(VillagerEntity villager) {
-        VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        return data != null ? data.getEmotionalState() : null;
+    @Nullable
+    public VillagerEmotionSystem.EmotionalState getVillagerEmotionalState(@Nullable VillagerEntity villager) {
+        // Use the VillagerEmotionSystem to get the runtime emotional state
+        return VillagerEmotionSystem.getEmotionalState(villager);
     }
-    
+
     /**
      * Process emotional event for a villager (compatibility method)
      */
-    public void processVillagerEmotionalEvent(VillagerEntity villager, VillagerEmotionSystem.EmotionalEvent event) {
-        emotionManager.processEmotionalEvent(villager, event);
+    public void processVillagerEmotionalEvent(@Nullable VillagerEntity villager, @NotNull VillagerEmotionSystem.EmotionalEvent event) {
+        VillagerEmotionSystem.processEmotionalEvent(villager, event);
     }
     
     /**
      * Analytics and debugging
      */
+    @NotNull
     public Map<String, Object> getAIAnalytics() {
+        String cacheKey = "ai_analytics";
+        Map<String, Object> cached = analyticsCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        
         Map<String, Object> analytics = new HashMap<>();
         analytics.put("active_villager_ais", villagerStates.size());
         int worldCount = 0;
@@ -466,135 +663,121 @@ public class AIWorldManager {
         analytics.put("server_worlds", worldCount);
         analytics.put("config", config);
         
+        // Add performance metrics
+        analytics.put("performance", performanceMetrics.getMetrics());
+        
+        // Add cache statistics
+        Map<String, Object> cacheStats = new HashMap<>();
+        cacheStats.put("villager_cache_size", villagerCache.size());
+        cacheStats.put("analytics_cache_size", analyticsCache.size());
+        cacheStats.put("validation_cache_size", validationCache.size());
+        analytics.put("cache_stats", cacheStats);
+        
         // Add subsystem analytics
-        analytics.put("emotions", emotionManager.getAnalytics());
+        // Emotion analytics can be derived from VillagerData; no direct manager analytics
+        analytics.put("emotions", Map.of("note", "See VillagerData registry for distribution"));
         analytics.put("learning", learningManager.getAnalytics());
         analytics.put("gossip", gossipManager.getAnalytics());
         analytics.put("planning", planningManager.getAnalytics());
         analytics.put("quests", questManager.getAnalytics());
         
+        analyticsCache.put(cacheKey, analytics);
         return analytics;
     }
-}
-
-// VillagerEmotionManager - instance-based emotion system
-class VillagerEmotionManager {
-    private final AIWorldManager worldManager;
-
-    public VillagerEmotionManager(AIWorldManager worldManager) {
-        this.worldManager = worldManager;
-    }
-
-    public void initializeVillagerEmotions(VillagerEntity villager, VillagerData data) {
-        // Set initial emotions based on personality using VillagerData's emotionalState
-        VillagerEmotionSystem.EmotionalState state = data.getEmotionalState();
-        initializeEmotionalStateFromPersonality(state, data.getPersonality());
-    }
-
-    private void initializeEmotionalStateFromPersonality(VillagerEmotionSystem.EmotionalState emotions, String personality) {
-        switch (personality) {
-            case "Cheerful" -> {
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS, 30.0f, "personality_initialization");
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.EXCITEMENT, 20.0f, "personality_initialization");
-            }
-            case "Grumpy" -> {
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.ANGER, 20.0f, "personality_initialization");
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS, -10.0f, "personality_initialization");
-            }
-            case "Shy" -> {
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.FEAR, 15.0f, "personality_initialization");
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, 25.0f, "personality_initialization");
-            }
-            case "Energetic" -> {
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.EXCITEMENT, 40.0f, "personality_initialization");
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.BOREDOM, -20.0f, "personality_initialization");
-            }
-            case "Curious" -> {
-                emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.CURIOSITY, 35.0f, "personality_initialization");
-            }
-        }
-    }
-
-    public void updateVillagerEmotions(VillagerEntity villager) {
-        VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        if (data == null) return;
-        
-        VillagerEmotionSystem.EmotionalState emotions = getEmotionalState(villager);
-        if (emotions == null) return;
-        
-        // Process environmental emotional influences
-        processEnvironmentalEmotions(villager, emotions, data);
-        
-        // Process social emotional influences  
-        processSocialEmotions(villager, emotions, data);
-        
-        // Update context in AI state
-        AIWorldManager.VillagerAIState aiState = worldManager.getVillagerAIState(villager);
-        if (aiState != null) {
-            aiState.setContext("dominant_emotion", emotions.getDominantEmotion().name());
-            aiState.setContext("emotional_description", emotions.getEmotionalDescription());
-        }
+    
+    /**
+     * Get performance metrics for monitoring
+     */
+    public Map<String, Object> getPerformanceMetrics() {
+        return performanceMetrics.getMetrics();
     }
     
-    private void processEnvironmentalEmotions(VillagerEntity villager, VillagerEmotionSystem.EmotionalState emotions, VillagerData data) {
-        // Weather influences
-        if (villager.getWorld().isRaining()) {
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.CONTENTMENT, -5.0f, "rainy_weather");
-        }
-        
-        // Isolation effects
+    /**
+     * Reset performance metrics
+     */
+    public void resetPerformanceMetrics() {
+        performanceMetrics.reset();
+        LOGGER.info("Performance metrics reset");
+    }
+
+    /**
+     * Adjust loneliness based on nearby villager proximity.
+     * This was previously accidentally placed outside the class scope.
+     */
+    private void updateIsolationEffects(VillagerEntity villager, VillagerEmotionSystem.EmotionalState emotions) {
+        if (villager == null || emotions == null || villager.getWorld() == null) return;
+
+        // Use a reasonable detection radius; tweak as needed
+        final double radius = 20.0;
         List<VillagerEntity> nearby = villager.getWorld().getEntitiesByClass(
-            VillagerEntity.class, villager.getBoundingBox().expand(20), v -> v != villager);
-        
+            VillagerEntity.class,
+            villager.getBoundingBox().expand(radius),
+            v -> v != villager
+        );
+
         if (nearby.isEmpty()) {
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, 3.0f, "isolation");
+            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, 3.0f);
         } else if (nearby.size() > 5) {
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, -2.0f, "social_environment");
+            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, -2.0f);
         }
     }
     
     private void processSocialEmotions(VillagerEntity villager, VillagerEmotionSystem.EmotionalState emotions, VillagerData data) {
         // Spouse and family influences
         if (!data.getSpouseId().isEmpty()) {
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LOVE, 5.0f, "married_life");
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, -10.0f, "married_life");
+            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LOVE, 5.0f);
+            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.LONELINESS, -10.0f);
         }
         
         if (!data.getChildrenIds().isEmpty()) {
-            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS, 8.0f, "family_joy");
+            emotions.adjustEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS, 8.0f);
         }
     }
     
     public VillagerEmotionSystem.EmotionalState getEmotionalState(VillagerEntity villager) {
+        if (villager == null) return null;
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        return data != null ? data.getEmotionalState() : null;
+        if (data == null) return null;
+        com.beeny.data.EmotionalState ds = data.getEmotionalState();
+        VillagerEmotionSystem.EmotionalState core = new VillagerEmotionSystem.EmotionalState();
+        if (ds != null) {
+            for (Map.Entry<String, Float> e : ds.getEmotions().entrySet()) {
+                try {
+                    VillagerEmotionSystem.EmotionType type = VillagerEmotionSystem.EmotionType.valueOf(e.getKey().toUpperCase());
+                    core.setEmotion(type, e.getValue());
+                } catch (IllegalArgumentException ignore) {}
+            }
+        }
+        return core;
     }
     
     public void processEmotionalEvent(VillagerEntity villager, VillagerEmotionSystem.EmotionalEvent event) {
+        if (villager == null || event == null) return;
+        
         VillagerEmotionSystem.EmotionalState state = getEmotionalState(villager);
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         if (state == null || data == null) return;
         
         // Apply personality modifiers to emotional reactions
-        float personalityMultiplier = getPersonalityEmotionalMultiplier(data.getPersonality(), event.emotionType);
-        float adjustedImpact = event.impact * personalityMultiplier;
+        float personalityMultiplier = getPersonalityEmotionalMultiplier(data.getPersonality().name(), event.primaryEmotion);
+        float adjustedImpact = event.intensity * personalityMultiplier;
         
-        state.adjustEmotion(event.emotionType, adjustedImpact, event.reason);
+        state.adjustEmotion(event.primaryEmotion, adjustedImpact);
 
         // Feedback for argument/friendship events
         if (villager.getWorld() instanceof ServerWorld serverWorld) {
-            if (event.emotionType == VillagerEmotionSystem.EmotionType.ANGER) {
+            if (event.primaryEmotion == VillagerEmotionSystem.EmotionType.ANGER) {
                 // Argument feedback: angry particles, angry sound, name tag
                 serverWorld.spawnParticles(ParticleTypes.ANGRY_VILLAGER,
                     villager.getX(), villager.getY() + 2, villager.getZ(),
                     12, 0.5, 0.5, 0.5, 0.1);
                 serverWorld.playSound(null, villager.getBlockPos(),
                     SoundEvents.ENTITY_VILLAGER_NO, SoundCategory.NEUTRAL, 1.0f, 0.8f);
-                villager.setCustomName(Text.literal(data.getName() + " (Arguing)").formatted(Formatting.RED));
-                // Reset name tag after short delay (pseudo, needs scheduling)
-            } else if (event.emotionType == VillagerEmotionSystem.EmotionType.HAPPINESS ||
-                       event.emotionType == VillagerEmotionSystem.EmotionType.LOVE) {
+                // Set temporary name with suffix
+                setTemporaryNameWithReset(villager, data.getName(), " (Arguing)", Formatting.RED, 200);
+            } else if (event.primaryEmotion == VillagerEmotionSystem.EmotionType.HAPPINESS ||
+                       event.primaryEmotion == VillagerEmotionSystem.EmotionType.LOVE) {
                 // Friendship feedback: happy/heart particles, positive sound, name tag
                 serverWorld.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
                     villager.getX(), villager.getY() + 2, villager.getZ(),
@@ -604,8 +787,8 @@ class VillagerEmotionManager {
                     6, 0.5, 0.5, 0.5, 0.1);
                 serverWorld.playSound(null, villager.getBlockPos(),
                     SoundEvents.ENTITY_VILLAGER_YES, SoundCategory.NEUTRAL, 1.0f, 1.2f);
-                villager.setCustomName(Text.literal(data.getName() + " (Friends)").formatted(Formatting.AQUA));
-                // Reset name tag after short delay (pseudo, needs scheduling)
+                // Set temporary name with suffix
+                setTemporaryNameWithReset(villager, data.getName(), " (Friends)", Formatting.AQUA, 200);
             }
             // Feedback only for nearby players (handled by particles/sounds range)
         }
@@ -615,6 +798,9 @@ class VillagerEmotionManager {
     }
     
     private float getPersonalityEmotionalMultiplier(String personality, VillagerEmotionSystem.EmotionType emotionType) {
+        if (personality == null || emotionType == null) {
+            return 1.0f;
+        }
         return switch (personality) {
             case "Cheerful" -> emotionType == VillagerEmotionSystem.EmotionType.HAPPINESS ? 1.5f : 
                              emotionType == VillagerEmotionSystem.EmotionType.ANGER ? 0.5f : 1.0f;
@@ -628,6 +814,86 @@ class VillagerEmotionManager {
         };
     }
     
+    // Schedules temporary name suffix and resets it after delayTicks (server ticks).
+    // Debounces per-villager so rapid events refresh the timer.
+    private final Map<UUID, Long> nameResetDeadlines = new ConcurrentHashMap<>();
+    private final Map<UUID, String> baseNames = new ConcurrentHashMap<>();
+
+    private void setTemporaryNameWithReset(VillagerEntity villager, String baseName, String suffix, Formatting color, int delayTicks) {
+        if (!(villager.getWorld() instanceof ServerWorld serverWorld)) return;
+        UUID id = villager.getUuid();
+
+        // Store base name once (first time) to avoid stacking suffixes
+        baseNames.putIfAbsent(id, baseName);
+
+        // Apply temporary name
+        MutableText name = Text.literal(baseName).append(Text.literal(suffix)).formatted(color);
+        villager.setCustomName(name);
+
+        // Compute/reset deadline using world time
+        long currentTick = serverWorld.getTime();
+        long deadline = currentTick + Math.max(1, delayTicks);
+        nameResetDeadlines.put(id, deadline);
+
+        // Ensure per-tick reset check is installed
+        ensureNameResetTickerInstalled();
+    }
+
+    // Install a lightweight per-second ticker using existing scheduler; it runs on server thread via server.execute
+    private volatile boolean nameResetTickerInstalled = false;
+
+    private void ensureNameResetTickerInstalled() {
+        if (nameResetTickerInstalled) return;
+        synchronized (this) {
+            if (nameResetTickerInstalled) return;
+            // Run every 1 second to minimize overhead
+            scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    server.execute(this::tickNameResets);
+                } catch (Exception ignored) {}
+            }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
+            nameResetTickerInstalled = true;
+        }
+    }
+
+    // Check deadlines and restore names
+    private void tickNameResets() {
+        if (nameResetDeadlines.isEmpty()) return;
+
+        // Iterate cached villagers
+        for (Map.Entry<String, WeakReference<VillagerEntity>> entry : villagerCache.entrySet()) {
+            VillagerEntity v = entry.getValue().get();
+            if (v == null || !(v.getWorld() instanceof ServerWorld sw)) continue;
+
+            UUID id = v.getUuid();
+            Long deadline = nameResetDeadlines.get(id);
+            if (deadline == null) continue;
+
+            long currentTick = sw.getTime();
+            if (currentTick >= deadline) {
+                // Reset to base name if still available
+                String base = baseNames.get(id);
+                if (base != null) {
+                    v.setCustomName(Text.literal(base));
+                } else {
+                    // Fallback to entity default name
+                    v.setCustomName(null);
+                }
+                // Clear tracking
+                nameResetDeadlines.remove(id);
+                baseNames.remove(id);
+            }
+        }
+
+        // Best-effort cleanup for entries whose villager is no longer cached
+        if (!nameResetDeadlines.isEmpty()) {
+            nameResetDeadlines.keySet().removeIf(id -> {
+                WeakReference<VillagerEntity> ref = villagerCache.get(id.toString());
+                return ref == null || ref.get() == null;
+            });
+        }
+    }
+
     private void updateLegacyHappiness(VillagerData data, VillagerEmotionSystem.EmotionalState state) {
         // Convert emotional state to legacy happiness value
         float happiness = state.getEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS);
@@ -641,168 +907,8 @@ class VillagerEmotionManager {
     }
     
     public void cleanupVillager(String uuid) {
-        villagerEmotions.remove(uuid);
+        // Clear per-villager emotion state maintained by VillagerEmotionSystem
+        VillagerEmotionSystem.clearEmotionalState(uuid);
     }
     
-    public void performMaintenance() {
-        // Cleanup stale emotion states
-        villagerEmotions.entrySet().removeIf(entry -> {
-            // Remove if no villager found with this UUID
-            VillagerEntity villager = findVillagerByUuid(entry.getKey());
-            return villager == null;
-        });
-    }
-    
-    private VillagerEntity findVillagerByUuid(String uuid) {
-        for (ServerWorld world : worldManager.getServer().getWorlds()) {
-            for (Entity entity : world.iterateEntities()) {
-                if (entity instanceof VillagerEntity villager && villager.getUuidAsString().equals(uuid)) {
-                    return villager;
-                }
-            }
-        }
-        return null;
-    }
-    
-    public void shutdown() {
-        villagerEmotions.clear();
-    }
-    
-    public Map<String, Object> getAnalytics() {
-        // Now operates on VillagerData's emotionalState
-        Map<String, Object> analytics = new HashMap<>();
-        // This would require access to all VillagerData instances, which should be tracked elsewhere
-        analytics.put("tracked_emotions", "See VillagerData registry for count");
-        analytics.put("emotion_distribution", "See VillagerData registry for distribution");
-        return analytics;
-    }
-}
-
-class VillagerLearningManager {
-    private final AIWorldManager worldManager;
-    
-    public VillagerLearningManager(AIWorldManager worldManager) {
-        this.worldManager = worldManager;
-    }
-    
-    public void initializeVillagerLearning(VillagerEntity villager, VillagerData data) {
-        // TODO: Implement
-    }
-    
-    public void updateVillagerLearning(VillagerEntity villager) {
-        // TODO: Implement
-    }
-    
-    public void cleanupVillager(String uuid) {
-        // TODO: Implement
-    }
-    
-    public void performMaintenance() {
-        // TODO: Implement
-    }
-    
-    public void shutdown() {
-        // TODO: Implement
-    }
-    
-    public Map<String, Object> getAnalytics() {
-        return new HashMap<>();
-    }
-}
-
-// Placeholder classes for other managers that haven't been refactored yet
-class VillagerPlanningManager {
-    private final AIWorldManager worldManager;
-    
-    public VillagerPlanningManager(AIWorldManager worldManager) {
-        this.worldManager = worldManager;
-    }
-    
-    public void initializeVillagerPlanning(VillagerEntity villager, VillagerData data) {
-        // TODO: Implement
-    }
-    
-    public void updateVillagerPlanning(VillagerEntity villager) {
-        // TODO: Implement
-    }
-    
-    public void cleanupVillager(String uuid) {
-        // TODO: Implement
-    }
-    
-    public void performMaintenance() {
-        // TODO: Implement
-    }
-    
-    public void shutdown() {
-        // TODO: Implement
-    }
-    
-    public Map<String, Object> getAnalytics() {
-        return new HashMap<>();
-    }
-}
-
-class VillagerPlanningManager {
-    private final AIWorldManager worldManager;
-    
-    public VillagerPlanningManager(AIWorldManager worldManager) {
-        this.worldManager = worldManager;
-    }
-    
-    public void initializeVillagerPlanning(VillagerEntity villager, VillagerData data) {
-        // TODO: Implement
-    }
-    
-    public void updateVillagerPlanning(VillagerEntity villager) {
-        // TODO: Implement
-    }
-    
-    public void cleanupVillager(String uuid) {
-        // TODO: Implement
-    }
-    
-    public void performMaintenance() {
-        // TODO: Implement
-    }
-    
-    public void shutdown() {
-        // TODO: Implement
-    }
-    
-    public Map<String, Object> getAnalytics() {
-        return new HashMap<>();
-    }
-}
-
-class VillagerQuestManager {
-    private final AIWorldManager worldManager;
-    
-    public VillagerQuestManager(AIWorldManager worldManager) {
-        this.worldManager = worldManager;
-    }
-    
-    public void initializeVillagerQuests(VillagerEntity villager, VillagerData data) {
-        // TODO: Implement
-    }
-    
-    public void updateVillagerQuests(VillagerEntity villager) {
-        // TODO: Implement
-    }
-    
-    public void cleanupVillager(String uuid) {
-        // TODO: Implement
-    }
-    
-    public void performMaintenance() {
-        // TODO: Implement
-    }
-    
-    public void shutdown() {
-        // TODO: Implement
-    }
-    
-    public Map<String, Object> getAnalytics() {
-        return new HashMap<>();
-    }
 }

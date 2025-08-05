@@ -64,25 +64,6 @@ dependencies {
 	implementation 'com.google.code.gson:gson:2.13.1'
 }
 
-// Configure the main jar to include dependencies
-jar {
-	archiveClassifier = ""
-	
-	from("LICENSE") {
-		rename { "${it}_${inputs.properties.archivesName}"}
-	}
-	
-	// Include dependencies in the JAR
-	from {
-		configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
-	}
-	
-	// Handle duplicate entries
-	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-	
-	// Exclude META-INF files that can cause issues
-	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-}
 
 processResources {
 	inputs.property "version", project.version

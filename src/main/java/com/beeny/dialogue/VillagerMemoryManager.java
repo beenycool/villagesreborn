@@ -7,6 +7,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
 import java.util.*;
@@ -21,7 +23,7 @@ public class VillagerMemoryManager {
         public final long timestamp;
         public final String category;
         
-        public ConversationEntry(String speaker, String message, long timestamp, String category) {
+        public ConversationEntry(@NotNull String speaker, @NotNull String message, long timestamp, @Nullable String category) {
             this.speaker = speaker;
             this.message = message;
             this.timestamp = timestamp;
@@ -29,7 +31,7 @@ public class VillagerMemoryManager {
         }
         
         @Override
-        public String toString() {
+        public @NotNull String toString() {
             return speaker + ": " + message;
         }
     }
@@ -47,7 +49,7 @@ public class VillagerMemoryManager {
             this.lastInteraction = System.currentTimeMillis();
         }
         
-        public synchronized void addEntry(ConversationEntry entry) {
+        public synchronized void addEntry(@NotNull ConversationEntry entry) {
             entries.addFirst(entry);
             
             // Limit conversation history size
@@ -64,13 +66,13 @@ public class VillagerMemoryManager {
             lastInteraction = entry.timestamp;
         }
         
-        public List<ConversationEntry> getRecentEntries(int limit) {
+        public @NotNull List<ConversationEntry> getRecentEntries(int limit) {
             synchronized (entries) {
                 return new ArrayList<>(entries.subList(0, Math.min(limit, entries.size())));
             }
         }
         
-        public String getRecentConversationText(int maxEntries) {
+        public @NotNull String getRecentConversationText(int maxEntries) {
             List<ConversationEntry> recent;
             synchronized (entries) {
                 if (entries.isEmpty()) return "";
@@ -85,13 +87,13 @@ public class VillagerMemoryManager {
             return sb.toString();
         }
         
-        public boolean hasDiscussedTopic(String topic) {
+        public boolean hasDiscussedTopic(@NotNull String topic) {
             synchronized (discussedTopics) {
                 return discussedTopics.contains(topic);
             }
         }
         
-        public int getTopicCount(String topic) {
+        public int getTopicCount(@NotNull String topic) {
             return topicCounts.getOrDefault(topic, 0);
         }
         
@@ -103,14 +105,14 @@ public class VillagerMemoryManager {
             return (System.currentTimeMillis() - lastInteraction) < withinMillis;
         }
         
-        public Set<String> getDiscussedTopics() {
+        public @NotNull Set<String> getDiscussedTopics() {
             synchronized (discussedTopics) {
                 return new HashSet<>(discussedTopics);
             }
         }
 
         // Setter for discussedTopics
-        public void setDiscussedTopics(Set<String> topics) {
+        public void setDiscussedTopics(@NotNull Set<String> topics) {
             this.discussedTopics = Collections.synchronizedSet(new HashSet<>(topics));
         }
 
@@ -120,20 +122,20 @@ public class VillagerMemoryManager {
         }
     }
     
-    public static ConversationHistory getConversationHistory(String villagerUuid, String playerUuid) {
+    public static @NotNull ConversationHistory getConversationHistory(@NotNull String villagerUuid, @NotNull String playerUuid) {
         return memoryCache.computeIfAbsent(villagerUuid, k -> new ConcurrentHashMap<>())
                          .computeIfAbsent(playerUuid, k -> new ConversationHistory());
     }
     
-    public static void addConversationEntry(String villagerUuid, String playerUuid, 
-                                          String speaker, String message, String category) {
+    public static void addConversationEntry(@NotNull String villagerUuid, @NotNull String playerUuid,
+                                          @NotNull String speaker, @NotNull String message, @Nullable String category) {
         ConversationHistory history = getConversationHistory(villagerUuid, playerUuid);
         ConversationEntry entry = new ConversationEntry(speaker, message, System.currentTimeMillis(), category);
         history.addEntry(entry);
     }
     
-    public static void addVillagerResponse(VillagerEntity villager, PlayerEntity player, 
-                                         String response, String category) {
+    public static void addVillagerResponse(@NotNull VillagerEntity villager, @NotNull PlayerEntity player,
+                                         @NotNull String response, @NotNull String category) {
         addConversationEntry(
             villager.getUuidAsString(), 
             player.getUuidAsString(),
@@ -143,7 +145,7 @@ public class VillagerMemoryManager {
         );
     }
     
-    public static void addPlayerMessage(VillagerEntity villager, PlayerEntity player, String message) {
+    public static void addPlayerMessage(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, @NotNull String message) {
         addConversationEntry(
             villager.getUuidAsString(),
             player.getUuidAsString(), 
@@ -153,22 +155,22 @@ public class VillagerMemoryManager {
         );
     }
     
-    public static String getRecentConversationContext(VillagerEntity villager, PlayerEntity player, int maxEntries) {
+    public static @NotNull String getRecentConversationContext(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, int maxEntries) {
         ConversationHistory history = getConversationHistory(villager.getUuidAsString(), player.getUuidAsString());
         return history.getRecentConversationText(maxEntries);
     }
     
-    public static boolean hasRecentInteraction(VillagerEntity villager, PlayerEntity player, long withinMillis) {
+    public static boolean hasRecentInteraction(@NotNull VillagerEntity villager, @NotNull PlayerEntity player, long withinMillis) {
         ConversationHistory history = getConversationHistory(villager.getUuidAsString(), player.getUuidAsString());
         return history.isRecentInteraction(withinMillis);
     }
     
-    public static Set<String> getDiscussedTopics(VillagerEntity villager, PlayerEntity player) {
+    public static @NotNull Set<String> getDiscussedTopics(@NotNull VillagerEntity villager, @NotNull PlayerEntity player) {
         ConversationHistory history = getConversationHistory(villager.getUuidAsString(), player.getUuidAsString());
         return history.getDiscussedTopics();
     }
     
-    public static void saveMemoryToNbt(VillagerEntity villager, NbtCompound nbt) {
+    public static void saveMemoryToNbt(@NotNull VillagerEntity villager, @NotNull NbtCompound nbt) {
         String villagerUuid = villager.getUuidAsString();
         Map<String, ConversationHistory> villagerMemory = memoryCache.get(villagerUuid);
         
@@ -207,7 +209,7 @@ public class VillagerMemoryManager {
         }
     }
     
-    public static void loadMemoryFromNbt(VillagerEntity villager, NbtCompound nbt) {
+    public static void loadMemoryFromNbt(@NotNull VillagerEntity villager, @NotNull NbtCompound nbt) {
         if (!nbt.contains("conversationMemory")) return;
         
         String villagerUuid = villager.getUuidAsString();
@@ -265,11 +267,11 @@ public class VillagerMemoryManager {
         memoryCache.put(villagerUuid, villagerMemory);
     }
     
-    public static void clearMemory(String villagerUuid) {
+    public static void clearMemory(@NotNull String villagerUuid) {
         memoryCache.remove(villagerUuid);
     }
     
-    public static void clearMemory(String villagerUuid, String playerUuid) {
+    public static void clearMemory(@NotNull String villagerUuid, @NotNull String playerUuid) {
         Map<String, ConversationHistory> villagerMemory = memoryCache.get(villagerUuid);
         if (villagerMemory != null) {
             villagerMemory.remove(playerUuid);

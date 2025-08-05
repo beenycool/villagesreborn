@@ -1,19 +1,22 @@
 package com.beeny.dialogue;
 
 import com.beeny.config.VillagersRebornConfig;
+import com.beeny.constants.StringConstants;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class OpenRouterDialogueProvider extends BaseLLMProvider {
-    private static final String DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+    private static final String DEFAULT_ENDPOINT = StringConstants.DEFAULT_OPENROUTER_ENDPOINT;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
     public OpenRouterDialogueProvider() {
         super(
-            System.getenv("VILLAGERS_REBORN_API_KEY"),
+            System.getenv(StringConstants.ENV_API_KEY),
             VillagersRebornConfig.LLM_API_ENDPOINT.isEmpty() ? DEFAULT_ENDPOINT : VillagersRebornConfig.LLM_API_ENDPOINT,
             VillagersRebornConfig.LLM_MODEL.isEmpty() ? "openai/gpt-3.5-turbo" : VillagersRebornConfig.LLM_MODEL
         );
@@ -29,11 +32,11 @@ public class OpenRouterDialogueProvider extends BaseLLMProvider {
     
     @Override
     public String getProviderName() {
-        return "OpenRouter";
+        return StringConstants.PROVIDER_NAME_OPENROUTER;
     }
     
     @Override
-    protected Request buildRequest(DialogueRequest request) throws Exception {
+    protected @NotNull Request buildRequest(@NotNull DialogueRequest request) throws Exception {
         JsonObject requestBody = new JsonObject();
         
         requestBody.addProperty("model", model);
@@ -71,7 +74,7 @@ public class OpenRouterDialogueProvider extends BaseLLMProvider {
     }
     
     @Override
-    protected String parseResponse(String responseBody) throws Exception {
+    protected @NotNull String parseResponse(@NotNull String responseBody) throws Exception {
         JsonObject response = gson.fromJson(responseBody, JsonObject.class);
         
         // Check for errors

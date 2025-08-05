@@ -1,12 +1,15 @@
 package com.beeny.system;
 
 import com.beeny.Villagersreborn;
+import com.    public static boolean attemptMarriage(@Nullable VillagerEntity villager1, @Nullable VillagerEntity villager2) {
+        if (!canMarry(villager1, villager2)) return false;eny.constants.VillagerConstants;
 import com.beeny.data.VillagerData;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.sound.SoundCategory;
@@ -14,6 +17,8 @@ import net.minecraft.sound.SoundCategory;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class VillagerRelationshipManager {
     // Relationship constants moved to VillagerConstants.Relationship
@@ -36,7 +41,7 @@ public class VillagerRelationshipManager {
     private static final Map<String, Long> lastProposalTime = new HashMap<>();
     
     
-    public static boolean canMarry(VillagerEntity villager1, VillagerEntity villager2) {
+    public static boolean canMarry(@Nullable VillagerEntity villager1, @Nullable VillagerEntity villager2) {
         if (villager1 == null || villager2 == null) return false;
         if (villager1.equals(villager2)) return false;
         
@@ -74,8 +79,8 @@ public class VillagerRelationshipManager {
         String uuid1 = villager1.getUuidAsString();
         String uuid2 = villager2.getUuidAsString();
         
-        if (lastProposalTime.getOrDefault(uuid1, 0L) + MARRIAGE_COOLDOWN > currentTime ||
-            lastProposalTime.getOrDefault(uuid2, 0L) + MARRIAGE_COOLDOWN > currentTime) {
+        if (lastProposalTime.getOrDefault(uuid1, 0L) + VillagerConstants.Relationship.MARRIAGE_COOLDOWN > currentTime ||
+            lastProposalTime.getOrDefault(uuid2, 0L) + VillagerConstants.Relationship.MARRIAGE_COOLDOWN > currentTime) {
             return false;
         }
         
@@ -99,13 +104,16 @@ public class VillagerRelationshipManager {
     }
     
     
-    private static void performMarriage(VillagerEntity villager1, VillagerEntity villager2) {
+    private static void performMarriage(@NotNull VillagerEntity villager1, @NotNull VillagerEntity villager2) {
         VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
         VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
         
         
-        data1.marry(data2.getName(), villager2.getUuidAsString());
-        data2.marry(data1.getName(), villager1.getUuidAsString());
+        // Updated API: store only spouse UUID; keep spouse name via separate field if needed
+        data1.setSpouseId(villager2.getUuidAsString());
+        data1.setSpouseName(data2.getName());
+        data2.setSpouseId(villager1.getUuidAsString());
+        data2.setSpouseName(data1.getName());
         
         
         data1.addFamilyMember(villager2.getUuidAsString());
@@ -151,7 +159,9 @@ public class VillagerRelationshipManager {
         villager2.setCustomName(Text.literal(data2.getName() + " (Married)").formatted(Formatting.LIGHT_PURPLE));
     }
     
-    public static void onVillagerBreed(VillagerEntity parent1, VillagerEntity parent2, VillagerEntity child) {
+    public static void onVillagerBreed(@Nullable VillagerEntity parent1, @Nullable VillagerEntity parent2, @Nullable VillagerEntity child) {
+        if (parent1 == null || parent2 == null || child == null) return;
+        
         VillagerData parentData1 = parent1.getAttached(Villagersreborn.VILLAGER_DATA);
         VillagerData parentData2 = parent2.getAttached(Villagersreborn.VILLAGER_DATA);
         VillagerData childData = child.getAttached(Villagersreborn.VILLAGER_DATA);
@@ -162,8 +172,9 @@ public class VillagerRelationshipManager {
         String parentUuid1 = parent1.getUuidAsString();
         String parentUuid2 = parent2.getUuidAsString();
 
-        parentData1.addChild(childUuid);
-        parentData2.addChild(childUuid);
+        // Updated API requires name and uuid
+        parentData1.addChild(child.getName().getString(), childUuid);
+        parentData2.addChild(child.getName().getString(), childUuid);
 
         // Birth feedback: particles, sound, name tags
         if (parent1.getWorld() instanceof ServerWorld serverWorld) {
@@ -271,12 +282,22 @@ public class VillagerRelationshipManager {
         Set<String> compatible = PERSONALITY_COMPATIBILITIES.getOrDefault(personality1, Set.of());
         return compatible.contains(personality2) || personality1.equals(personality2);
     }
+    // Overload for enum-based personality
+    private static boolean arePersonalitiesCompatible(VillagerConstants.PersonalityType p1, VillagerConstants.PersonalityType p2) {
+        if (p1 == null || p2 == null) return false;
+        return arePersonalitiesCompatible(p1.name(), p2.name());
+    }
     
     private static boolean arePersonalitiesHighlyCompatible(String personality1, String personality2) {
         return (personality1.equals("Friendly") && personality2.equals("Cheerful")) ||
                (personality1.equals("Cheerful") && personality2.equals("Friendly")) ||
                (personality1.equals("Energetic") && personality2.equals("Confident")) ||
                (personality1.equals("Confident") && personality2.equals("Energetic"));
+    }
+    // Overload for enum-based personality
+    private static boolean arePersonalitiesHighlyCompatible(VillagerConstants.PersonalityType p1, VillagerConstants.PersonalityType p2) {
+        if (p1 == null || p2 == null) return false;
+        return arePersonalitiesHighlyCompatible(p1.name(), p2.name());
     }
     
     
@@ -320,8 +341,11 @@ public class VillagerRelationshipManager {
         }
         
         
-        data1.marry("", "");
-        data2.marry("", "");
+        // Clear spouse links to represent divorce
+        data1.setSpouseId("");
+        data1.setSpouseName("");
+        data2.setSpouseId("");
+        data2.setSpouseName("");
         
         
         data1.adjustHappiness(-30);
@@ -378,7 +402,7 @@ public class VillagerRelationshipManager {
         if (villager.getWorld() == null) return List.of();
     
         // Use world.getEntitiesByClass for efficient lookup
-        double range = MARRIAGE_RANGE;
+        double range = VillagerConstants.Relationship.MARRIAGE_RANGE;
         Box searchBox = new Box(
             villager.getX() - range, villager.getY() - range, villager.getZ() - range,
             villager.getX() + range, villager.getY() + range, villager.getZ() + range
@@ -413,7 +437,7 @@ public class VillagerRelationshipManager {
         long currentTime = System.currentTimeMillis();
         int initialSize = lastProposalTime.size();
         lastProposalTime.entrySet().removeIf(entry ->
-            currentTime - entry.getValue() > PROPOSAL_TIME_THRESHOLD * 50
+            currentTime - entry.getValue() > VillagerConstants.Relationship.PROPOSAL_TIME_THRESHOLD * 50
         );
         return initialSize - lastProposalTime.size();
     }

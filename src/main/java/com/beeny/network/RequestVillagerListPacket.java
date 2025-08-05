@@ -1,6 +1,7 @@
 package com.beeny.network;
 
 import com.beeny.Villagersreborn;
+import com.beeny.constants.StringConstants;
 import com.beeny.data.VillagerData;
 import com.beeny.system.ServerVillagerManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -17,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RequestVillagerListPacket implements CustomPayload {
-    public static final CustomPayload.Id<RequestVillagerListPacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, "request_villager_list"));
+    public static final CustomPayload.Id<RequestVillagerListPacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, StringConstants.CH_REQUEST_VILLAGER_LIST));
     public static final PacketCodec<RegistryByteBuf, RequestVillagerListPacket> CODEC = PacketCodec.of((value, buf) -> {}, buf -> new RequestVillagerListPacket());
 
     @Override
@@ -37,6 +38,10 @@ public class RequestVillagerListPacket implements CustomPayload {
     }
 
     public static void sendVillagerList(ServerPlayerEntity player) {
+        // Cap the number of villagers sent to the client to avoid network/perf issues.
+        // 200 is a sensible upper bound for UI lists and dense villages while preventing large payloads.
+        final int MAX_VILLAGERS_TO_SEND = 200;
+
         List<VillagerDataPacket> villagerDataList = new ArrayList<>();
         
         // Debug logging
@@ -85,14 +90,19 @@ public class RequestVillagerListPacket implements CustomPayload {
             }
         }
         
-        Villagersreborn.LOGGER.info("[RequestVillagerListPacket] Found {} villagers in same world, {} with data. Sending {} villagers to client.", 
-            sameWorldCount, withDataCount, villagerDataList.size());
-        
-        ServerPlayNetworking.send(player, new ResponsePacket(villagerDataList));
+        // Truncate the list to the maximum allowed size before sending
+        List<VillagerDataPacket> toSend = villagerDataList.size() > MAX_VILLAGERS_TO_SEND
+                ? villagerDataList.subList(0, MAX_VILLAGERS_TO_SEND)
+                : villagerDataList;
+
+        Villagersreborn.LOGGER.info("[RequestVillagerListPacket] Found {} villagers in same world, {} with data. Sending {} (capped at {}) villagers to client.",
+                sameWorldCount, withDataCount, toSend.size(), MAX_VILLAGERS_TO_SEND);
+
+        ServerPlayNetworking.send(player, new ResponsePacket(toSend));
     }
 
     public static class ResponsePacket implements CustomPayload {
-        public static final CustomPayload.Id<ResponsePacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, "villager_list_response"));
+        public static final CustomPayload.Id<ResponsePacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, StringConstants.CH_VILLAGER_LIST_RESPONSE));
         public static final PacketCodec<RegistryByteBuf, ResponsePacket> CODEC = PacketCodec.of(
             (value, buf) -> {
                 buf.writeInt(value.villagerDataList.size());

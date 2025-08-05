@@ -1,6 +1,7 @@
 package com.beeny.client.gui;
 
 import com.beeny.data.VillagerData;
+import com.beeny.network.VillagerDataPacket;
 import com.beeny.network.VillagerTeleportPacket;
 import com.beeny.network.UpdateVillagerNotesPacket;
 import com.beeny.Villagersreborn;
@@ -525,9 +526,9 @@ public class EnhancedVillagerJournalScreen extends Screen {
         for (int i = 0; i < ENTRIES_PER_PAGE; i++) {
             ButtonWidget button = villagerButtons.get(i);
             if (i + scrollOffset < endIndex) {
-                VillagerData data = filteredVillagers.get(i + scrollOffset);
+                VillagerDataPacket data = filteredVillagers.get(i + scrollOffset);
                 
-                String name = VillagerNames.getVillagerName(villager);
+                String name = data.getName();
                 button.setMessage(Text.literal(name));
                 button.visible = true;
             } else {
@@ -589,7 +590,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     private void teleportToVillager() {
         if (selectedVillagerData != null && client != null && client.player != null) {
             // Send teleport packet using data from selectedVillagerData
-            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillagerData.getId()));
+            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillagerData.getId().hashCode()));
 
             client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_ENDERMAN_TELEPORT, 1.0f));
             close();
@@ -608,7 +609,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             
             
             
-            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillagerData.getId(), notes));
+            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillagerData.getId().hashCode(), notes));
             
             
             if (selectedVillagerData != null) {

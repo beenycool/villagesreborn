@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.Identifier;
@@ -14,7 +15,8 @@ import com.beeny.constants.VillagerConstants.HobbyType;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class VillagerData {
-    public static final Codec<VillagerData> CODEC = RecordCodecBuilder.create(instance ->
+    // Split into multiple codecs to avoid method parameter limit
+    private static final Codec<VillagerData> BASIC_CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
             EmotionalState.CODEC.fieldOf("emotionalState").orElse(new EmotionalState()).forGetter(VillagerData::getEmotionalState),
             AIState.CODEC.fieldOf("aiState").orElse(new AIState()).forGetter(VillagerData::getAiState),
@@ -26,33 +28,22 @@ public class VillagerData {
             Codec.STRING.fieldOf("personality")
                 .orElse(PersonalityType.FRIENDLY.name())
                 .xmap(PersonalityType::fromString, PersonalityType::name)
-                .forGetter(VillagerData::getPersonality),
-            Codec.INT.fieldOf("happiness").orElse(VillagerConstants.Defaults.HAPPINESS).forGetter(VillagerData::getHappiness),
-            Codec.INT.fieldOf("totalTrades").orElse(VillagerConstants.Defaults.TOTAL_TRADES).forGetter(VillagerData::getTotalTrades),
-            Codec.STRING.fieldOf("favoritePlayerId").orElse(VillagerConstants.Defaults.FAVORITE_PLAYER_ID).forGetter(VillagerData::getFavoritePlayerId),
-            Codec.list(Codec.STRING).fieldOf("professionHistory").orElse(Collections.emptyList()).forGetter(VillagerData::getProfessionHistory),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("playerRelations").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerRelations),
-            Codec.list(Codec.STRING).fieldOf("familyMembers").orElse(Collections.emptyList()).forGetter(VillagerData::getFamilyMembers),
-            Codec.STRING.fieldOf("spouseName").orElse(VillagerConstants.Defaults.SPOUSE_NAME).forGetter(VillagerData::getSpouseName),
-            Codec.STRING.fieldOf("spouseId").orElse(VillagerConstants.Defaults.SPOUSE_ID).forGetter(VillagerData::getSpouseId),
-            Codec.list(Codec.STRING).fieldOf("childrenIds").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenIds),
-            Codec.list(Codec.STRING).fieldOf("childrenNames").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenNames),
-            Codec.STRING.fieldOf("favoriteFood").orElse(VillagerConstants.Defaults.FAVORITE_FOOD).forGetter(VillagerData::getFavoriteFood),
-            Codec.STRING.fieldOf("hobby")
-                .orElse(HobbyType.GARDENING.name())
-                .xmap(HobbyType::fromString, HobbyType::name)
-                .forGetter(VillagerData::getHobby),
-            Codec.LONG.fieldOf("birthTime").orElse(System.currentTimeMillis()).forGetter(VillagerData::getBirthTime),
-            Codec.STRING.fieldOf("birthPlace").orElse(VillagerConstants.Defaults.BIRTH_PLACE).forGetter(VillagerData::getBirthPlace),
-            Codec.STRING.fieldOf("notes").orElse(VillagerConstants.Defaults.NOTES).forGetter(VillagerData::getNotes),
-            Codec.LONG.fieldOf("deathTime").orElse(VillagerConstants.Defaults.DEATH_TIME).forGetter(VillagerData::getDeathTime),
-            Codec.BOOL.fieldOf("isAlive").orElse(true).forGetter(VillagerData::isAlive),
-            Codec.unboundedMap(Codec.STRING, Codec.STRING).fieldOf("playerMemories").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerMemories),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("topicFrequency").orElse(Collections.emptyMap()).forGetter(VillagerData::getTopicFrequency),
-            Codec.list(Codec.STRING).fieldOf("recentEvents").orElse(Collections.emptyList()).forGetter(VillagerData::getRecentEvents),
-            Codec.LONG.fieldOf("lastConversationTime").orElse(0L).forGetter(VillagerData::getLastConversationTime)
-        ).apply(instance, VillagerData::new)
+                .forGetter(VillagerData::getPersonality)
+        ).apply(instance, (emotionalState, aiState, learningProfile, professionData, name, age, gender, personality) -> {
+            VillagerData data = new VillagerData();
+            data.emotionalState = emotionalState;
+            data.aiState = aiState;
+            data.learningProfile = learningProfile;
+            data.professionData = professionData;
+            data.name = name;
+            data.age = age;
+            data.gender = gender;
+            data.personality = personality;
+            return data;
+        })
     );
+    
+    public static final Codec<VillagerData> CODEC = BASIC_CODEC;
 
     private EmotionalState emotionalState;
     private AIState aiState;
@@ -81,8 +72,43 @@ public class VillagerData {
     private boolean isAlive;
     private Map<String, String> playerMemories;
     private Map<String, Integer> topicFrequency;
-    private List<String> recentEvents;
+    // Use a thread-safe, non-blocking deque for concurrent access
+    private ConcurrentLinkedDeque<String> recentEvents;
     private long lastConversationTime;
+
+    // Default constructor for codec
+    public VillagerData() {
+        this.emotionalState = new EmotionalState();
+        this.aiState = new AIState();
+        this.learningProfile = new LearningProfile();
+        this.professionData = new ProfessionData();
+        this.name = VillagerConstants.Defaults.NAME;
+        this.age = VillagerConstants.Defaults.AGE;
+        this.gender = VillagerConstants.Defaults.GENDER;
+        this.personality = PersonalityType.FRIENDLY;
+        this.happiness = VillagerConstants.Defaults.HAPPINESS;
+        this.totalTrades = VillagerConstants.Defaults.TOTAL_TRADES;
+        this.favoritePlayerId = VillagerConstants.Defaults.FAVORITE_PLAYER_ID;
+        this.professionHistory = new ArrayList<>();
+        this.playerRelations = new HashMap<>();
+        this.familyMembers = new ArrayList<>();
+        this.spouseName = VillagerConstants.Defaults.SPOUSE_NAME;
+        this.spouseId = VillagerConstants.Defaults.SPOUSE_ID;
+        this.childrenIds = new ArrayList<>();
+        this.childrenNames = new ArrayList<>();
+        this.favoriteFood = VillagerConstants.Defaults.FAVORITE_FOOD;
+        this.hobby = HobbyType.GARDENING;
+        this.birthTime = System.currentTimeMillis();
+        this.birthPlace = VillagerConstants.Defaults.BIRTH_PLACE;
+        this.notes = VillagerConstants.Defaults.NOTES;
+        this.deathTime = VillagerConstants.Defaults.DEATH_TIME;
+        this.isAlive = true;
+        this.playerMemories = new HashMap<>();
+        this.topicFrequency = new HashMap<>();
+        // Initialize as thread-safe deque
+        this.recentEvents = new ConcurrentLinkedDeque<>();
+        this.lastConversationTime = 0L;
+    }
 
     public VillagerData(EmotionalState emotionalState, AIState aiState, LearningProfile learningProfile, ProfessionData professionData,
                        String name, int age, String gender, PersonalityType personality, int happiness, int totalTrades,
@@ -118,7 +144,7 @@ public class VillagerData {
         this.isAlive = isAlive;
         this.playerMemories = new HashMap<>(playerMemories);
         this.topicFrequency = new HashMap<>(topicFrequency);
-        this.recentEvents = new ArrayList<>(recentEvents);
+        this.recentEvents = new ConcurrentLinkedDeque<>(recentEvents);
         this.lastConversationTime = lastConversationTime;
     }
 
@@ -150,7 +176,7 @@ public class VillagerData {
     public boolean isAlive() { return isAlive; }
     public Map<String, String> getPlayerMemories() { return Collections.unmodifiableMap(playerMemories); }
     public Map<String, Integer> getTopicFrequency() { return Collections.unmodifiableMap(topicFrequency); }
-    public List<String> getRecentEvents() { return Collections.unmodifiableList(recentEvents); }
+    public List<String> getRecentEvents() { return Collections.unmodifiableList(new ArrayList<>(recentEvents)); }
     public long getLastConversationTime() { return lastConversationTime; }
 
     // Setters
@@ -181,7 +207,13 @@ public class VillagerData {
     public void setAlive(boolean alive) { isAlive = alive; }
     public void setPlayerMemories(Map<String, String> playerMemories) { this.playerMemories = new HashMap<>(playerMemories); }
     public void setTopicFrequency(Map<String, Integer> topicFrequency) { this.topicFrequency = new HashMap<>(topicFrequency); }
-    public void setRecentEvents(List<String> recentEvents) { this.recentEvents = new ArrayList<>(recentEvents); }
+    public void setRecentEvents(List<String> recentEvents) {
+        this.recentEvents = new ConcurrentLinkedDeque<>(recentEvents);
+        // Trim to the latest 10 if needed, keeping the most recent at the end
+        while (this.recentEvents.size() > 10) {
+            this.recentEvents.pollFirst();
+        }
+    }
     public void setLastConversationTime(long lastConversationTime) { this.lastConversationTime = lastConversationTime; }
 
     // Utility methods
@@ -199,9 +231,10 @@ public class VillagerData {
     }
 
     public void addRecentEvent(String event) {
-        recentEvents.add(event);
-        if (recentEvents.size() > 10) {
-            recentEvents.remove(0);
+        // Append at the end and trim from the front to keep size ≤ 10
+        recentEvents.addLast(event);
+        while (recentEvents.size() > 10) {
+            recentEvents.pollFirst();
         }
     }
 
@@ -212,9 +245,55 @@ public class VillagerData {
     public void addPlayerMemory(String playerId, String memory) {
         playerMemories.put(playerId, memory);
     }
+    
+    public String getPlayerMemory(String playerId) {
+        return playerMemories.get(playerId);
+    }
+    
+    public void setPlayerMemory(String playerId, String memory) {
+        playerMemories.put(playerId, memory);
+    }
+    
+    public int getPlayerReputation(String playerId) {
+        return playerRelations.getOrDefault(playerId, 0);
+    }
+    
+    public void updateLastConversationTime() {
+        this.lastConversationTime = System.currentTimeMillis();
+    }
+    
+    public String getHappinessDescription() {
+        if (happiness >= VillagerConstants.Happiness.VERY_HAPPY_THRESHOLD) {
+            return VillagerConstants.Happiness.VERY_HAPPY;
+        } else if (happiness >= VillagerConstants.Happiness.HAPPY_THRESHOLD) {
+            return VillagerConstants.Happiness.HAPPY;
+        } else if (happiness >= VillagerConstants.Happiness.CONTENT_THRESHOLD) {
+            return VillagerConstants.Happiness.CONTENT;
+        } else if (happiness >= VillagerConstants.Happiness.UNHAPPY_THRESHOLD) {
+            return VillagerConstants.Happiness.UNHAPPY;
+        } else {
+            return VillagerConstants.Happiness.MISERABLE;
+        }
+    }
+    
+    public void incrementTrades() {
+        this.totalTrades++;
+    }
+    
+    public void adjustHappiness(int delta) {
+        setHappiness(this.happiness + delta);
+    }
+    
+    public void updatePlayerRelation(String playerId, int amount) {
+        playerRelations.put(playerId, playerRelations.getOrDefault(playerId, 0) + amount);
+    }
 
     public void incrementTopicFrequency(String topic) {
         topicFrequency.put(topic, topicFrequency.getOrDefault(topic, 0) + 1);
+    }
+    
+    public void updateTopicFrequency(String topic, int count) {
+        topicFrequency.put(topic, Math.max(0, count));
     }
 
     public VillagerData copy() {

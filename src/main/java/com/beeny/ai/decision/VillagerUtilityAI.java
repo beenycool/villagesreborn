@@ -4,6 +4,7 @@ import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.system.VillagerRelationshipManager;
+import com.beeny.constants.VillagerConstants.PersonalityType;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 
@@ -30,12 +31,12 @@ public class VillagerUtilityAI {
         try (InputStream is = VillagerUtilityAI.class.getClassLoader()
                 .getResourceAsStream("personality_compatibility.json")) {
             if (is == null) {
-                LOGGER.severe("personality_compatibility.json not found in resources.");
+                LOGGER.severe("[SEVERE] [VillagerUtilityAI] [static] - personality_compatibility.json not found in resources.");
             } else {
             Map<String, Object> config = mapper.readValue(is, new TypeReference<Map<String, Object>>() {});
             // Validate structure
             if (!config.containsKey("high") || !(config.get("high") instanceof Map)) {
-                LOGGER.severe("Missing or invalid 'high' key in personality_compatibility.json");
+                LOGGER.severe("[SEVERE] [VillagerUtilityAI] [static] - Missing or invalid 'high' key in personality_compatibility.json");
             } else {
                 // Parse high compatibility
                 Map<String, List<String>> high = (Map<String, List<String>>) config.get("high");
@@ -167,8 +168,8 @@ public class VillagerUtilityAI {
             
             if (villagerData == null || partnerData == null) return 0.0f;
             
-            String personality1 = villagerData.getPersonality();
-            String personality2 = partnerData.getPersonality();
+            String personality1 = villagerData.getPersonality().name();
+            String personality2 = partnerData.getPersonality().name();
 
             if (personality1 == null || personality2 == null) {
                 return 0.0f; // No compatibility if either personality is missing
@@ -339,9 +340,9 @@ public class VillagerUtilityAI {
             
             // Threshold varies by personality
             return switch (data.getPersonality()) {
-                case "Shy", "Nervous" -> 0.8f; // Higher threshold - more cautious
-                case "Confident", "Energetic" -> 0.5f; // Lower threshold - more willing
-                case "Serious" -> 0.9f; // Very high threshold - very selective
+                case SHY, NERVOUS -> 0.8f; // Higher threshold - more cautious
+                case CONFIDENT, ENERGETIC -> 0.5f; // Lower threshold - more willing
+                case SERIOUS -> 0.9f; // Very high threshold - very selective
                 default -> 0.7f;
             };
         }
@@ -423,9 +424,9 @@ public class VillagerUtilityAI {
             
             // Personality affects migration tendency
             migrationScore *= switch (data.getPersonality()) {
-                case "Energetic", "Curious" -> 1.5f; // More likely to seek change
-                case "Shy", "Nervous" -> 0.5f; // Less likely to leave comfort zone
-                case "Grumpy" -> 1.2f; // Might leave if dissatisfied
+                case ENERGETIC, CURIOUS -> 1.5f; // More likely to seek change
+                case SHY, NERVOUS -> 0.5f; // Less likely to leave comfort zone
+                case GRUMPY -> 1.2f; // Might leave if dissatisfied
                 default -> 1.0f;
             };
             
@@ -449,10 +450,11 @@ public class VillagerUtilityAI {
             float reputationModifier = 1.0f + (reputation / 200.0f); // -0.5 to +0.5
             
             // Adjust based on personality
-            float personalityModifier = switch (data.getPersonality()) {
-                case "Friendly", "Cheerful" -> 0.9f; // More generous
-                case "Grumpy" -> 1.2f; // Wants better deals
-                case "Shy" -> 1.1f; // Slightly more cautious
+            PersonalityType personality = data.getPersonality();
+            float personalityModifier = switch (personality) {
+                case FRIENDLY, CHEERFUL -> 0.9f; // More generous
+                case GRUMPY -> 1.2f; // Wants better deals
+                case SHY -> 1.1f; // Slightly more cautious
                 default -> 1.0f;
             };
             
@@ -494,11 +496,12 @@ public class VillagerUtilityAI {
             float trust = (personalTrust * 0.7f) + (globalTrust * 0.3f);
             
             // Personality adjustments
-            trust *= switch (data.getPersonality()) {
-                case "Friendly", "Cheerful" -> 1.2f; // More trusting
-                case "Nervous", "Shy" -> 0.8f; // Less trusting
-                case "Grumpy" -> 0.9f; // Somewhat skeptical
-                case "Confident" -> 1.1f; // Moderately trusting
+            PersonalityType trustPersonality = data.getPersonality();
+            trust *= switch (trustPersonality) {
+                case FRIENDLY, CHEERFUL -> 1.2f; // More trusting
+                case NERVOUS, SHY -> 0.8f; // Less trusting
+                case GRUMPY -> 0.9f; // Somewhat skeptical
+                case CONFIDENT -> 1.1f; // Moderately trusting
                 default -> 1.0f;
             };
             

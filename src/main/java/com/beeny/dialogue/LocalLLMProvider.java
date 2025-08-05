@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LocalLLMProvider now conforms to BaseLLMProvider's template method:
@@ -31,7 +33,7 @@ public class LocalLLMProvider extends BaseLLMProvider {
     }
 
     @Override
-    protected Request buildRequest(DialogueRequest request) {
+    protected @NotNull Request buildRequest(@NotNull DialogueRequest request) {
         // Build contextual prompt via shared builder
         String prompt = DialoguePromptBuilder.buildContextualPrompt(
             request.context,
@@ -60,7 +62,7 @@ public class LocalLLMProvider extends BaseLLMProvider {
     }
 
     @Override
-    protected String parseResponse(String responseBody) {
+    protected @NotNull String parseResponse(@NotNull String responseBody) {
         JsonObject responseJson = new Gson().fromJson(responseBody, JsonObject.class);
 
         // Try common llama.cpp compatible shapes
@@ -79,7 +81,7 @@ public class LocalLLMProvider extends BaseLLMProvider {
         throw new IllegalStateException("Unexpected response format from local LLM");
     }
 
-    private String cleanResponse(String s) {
+    private @NotNull String cleanResponse(@Nullable String s) {
         if (s == null) return "";
         s = s.trim();
         if (s.startsWith("\"") && s.endsWith("\"") && s.length() >= 2) s = s.substring(1, s.length() - 1);

@@ -1,5 +1,6 @@
 package com.beeny.network;
 
+import com.beeny.constants.StringConstants;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
@@ -14,7 +15,7 @@ import net.minecraft.util.Identifier;
  */
 public record TestLLMConnectionPacket() implements CustomPayload {
     public static final Id<TestLLMConnectionPacket> ID = new Id<>(
-        Identifier.of("villagersreborn", "test_llm_connection"));
+        Identifier.of(StringConstants.MOD_ID, StringConstants.CH_TEST_LLM_CONNECTION));
 
     public static final PacketCodec<RegistryByteBuf, TestLLMConnectionPacket> CODEC = PacketCodec.of(
         (value, buf) -> {

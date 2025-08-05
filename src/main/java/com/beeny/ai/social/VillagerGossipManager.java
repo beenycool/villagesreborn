@@ -11,6 +11,9 @@ import net.minecraft.util.Formatting;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Instance-based gossip and reputation network where villagers share information and opinions
@@ -54,7 +57,7 @@ public class VillagerGossipManager {
         public final Set<String> knownBy; // UUIDs of villagers who know this gossip
         public float credibility; // 0.0 to 1.0, decreases over time and with retellings
         
-        public GossipPiece(String subject, String gossiper, GossipType type, String details) {
+        public GossipPiece(@NotNull String subject, @NotNull String gossiper, @NotNull GossipType type, @NotNull String details) {
             this.subject = subject;
             this.gossiper = gossiper;
             this.type = type;
@@ -69,7 +72,7 @@ public class VillagerGossipManager {
             return (System.currentTimeMillis() - timestamp) < 600000; // 10 minutes
         }
         
-        public void spreadTo(String villagerUuid) {
+        public void spreadTo(@NotNull String villagerUuid) {
             knownBy.add(villagerUuid);
             // Credibility decreases slightly with each retelling
             credibility *= 0.95f;
@@ -84,21 +87,21 @@ public class VillagerGossipManager {
     private final Map<String, List<GossipPiece>> villageGossip = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Integer>> globalReputation = new ConcurrentHashMap<>();
     
-    public VillagerGossipManager(AIWorldManager worldManager) {
+    public VillagerGossipManager(@NotNull AIWorldManager worldManager) {
         this.worldManager = worldManager;
     }
     
     /**
      * Create and spread a new piece of gossip
      */
-    public void createGossip(VillagerEntity gossiper, String subject, GossipType type, String details) {
+    public void createGossip(@Nullable VillagerEntity gossiper, @Nullable String subject, @NotNull GossipType type, @NotNull String details) {
         if (gossiper == null || subject == null) return;
         
         String villageName = getVillageName(gossiper);
         GossipPiece gossip = new GossipPiece(subject, gossiper.getUuidAsString(), type, details);
         
         // Add to village gossip
-        villageGossip.computeIfAbsent(villageName, k -> new ArrayList<>()).add(gossip);
+        villageGossip.computeIfAbsent(villageName, k -> new CopyOnWriteArrayList<>()).add(gossip);
         
         // Update the gossiper's emotional state
         worldManager.processVillagerEmotionalEvent(gossiper, 
@@ -116,7 +119,7 @@ public class VillagerGossipManager {
     /**
      * Spread gossip to nearby villagers based on personality and relationships
      */
-    private void spreadGossip(VillagerEntity spreader, GossipPiece gossip) {
+    private void spreadGossip(@NotNull VillagerEntity spreader, @NotNull GossipPiece gossip) {
         List<VillagerEntity> nearbyVillagers = spreader.getWorld().getEntitiesByClass(
             VillagerEntity.class,
             spreader.getBoundingBox().expand(15.0),
@@ -132,7 +135,7 @@ public class VillagerGossipManager {
             
             // Calculate spread probability
             float baseChance = gossip.type.spreadChance;
-            float personalityModifier = getGossipPersonalityModifier(spreaderData.getPersonality());
+            float personalityModifier = getGossipPersonalityModifier(spreaderData.getPersonality().name());
             float relationshipModifier = getRelationshipModifier(spreaderData, listenerData);
             float listenerInterestModifier = getListenerInterest(listenerData, gossip);
             
@@ -156,7 +159,8 @@ public class VillagerGossipManager {
         }
     }
     
-    private float getGossipPersonalityModifier(String personality) {
+    private float getGossipPersonalityModifier(@Nullable String personality) {
+        if (personality == null) return 1.0f;
         return switch (personality) {
             case "Friendly", "Cheerful" -> 1.4f; // Love to gossip
             case "Curious" -> 1.6f; // Very interested in information
@@ -167,7 +171,7 @@ public class VillagerGossipManager {
         };
     }
     
-    private float getRelationshipModifier(VillagerData spreader, VillagerData listener) {
+    private float getRelationshipModifier(@NotNull VillagerData spreader, @NotNull VillagerData listener) {
         // Check if they're family
         if (spreader.getFamilyMembers().contains(listener.getName()) ||
             listener.getFamilyMembers().contains(spreader.getName())) {
@@ -183,7 +187,7 @@ public class VillagerGossipManager {
         return 1.0f;
     }
     
-    private float getListenerInterest(VillagerData listener, GossipPiece gossip) {
+    private float getListenerInterest(@NotNull VillagerData listener, @NotNull GossipPiece gossip) {
         // More interested in gossip about players they know
         int playerReputation = listener.getPlayerReputation(gossip.subject);
         if (Math.abs(playerReputation) > 20) {
@@ -191,16 +195,17 @@ public class VillagerGossipManager {
         }
         
         // Personality affects interest
-        return switch (listener.getPersonality()) {
-            case "Curious" -> 1.5f;
-            case "Friendly", "Cheerful" -> 1.2f;
-            case "Grumpy" -> gossip.type.reputationImpact < 0 ? 1.4f : 0.8f; // Prefers negative gossip
-            case "Shy" -> 0.7f;
+        return switch (listener.getPersonality().name()) {
+            case "CURIOUS" -> 1.5f;
+            case "FRIENDLY", "CHEERFUL" -> 1.2f;
+            case "GRUMPY" -> gossip.type.reputationImpact < 0 ? 1.4f : 0.8f; // Prefers negative gossip
+            case "SHY" -> 0.7f;
             default -> 1.0f;
         };
     }
     
-    private VillagerEmotionSystem.EmotionType getGossipEmotionalReaction(GossipType gossipType) {
+    @Nullable
+    private VillagerEmotionSystem.EmotionType getGossipEmotionalReaction(@NotNull GossipType gossipType) {
         return switch (gossipType) {
             case POSITIVE_INTERACTION, ACHIEVEMENT, KINDNESS -> VillagerEmotionSystem.EmotionType.HAPPINESS;
             case NEGATIVE_INTERACTION, AGGRESSION, TRADE_EXPLOIT -> VillagerEmotionSystem.EmotionType.ANGER;
@@ -214,26 +219,29 @@ public class VillagerGossipManager {
     /**
      * Update global reputation that affects all villagers' opinions
      */
-    private void updateGlobalReputation(String playerUuid, int change) {
+    private void updateGlobalReputation(@NotNull String playerUuid, int change) {
         Map<String, Integer> playerRep = globalReputation.computeIfAbsent(playerUuid, k -> new ConcurrentHashMap<>());
-        playerRep.put("global", playerRep.getOrDefault("global", 0) + change);
-        
-        // Clamp between -200 and 200
-        int newRep = Math.max(-200, Math.min(200, playerRep.get("global")));
-        playerRep.put("global", newRep);
+        // Atomically update and clamp the "global" reputation to [-200, 200]
+        playerRep.merge("global", change, (oldVal, delta) -> {
+            int updated = oldVal + delta;
+            if (updated > 200) return 200;
+            if (updated < -200) return -200;
+            return updated;
+        });
     }
     
     /**
      * Get player's global reputation
      */
-    public int getGlobalReputation(String playerUuid) {
+    public int getGlobalReputation(@NotNull String playerUuid) {
         return globalReputation.getOrDefault(playerUuid, new HashMap<>()).getOrDefault("global", 0);
     }
     
     /**
      * Apply global reputation to a villager's opinion when they first meet a player
      */
-    public void applyGlobalReputation(VillagerEntity villager, PlayerEntity player) {
+    public void applyGlobalReputation(@Nullable VillagerEntity villager, @Nullable PlayerEntity player) {
+        if (villager == null || player == null) return;
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         if (data == null) return;
         
@@ -284,7 +292,7 @@ public class VillagerGossipManager {
         }
         
         VillagerData villagerData = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        String personality = villagerData != null ? villagerData.getPersonality() : "Friendly";
+        String personality = villagerData != null ? villagerData.getPersonality() != null ? villagerData.getPersonality().name() : "Friendly" : "Friendly";
         
         for (GossipPiece gossip : recentGossip) {
             String gossipText = formatGossipForPersonality(gossip, personality);
@@ -310,26 +318,52 @@ public class VillagerGossipManager {
         
         // Modify based on personality
         return switch (personality) {
-            case "Grumpy" -> baseText.replace("excellent", "decent").replace("remarkable", "noteworthy");
-            case "Shy" -> "*whispers* " + baseText.toLowerCase();
-            case "Energetic" -> baseText.replace(".", "!").toUpperCase();
-            case "Curious" -> "Did you know? " + baseText;
+            case "GRUMPY" -> baseText.replace("excellent", "decent").replace("remarkable", "noteworthy");
+            case "SHY" -> "*whispers* " + baseText.toLowerCase();
+            case "ENERGETIC" -> baseText.replace(".", "!").toUpperCase();
+            case "CURIOUS" -> "Did you know? " + baseText;
             default -> baseText;
         };
     }
     
     /**
      * Cleanup old gossip to prevent memory leaks
+     *
+     * Thread-safety:
+     * - villageGossip is a ConcurrentHashMap
+     * - GossipPiece.knownBy is a concurrent set
+     * - The per-village lists may be ArrayList (non-thread-safe), so we use synchronized blocks
+     *   around mutations/removals and use removeIf guarded by synchronization.
      */
     public void cleanupOldGossip() {
         long cutoffTime = System.currentTimeMillis() - 3600000; // 1 hour
-        
-        for (List<GossipPiece> gossipList : villageGossip.values()) {
-            gossipList.removeIf(g -> g.timestamp < cutoffTime);
+
+        // First, clean individual village lists
+        for (Map.Entry<String, List<GossipPiece>> entry : villageGossip.entrySet()) {
+            List<GossipPiece> gossipList = entry.getValue();
+            if (gossipList == null) continue;
+
+            // Synchronize on the list instance to avoid concurrent modification while iterating/removing
+            synchronized (gossipList) {
+                // Use iterator-based removal to be safe with non-concurrent lists
+                Iterator<GossipPiece> it = gossipList.iterator();
+                while (it.hasNext()) {
+                    GossipPiece g = it.next();
+                    if (g.timestamp < cutoffTime) {
+                        it.remove();
+                    }
+                }
+            }
         }
-        
-        // Remove empty village entries
-        villageGossip.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+
+        // Then, remove empty village entries atomically on the concurrent map
+        villageGossip.entrySet().removeIf(entry -> {
+            List<GossipPiece> list = entry.getValue();
+            if (list == null) return true;
+            synchronized (list) {
+                return list.isEmpty();
+            }
+        });
     }
     
     /**

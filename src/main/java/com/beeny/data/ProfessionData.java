@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ProfessionData {
     public static final Codec<ProfessionData> CODEC = RecordCodecBuilder.create(instance ->
@@ -32,13 +33,14 @@ public class ProfessionData {
         this.professionLevel = professionLevel;
         this.experience = experience;
         this.experienceToNextLevel = experienceToNextLevel;
-        this.professionStats = new HashMap<>(professionStats);
+        // Backing map should be concurrent to make merge atomic under contention
+        this.professionStats = new ConcurrentHashMap<>(professionStats);
         this.efficiency = efficiency;
         this.quality = quality;
     }
 
     public ProfessionData() {
-        this("UNEMPLOYED", 1, 0, 100, new HashMap<>(), 1.0f, 1.0f);
+        this("UNEMPLOYED", 1, 0, 100, new ConcurrentHashMap<>(), 1.0f, 1.0f);
     }
 
     public String getCurrentProfession() {
@@ -96,7 +98,8 @@ public class ProfessionData {
     }
 
     public void incrementStat(String stat) {
-        professionStats.put(stat, professionStats.getOrDefault(stat, 0) + 1);
+        // Use atomic merge to avoid lost updates under concurrent access
+        professionStats.merge(stat, 1, Integer::sum);
     }
 
     public int getStat(String stat) {

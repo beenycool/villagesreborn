@@ -2,6 +2,8 @@ package com.beeny.client.gui;
 
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.dialogue.LLMDialogueManager;
+import com.beeny.network.TestLLMConnectionPacket;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -38,7 +40,7 @@ public class DialogueConfigScreen extends Screen {
     private Formatting statusColor = Formatting.WHITE;
     
     public DialogueConfigScreen(Screen parent) {
-        super(Text.literal("Dynamic Dialogue Configuration"));
+        super(Text.literal(com.beeny.constants.StringConstants.UI_DIALOGUE_SETUP_TITLE));
         this.parent = parent;
     }
     
@@ -62,7 +64,7 @@ public class DialogueConfigScreen extends Screen {
         this.tempApiKey = VillagersRebornConfig.LLM_API_KEY;
         this.tempEndpoint = VillagersRebornConfig.LLM_API_ENDPOINT;
         this.tempModel = VillagersRebornConfig.LLM_MODEL;
-        this.statusMessage = Text.literal("Configure your AI dialogue settings below");
+        this.statusMessage = Text.literal(com.beeny.constants.StringConstants.UI_CONFIGURE_AI_DIALOGUE);
         this.statusColor = Formatting.WHITE;
 
         int centerX = this.width / 2;
@@ -74,7 +76,7 @@ public class DialogueConfigScreen extends Screen {
         int currentY = panelTop + 40;
         
         // Enable/Disable toggle
-        this.enabledButton = CyclingButtonWidget.<Boolean>builder(enabled -> enabled ? Text.literal("Dynamic Dialogue: Enabled") : Text.literal("Dynamic Dialogue: Disabled"))
+        this.enabledButton = CyclingButtonWidget.<Boolean>builder(enabled -> enabled ? Text.literal(com.beeny.constants.StringConstants.UI_DYNAMIC_ENABLED) : Text.literal(com.beeny.constants.StringConstants.UI_DYNAMIC_DISABLED))
             .values(true, false)
             .initially(tempEnabled)
             .build(panelLeft + 20, currentY, 240, 20, Text.literal("Dynamic Dialogue"),
@@ -94,8 +96,8 @@ public class DialogueConfigScreen extends Screen {
         
         // Provider selection
         // Add "local" provider for local LLM integration
-        List<String> providers = Arrays.asList("gemini", "openrouter", "local");
-        this.providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal("Provider: " + value.toUpperCase()))
+        List<String> providers = Arrays.asList(com.beeny.constants.StringConstants.PROVIDER_GEMINI_ID, com.beeny.constants.StringConstants.PROVIDER_OPENROUTER_ID, com.beeny.constants.StringConstants.PROVIDER_LOCAL_ID);
+        this.providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal(com.beeny.constants.StringConstants.UI_PROVIDER_LABEL_FN + value.toUpperCase()))
             .values(providers)
             .initially(tempProvider)
             .build(panelLeft + 20, currentY, 200, 20, Text.literal("LLM Provider"),
@@ -108,9 +110,9 @@ public class DialogueConfigScreen extends Screen {
         currentY += 30;
         
         // API Key field
-        this.addDrawableChild(createLabel(panelLeft + 20, currentY, "API Key:"));
+        this.addDrawableChild(createLabel(panelLeft + 20, currentY, com.beeny.constants.StringConstants.UI_API_KEY));
         currentY += 15;
-        this.apiKeyField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 300, 20, Text.literal("API Key"));
+        this.apiKeyField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 300, 20, Text.literal(com.beeny.constants.StringConstants.UI_API_KEY));
         this.apiKeyField.setText(tempApiKey);
         this.apiKeyField.setMaxLength(200);
         this.addDrawableChild(apiKeyField);
@@ -118,36 +120,36 @@ public class DialogueConfigScreen extends Screen {
         currentY += 30;
         
         // Model field
-        this.addDrawableChild(createLabel(panelLeft + 20, currentY, "Model:"));
+        this.addDrawableChild(createLabel(panelLeft + 20, currentY, com.beeny.constants.StringConstants.UI_MODEL + ":"));
         currentY += 15;
-        this.modelField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 200, 20, Text.literal("Model"));
+        this.modelField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 200, 20, Text.literal(com.beeny.constants.StringConstants.UI_MODEL));
         this.modelField.setText(tempModel);
         this.addDrawableChild(modelField);
         
         currentY += 30;
         
         // Advanced: Endpoint field (optional)
-        this.addDrawableChild(createLabel(panelLeft + 20, currentY, "Custom Endpoint (Optional):"));
+        this.addDrawableChild(createLabel(panelLeft + 20, currentY, com.beeny.constants.StringConstants.UI_ENDPOINT_OPTIONAL));
         currentY += 15;
-        this.endpointField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 300, 20, Text.literal("Endpoint"));
+        this.endpointField = new TextFieldWidget(this.textRenderer, panelLeft + 20, currentY, 300, 20, Text.literal(com.beeny.constants.StringConstants.UI_ENDPOINT_OPTIONAL));
         this.endpointField.setText(tempEndpoint);
         this.addDrawableChild(endpointField);
         
         currentY += 40;
         
         // Test connection button
-        this.testButton = ButtonWidget.builder(Text.literal("Test Connection"), button -> testConnection())
+        this.testButton = ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_TEST_CONNECTION), button -> testConnection())
             .dimensions(panelLeft + 20, currentY, 120, 20)
             .build();
         this.addDrawableChild(testButton);
         
         // Save and Cancel buttons
-        this.saveButton = ButtonWidget.builder(Text.literal("Save"), button -> saveAndClose())
+        this.saveButton = ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_SAVE), button -> saveAndClose())
             .dimensions(panelLeft + 200, currentY, 60, 20)
             .build();
         this.addDrawableChild(saveButton);
         
-        this.cancelButton = ButtonWidget.builder(Text.literal("Cancel"), button -> close())
+        this.cancelButton = ButtonWidget.builder(Text.literal(com.beeny.constants.StringConstants.UI_CANCEL), button -> close())
             .dimensions(panelLeft + 270, currentY, 60, 20)
             .build();
         this.addDrawableChild(cancelButton);
@@ -226,7 +228,7 @@ public class DialogueConfigScreen extends Screen {
     }
     
     private void testConnection() {
-        setStatusMessage(Text.literal("Testing connection..."), Formatting.YELLOW);
+        setStatusMessage(Text.literal(com.beeny.constants.StringConstants.UI_TESTING_CONNECTION), Formatting.YELLOW);
 
         // Send a simple connection test request to the server
         TestLLMConnectionPacket packet = new TestLLMConnectionPacket();
@@ -237,8 +239,8 @@ public class DialogueConfigScreen extends Screen {
     
     private void saveAndClose() {
         // Validate settings
-        if (tempEnabled && !tempProvider.equals("local") && apiKeyField.getText().trim().isEmpty()) {
-            setStatusMessage(Text.literal("API key is required for this provider when dynamic dialogue is enabled"), Formatting.RED);
+        if (tempEnabled && !tempProvider.equals(com.beeny.constants.StringConstants.PROVIDER_LOCAL_ID) && apiKeyField.getText().trim().isEmpty()) {
+            setStatusMessage(Text.literal(com.beeny.constants.StringConstants.UI_REQUIRE_API_KEY), Formatting.RED);
             return;
         }
         
@@ -282,9 +284,9 @@ public class DialogueConfigScreen extends Screen {
             // Optionally reload to verify persistence
             com.beeny.config.ConfigManager.loadConfig();
 
-            setStatusMessage(Text.literal("✓ Settings saved!"), Formatting.GREEN);
+            setStatusMessage(Text.literal(com.beeny.constants.StringConstants.UI_SETTINGS_SAVED), Formatting.GREEN);
         } catch (Exception e) {
-            setStatusMessage(Text.literal("✗ Failed to save settings: " + e.getMessage()), Formatting.RED);
+            setStatusMessage(Text.literal(com.beeny.constants.StringConstants.UI_SETTINGS_FAILED_PREFIX + e.getMessage()), Formatting.RED);
         }
     }
     
@@ -308,7 +310,7 @@ public class DialogueConfigScreen extends Screen {
         context.drawBorder(panelLeft, panelTop, PANEL_WIDTH, PANEL_HEIGHT, 0xFFFFFFFF);
         
         // Draw title
-        Text title = Text.literal("Dynamic Dialogue Setup").formatted(Formatting.BOLD);
+        Text title = Text.literal(com.beeny.constants.StringConstants.UI_DIALOGUE_SETUP_TITLE).formatted(Formatting.BOLD);
         int titleWidth = this.textRenderer.getWidth(title);
         context.drawText(this.textRenderer, title, centerX - titleWidth / 2, panelTop + 10, 0xFFFFFF, false);
         

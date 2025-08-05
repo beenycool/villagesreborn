@@ -1,39 +1,42 @@
 package com.beeny.dialogue;
 
 import com.beeny.config.VillagersRebornConfig;
+import com.beeny.constants.StringConstants;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class GeminiDialogueProvider extends BaseLLMProvider {
-    private static final String DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+    private static final String DEFAULT_ENDPOINT = StringConstants.DEFAULT_GEMINI_ENDPOINT;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     
     public GeminiDialogueProvider() {
         super(
-            System.getenv("VILLAGERS_REBORN_API_KEY"),
+            System.getenv(StringConstants.ENV_API_KEY),
             (VillagersRebornConfig.LLM_API_ENDPOINT == null || VillagersRebornConfig.LLM_API_ENDPOINT.isEmpty()) ? DEFAULT_ENDPOINT : VillagersRebornConfig.LLM_API_ENDPOINT,
-            (VillagersRebornConfig.LLM_MODEL == null || VillagersRebornConfig.LLM_MODEL.isEmpty()) ? "gemini-1.5-flash" : VillagersRebornConfig.LLM_MODEL
+            (VillagersRebornConfig.LLM_MODEL == null || VillagersRebornConfig.LLM_MODEL.isEmpty()) ? StringConstants.DEFAULT_GEMINI_MODEL : VillagersRebornConfig.LLM_MODEL
         );
     }
 
     public GeminiDialogueProvider(String apiKey, String endpoint, String model) {
         super(
-            apiKey != null ? apiKey : System.getenv("VILLAGERS_REBORN_API_KEY"),
+            apiKey != null ? apiKey : System.getenv(StringConstants.ENV_API_KEY),
             (endpoint == null || endpoint.isEmpty()) ? DEFAULT_ENDPOINT : endpoint,
-            (model == null || model.isEmpty()) ? "gemini-1.5-flash" : model
+            (model == null || model.isEmpty()) ? StringConstants.DEFAULT_GEMINI_MODEL : model
         );
     }
     
     @Override
     public String getProviderName() {
-        return "Gemini";
+        return StringConstants.PROVIDER_NAME_GEMINI;
     }
     
     @Override
-    protected Request buildRequest(DialogueRequest request) throws Exception {
+    protected @NotNull Request buildRequest(@NotNull DialogueRequest request) throws Exception {
         JsonObject requestBody = new JsonObject();
         
         // Build the contents array
@@ -88,7 +91,7 @@ public class GeminiDialogueProvider extends BaseLLMProvider {
     }
     
     @Override
-    protected String parseResponse(String responseBody) throws Exception {
+    protected @NotNull String parseResponse(@NotNull String responseBody) throws Exception {
         JsonObject response = gson.fromJson(responseBody, JsonObject.class);
         
         // Check for errors

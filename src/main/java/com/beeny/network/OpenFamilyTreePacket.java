@@ -1,5 +1,6 @@
 package com.beeny.network;
 
+import com.beeny.constants.StringConstants;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.RegistryByteBuf;
@@ -9,7 +10,7 @@ import net.minecraft.util.Identifier;
 
 public record OpenFamilyTreePacket(int villagerEntityId) implements CustomPayload {
     public static final Id<OpenFamilyTreePacket> ID = new Id<>(
-        Identifier.of("villagersreborn", "open_family_tree"));
+        Identifier.of(StringConstants.MOD_ID, StringConstants.CH_OPEN_FAMILY_TREE));
     
     public static final PacketCodec<RegistryByteBuf, OpenFamilyTreePacket> CODEC = PacketCodec.of(
         (value, buf) -> buf.writeInt(value.villagerEntityId),

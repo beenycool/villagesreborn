@@ -4,11 +4,15 @@ import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.system.VillagerScheduleManager;
+import com.beeny.system.ServerVillagerManager;
+import com.beeny.constants.VillagerConstants;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Goal-Oriented Action Planning (GOAP) system for intelligent villager behavior
@@ -196,7 +200,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -231,7 +235,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -294,7 +298,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -341,10 +345,10 @@ public class VillagerGOAP {
                 VillagerEntity target = nearby.get(villager.getWorld().getRandom().nextInt(nearby.size()));
                 
                 // Emotional effects of socializing
-                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
+                VillagerEmotionSystem.processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 10.0f, "socializing", false));
                 
-                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionManager().processEmotionalEvent(villager,
+                VillagerEmotionSystem.processEmotionalEvent(villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.LONELINESS, -15.0f, "socializing", false));
                 
                 state.setBool("has_socialized", true);
@@ -363,7 +367,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -422,7 +426,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -478,7 +482,7 @@ public class VillagerGOAP {
         
         private String getPersonality() {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? data.getPersonality() : "Friendly";
+            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -487,23 +491,32 @@ public class VillagerGOAP {
         public static List<Action> plan(WorldState currentState, Goal goal, List<Action> availableActions) {
             // A* search for action sequence
             PriorityQueue<Node> openSet = new PriorityQueue<>(Comparator.comparing(n -> n.fCost));
+            // closedSet prevents revisiting the same state, which is essential for cycle detection and infinite loop prevention.
             Set<String> closedSet = new HashSet<>();
             
             Node startNode = new Node(currentState, null, null, 0);
             openSet.add(startNode);
 
-            // Safeguard: iteration and time limits
-            final int MAX_ITERATIONS = 10000;
-            final long MAX_TIME_MS = 100; // 100 milliseconds
+            // Safeguard limits are now configurable via config
+            final int MAX_ITERATIONS = com.beeny.config.ConfigManager.getInt("goapMaxIterations", 1000);
+            final long MAX_TIME_MS = com.beeny.config.ConfigManager.getInt("goapMaxTimeMs", 25);
+            final int MAX_OPEN_SET_SIZE = com.beeny.config.ConfigManager.getInt("goapMaxOpenSetSize", 500);
             int iterations = 0;
             long startTime = System.currentTimeMillis();
             
             while (!openSet.isEmpty()) {
-                // Check iteration and time limits
+                // Check multiple safety limits
                 iterations++;
-                if (iterations > MAX_ITERATIONS || (System.currentTimeMillis() - startTime) > MAX_TIME_MS) {
-                    // Exceeded safe limits, abort search
-                    return new ArrayList<>();
+                if (iterations > MAX_ITERATIONS ||
+                    (System.currentTimeMillis() - startTime) > MAX_TIME_MS ||
+                    openSet.size() > MAX_OPEN_SET_SIZE) {
+                    com.beeny.Villagersreborn.LOGGER.warn(
+                        "GOAP planner aborted: iterations={}, timeMs={}, openSetSize={}. Limits: iter={}, timeMs={}, openSet={}",
+                        iterations, (System.currentTimeMillis() - startTime), openSet.size(),
+                        MAX_ITERATIONS, MAX_TIME_MS, MAX_OPEN_SET_SIZE
+                    );
+                    // Exceeded safe limits, abort search and return simple fallback
+                    return createFallbackPlan(currentState, goal, availableActions);
                 }
 
                 Node current = openSet.poll();
@@ -528,14 +541,15 @@ public class VillagerGOAP {
                         neighbor.fCost = newCost + heuristic;
                         
                         String neighborKey = generateStateKey(newState);
-                        if (!closedSet.contains(neighborKey)) {
+                        if (!closedSet.contains(neighborKey) && openSet.size() < MAX_OPEN_SET_SIZE) {
                             openSet.add(neighbor);
                         }
                     }
                 }
             }
             
-            return new ArrayList<>(); // No plan found
+            // No plan found, return fallback
+            return createFallbackPlan(currentState, goal, availableActions);
         }
         
         private static WorldState applyAction(WorldState currentState, Action action) {
@@ -582,6 +596,37 @@ public class VillagerGOAP {
             }
             
             return path;
+        }
+        
+        /**
+         * Creates a simple fallback plan when full planning fails
+         */
+        private static List<Action> createFallbackPlan(WorldState currentState, Goal goal, List<Action> availableActions) {
+            List<Action> fallbackPlan = new ArrayList<>();
+            
+            // Find any action that can be performed and might help with the goal
+            for (Action action : availableActions) {
+                if (action.canPerform(currentState)) {
+                    WorldState effects = action.getEffects(currentState);
+                    // Check if this action helps with any goal state
+                    for (String key : goal.desiredState.getKeys()) {
+                        if (effects.hasKey(key)) {
+                            fallbackPlan.add(action);
+                            return fallbackPlan; // Return single-action plan
+                        }
+                    }
+                }
+            }
+            
+            // If no helpful action found, just pick first available action
+            for (Action action : availableActions) {
+                if (action.canPerform(currentState)) {
+                    fallbackPlan.add(action);
+                    break;
+                }
+            }
+            
+            return fallbackPlan;
         }
     }
     
@@ -689,7 +734,7 @@ public class VillagerGOAP {
                 state.setInt("age", data.getAge());
                 state.setFloat("happiness", data.getHappiness());
                 state.setBool("has_spouse", !data.getSpouseId().isEmpty());
-                state.setString("personality", data.getPersonality());
+                state.setString("personality", VillagerConstants.PersonalityType.toString(data.getPersonality()));
                 
                 // Emotional state
                 state.setFloat("loneliness", emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS));

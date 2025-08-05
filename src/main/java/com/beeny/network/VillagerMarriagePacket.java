@@ -1,6 +1,7 @@
 package com.beeny.network;
 
 import com.beeny.system.VillagerRelationshipManager;
+import com.beeny.constants.StringConstants;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public record VillagerMarriagePacket(int villager1Id, int villager2Id) implements CustomPayload {
     public static final Id<VillagerMarriagePacket> ID = new Id<>(
-        Identifier.of("villagersreborn", "marriage"));
+        Identifier.of(StringConstants.MOD_ID, StringConstants.CH_MARRIAGE));
     
     // Rate limiting - track last time each player sent a marriage packet
     private static final Map<UUID, Long> lastMarriageAttempt = new ConcurrentHashMap<>();
@@ -52,7 +53,7 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 
                 if (lastAttempt != null && (currentTime - lastAttempt) < MARRIAGE_PACKET_COOLDOWN) {
                     long remainingTime = (MARRIAGE_PACKET_COOLDOWN - (currentTime - lastAttempt)) / 1000;
-                    player.sendMessage(Text.literal("Marriage request failed - please wait " + (remainingTime + 1) + " seconds before trying again")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_RATE_LIMIT_PREFIX + (remainingTime + 1) + StringConstants.MSG_MARRIAGE_RATE_LIMIT_SUFFIX)
                         .formatted(Formatting.RED), false);
                     return;
                 }
@@ -62,7 +63,7 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 
                 // Check if the same entity ID is used twice
                 if (payload.villager1Id() == payload.villager2Id()) {
-                    player.sendMessage(Text.literal("Marriage failed - cannot marry the same villager to themselves")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_SAME_VILLAGER)
                         .formatted(Formatting.RED), false);
                     return;
                 }
@@ -73,7 +74,7 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 
                 // Null checks for entities
                 if (entity1 == null || entity2 == null) {
-                    player.sendMessage(Text.literal("Marriage failed - one or both villagers not found")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_NOT_FOUND)
                         .formatted(Formatting.RED), false);
                     return;
                 }
@@ -81,7 +82,7 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 // Check if entities are villagers
                 if (!(entity1 instanceof VillagerEntity villager1) ||
                     !(entity2 instanceof VillagerEntity villager2)) {
-                    player.sendMessage(Text.literal("Marriage failed - selected entities are not villagers")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_NOT_VILLAGERS)
                         .formatted(Formatting.RED), false);
                     return;
                 }
@@ -92,17 +93,17 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 double maxInteractionDistance = 5.0; // Max distance for interaction
                 
                 if (distanceToVillager1 > maxInteractionDistance || distanceToVillager2 > maxInteractionDistance) {
-                    player.sendMessage(Text.literal("Marriage failed - you are too far from one or both villagers")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_TOO_FAR)
                         .formatted(Formatting.RED), false);
                     return;
                 }
                 
                 // Attempt marriage
                 if (VillagerRelationshipManager.attemptMarriage(villager1, villager2)) {
-                    player.sendMessage(Text.literal("Marriage successful!")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_SUCCESS)
                         .formatted(Formatting.GREEN), false);
                 } else {
-                    player.sendMessage(Text.literal("Marriage failed - conditions not met")
+                    player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_FAILED_CONDITIONS)
                         .formatted(Formatting.RED), false);
                 }
             });

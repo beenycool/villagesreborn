@@ -432,7 +432,7 @@ public class VillagerActivityCommands {
         context.getSource().sendFeedback(() -> Text.literal("Activity data exported to server log")
             .formatted(Formatting.GREEN), false);
 
-        LOGGER.info(export.toString());
+        LOGGER.info("[INFO] [VillagerActivityCommands] [exportActivityData] - {}", export);
 
         return 1;
     }

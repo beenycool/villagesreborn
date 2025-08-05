@@ -47,7 +47,7 @@ public class VillagerJournalItem extends Item {
         } else {
             user.sendMessage(Text.literal("§aFound " + villagers.size() + " villager(s) within " + SCAN_RADIUS + " blocks."), false);
             for (VillagerEntity villager : villagers) {
-                String name = villager.hasCustomName() ? villager.getCustomName().getString() : "Unnamed Villager";
+                String name = villager.hasCustomName() ? villager.getCustomName().getString() : com.beeny.constants.StringConstants.UNNAMED_VILLAGER;
                 BlockPos pos = villager.getBlockPos();
                 user.sendMessage(Text.literal("§7- " + name + " at [" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + "]"), false);
             }
