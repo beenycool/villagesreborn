@@ -2,6 +2,7 @@ package com.beeny.util;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.system.ServerVillagerManager;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -13,6 +14,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -24,6 +26,70 @@ public class VillagerUtils {
                     .expireAfterWrite(5, TimeUnit.SECONDS)
                     .concurrencyLevel(4)
                     .build();
+    
+    /**
+     * Get nearby villagers using ServerVillagerManager for optimal performance.
+     * This method leverages the tracked villager list instead of scanning world chunks.
+     */
+    public static List<VillagerEntity> getNearbyVillagersOptimized(VillagerEntity center, double range) {
+        if (center.getWorld().isClient) {
+            return List.of();
+        }
+        
+        String cacheKey = center.getUuidAsString() + "_opt_" + (int)range;
+        List<VillagerEntity> cached = nearbyCache.getIfPresent(cacheKey);
+        
+        if (cached != null) {
+            // Filter out dead villagers from cache
+            return cached.stream()
+                .filter(VillagerEntity::isAlive)
+                .filter(v -> v.getWorld() == center.getWorld()) // Ensure same world
+                .toList();
+        }
+        
+        // Use ServerVillagerManager's tracked villagers for efficient lookup
+        List<VillagerEntity> nearby = new ArrayList<>();
+        Vec3d centerPos = center.getPos();
+        double rangeSquared = range * range;
+        
+        try {
+            ServerVillagerManager manager = ServerVillagerManager.getInstance();
+            if (manager != null) {
+                // Get all tracked villagers and filter by distance
+                var trackedVillagers = manager.getAllTrackedVillagers();
+                for (VillagerEntity villager : trackedVillagers) {
+                    if (villager != center && 
+                        villager.isAlive() && 
+                        villager.getWorld() == center.getWorld()) {
+                        
+                        double distanceSquared = villager.getPos().squaredDistanceTo(centerPos);
+                        if (distanceSquared <= rangeSquared) {
+                            nearby.add(villager);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to world scan if ServerVillagerManager is not available
+            return getNearbyVillagersFallback(center, range);
+        }
+        
+        // Cache the result
+        nearbyCache.put(cacheKey, nearby);
+        
+        return nearby;
+    }
+    
+    /**
+     * Fallback method using world scan (less efficient, but guaranteed to work)
+     */
+    private static List<VillagerEntity> getNearbyVillagersFallback(VillagerEntity center, double range) {
+        return center.getWorld().getEntitiesByClass(
+            VillagerEntity.class,
+            BoundingBoxUtils.fromBlocks(center.getBlockPos(), center.getBlockPos()).expand(range),
+            v -> v != center && v.isAlive()
+        );
+    }
     
     /**
      * Get nearby villagers with caching to improve performance

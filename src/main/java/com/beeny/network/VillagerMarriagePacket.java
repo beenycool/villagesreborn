@@ -24,7 +24,10 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
     
     // Rate limiting - track last time each player sent a marriage packet
     private static final Map<UUID, Long> lastMarriageAttempt = new ConcurrentHashMap<>();
-    private static final long MARRIAGE_PACKET_COOLDOWN = 5000; // 5 seconds cooldown
+    
+    private static long getMarriageCooldown() {
+        return com.beeny.config.ConfigManager.getInt("marriagePacketCooldown", 5000);
+    }
     
     public static final PacketCodec<RegistryByteBuf, VillagerMarriagePacket> CODEC = PacketCodec.of(
         (value, buf) -> {
@@ -51,8 +54,8 @@ public record VillagerMarriagePacket(int villager1Id, int villager2Id) implement
                 long currentTime = System.currentTimeMillis();
                 Long lastAttempt = lastMarriageAttempt.get(playerUUID);
                 
-                if (lastAttempt != null && (currentTime - lastAttempt) < MARRIAGE_PACKET_COOLDOWN) {
-                    long remainingTime = (MARRIAGE_PACKET_COOLDOWN - (currentTime - lastAttempt)) / 1000;
+                if (lastAttempt != null && (currentTime - lastAttempt) < getMarriageCooldown()) {
+                    long remainingTime = (getMarriageCooldown() - (currentTime - lastAttempt)) / 1000;
                     player.sendMessage(Text.literal(StringConstants.MSG_MARRIAGE_RATE_LIMIT_PREFIX + (remainingTime + 1) + StringConstants.MSG_MARRIAGE_RATE_LIMIT_SUFFIX)
                         .formatted(Formatting.RED), false);
                     return;

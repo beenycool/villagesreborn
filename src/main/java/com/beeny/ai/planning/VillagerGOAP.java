@@ -1,11 +1,13 @@
 package com.beeny.ai.planning;
 
 import com.beeny.data.VillagerData;
+import com.beeny.ai.AIWorldManagerRefactored;
 import com.beeny.ai.core.VillagerEmotionSystem;
-import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
 import com.beeny.constants.VillagerConstants;
+import com.beeny.util.VillagerPersonalityUtils;
+import com.beeny.util.VillagerEmotionUtils;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.util.math.BlockPos;
 
@@ -189,18 +191,9 @@ public class VillagerGOAP {
         @Override
         public float calculateDynamicPriority(WorldState currentState) {
             float loneliness = currentState.getFloat("loneliness");
-            float personality_modifier = switch (getPersonality()) {
-                case "Friendly", "Cheerful" -> 1.5f;
-                case "Shy" -> 0.6f;
-                case "Grumpy" -> 0.7f;
-                default -> 1.0f;
-            };
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
+            float personality_modifier = VillagerPersonalityUtils.getSocialModifier(personality);
             return Math.max(0.1f, (loneliness / 50.0f)) * personality_modifier;
-        }
-        
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
         }
     }
     
@@ -224,19 +217,10 @@ public class VillagerGOAP {
         
         @Override
         public float calculateDynamicPriority(WorldState currentState) {
-            String personality = getPersonality();
-            float modifier = switch (personality) {
-                case "Energetic", "Serious" -> 1.3f;
-                case "Lazy" -> 0.5f;
-                default -> 1.0f;
-            };
-            return modifier;
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
+            return VillagerPersonalityUtils.getWorkModifier(personality);
         }
         
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
-        }
     }
     
     public static class FindLoveGoal extends Goal {
@@ -286,7 +270,7 @@ public class VillagerGOAP {
         
         @Override
         public float calculateDynamicPriority(WorldState currentState) {
-            String personality = getPersonality();
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
             float modifier = switch (personality) {
                 case "Curious" -> 2.0f;
                 case "Friendly", "Cheerful" -> 1.3f;
@@ -296,10 +280,6 @@ public class VillagerGOAP {
             return (currentState.getFloat("curiosity") / 100.0f) * modifier;
         }
         
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
-        }
     }
     
     // Specific Actions
@@ -323,13 +303,8 @@ public class VillagerGOAP {
         
         @Override
         public float getCost(WorldState state) {
-            String personality = getPersonality();
-            float modifier = switch (personality) {
-                case "Shy" -> 2.0f;
-                case "Friendly", "Cheerful" -> 0.5f;
-                default -> 1.0f;
-            };
-            return baseCost * modifier;
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
+            return baseCost * VillagerPersonalityUtils.getActionCostModifier(personality, "social");
         }
         
         @Override
@@ -345,11 +320,7 @@ public class VillagerGOAP {
                 VillagerEntity target = nearby.get(villager.getWorld().getRandom().nextInt(nearby.size()));
                 
                 // Emotional effects of socializing
-                VillagerEmotionSystem.processEmotionalEvent(villager,
-                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 10.0f, "socializing", false));
-                
-                VillagerEmotionSystem.processEmotionalEvent(villager,
-                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.LONELINESS, -15.0f, "socializing", false));
+                VillagerEmotionUtils.processSocializingEffects(villager);
                 
                 state.setBool("has_socialized", true);
                 state.setBool("has_socialized_today", true);
@@ -365,10 +336,6 @@ public class VillagerGOAP {
             return preconditions;
         }
         
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
-        }
     }
     
     public static class WorkAction extends Action {
@@ -393,26 +360,14 @@ public class VillagerGOAP {
         
         @Override
         public float getCost(WorldState state) {
-            String personality = getPersonality();
-            float modifier = switch (personality) {
-                case "Lazy" -> 3.0f;
-                case "Energetic", "Serious" -> 0.7f;
-                default -> 1.0f;
-            };
-            return baseCost * modifier;
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
+            return baseCost * VillagerPersonalityUtils.getActionCostModifier(personality, "work");
         }
         
         @Override
         public boolean execute(WorldState state) {
             // Simulate work and its effects
-            VillagerEmotionSystem.processEmotionalEvent(villager,
-                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.CONTENTMENT, 8.0f, "working", false));
-            
-            // Small chance of boredom from repetitive work
-            if (villager.getWorld().getRandom().nextFloat() < 0.2f) {
-                VillagerEmotionSystem.processEmotionalEvent(villager,
-                    VillagerEmotionSystem.EmotionalEvent.REPETITIVE_TASK);
-            }
+            VillagerEmotionUtils.processWorkingEffects(villager);
             
             state.setBool("has_worked", true);
             state.setBool("has_worked_today", true);
@@ -424,10 +379,6 @@ public class VillagerGOAP {
             return new SimpleWorldState(); // No specific preconditions
         }
         
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
-        }
     }
     
     public static class GossipAction extends Action {
@@ -450,23 +401,17 @@ public class VillagerGOAP {
         
         @Override
         public float getCost(WorldState state) {
-            String personality = getPersonality();
-            float modifier = switch (personality) {
-                case "Shy" -> 2.5f;
-                case "Curious", "Friendly" -> 0.5f;
-                default -> 1.0f;
-            };
-            return baseCost * modifier;
+            String personality = VillagerPersonalityUtils.getPersonality(villager);
+            return baseCost * VillagerPersonalityUtils.getActionCostModifier(personality, "gossip");
         }
         
         @Override
         public boolean execute(WorldState state) {
             // Find recent gossip and "learn" it
-            List<VillagerGossipNetwork.GossipPiece> availableGossip = new ArrayList<>();
+            // Find available gossip (implementation simplified for refactored system)
             // In a real implementation, this would query the gossip network
             
-            VillagerEmotionSystem.processEmotionalEvent(villager,
-                new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.CURIOSITY, 10.0f, "learning_gossip", false));
+            VillagerEmotionUtils.processGossipLearningEffects(villager);
             
             state.setBool("knows_latest_gossip", true);
             state.setBool("has_socialized", true);
@@ -480,10 +425,6 @@ public class VillagerGOAP {
             return preconditions;
         }
         
-        private String getPersonality() {
-            VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null ? VillagerConstants.PersonalityType.toString(data.getPersonality()) : "Friendly";
-        }
     }
     
     // GOAP Planner
@@ -645,36 +586,68 @@ public class VillagerGOAP {
         }
     }
     
-    // Manager for villager GOAP systems
-    public static class VillagerGOAPManager {
-        private static final Map<String, List<Goal>> villagerGoals = new ConcurrentHashMap<>();
-        private static final Map<String, List<Action>> villagerActions = new ConcurrentHashMap<>();
-        private static final Map<String, List<Action>> currentPlans = new ConcurrentHashMap<>();
-        private static final Map<String, Integer> planExecutionIndex = new ConcurrentHashMap<>();
+    // Instance-based manager for villager GOAP systems (replaces static VillagerGOAPManager)
+    private final Map<String, List<Goal>> villagerGoals = new ConcurrentHashMap<>();
+    private final Map<String, List<Action>> villagerActions = new ConcurrentHashMap<>();
+    private final Map<String, List<Action>> currentPlans = new ConcurrentHashMap<>();
+    private final Map<String, Integer> planExecutionIndex = new ConcurrentHashMap<>();
+    
+    // Instance-based lifecycle methods
+    public void initializeVillagerPlanning(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        initializeVillager(villager);
+    }
+
+    public void updateVillagerPlanning(@NotNull VillagerEntity villager) {
+        updateVillager(villager);
+    }
+
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        cleanup(villagerUuid);
+    }
+
+    public void performMaintenance() {
+        // Clean up stale planning data periodically
+        // Remove plans for non-existent villagers, etc.
+    }
+
+    public void shutdown() {
+        villagerGoals.clear();
+        villagerActions.clear();
+        currentPlans.clear();
+        planExecutionIndex.clear();
+    }
+
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("total_villager_goals", villagerGoals.size());
+        analytics.put("total_active_plans", currentPlans.size());
+        return analytics;
+    }
+    
+    public void initializeVillager(VillagerEntity villager) {
+        String uuid = villager.getUuidAsString();
         
-        public static void initializeVillager(VillagerEntity villager) {
-            String uuid = villager.getUuidAsString();
-            
-            // Initialize goals based on villager data and personality
-            List<Goal> goals = new ArrayList<>();
-            goals.add(new IncreaseHappinessGoal(villager));
-            goals.add(new SocializeGoal(villager));
-            goals.add(new WorkGoal(villager));
-            goals.add(new FindLoveGoal(villager));
-            goals.add(new LearnGossipGoal(villager));
-            
-            villagerGoals.put(uuid, goals);
-            
-            // Initialize available actions
-            List<Action> actions = new ArrayList<>();
-            actions.add(new SocializeAction(villager));
-            actions.add(new WorkAction(villager));
-            actions.add(new GossipAction(villager));
-            
-            villagerActions.put(uuid, actions);
-        }
+        // Initialize goals based on villager data and personality
+        List<Goal> goals = new ArrayList<>();
+        goals.add(new IncreaseHappinessGoal(villager));
+        goals.add(new SocializeGoal(villager));
+        goals.add(new WorkGoal(villager));
+        goals.add(new FindLoveGoal(villager));
+        goals.add(new LearnGossipGoal(villager));
         
-        public static void updateVillager(VillagerEntity villager) {
+        villagerGoals.put(uuid, goals);
+        
+        // Initialize available actions
+        List<Action> actions = new ArrayList<>();
+        actions.add(new SocializeAction(villager));
+        actions.add(new WorkAction(villager));
+        actions.add(new GossipAction(villager));
+        
+        villagerActions.put(uuid, actions);
+    }
+    
+    public void updateVillager(VillagerEntity villager) {
             String uuid = villager.getUuidAsString();
             WorldState currentState = buildCurrentWorldState(villager);
             
@@ -714,7 +687,7 @@ public class VillagerGOAP {
             }
         }
         
-        private static Goal selectBestGoal(VillagerEntity villager, WorldState currentState) {
+        private Goal selectBestGoal(VillagerEntity villager, WorldState currentState) {
             String uuid = villager.getUuidAsString();
             List<Goal> goals = villagerGoals.get(uuid);
             if (goals == null) return null;
@@ -725,10 +698,10 @@ public class VillagerGOAP {
                 .orElse(null);
         }
         
-        private static WorldState buildCurrentWorldState(VillagerEntity villager) {
+        private WorldState buildCurrentWorldState(VillagerEntity villager) {
             SimpleWorldState state = new SimpleWorldState();
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().getEmotionalState(villager);
             
             if (data != null) {
                 state.setInt("age", data.getAge());
@@ -799,11 +772,10 @@ public class VillagerGOAP {
             return state;
         }
         
-        public static void cleanup(String villagerUuid) {
+        public void cleanup(String villagerUuid) {
             villagerGoals.remove(villagerUuid);
             villagerActions.remove(villagerUuid);
             currentPlans.remove(villagerUuid);
             planExecutionIndex.remove(villagerUuid);
         }
     }
-}

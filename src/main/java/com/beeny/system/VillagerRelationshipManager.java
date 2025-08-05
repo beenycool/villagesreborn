@@ -1,8 +1,8 @@
 package com.beeny.system;
 
+import com.beeny.constants.VillagerConstants;
+
 import com.beeny.Villagersreborn;
-import com.    public static boolean attemptMarriage(@Nullable VillagerEntity villager1, @Nullable VillagerEntity villager2) {
-        if (!canMarry(villager1, villager2)) return false;eny.constants.VillagerConstants;
 import com.beeny.data.VillagerData;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.world.ServerWorld;

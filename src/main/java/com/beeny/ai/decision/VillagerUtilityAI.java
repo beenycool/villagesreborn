@@ -1,8 +1,8 @@
 package com.beeny.ai.decision;
 
 import com.beeny.data.VillagerData;
+import com.beeny.ai.AIWorldManagerRefactored;
 import com.beeny.ai.core.VillagerEmotionSystem;
-import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.constants.VillagerConstants.PersonalityType;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -202,7 +202,7 @@ public class VillagerUtilityAI {
         
         @Override
         public float getValue(VillagerEntity villager, Object context) {
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             
             float love = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LOVE) / 100.0f;
             float happiness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS) / 100.0f;
@@ -265,7 +265,7 @@ public class VillagerUtilityAI {
         @Override
         public float getValue(VillagerEntity villager, Object context) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             
             if (data == null) return 0.5f;
             
@@ -374,7 +374,7 @@ public class VillagerUtilityAI {
             // Don't change career too frequently
             if (data.getProfessionHistory().size() > 3) return false;
             
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             float boredom = emotions.getEmotion(VillagerEmotionSystem.EmotionType.BOREDOM);
             float contentment = emotions.getEmotion(VillagerEmotionSystem.EmotionType.CONTENTMENT);
             
@@ -394,7 +394,7 @@ public class VillagerUtilityAI {
     public static class MigrationDecisionMaker {
         public boolean shouldMigrate(VillagerEntity villager) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             
             if (data == null) return false;
             
@@ -402,7 +402,7 @@ public class VillagerUtilityAI {
             float happiness = data.getHappiness();
             float stress = emotions.getEmotion(VillagerEmotionSystem.EmotionType.STRESS);
             float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS);
-            int globalReputation = VillagerGossipNetwork.getGlobalReputation(villager.getUuidAsString());
+            int globalReputation = AIWorldManagerRefactored.getInstance().getGossipManager().getGlobalReputation(villager.getUuidAsString());
             
             // Migration more likely if:
             // - Very unhappy
@@ -468,11 +468,16 @@ public class VillagerUtilityAI {
                                        int playerOfferedValue, int villagerOfferedValue) {
             float fairness = calculateTradeFairness(villager, player, playerOfferedValue, villagerOfferedValue);
             
-            // Generate gossip about trade fairness
-            if (fairness < 0.7f) {
-                VillagerGossipNetwork.CommonGossipEvents.playerTraded(villager, player, false);
-            } else if (fairness > 1.0f && fairness < 1.3f) {
-                VillagerGossipNetwork.CommonGossipEvents.playerTraded(villager, player, true);
+            // Generate gossip about trade fairness through AIWorldManager
+            try {
+                com.beeny.ai.AIWorldManagerRefactored aiManager = AIWorldManagerRefactored.getInstance();
+                if (fairness < 0.7f) {
+                    com.beeny.ai.social.VillagerGossipManager.CommonGossipEvents.playerTraded(aiManager.getGossipManager(), villager, player, false);
+                } else if (fairness > 1.0f && fairness < 1.3f) {
+                    com.beeny.ai.social.VillagerGossipManager.CommonGossipEvents.playerTraded(aiManager.getGossipManager(), villager, player, true);
+                }
+            } catch (Exception e) {
+                // Silently handle if AI manager not available
             }
             
             // Accept if fairness is reasonable (0.6 to 1.8 range)
@@ -484,7 +489,13 @@ public class VillagerUtilityAI {
             if (data == null) return 0.5f;
             
             int reputation = data.getPlayerReputation(player.getUuidAsString());
-            int globalRep = VillagerGossipNetwork.getGlobalReputation(player.getUuidAsString());
+            int globalRep = 0;
+            try {
+                com.beeny.ai.AIWorldManagerRefactored aiManager = AIWorldManagerRefactored.getInstance();
+                globalRep = aiManager.getGossipManager().getGlobalReputation(player.getUuidAsString());
+            } catch (Exception e) {
+                // Use 0 if AI manager not available
+            }
             
             // Base trust from personal reputation (normalized to 0-1)
             float personalTrust = Math.max(0.0f, Math.min(1.0f, (reputation + 100) / 200.0f));
@@ -555,9 +566,9 @@ public class VillagerUtilityAI {
                     data.addProfession("career_seeker");
                     
                     // Process emotional impact of career change
-                    VillagerEmotionSystem.processEmotionalEvent(villager,
+                    AIWorldManagerRefactored.getInstance().getEmotionSystem().processEmotionalEvent(villager,
                         new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.EXCITEMENT, 20.0f, "career_change", false));
-                    VillagerEmotionSystem.processEmotionalEvent(villager,
+                    AIWorldManagerRefactored.getInstance().getEmotionSystem().processEmotionalEvent(villager,
                         new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.BOREDOM, -30.0f, "career_change", false));
                 }
             }
@@ -565,10 +576,15 @@ public class VillagerUtilityAI {
             // Migration decisions
             if (migrationDecisionMaker.shouldMigrate(villager)) {
                 // This would integrate with village management systems
-                // For now, just create gossip about the migration
-                VillagerGossipNetwork.CommonGossipEvents.mysteriousActivity(
-                    villager, villager.getUuidAsString(), "is considering leaving the village"
-                );
+                // For now, just create gossip about the migration through AIWorldManager
+                try {
+                    com.beeny.ai.AIWorldManagerRefactored aiManager = AIWorldManagerRefactored.getInstance();
+                    com.beeny.ai.social.VillagerGossipManager.CommonGossipEvents.mysteriousActivity(
+                        aiManager.getGossipManager(), villager, villager.getUuidAsString(), "is considering leaving the village"
+                    );
+                } catch (Exception e) {
+                    // Silently handle if AI manager not available
+                }
             }
         }
     }

@@ -268,17 +268,7 @@ public class DialogueConfigScreen extends Screen {
     private void saveConfigToFile() {
         // Persist settings to villagersreborn.json
         try {
-            // Ensure in-memory config mirrors UI state before saving
-            com.beeny.config.VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = tempEnabled;
-            com.beeny.config.VillagersRebornConfig.LLM_PROVIDER = tempProvider;
-            com.beeny.config.VillagersRebornConfig.LLM_API_KEY = apiKeyField.getText().trim();
-            com.beeny.config.VillagersRebornConfig.LLM_API_ENDPOINT = endpointField.getText().trim();
-            com.beeny.config.VillagersRebornConfig.LLM_MODEL = modelField.getText().trim();
-            if ("local".equalsIgnoreCase(tempProvider)) {
-                com.beeny.config.VillagersRebornConfig.LLM_LOCAL_URL = endpointField.getText().trim();
-            }
-
-            // Persist to disk
+            // Persist current configuration state to disk
             com.beeny.config.ConfigManager.saveConfig();
 
             // Optionally reload to verify persistence

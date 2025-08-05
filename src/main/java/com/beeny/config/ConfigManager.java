@@ -3,6 +3,7 @@ package com.beeny.config;
 import com.beeny.Villagersreborn;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -66,77 +67,180 @@ public class ConfigManager {
     }
 
     /**
-     * Apply config values from JsonObject.
+     * Apply config values from JsonObject with validation.
+     * Missing or invalid entries fall back to defaults and are logged.
      */
     private static void applyConfig(JsonObject config) {
-        if (config.has("villagerScanChunkRadius")) {
-            VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS = config.get("villagerScanChunkRadius").getAsInt();
-        }
-        
-        if (config.has("happinessNeutralThreshold")) {
-            VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD = config.get("happinessNeutralThreshold").getAsInt();
-        }
-        
-        if (config.has("happinessDecayRate")) {
-            VillagersRebornConfig.HAPPINESS_DECAY_RATE = config.get("happinessDecayRate").getAsInt();
-        }
-        
-        if (config.has("happinessRecoveryRate")) {
-            VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
-        }
-        
-        if (config.has("enableDynamicDialogue")) {
-            VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = config.get("enableDynamicDialogue").getAsBoolean();
-        }
-        
-        if (config.has("llmProvider")) {
-            VillagersRebornConfig.LLM_PROVIDER = config.get("llmProvider").getAsString();
-        }
-        
-        if (config.has("llmApiEndpoint")) {
-            VillagersRebornConfig.LLM_API_ENDPOINT = config.get("llmApiEndpoint").getAsString();
-        }
-        
-        if (config.has("llmModel")) {
-            VillagersRebornConfig.LLM_MODEL = config.get("llmModel").getAsString();
-        }
-        
-        if (config.has("llmTemperature")) {
-            VillagersRebornConfig.LLM_TEMPERATURE = config.get("llmTemperature").getAsFloat();
-        }
-        
-        if (config.has("llmMaxTokens")) {
-            VillagersRebornConfig.LLM_MAX_TOKENS = config.get("llmMaxTokens").getAsInt();
-        }
-        
-        if (config.has("llmRequestTimeout")) {
-            VillagersRebornConfig.LLM_REQUEST_TIMEOUT = config.get("llmRequestTimeout").getAsInt();
-        }
-        
-        if (config.has("fallbackToStatic")) {
-            VillagersRebornConfig.FALLBACK_TO_STATIC = config.get("fallbackToStatic").getAsBoolean();
-        }
-        
-        if (config.has("enableDialogueCache")) {
-            VillagersRebornConfig.ENABLE_DIALOGUE_CACHE = config.get("enableDialogueCache").getAsBoolean();
-        }
-        
-        if (config.has("dialogueCacheSize")) {
-            VillagersRebornConfig.DIALOGUE_CACHE_SIZE = config.get("dialogueCacheSize").getAsInt();
-        }
-        
-        if (config.has("conversationHistoryLimit")) {
-            VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = config.get("conversationHistoryLimit").getAsInt();
-        }
-        
-        if (config.has("llmLocalUrl")) {
-            VillagersRebornConfig.LLM_LOCAL_URL = config.get("llmLocalUrl").getAsString();
-        }
+        // Int validators with ranges
+        VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS = validateInt(
+                config, "villagerScanChunkRadius",
+                VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS,
+                0, 64);
+
+        VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD = validateInt(
+                config, "happinessNeutralThreshold",
+                VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD,
+                0, 100);
+
+        VillagersRebornConfig.HAPPINESS_DECAY_RATE = validateInt(
+                config, "happinessDecayRate",
+                VillagersRebornConfig.HAPPINESS_DECAY_RATE,
+                0, Integer.MAX_VALUE);
+
+        VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = validateInt(
+                config, "happinessRecoveryRate",
+                VillagersRebornConfig.HAPPINESS_RECOVERY_RATE,
+                0, Integer.MAX_VALUE);
+
+        // Booleans
+        VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE = validateBoolean(
+                config, "enableDynamicDialogue",
+                VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE);
+
+        // Strings
+        VillagersRebornConfig.LLM_PROVIDER = validateString(
+                config, "llmProvider",
+                VillagersRebornConfig.LLM_PROVIDER,
+                new String[]{"gemini", "openrouter", "local"});
+
+        VillagersRebornConfig.LLM_API_ENDPOINT = validateString(
+                config, "llmApiEndpoint",
+                VillagersRebornConfig.LLM_API_ENDPOINT,
+                null);
+
+        VillagersRebornConfig.LLM_MODEL = validateString(
+                config, "llmModel",
+                VillagersRebornConfig.LLM_MODEL,
+                null);
+
+        // Double (temperature)
+        VillagersRebornConfig.LLM_TEMPERATURE = validateDouble(
+                config, "llmTemperature",
+                VillagersRebornConfig.LLM_TEMPERATURE,
+                0.0, 2.0);
+
+        // More ints
+        VillagersRebornConfig.LLM_MAX_TOKENS = validateInt(
+                config, "llmMaxTokens",
+                VillagersRebornConfig.LLM_MAX_TOKENS,
+                1, 1_000_000);
+
+        VillagersRebornConfig.LLM_REQUEST_TIMEOUT = validateInt(
+                config, "llmRequestTimeout",
+                VillagersRebornConfig.LLM_REQUEST_TIMEOUT,
+                100, 3_600_000);
+
+        VillagersRebornConfig.FALLBACK_TO_STATIC = validateBoolean(
+                config, "fallbackToStatic",
+                VillagersRebornConfig.FALLBACK_TO_STATIC);
+
+        VillagersRebornConfig.ENABLE_DIALOGUE_CACHE = validateBoolean(
+                config, "enableDialogueCache",
+                VillagersRebornConfig.ENABLE_DIALOGUE_CACHE);
+
+        VillagersRebornConfig.DIALOGUE_CACHE_SIZE = validateInt(
+                config, "dialogueCacheSize",
+                VillagersRebornConfig.DIALOGUE_CACHE_SIZE,
+                0, Integer.MAX_VALUE);
+
+        VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT = validateInt(
+                config, "conversationHistoryLimit",
+                VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT,
+                0, 10_000);
+
+        VillagersRebornConfig.LLM_LOCAL_URL = validateString(
+                config, "llmLocalUrl",
+                VillagersRebornConfig.LLM_LOCAL_URL,
+                null);
+
+        // AI Subsystem Update Intervals
+        VillagersRebornConfig.AI_EMOTION_UPDATE_INTERVAL = validateInt(
+                config, "aiEmotionUpdateInterval",
+                VillagersRebornConfig.AI_EMOTION_UPDATE_INTERVAL,
+                50, Integer.MAX_VALUE);
+
+        VillagersRebornConfig.AI_MANAGER_UPDATE_INTERVAL = validateInt(
+                config, "aiManagerUpdateInterval",
+                VillagersRebornConfig.AI_MANAGER_UPDATE_INTERVAL,
+                1, Integer.MAX_VALUE);
+
+        VillagersRebornConfig.AI_GOAP_UPDATE_INTERVAL = validateInt(
+                config, "aiGoapUpdateInterval",
+                VillagersRebornConfig.AI_GOAP_UPDATE_INTERVAL,
+                1, Integer.MAX_VALUE);
+
+        VillagersRebornConfig.MARRIAGE_PACKET_COOLDOWN = validateInt(
+                config, "marriagePacketCooldown",
+                VillagersRebornConfig.MARRIAGE_PACKET_COOLDOWN,
+                0, Integer.MAX_VALUE);
     }
 
     public static int getInt(String key, int defaultValue) {
-        // TODO: Implement proper config reading
-        return defaultValue;
+        switch (key) {
+            case "villagerScanChunkRadius":
+                return VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS;
+            case "happinessNeutralThreshold":
+                return VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD;
+            case "happinessDecayRate":
+                return VillagersRebornConfig.HAPPINESS_DECAY_RATE;
+            case "happinessRecoveryRate":
+                return VillagersRebornConfig.HAPPINESS_RECOVERY_RATE;
+            case "llmMaxTokens":
+                return VillagersRebornConfig.LLM_MAX_TOKENS;
+            case "llmRequestTimeout":
+                return VillagersRebornConfig.LLM_REQUEST_TIMEOUT;
+            case "dialogueCacheSize":
+                return VillagersRebornConfig.DIALOGUE_CACHE_SIZE;
+            case "conversationHistoryLimit":
+                return VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT;
+            case "aiEmotionUpdateInterval":
+                return VillagersRebornConfig.AI_EMOTION_UPDATE_INTERVAL;
+            case "aiManagerUpdateInterval":
+                return VillagersRebornConfig.AI_MANAGER_UPDATE_INTERVAL;
+            case "aiGoapUpdateInterval":
+                return VillagersRebornConfig.AI_GOAP_UPDATE_INTERVAL;
+            case "marriagePacketCooldown":
+                return VillagersRebornConfig.MARRIAGE_PACKET_COOLDOWN;
+            default:
+                return defaultValue;
+        }
+    }
+
+    public static boolean getBoolean(String key, boolean defaultValue) {
+        switch (key) {
+            case "enableDynamicDialogue":
+                return VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE;
+            case "fallbackToStatic":
+                return VillagersRebornConfig.FALLBACK_TO_STATIC;
+            case "enableDialogueCache":
+                return VillagersRebornConfig.ENABLE_DIALOGUE_CACHE;
+            default:
+                return defaultValue;
+        }
+    }
+
+    public static String getString(String key, String defaultValue) {
+        switch (key) {
+            case "llmProvider":
+                return VillagersRebornConfig.LLM_PROVIDER;
+            case "llmApiEndpoint":
+                return VillagersRebornConfig.LLM_API_ENDPOINT;
+            case "llmModel":
+                return VillagersRebornConfig.LLM_MODEL;
+            case "llmLocalUrl":
+                return VillagersRebornConfig.LLM_LOCAL_URL;
+            default:
+                return defaultValue;
+        }
+    }
+
+    public static double getDouble(String key, double defaultValue) {
+        switch (key) {
+            case "llmTemperature":
+                return VillagersRebornConfig.LLM_TEMPERATURE;
+            default:
+                return defaultValue;
+        }
     }
 
     private static void createDefaultConfig(Path configPath) throws IOException {
@@ -162,6 +266,100 @@ public class ConfigManager {
     /**
      * Save config to a specific path using current in-memory values.
      */
+    // Validation helpers
+
+    private static int validateInt(JsonObject obj, String key, int fallback, int min, int max) {
+        if (!obj.has(key)) {
+            Villagersreborn.LOGGER.warn("Config key '{}' missing; using default {}", key, fallback);
+            return fallback;
+        }
+        JsonElement el = obj.get(key);
+        if (!el.isJsonPrimitive() || !el.getAsJsonPrimitive().isNumber()) {
+            Villagersreborn.LOGGER.warn("Config key '{}' has invalid type (expected integer); using default {}", key, fallback);
+            return fallback;
+        }
+        try {
+            int val = el.getAsInt();
+            if (val < min || val > max) {
+                Villagersreborn.LOGGER.warn("Config key '{}' out of range [{}..{}] (was {}); using default {}", key, min, max, val, fallback);
+                return fallback;
+            }
+            return val;
+        } catch (Exception ex) {
+            Villagersreborn.LOGGER.warn("Config key '{}' could not be parsed as integer; using default {} (error: {})", key, fallback, ex.toString());
+            return fallback;
+        }
+    }
+
+    private static double validateDouble(JsonObject obj, String key, double fallback, double min, double max) {
+        if (!obj.has(key)) {
+            Villagersreborn.LOGGER.warn("Config key '{}' missing; using default {}", key, fallback);
+            return fallback;
+        }
+        JsonElement el = obj.get(key);
+        if (!el.isJsonPrimitive() || !el.getAsJsonPrimitive().isNumber()) {
+            Villagersreborn.LOGGER.warn("Config key '{}' has invalid type (expected number); using default {}", key, fallback);
+            return fallback;
+        }
+        try {
+            double val = el.getAsDouble();
+            if (Double.isNaN(val) || val < min || val > max) {
+                Villagersreborn.LOGGER.warn("Config key '{}' out of range [{}..{}] (was {}); using default {}", key, min, max, val, fallback);
+                return fallback;
+            }
+            return val;
+        } catch (Exception ex) {
+            Villagersreborn.LOGGER.warn("Config key '{}' could not be parsed as number; using default {} (error: {})", key, fallback, ex.toString());
+            return fallback;
+        }
+    }
+
+    private static boolean validateBoolean(JsonObject obj, String key, boolean fallback) {
+        if (!obj.has(key)) {
+            Villagersreborn.LOGGER.warn("Config key '{}' missing; using default {}", key, fallback);
+            return fallback;
+        }
+        JsonElement el = obj.get(key);
+        if (!el.isJsonPrimitive() || !el.getAsJsonPrimitive().isBoolean()) {
+            Villagersreborn.LOGGER.warn("Config key '{}' has invalid type (expected boolean); using default {}", key, fallback);
+            return fallback;
+        }
+        try {
+            return el.getAsBoolean();
+        } catch (Exception ex) {
+            Villagersreborn.LOGGER.warn("Config key '{}' could not be parsed as boolean; using default {} (error: {})", key, fallback, ex.toString());
+            return fallback;
+        }
+    }
+
+    private static String validateString(JsonObject obj, String key, String fallback, String[] allowed) {
+        if (!obj.has(key)) {
+            Villagersreborn.LOGGER.warn("Config key '{}' missing; using default '{}'", key, fallback);
+            return fallback;
+        }
+        JsonElement el = obj.get(key);
+        if (!el.isJsonPrimitive() || !el.getAsJsonPrimitive().isString()) {
+            Villagersreborn.LOGGER.warn("Config key '{}' has invalid type (expected string); using default '{}'", key, fallback);
+            return fallback;
+        }
+        String val = el.getAsString();
+        if (allowed != null) {
+            boolean ok = false;
+            for (String a : allowed) {
+                if (a.equalsIgnoreCase(val)) { ok = true; break; }
+            }
+            if (!ok) {
+                Villagersreborn.LOGGER.warn("Config key '{}' has unsupported value '{}'; allowed: {}; using default '{}'", key, val, String.join(", ", allowed), fallback);
+                return fallback;
+            }
+            // normalize to canonical case from allowed list
+            for (String a : allowed) {
+                if (a.equalsIgnoreCase(val)) return a;
+            }
+        }
+        return val;
+    }
+
     private static void saveConfig(Path configPath) throws IOException {
         JsonObject config = new JsonObject();
         config.addProperty("//", "Set your API key via environment variable VILLAGERS_REBORN_API_KEY");

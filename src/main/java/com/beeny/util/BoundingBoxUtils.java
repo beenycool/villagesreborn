@@ -133,9 +133,9 @@ public final class BoundingBoxUtils {
      */
     public static double volume(Box box) {
         if (box == null) return 0.0;
-        double dx = Math.max(0.0, box.getXLength());
-        double dy = Math.max(0.0, box.getYLength());
-        double dz = Math.max(0.0, box.getZLength());
+        double dx = Math.max(0.0, box.maxX - box.minX);
+        double dy = Math.max(0.0, box.maxY - box.minY);
+        double dz = Math.max(0.0, box.maxZ - box.minZ);
         return dx * dy * dz;
     }
 
@@ -261,7 +261,7 @@ public final class BoundingBoxUtils {
      */
     public static boolean hasVolume(Box box) {
         if (box == null) return false;
-        return box.getXLength() > 0 && box.getYLength() > 0 && box.getZLength() > 0;
+        return (box.maxX - box.minX) > 0 && (box.maxY - box.minY) > 0 && (box.maxZ - box.minZ) > 0;
     }
 
     private static double clamp(double v, double min, double max) {

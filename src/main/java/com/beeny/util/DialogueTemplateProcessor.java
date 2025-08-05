@@ -155,9 +155,22 @@ public class DialogueTemplateProcessor {
             return "unknown";
         }
         
-        return biomeName.replace("_", " ")
-                       .toLowerCase()
-                       .replaceAll("\\b\\w", m -> m.group().toUpperCase());
+        String formatted = biomeName.replace("_", " ").toLowerCase();
+        // Capitalize first letter of each word
+        StringBuilder result = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : formatted.toCharArray()) {
+            if (Character.isWhitespace(c)) {
+                capitalizeNext = true;
+                result.append(c);
+            } else if (capitalizeNext) {
+                result.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
     
     /**

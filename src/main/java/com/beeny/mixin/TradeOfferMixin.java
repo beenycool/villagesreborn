@@ -14,8 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(VillagerEntity.class)
 public class TradeOfferMixin {
     
-    @Inject(method = "createNewOffer", at = @At("RETURN"))
-    private void modifyTradeOfferBasedOnHappiness(CallbackInfoReturnable<TradeOffer> cir) {
+    // NOTE: The method "createNewOffer" does not exist in VillagerEntity
+    // Trade offer modification is handled in VillagerEntityMixin.onTradeComplete() instead
+    // This mixin is disabled to prevent compilation errors
+    // @Inject(method = "createNewOffer", at = @At("RETURN"))
+    private void modifyTradeOfferBasedOnHappiness_DISABLED(CallbackInfoReturnable<TradeOffer> cir) {
         VillagerEntity villager = (VillagerEntity) (Object) this;
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         

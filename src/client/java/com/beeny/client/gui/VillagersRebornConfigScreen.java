@@ -262,13 +262,8 @@ public class VillagersRebornConfigScreen extends Screen {
     
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Prevent blur effect to avoid "Can only blur once per frame" error
-        if (this.client != null && this.client.world != null) {
-            // Draw a simple gradient background without blur
-            context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
-        } else {
-            super.renderBackground(context, mouseX, mouseY, delta);
-        }
+        // Use simple background without accessing render system during initialization
+        context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
     }
     
     @Override

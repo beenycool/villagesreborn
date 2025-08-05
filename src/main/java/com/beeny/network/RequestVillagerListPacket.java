@@ -84,8 +84,8 @@ public class RequestVillagerListPacket implements CustomPayload {
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 withDataCount++;
-                villagerDataList.add(VillagerDataPacket.fromVillagerData(data, villager.getUuid()));
-                Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}", 
+                villagerDataList.add(VillagerDataPacket.fromVillagerData(data, villager.getId(), villager.getUuid()));
+                Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}",
                     data.getName(), villager.getBlockPos());
             }
         }

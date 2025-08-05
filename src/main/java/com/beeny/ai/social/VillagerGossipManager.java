@@ -1,6 +1,6 @@
 package com.beeny.ai.social;
 
-import com.beeny.ai.AIWorldManager;
+import com.beeny.ai.AIWorldManagerRefactored;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * Creates emergent social dynamics and reputation consequences
  */
 public class VillagerGossipManager {
-    private final AIWorldManager worldManager;
+    private final AIWorldManagerRefactored worldManager;
     
     public enum GossipType {
         POSITIVE_INTERACTION("positive interaction", 5, 0.8f, true),
@@ -87,7 +87,7 @@ public class VillagerGossipManager {
     private final Map<String, List<GossipPiece>> villageGossip = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Integer>> globalReputation = new ConcurrentHashMap<>();
     
-    public VillagerGossipManager(@NotNull AIWorldManager worldManager) {
+    public VillagerGossipManager(@NotNull AIWorldManagerRefactored worldManager) {
         this.worldManager = worldManager;
     }
     
@@ -434,7 +434,7 @@ public class VillagerGossipManager {
         return report;
     }
     
-    // Methods for AIWorldManager integration
+    // Methods for AIWorldManagerRefactored integration
     public void initializeVillagerGossip(VillagerEntity villager, VillagerData data) {
         // No specific initialization needed for gossip system
     }

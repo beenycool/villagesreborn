@@ -151,11 +151,7 @@ public class VillagerAICommands extends BaseVillagerCommand {
             return 0;
         }
         
-        VillagerData villagerData = VillagerDataUtils.getVillagerDataOrNull(villager);
-        if (villagerData == null) {
-            CommandMessageUtils.sendError(source, "This villager has no data!");
-            return 0;
-        }
+        VillagerData villagerData = VillagerDataUtils.ensureVillagerData(villager);
         
         VillagerDialogueSystem.DialogueContext dialogueContext = 
             new VillagerDialogueSystem.DialogueContext(villager, source.getPlayer());

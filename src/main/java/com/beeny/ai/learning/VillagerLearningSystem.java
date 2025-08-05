@@ -1,5 +1,6 @@
 package com.beeny.ai.learning;
 
+import com.beeny.ai.core.AISubsystem;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
@@ -23,7 +24,72 @@ import org.jetbrains.annotations.Nullable;
  * Learning and adaptation system that allows villagers to learn from experiences
  * and adapt their behavior patterns over time
  */
-public class VillagerLearningSystem {
+public class VillagerLearningSystem implements AISubsystem {
+    // REQUIRED AISubsystem methods (grouped for clarity)
+
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        // Ensure a learning profile exists for this villager
+        VillagerLearningProfile ignored = getLearningProfile(villager);
+    }
+
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        // Minimal periodic maintenance or decay can occur here
+        VillagerLearningProfile profile = learningProfiles.get(villager.getUuidAsString());
+        if (profile != null) {
+            // periodic hooks can be placed here if needed
+        }
+    }
+
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        learningProfiles.remove(villagerUuid);
+    }
+
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        long worldTime = villager.getWorld().getTime();
+        int stagger = Math.floorMod(villager.getUuid().hashCode(), 40);
+        return (worldTime % 40) == (stagger % 40);
+    }
+
+    @Override
+    public long getUpdateInterval() {
+        return 1000L;
+    }
+
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "LearningSystem";
+    }
+
+    @Override
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("total_learning_profiles", learningProfiles.size());
+        int totalExperiences = learningProfiles.values().stream()
+            .mapToInt(VillagerLearningProfile::getCurrentExperienceCount)
+            .sum();
+        analytics.put("total_experiences", totalExperiences);
+        return analytics;
+    }
+
+    @Override
+    public void performMaintenance() {
+        long currentTime = System.currentTimeMillis();
+        learningProfiles.entrySet().removeIf(entry -> {
+            VillagerLearningProfile profile = entry.getValue();
+            return (currentTime - profile.lastLearningUpdate) > (24 * 60 * 60 * 1000); // 24 hours
+        });
+    }
+
+    @Override
+    public void shutdown() {
+        learningProfiles.clear();
+    }
 
     // Class-level logger
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(VillagerLearningSystem.class);
@@ -304,75 +370,115 @@ public class VillagerLearningSystem {
         }
     }
     
-    // Global learning profiles for all villagers
-    private static final Map<String, VillagerLearningProfile> learningProfiles = new ConcurrentHashMap<>();
-    
+    // Instance learning profiles for all villagers
+    private final Map<String, VillagerLearningProfile> learningProfiles;
+
+    public VillagerLearningSystem() {
+        this.learningProfiles = new ConcurrentHashMap<>();
+    }
+
     @Nullable
-    public static VillagerLearningProfile getLearningProfile(@Nullable VillagerEntity villager) {
+    public VillagerLearningProfile getLearningProfile(@Nullable VillagerEntity villager) {
         if (villager == null) return null;
-        
+
         String uuid = villager.getUuidAsString();
         if (uuid == null) return null;
-        
+
         VillagerLearningProfile profile = learningProfiles.computeIfAbsent(uuid, k -> new VillagerLearningProfile());
         profile.adjustLearningRate(villager);
         return profile;
     }
-    
-    // Learning event processors
-    public static void processPlayerInteraction(VillagerEntity villager, PlayerEntity player, String interactionType, float outcome) {
-        if (villager == null || player == null || interactionType == null) return;
-        
+
+    // Instance-based lifecycle methods (legacy helpers kept for compatibility)
+    public void initializeVillagerLearning(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        // Initialize learning profile if not exists
+        getLearningProfile(villager);
+    }
+
+    public void updateVillagerLearning(@NotNull VillagerEntity villager) {
         VillagerLearningProfile profile = getLearningProfile(villager);
         if (profile == null) return;
         
+        // Perform periodic learning updates like personality evolution
+        if (profile.getCurrentExperienceCount() > 50) {
+            evolvePersonality(villager, profile);
+        }
+    }
+
+    // (implements AISubsystem.cleanupVillager earlier in class)
+
+    // (implements AISubsystem.performMaintenance earlier in class)
+
+    // (implements AISubsystem.shutdown earlier in class)
+
+    // (implements AISubsystem.getSubsystemName earlier in class)
+
+    // (implements AISubsystem.getUpdateInterval earlier in class)
+
+    // (implements AISubsystem.needsUpdate earlier in class)
+
+    // (duplicate method was removed earlier)
+
+    // (duplicate method was removed earlier)
+
+    // (implements AISubsystem.getAnalytics earlier in class)
+
+    // Learning event processors
+    public void processPlayerInteraction(VillagerEntity villager, PlayerEntity player, String interactionType, float outcome) {
+        if (villager == null || player == null || interactionType == null) return;
+
+        VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return;
+
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        
+
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("player_reputation", data != null ? data.getPlayerReputation(player.getUuidAsString()) : 0);
         parameters.put("villager_happiness", data != null ? data.getHappiness() : 50);
         parameters.put("time_of_day", villager.getWorld().getTimeOfDay() % 24000);
-        
+
         Experience experience = new Experience(ExperienceType.PLAYER_INTERACTION, interactionType, parameters, outcome);
         profile.addExperience(experience);
-        
+
         // Update emotional response based on learned patterns
-        // Note: This should be refactored to use dependency injection instead of static access
-        // For now, keeping it working but marking for future refactoring
+        // This should use the AIWorldManager's emotion system instead of static access
         try {
-            if (outcome > 0.5f) {
-                VillagerEmotionSystem.processEmotionalEvent(villager,
-                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 15.0f, "positive_interaction", false));
-            } else if (outcome < -0.5f) {
-                VillagerEmotionSystem.processEmotionalEvent(villager,
-                    new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 10.0f, "negative_interaction", false));
+            com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+            if (aiManager != null) {
+                if (outcome > 0.5f) {
+                    aiManager.getEmotionSystem().processEmotionalEvent(villager,
+                        new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 15.0f, "positive_interaction", false));
+                } else if (outcome < -0.5f) {
+                    aiManager.getEmotionSystem().processEmotionalEvent(villager,
+                        new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 10.0f, "negative_interaction", false));
+                }
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to process emotional event for villager {}: {}", villager.getUuidAsString(), e.getMessage());
         }
     }
-    
-    public static void processTradeOutcome(VillagerEntity villager, PlayerEntity player, boolean fair, int emeraldValue) {
+
+    public void processTradeOutcome(VillagerEntity villager, PlayerEntity player, boolean fair, int emeraldValue) {
         if (villager == null || player == null) return;
-        
+
         VillagerLearningProfile profile = getLearningProfile(villager);
         if (profile == null) return;
-        
+
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        
+
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("trade_value", emeraldValue);
         parameters.put("player_reputation", data != null ? data.getPlayerReputation(player.getUuidAsString()) : 0);
         parameters.put("fair_trade", fair ? 1.0f : 0.0f);
-        
+
         float outcome = fair ? 0.7f : -0.8f;
         Experience experience = new Experience(ExperienceType.TRADING, "emerald_trade", parameters, outcome);
         profile.addExperience(experience);
-        
+
         // Learn player trading patterns
         String playerPattern = "player_" + player.getUuidAsString() + "_trading";
         profile.incrementBehaviorCount(playerPattern);
-        
+
         // Adjust future trade expectations
         if (!fair) {
             profile.preferences.compute(
@@ -381,16 +487,16 @@ public class VillagerLearningSystem {
             );
         }
     }
-    
-    public static void processSocialOutcome(VillagerEntity villager, VillagerEntity other, String interactionType, float outcome) {
+
+    public void processSocialOutcome(VillagerEntity villager, VillagerEntity other, String interactionType, float outcome) {
         if (villager == null || other == null || interactionType == null) return;
-        
+
         VillagerLearningProfile profile = getLearningProfile(villager);
         if (profile == null) return;
-        
+
         VillagerData villagerData = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         VillagerData otherData = other.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-        
+
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("other_personality",
             otherData != null && otherData.getPersonality() != null
@@ -411,7 +517,7 @@ public class VillagerLearningSystem {
     }
     
 
-    public static void processWorkOutcome(VillagerEntity villager, String workType, float satisfaction) {
+    public void processWorkOutcome(VillagerEntity villager, String workType, float satisfaction) {
         if (villager == null || workType == null) return;
         
         VillagerLearningProfile profile = getLearningProfile(villager);
@@ -436,7 +542,7 @@ public class VillagerLearningSystem {
     }
     
     // Behavioral adaptation methods
-    public static boolean shouldAdaptBehavior(VillagerEntity villager, String behaviorType) {
+    public boolean shouldAdaptBehavior(VillagerEntity villager, String behaviorType) {
         VillagerLearningProfile profile = getLearningProfile(villager);
         
         List<Experience> relevantExperiences;
@@ -462,13 +568,14 @@ public class VillagerLearningSystem {
         return avgOutcome < NEGATIVE_OUTCOME_THRESHOLD;
     }
     
-    public static float getLearnedPreference(VillagerEntity villager, String preferenceType) {
+    public float getLearnedPreference(VillagerEntity villager, String preferenceType) {
         VillagerLearningProfile profile = getLearningProfile(villager);
-        return profile.getPreference(preferenceType);
+        return profile != null ? profile.getPreference(preferenceType) : 0.0f;
     }
     
-    public static float predictInteractionOutcome(VillagerEntity villager, PlayerEntity player, String interactionType) {
+    public float predictInteractionOutcome(VillagerEntity villager, PlayerEntity player, String interactionType) {
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return 0.0f;
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         Map<String, Float> conditions = new HashMap<>();
@@ -480,8 +587,7 @@ public class VillagerLearningSystem {
     }
     
     // Personality evolution based on experiences
-    public static void evolvePersonality(VillagerEntity villager) {
-        VillagerLearningProfile profile = getLearningProfile(villager);
+    public void evolvePersonality(VillagerEntity villager, VillagerLearningProfile profile) {
         VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
         
         if (data == null || profile.getCurrentExperienceCount() < 50) return; // Need enough experiences
@@ -519,7 +625,7 @@ public class VillagerLearningSystem {
     }
     
     // NBT serialization for persistence
-    public static void saveLearningDataToNbt(VillagerEntity villager, NbtCompound nbt) {
+    public void saveLearningDataToNbt(VillagerEntity villager, NbtCompound nbt) {
         VillagerLearningProfile profile = learningProfiles.get(villager.getUuidAsString());
         if (profile == null) return;
         
@@ -644,7 +750,7 @@ public class VillagerLearningSystem {
         nbt.put("learning_data", learningNbt);
     }
     
-    public static void loadLearningDataFromNbt(VillagerEntity villager, NbtCompound nbt) {
+    public void loadLearningDataFromNbt(VillagerEntity villager, NbtCompound nbt) {
         if (!nbt.contains("learning_data")) return;
         
         NbtCompound learningNbt = nbt.getCompound("learning_data").orElse(new NbtCompound());
@@ -753,15 +859,17 @@ public class VillagerLearningSystem {
         learningProfiles.put(villager.getUuidAsString(), profile);
     }
     
-    public static void clearLearningData(String villagerUuid) {
+    public void clearLearningData(String villagerUuid) {
         learningProfiles.remove(villagerUuid);
     }
     
     // Global learning system management
 
     // Analytics and debugging
-    public static Map<String, Object> getLearningAnalytics(VillagerEntity villager) {
+    public Map<String, Object> getLearningAnalytics(VillagerEntity villager) {
         VillagerLearningProfile profile = getLearningProfile(villager);
+        if (profile == null) return new HashMap<>();
+        
         Map<String, Object> analytics = new HashMap<>();
         
         analytics.put("experience_count", profile.getExperienceCount());

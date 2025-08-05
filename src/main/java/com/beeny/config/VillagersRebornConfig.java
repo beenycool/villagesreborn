@@ -97,6 +97,31 @@ public class VillagersRebornConfig {
      * Example: http://localhost:8080
      */
     public static String LLM_LOCAL_URL = "http://localhost:8080";
+    
+    // AI Subsystem Update Intervals (in milliseconds)
+    /**
+     * Update interval for the emotion system.
+     * Units: milliseconds.
+     */
+    public static int AI_EMOTION_UPDATE_INTERVAL = 60000; // 60 seconds
+    
+    /**
+     * Update interval for the AI manager state system.
+     * Units: milliseconds.
+     */
+    public static int AI_MANAGER_UPDATE_INTERVAL = 5000; // 5 seconds
+    
+    /**
+     * Update interval for the GOAP planning system.
+     * Units: milliseconds.
+     */
+    public static int AI_GOAP_UPDATE_INTERVAL = 3000; // 3 seconds
+    
+    /**
+     * Cooldown period for villager marriage proposals.
+     * Units: milliseconds.
+     */
+    public static int MARRIAGE_PACKET_COOLDOWN = 5000; // 5 seconds
     /**
      * Full endpoint for a locally hosted LLM service when {@link #LLM_PROVIDER} is "local".
      * Example: http://localhost:8080

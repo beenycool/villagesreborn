@@ -1,6 +1,7 @@
 package com.beeny;
 
 import com.beeny.data.VillagerData;
+import com.beeny.network.*;
 import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
@@ -30,7 +31,19 @@ public class Villagersreborn implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        // Delegate to new initializer
-        new ModInitializer().onInitialize();
+        // Initialize the mod directly since the separate ModInitializer was removed
+        LOGGER.info("Initializing VillagersReborn mod...");
+        
+        // Register network packets
+        OpenFamilyTreePacket.register();
+        FamilyTreeDataPacket.register();
+        UpdateVillagerNotesPacket.register();
+        TestLLMConnectionPacket.register();
+        VillagerTeleportPacket.register();
+        TestLLMConnectionResultPacket.register();
+        RequestVillagerListPacket.register();
+        VillagerMarriagePacket.register();
+        
+        LOGGER.info("VillagersReborn mod initialized successfully!");
     }
 }

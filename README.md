@@ -1,5 +1,11 @@
 # Villagers Reborn
 
+## Documentation
+
+Start here:
+- Configuration guide: [docs/CONFIG.md](docs/CONFIG.md)
+- Backup and restore: [docs/BACKUP.md](docs/BACKUP.md)
+
 Hey there! 👋 Welcome to Villagers Reborn—a Minecraft Fabric mod I made to give villagers cool custom names and let them chat with you using AI!
 
 ## What Is This Mod?

@@ -1,5 +1,54 @@
 package com.beeny.commands;
 
+import com.beeny.config.VillagersRebornConfig;
+import com.beeny.constants.VillagerConstants;
+import com.beeny.dialogue.DialogueCache;
+import com.beeny.dialogue.LLMDialogueManager;
+import com.beeny.dialogue.VillagerMemoryManager;
+import com.beeny.system.ServerVillagerManager;
+import com.beeny.system.VillagerDialogueSystem;
+import com.beeny.system.VillagerScheduleManager;
+import com.beeny.util.VillagerDataUtils;
+import com.beeny.util.VillagerNames;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.entity.Entity;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.command.CommandRegistryAccess;
+import net.minecraft.server.command.CommandManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.command.argument.EntityArgumentType;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import com.beeny.Villagersreborn;
+import com.beeny.data.VillagerData;
+import com.beeny.network.OpenFamilyTreePacket;
+import com.beeny.system.VillagerRelationshipManager;
+import net.minecraft.text.ClickEvent;
+
 /**
  * Legacy VillagerCommands class - now delegates to VillagerCommandRegistry
  * 
@@ -12,6 +61,9 @@ package com.beeny.commands;
  */
 public class VillagerCommands {
     private static final double RANDOMIZE_SEARCH_RADIUS = VillagerConstants.SearchRadius.RANDOMIZE;
+    private static final double NEAREST_SEARCH_RADIUS = 32.0;
+    private static final double LIST_SEARCH_RADIUS = 50.0;
+    private static final double FIND_SEARCH_RADIUS = 100.0;
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -51,6 +103,17 @@ public class VillagerCommands {
                 .then(CommandManager.literal("toggle")
                     .executes(VillagerCommands::toggleDynamicDialogue))
             )
+            // Backup export: /villager backup export
+            .then(CommandManager.literal("backup")
+                .then(CommandManager.literal("export")
+                    .executes(ctx -> {
+                        ServerVillagerManager.getInstance().exportVillagerDataBackup();
+                        ctx.getSource().sendFeedback(() ->
+                            Text.literal("Villager data backup export triggered").formatted(Formatting.GREEN), false);
+                        return 1;
+                    })
+                )
+            )
             // ... (other villager commands: rename, list, find, etc. unchanged)
         );
     }
@@ -82,12 +145,7 @@ public class VillagerCommands {
                 Text.literal("Look at a villager to test dialogue!").formatted(Formatting.RED), false);
             return 0;
         }
-        VillagerData villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (villagerData == null) {
-            source.sendFeedback(() ->
-                Text.literal("This villager has no data!").formatted(Formatting.RED), false);
-            return 0;
-        }
+        VillagerData villagerData = VillagerDataUtils.ensureVillagerData(villager);
         VillagerDialogueSystem.DialogueContext dialogueContext =
             new VillagerDialogueSystem.DialogueContext(villager, source.getPlayer());
         source.sendFeedback(() ->
@@ -232,24 +290,22 @@ public class VillagerCommands {
         
         int renamedCount = 0;
         for (VillagerEntity villager : villagers) {
-            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-            if (data != null) {
-                String oldName = data.getName();
-                data.setName(newName);
-                villager.setAttached(Villagersreborn.VILLAGER_NAME, newName); 
-                villager.setCustomName(Text.literal(newName));
-                renamedCount++;
-                
-                String feedback = !oldName.isEmpty() 
-                    ? String.format("Renamed villager from '%s' to '%s' at (%.1f, %.1f, %.1f)", 
-                        oldName, newName, villager.getX(), villager.getY(), villager.getZ())
-                    : String.format("Named villager '%s' at (%.1f, %.1f, %.1f)", 
-                        newName, villager.getX(), villager.getY(), villager.getZ());
-                
-                sendInfo(source, feedback);
-            }
+            VillagerData data = VillagerDataUtils.ensureVillagerData(villager);
+            
+            String oldName = data.getName();
+            data.setName(newName);
+            villager.setAttached(Villagersreborn.VILLAGER_NAME, newName);
+            villager.setCustomName(Text.literal(newName));
+            renamedCount++;
+            
+            String feedback = !oldName.isEmpty()
+                ? String.format("Renamed villager from '%s' to '%s' at (%.1f, %.1f, %.1f)",
+                    oldName, newName, villager.getX(), villager.getY(), villager.getZ())
+                : String.format("Named villager '%s' at (%.1f, %.1f, %.1f)",
+                    newName, villager.getX(), villager.getY(), villager.getZ());
+            
+            sendInfo(source, feedback);
         }
-        
         sendSuccess(source, String.format("Successfully renamed %d villager%s to '%s'", 
             renamedCount, renamedCount == 1 ? "" : "s", newName));
         return renamedCount;
@@ -265,12 +321,11 @@ public class VillagerCommands {
             return 0;
         }
 
-        VillagerData data = nearestVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (data == null) return 0;
+        VillagerData data = VillagerDataUtils.ensureVillagerData(nearestVillager);
         
         String oldName = data.getName();
         data.setName(newName);
-        nearestVillager.setAttached(Villagersreborn.VILLAGER_NAME, newName); 
+        nearestVillager.setAttached(Villagersreborn.VILLAGER_NAME, newName);
         nearestVillager.setCustomName(Text.literal(newName));
 
         String feedback = !oldName.isEmpty() 
@@ -290,11 +345,7 @@ public class VillagerCommands {
             return 0;
         }
         
-        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (data == null) {
-            sendError(context.getSource(), "Villager has no data");
-            return 0;
-        }
+        VillagerData data = VillagerDataUtils.ensureVillagerData(villager);
         
         ServerCommandSource source = context.getSource();
         
@@ -428,9 +479,8 @@ public class VillagerCommands {
         ServerPlayNetworking.send(context.getSource().getPlayer(), 
             new OpenFamilyTreePacket(villager.getId()));
         
-        sendSuccess(context.getSource(), "Opening family tree for " + 
-            (villager.getAttached(Villagersreborn.VILLAGER_DATA) != null ? 
-             villager.getAttached(Villagersreborn.VILLAGER_DATA).getName() : "villager"));
+        VillagerData data = VillagerDataUtils.ensureVillagerData(villager);
+        sendSuccess(context.getSource(), "Opening family tree for " + data.getName());
         
         return 1;
     }
@@ -451,8 +501,8 @@ public class VillagerCommands {
             
             
             if (!VillagerRelationshipManager.canMarry(villager1, villager2)) {
-                VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
-                VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
+                VillagerData data1 = VillagerDataUtils.ensureVillagerData(villager1);
+                VillagerData data2 = VillagerDataUtils.ensureVillagerData(villager2);
                 
                 if (data1 != null && data2 != null) {
                     if (data1.getAge() < 100 || data2.getAge() < 100) {
@@ -1164,11 +1214,7 @@ public class VillagerCommands {
             return 0;
         }
         
-        VillagerData villagerData = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-        if (villagerData == null) {
-            sendError(source, "This villager has no data!");
-            return 0;
-        }
+        VillagerData villagerData = VillagerDataUtils.ensureVillagerData(villager);
         
         // Create dialogue context
         VillagerDialogueSystem.DialogueContext dialogueContext = 
@@ -1315,12 +1361,18 @@ public class VillagerCommands {
         sendInfo(source, "  /villager schedule <villager> - Show daily schedule");
         sendInfo(source, "  /villager help - Show this help");
         sendInfo(source, "");
-        
-        sendInfo(source, "🔧 QUICK START:");
+
+        // Documentation references
+        sendInfo(source, "📘 DOCUMENTATION:");
+        sendInfo(source, "  Configuration guide: see docs/CONFIG.md");
+        sendInfo(source, "  Backups and restore: see docs/BACKUP.md");
+        sendInfo(source, "");
+
+        sendInfo(source, "� QUICK START:");
         sendInfo(source, "1. Setup AI: /villager ai setup gemini YOUR_API_KEY");
         sendInfo(source, "2. Test it: /villager ai test (look at a villager)");
         sendInfo(source, "3. Manage villagers: /villager manage list");
-        
+
         return 1;
     }
 }

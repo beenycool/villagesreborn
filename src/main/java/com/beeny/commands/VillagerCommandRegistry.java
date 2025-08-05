@@ -3,6 +3,7 @@ package com.beeny.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.CommandRegistryAccess;
+import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 
 /**
@@ -20,7 +21,7 @@ public class VillagerCommandRegistry {
     
     private static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher, 
                                        CommandRegistryAccess registryAccess, 
-                                       net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.RegistrationEnvironment environment) {
+                                       CommandManager.RegistrationEnvironment environment) {
         
         // Register all command modules
         VillagerAICommands.register(dispatcher);

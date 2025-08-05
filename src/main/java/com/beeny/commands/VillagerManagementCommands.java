@@ -182,20 +182,10 @@ public class VillagerManagementCommands extends BaseVillagerCommand {
         double distance = source.getPosition().distanceTo(pos);
         
         Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
-            .formatted(Formatting.AQUA)
-            .styled(style -> style
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    Text.literal("Click to teleport to this villager")))
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                    String.format("/tp @s %.3f %.3f %.3f", pos.x, pos.y, pos.z))));
+            .formatted(Formatting.AQUA);
 
         Text message = Text.literal("- ")
-            .append(Text.literal(data.getName()).formatted(Formatting.WHITE)
-                .styled(style -> style
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        Text.literal("Click to see info for " + data.getName())))
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                        String.format("/villager manage info %s", villager.getUuidAsString())))))
+            .append(Text.literal(data.getName()).formatted(Formatting.WHITE))
             .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
             .append(Text.literal(" at "))
             .append(coordsText)
@@ -244,20 +234,10 @@ public class VillagerManagementCommands extends BaseVillagerCommand {
         String professionId = villager.getVillagerData().profession().toString();
         
         Text coordsText = Text.literal(String.format("[%.1f, %.1f, %.1f]", pos.x, pos.y, pos.z))
-            .formatted(Formatting.AQUA)
-            .styled(style -> style
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    Text.literal("Click to teleport to this villager")))
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                    String.format("/tp @s %.3f %.3f %.3f", pos.x, pos.y, pos.z))));
+            .formatted(Formatting.AQUA);
 
         Text message = Text.literal("Found ")
-            .append(Text.literal(data.getName()).formatted(Formatting.GREEN)
-                .styled(style -> style
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        Text.literal("Click to see info for " + data.getName())))
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                        "/villager manage info " + villager.getUuidAsString()))))
+            .append(Text.literal(data.getName()).formatted(Formatting.GREEN))
             .append(Text.literal(" (" + professionId + ")").formatted(Formatting.GRAY))
             .append(Text.literal(" at "))
             .append(coordsText)

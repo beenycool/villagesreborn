@@ -589,8 +589,8 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     private void teleportToVillager() {
         if (selectedVillagerData != null && client != null && client.player != null) {
-            // Send teleport packet using data from selectedVillagerData
-            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillagerData.getId().hashCode()));
+            // Send teleport packet using the correct runtime entity ID
+            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillagerData.getEntityIdInt()));
 
             client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_ENDERMAN_TELEPORT, 1.0f));
             close();
@@ -609,7 +609,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
             
             
             
-            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillagerData.getId().hashCode(), notes));
+            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillagerData.getEntityIdInt(), notes));
             
             
             if (selectedVillagerData != null) {

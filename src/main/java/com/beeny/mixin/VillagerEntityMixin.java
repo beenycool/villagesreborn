@@ -11,6 +11,7 @@ import com.beeny.system.VillagerEmotionalBehavior;
 import com.beeny.system.VillagerPersonalityBehavior;
 import com.beeny.system.VillagerMemoryEnhancer;
 import com.beeny.util.VillagerNames;
+import com.beeny.util.VillagerUtils;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -372,19 +373,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         }
         
         
-        // Use ServerVillagerManager for efficient nearby villager lookup
-        List<VillagerEntity> nearbyVillagers = new java.util.ArrayList<>();
+        // Check social happiness based on nearby villagers
         double range = 10.0;
-        Box searchBox = new Box(
-            villager.getX() - range, villager.getY() - range, villager.getZ() - range,
-            villager.getX() + range, villager.getY() + range, villager.getZ() + range
-        );
-        List<VillagerEntity> found = villager.getWorld().getEntitiesByClass(
-            VillagerEntity.class,
-            searchBox,
-            v -> v != villager && v.getWorld() == villager.getWorld()
-        );
-        nearbyVillagers.addAll(found);
+        List<VillagerEntity> nearbyVillagers = VillagerUtils.getNearbyVillagersOptimized(villager, range);
         
         if (nearbyVillagers.size() > 2) {
             data.adjustHappiness(1);

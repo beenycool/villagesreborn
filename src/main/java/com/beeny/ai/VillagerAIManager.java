@@ -1,77 +1,138 @@
 package com.beeny.ai;
 
+import com.beeny.ai.core.AISubsystem;
+import com.beeny.data.VillagerData;
 import net.minecraft.entity.passive.VillagerEntity;
-import java.util.HashMap;
-import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
-public class VillagerAIManager {
-    
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Refactored AI state manager that implements AISubsystem interface.
+ * Manages general AI state and coordination between other subsystems.
+ */
+public class VillagerAIManager implements AISubsystem {
+
     public static class VillagerAIState {
-        private final Map<String, Object> context = new HashMap<>();
-        public boolean isAIActive = true;
-        
+        private final Map<String, Object> context = new ConcurrentHashMap<>();
+        public volatile boolean isAIActive = true;
+
         public void setContext(@NotNull String key, @NotNull Object value) {
             context.put(key, value);
         }
-        
+
         public Object getContext(@NotNull String key) {
             return context.get(key);
         }
-        
+
         public Map<String, Object> getAllContext() {
             return new HashMap<>(context);
         }
     }
-    
-    private static final Map<String, VillagerAIState> aiStates = new HashMap<>();
-    
-    public static void initializeVillagerAI(@NotNull VillagerEntity villager) {
+
+    // Instance state
+    private final Map<String, VillagerAIState> aiStates = new ConcurrentHashMap<>();
+
+    public void initializeVillagerAI(@NotNull VillagerEntity villager) {
         String uuid = villager.getUuidAsString();
         aiStates.computeIfAbsent(uuid, k -> new VillagerAIState());
     }
-    
-    public static VillagerAIState getVillagerAIState(@NotNull VillagerEntity villager) {
+
+    public VillagerAIState getVillagerAIState(@NotNull VillagerEntity villager) {
         String uuid = villager.getUuidAsString();
         return aiStates.computeIfAbsent(uuid, k -> {
             initializeVillagerAI(villager);
             return aiStates.get(uuid);
         });
     }
-    
-    public static void clearVillagerAI(@NotNull String villagerUuid) {
+
+    public void clearVillagerAI(@NotNull String villagerUuid) {
         aiStates.remove(villagerUuid);
     }
-    
-    public static void performMaintenance() {
-        // Cleanup old AI states, etc.
-    }
-    
-    public static void onVillagerTrade(@NotNull VillagerEntity villager, @NotNull net.minecraft.entity.player.PlayerEntity player, boolean successful, int value) {
-        // Handle trade events for AI learning
+
+
+    public void onVillagerTrade(@NotNull VillagerEntity villager, @NotNull net.minecraft.entity.player.PlayerEntity player, boolean successful, int value) {
         VillagerAIState state = getVillagerAIState(villager);
         state.setContext("last_trade_successful", successful);
         state.setContext("last_trade_value", value);
         state.setContext("last_trade_player", player.getUuidAsString());
     }
-    
-    public static java.util.List<net.minecraft.text.Text> getVillagerAIStatus(@NotNull VillagerEntity villager) {
+
+    public java.util.List<net.minecraft.text.Text> getVillagerAIStatus(@NotNull VillagerEntity villager) {
         java.util.List<net.minecraft.text.Text> status = new java.util.ArrayList<>();
         VillagerAIState state = getVillagerAIState(villager);
-        
+
         status.add(net.minecraft.text.Text.literal("AI Status: " + (state.isAIActive ? "Active" : "Inactive")));
         status.add(net.minecraft.text.Text.literal("Context size: " + state.context.size()));
-        
+
         return status;
     }
-    
-    public static Map<String, Object> getGlobalAIAnalytics() {
-        return getAnalytics();
-    }
-    
-    public static Map<String, Object> getAnalytics() {
+
+
+    // Methods that were previously static - now migrated to be called through AIWorldManager
+    public Map<String, Object> getGlobalAIAnalytics() {
         Map<String, Object> analytics = new HashMap<>();
-        analytics.put("active_ai_states", aiStates.size());
+        analytics.put("total_managed_ais", aiStates.size());
+        analytics.put("active_ais", (int) aiStates.values().stream().filter(state -> state.isAIActive).count());
         return analytics;
+    }
+
+    // AISubsystem implementation
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        initializeVillagerAI(villager);
+    }
+
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        // General AI state updates can be done here
+        // For now, just ensure the state exists
+        getVillagerAIState(villager);
+    }
+
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        clearVillagerAI(villagerUuid);
+    }
+
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        VillagerAIState state = aiStates.get(villager.getUuidAsString());
+        return state != null && state.isAIActive;
+    }
+
+    @Override
+    public long getUpdateInterval() {
+        return com.beeny.config.ConfigManager.getInt("aiManagerUpdateInterval", 5000);
+    }
+
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "AIManager";
+    }
+
+    @Override
+    public int getPriority() {
+        return 50; // Medium priority - runs after emotions but before complex systems
+    }
+
+    @Override
+    public void performMaintenance() {
+        // Clean up inactive states periodically
+        aiStates.entrySet().removeIf(entry -> !entry.getValue().isAIActive);
+    }
+
+    @Override
+    public void shutdown() {
+        aiStates.clear();
+    }
+
+    @Override
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        return getGlobalAIAnalytics();
     }
 }

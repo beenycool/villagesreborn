@@ -11,6 +11,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import com.beeny.util.BoundingBoxUtils;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;

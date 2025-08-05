@@ -2,7 +2,6 @@ package com.beeny.ai.quests;
 
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
-import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -11,6 +10,7 @@ import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,6 +67,7 @@ public class VillagerQuestSystem {
         public final QuestType type;
         public final QuestPriority priority;
         public final VillagerEntity questGiver;
+        public final String giverUuid;
         public final PlayerEntity questReceiver;
         public final Map<String, Object> objectives;
         public final Map<String, Object> rewards;
@@ -85,6 +86,7 @@ public class VillagerQuestSystem {
             this.type = type;
             this.priority = priority;
             this.questGiver = questGiver;
+            this.giverUuid = questGiver != null ? questGiver.getUuidAsString() : "";
             this.questReceiver = questReceiver;
             this.objectives = new ConcurrentHashMap<>();
             this.rewards = new ConcurrentHashMap<>();
@@ -273,7 +275,7 @@ public class VillagerQuestSystem {
         
         @Override
         public QuestPriority calculatePriority(VillagerEntity villager) {
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().getEmotionalState(villager);
             float stress = emotions.getEmotion(VillagerEmotionSystem.EmotionType.STRESS);
             
             if (stress > 70) return QuestPriority.HIGH;
@@ -353,7 +355,7 @@ public class VillagerQuestSystem {
         @Override
         public Quest generateQuest(VillagerEntity villager, PlayerEntity player) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().getEmotionalState(villager);
             
             if (data == null) return null;
             
@@ -440,7 +442,7 @@ public class VillagerQuestSystem {
         
         @Override
         public QuestPriority calculatePriority(VillagerEntity villager) {
-            VillagerEmotionSystem.EmotionalState emotions = VillagerEmotionSystem.getEmotionalState(villager);
+            VillagerEmotionSystem.EmotionalState emotions = ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().getEmotionalState(villager);
             float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS);
             
             if (loneliness > 80) return QuestPriority.HIGH;
@@ -501,58 +503,94 @@ public class VillagerQuestSystem {
         }
     }
     
-    // Quest management system
-    public static class QuestManager {
-        private static final Map<String, Quest> activeQuests = new ConcurrentHashMap<>();
-        private static final Map<String, List<Quest>> playerQuests = new ConcurrentHashMap<>();
-        private static final List<QuestGenerator> questGenerators = Arrays.asList(
-            new FetchQuestGenerator(),
-            new DeliveryQuestGenerator(),
-            new SocialQuestGenerator(),
-            new MysteryQuestGenerator()
-        );
+    // Instance-based Quest management system (replaces static QuestManager)
+    private final Map<String, Quest> activeQuests = new ConcurrentHashMap<>();
+    private final Map<String, List<Quest>> playerQuests = new ConcurrentHashMap<>();
+    private final List<QuestGenerator> questGenerators = Arrays.asList(
+        new FetchQuestGenerator(),
+        new DeliveryQuestGenerator(),
+        new SocialQuestGenerator(),
+        new MysteryQuestGenerator()
+    );
+    
+    // Instance-based lifecycle methods
+    public void initializeVillagerQuests(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        // Initialize quest state for villager if needed
+    }
+
+    public void updateVillagerQuests(@NotNull VillagerEntity villager) {
+        // Update quest progress, check for completions, etc.
+        cleanupExpiredQuests();
+    }
+
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        // Remove quests associated with this villager
+        activeQuests.values().removeIf(quest -> quest.giverUuid.equals(villagerUuid));
+    }
+
+    public void performMaintenance() {
+        cleanupExpiredQuests();
+    }
+
+    public void shutdown() {
+        activeQuests.clear();
+        playerQuests.clear();
+    }
+
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("total_active_quests", activeQuests.size());
+        analytics.put("total_players_with_quests", playerQuests.size());
+        return analytics;
+    }
+    
+    public Quest generateQuestForVillager(VillagerEntity villager, PlayerEntity player) {
+        // Check cooldown - don't generate quests too frequently
+        if (hasRecentQuest(villager, player)) return null;
         
-        public static Quest generateQuestForVillager(VillagerEntity villager, PlayerEntity player) {
-            // Check cooldown - don't generate quests too frequently
-            if (hasRecentQuest(villager, player)) return null;
+        // Find available quest generators
+        List<QuestGenerator> availableGenerators = questGenerators.stream()
+            .filter(gen -> gen.canGenerateQuest(villager, player))
+            .toList();
+        
+        if (availableGenerators.isEmpty()) return null;
+        
+        // Select generator based on priority and randomness
+        QuestGenerator selectedGenerator = selectWeightedGenerator(availableGenerators, villager);
+        Quest quest = selectedGenerator.generateQuest(villager, player);
+        
+        if (quest != null) {
+            activeQuests.put(quest.id, quest);
+            playerQuests.computeIfAbsent(player.getUuidAsString(), k -> new ArrayList<>()).add(quest);
             
-            // Find available quest generators
-            List<QuestGenerator> availableGenerators = questGenerators.stream()
-                .filter(gen -> gen.canGenerateQuest(villager, player))
-                .toList();
-            
-            if (availableGenerators.isEmpty()) return null;
-            
-            // Select generator based on priority and randomness
-            QuestGenerator selectedGenerator = selectWeightedGenerator(availableGenerators, villager);
-            Quest quest = selectedGenerator.generateQuest(villager, player);
-            
-            if (quest != null) {
-                activeQuests.put(quest.id, quest);
-                playerQuests.computeIfAbsent(player.getUuidAsString(), k -> new ArrayList<>()).add(quest);
-                
-                // Create gossip about the quest
-                VillagerGossipNetwork.createGossip(villager, player.getUuidAsString(),
-                    VillagerGossipNetwork.GossipType.ACHIEVEMENT,
+            // Create gossip about the quest through AIWorldManager
+            try {
+                com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+                aiManager.getGossipManager().createGossip(villager, player.getUuidAsString(),
+                    com.beeny.ai.social.VillagerGossipManager.GossipType.ACHIEVEMENT,
                     "Gave " + player.getName().getString() + " a task to help the village");
+            } catch (Exception e) {
+                // Silently handle if AI manager not available
             }
-            
-            return quest;
         }
         
-        private static boolean hasRecentQuest(VillagerEntity villager, PlayerEntity player) {
-            List<Quest> playerQuestList = playerQuests.get(player.getUuidAsString());
-            if (playerQuestList == null) return false;
-            
-            long cooldownTime = 600000; // 10 minutes
-            long currentTime = System.currentTimeMillis();
-            
-            return playerQuestList.stream()
+        return quest;
+    }
+    
+    private boolean hasRecentQuest(VillagerEntity villager, PlayerEntity player) {
+        List<Quest> playerQuestList = playerQuests.get(player.getUuidAsString());
+        if (playerQuestList == null) return false;
+        
+        long cooldownTime = 600000; // 10 minutes
+        long currentTime = System.currentTimeMillis();
+        
+        return playerQuestList.stream()
                 .anyMatch(quest -> quest.questGiver.equals(villager) && 
                          (currentTime - quest.creationTime) < cooldownTime);
         }
         
-        private static QuestGenerator selectWeightedGenerator(List<QuestGenerator> generators, VillagerEntity villager) {
+        private QuestGenerator selectWeightedGenerator(List<QuestGenerator> generators, VillagerEntity villager) {
             Map<QuestGenerator, Float> weights = new HashMap<>();
             
             for (QuestGenerator generator : generators) {
@@ -574,18 +612,18 @@ public class VillagerQuestSystem {
             return generators.get(0); // Fallback
         }
         
-        public static List<Quest> getPlayerQuests(PlayerEntity player) {
+        public List<Quest> getPlayerQuests(PlayerEntity player) {
             return new ArrayList<>(playerQuests.getOrDefault(player.getUuidAsString(), new ArrayList<>()));
         }
         
-        public static List<Quest> getActiveQuests(PlayerEntity player) {
+        public List<Quest> getActiveQuests(PlayerEntity player) {
             return getPlayerQuests(player).stream()
                 .filter(quest -> quest.getStatus() == Quest.QuestStatus.ACCEPTED || 
                               quest.getStatus() == Quest.QuestStatus.IN_PROGRESS)
                 .toList();
         }
         
-        public static boolean acceptQuest(String questId, PlayerEntity player) {
+        public boolean acceptQuest(String questId, PlayerEntity player) {
             Quest quest = activeQuests.get(questId);
             if (quest != null && quest.questReceiver.equals(player) && 
                 quest.getStatus() == Quest.QuestStatus.AVAILABLE) {
@@ -595,7 +633,7 @@ public class VillagerQuestSystem {
             return false;
         }
         
-        public static boolean completeQuest(String questId, PlayerEntity player) {
+        public boolean completeQuest(String questId, PlayerEntity player) {
             Quest quest = activeQuests.get(questId);
             if (quest != null && quest.questReceiver.equals(player) && 
                 quest.getCompletionPercentage() >= 1.0f) {
@@ -603,12 +641,17 @@ public class VillagerQuestSystem {
                 quest.setStatus(Quest.QuestStatus.COMPLETED);
                 giveQuestRewards(quest, player);
                 
-                // Create positive gossip about quest completion
+                // Create positive gossip about quest completion through AIWorldManager
                 VillagerData questGiverData = quest.questGiver.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
                 if (questGiverData != null) {
-                    VillagerGossipNetwork.createGossip(quest.questGiver, player.getUuidAsString(),
-                        VillagerGossipNetwork.GossipType.ACHIEVEMENT, 
-                        "Successfully completed a quest for " + questGiverData.getName());
+                    try {
+                        com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+                        aiManager.getGossipManager().createGossip(quest.questGiver, player.getUuidAsString(),
+                            com.beeny.ai.social.VillagerGossipManager.GossipType.ACHIEVEMENT,
+                            "Successfully completed a quest for " + questGiverData.getName());
+                    } catch (Exception e) {
+                        // Silently handle if AI manager not available
+                    }
                 }
                 
                 return true;
@@ -616,7 +659,7 @@ public class VillagerQuestSystem {
             return false;
         }
         
-        private static void giveQuestRewards(Quest quest, PlayerEntity player) {
+        private void giveQuestRewards(Quest quest, PlayerEntity player) {
             VillagerData questGiverData = quest.questGiver.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             
             for (Map.Entry<String, Object> reward : quest.rewards.entrySet()) {
@@ -654,14 +697,14 @@ public class VillagerQuestSystem {
             }
             
             // Emotional impact on quest giver
-            VillagerEmotionSystem.processEmotionalEvent(quest.questGiver,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(quest.questGiver,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 25.0f, "quest_completed", false));
         }
         
         /**
          * Parse emerald amount from reward string like "5 Emeralds" or "1 Emerald"
          */
-        private static int parseEmeraldAmount(String rewardString) {
+        private int parseEmeraldAmount(String rewardString) {
             try {
                 String[] parts = rewardString.split(" ");
                 if (parts.length > 0) {
@@ -677,7 +720,7 @@ public class VillagerQuestSystem {
         /**
          * Give special rewards to player
          */
-        private static void giveSpecialReward(PlayerEntity player, String rewardDescription) {
+        private void giveSpecialReward(PlayerEntity player, String rewardDescription) {
             // Give some special items based on the reward description
             ItemStack specialItem = null;
             
@@ -709,7 +752,7 @@ public class VillagerQuestSystem {
             }
         }
         
-        public static void updateQuestProgress(String questId, String progressKey, Object value) {
+        public void updateQuestProgress(String questId, String progressKey, Object value) {
             Quest quest = activeQuests.get(questId);
             if (quest != null) {
                 quest.updateProgress(progressKey, value);
@@ -720,7 +763,7 @@ public class VillagerQuestSystem {
             }
         }
         
-        public static void cleanupExpiredQuests() {
+        public void cleanupExpiredQuests() {
             activeQuests.entrySet().removeIf(entry -> {
                 Quest quest = entry.getValue();
                 if (quest.isExpired()) {
@@ -741,7 +784,7 @@ public class VillagerQuestSystem {
             );
         }
         
-        public static List<Text> getQuestListForPlayer(PlayerEntity player) {
+        public List<Text> getQuestListForPlayer(PlayerEntity player) {
             List<Quest> quests = getActiveQuests(player);
             List<Text> questList = new ArrayList<>();
             
@@ -769,54 +812,68 @@ public class VillagerQuestSystem {
             
             return questList;
         }
-    }
     
-    // Integration helpers
+    // Integration helpers (now use AIWorldManager instance)
     public static void onPlayerInteractWithVillager(VillagerEntity villager, PlayerEntity player) {
         // Chance to offer a quest
         if (ThreadLocalRandom.current().nextFloat() < 0.1f) { // 10% chance
-            Quest quest = QuestManager.generateQuestForVillager(villager, player);
-            if (quest != null) {
-                player.sendMessage(Text.literal("" + villager.getName().getString() + " has a quest for you!")
-                    .formatted(Formatting.GREEN), false);
+            try {
+                com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+                Quest quest = aiManager.getQuestSystem().generateQuestForVillager(villager, player);
+                if (quest != null) {
+                    player.sendMessage(Text.literal("" + villager.getName().getString() + " has a quest for you!")
+                        .formatted(Formatting.GREEN), false);
+                }
+            } catch (Exception e) {
+                // Silently handle if AI manager not available
             }
         }
     }
     
     public static void onItemDelivered(PlayerEntity player, VillagerEntity recipient, String itemType) {
-        List<Quest> activeQuests = QuestManager.getActiveQuests(player);
-        
-        for (Quest quest : activeQuests) {
-            if (quest.type == QuestType.DELIVERY && 
-                quest.objectives.get("recipient_uuid").equals(recipient.getUuidAsString()) &&
-                quest.objectives.get("item_type").equals(itemType)) {
-                
-                QuestManager.updateQuestProgress(quest.id, "delivery_completed", true);
-                player.sendMessage(Text.literal("Quest objective completed!").formatted(Formatting.GREEN), false);
-                
-                if (quest.getCompletionPercentage() >= 1.0f) {
-                    QuestManager.completeQuest(quest.id, player);
-                    player.sendMessage(Text.literal("Quest completed: " + quest.title).formatted(Formatting.GOLD), false);
+        try {
+            com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+            List<Quest> activeQuests = aiManager.getQuestSystem().getActiveQuests(player);
+            
+            for (Quest quest : activeQuests) {
+                if (quest.type == QuestType.DELIVERY && 
+                    quest.objectives.get("recipient_uuid").equals(recipient.getUuidAsString()) &&
+                    quest.objectives.get("item_type").equals(itemType)) {
+                    
+                    aiManager.getQuestSystem().updateQuestProgress(quest.id, "delivery_completed", true);
+                    player.sendMessage(Text.literal("Quest objective completed!").formatted(Formatting.GREEN), false);
+                    
+                    if (quest.getCompletionPercentage() >= 1.0f) {
+                        aiManager.getQuestSystem().completeQuest(quest.id, player);
+                        player.sendMessage(Text.literal("Quest completed: " + quest.title).formatted(Formatting.GOLD), false);
+                    }
                 }
             }
+        } catch (Exception e) {
+            // Silently handle if AI manager not available
         }
     }
     
     public static void onItemFetchedToVillager(PlayerEntity player, VillagerEntity villager, String itemType, int quantity) {
-        List<Quest> activeQuests = QuestManager.getActiveQuests(player);
-        
-        for (Quest quest : activeQuests) {
-            if (quest.type == QuestType.FETCH_ITEM && 
-                quest.questGiver.equals(villager) &&
-                quest.objectives.get("item_type").equals(itemType)) {
-                
-                int requiredQuantity = (Integer) quest.objectives.get("quantity");
-                if (quantity >= requiredQuantity) {
-                    QuestManager.updateQuestProgress(quest.id, "fetch_item_completed", true);
-                    QuestManager.completeQuest(quest.id, player);
-                    player.sendMessage(Text.literal("Quest completed: " + quest.title).formatted(Formatting.GOLD), false);
+        try {
+            com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.system.ServerVillagerManager.getInstance().getAIWorldManager();
+            List<Quest> activeQuests = aiManager.getQuestSystem().getActiveQuests(player);
+            
+            for (Quest quest : activeQuests) {
+                if (quest.type == QuestType.FETCH_ITEM && 
+                    quest.questGiver.equals(villager) &&
+                    quest.objectives.get("item_type").equals(itemType)) {
+                    
+                    int requiredQuantity = (Integer) quest.objectives.get("quantity");
+                    if (quantity >= requiredQuantity) {
+                        aiManager.getQuestSystem().updateQuestProgress(quest.id, "fetch_item_completed", true);
+                        aiManager.getQuestSystem().completeQuest(quest.id, player);
+                        player.sendMessage(Text.literal("Quest completed: " + quest.title).formatted(Formatting.GOLD), false);
+                    }
                 }
             }
+        } catch (Exception e) {
+            // Silently handle if AI manager not available
         }
     }
 }

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import com.beeny.Villagersreborn;
+import com.beeny.constants.VillagerConstants;
 import com.beeny.data.VillagerData;
 import com.beeny.network.FamilyTreeDataPacket;
 import com.beeny.system.VillagerAncestryManager;
@@ -564,7 +565,7 @@ public class VillagerFamilyTreeScreen extends Screen {
             birthTime = data.getBirthTime();
             deathTime = data.getDeathTime();
             isAlive = data.isAlive();
-            personality = data.getPersonality().toString();
+            personality = VillagerConstants.PersonalityType.toString(data.getPersonality());
             happiness = data.getHappiness();
             profession = !data.getProfessionHistory().isEmpty() ? data.getProfessionHistory().get(0) : "";
             spouseName = data.getSpouseName();

@@ -11,7 +11,9 @@ public class VillagerDataPacket {
     public static final PacketCodec<PacketByteBuf, VillagerDataPacket> CODEC = PacketCodec.of(
         (value, buf) -> {
             // Write VillagerDataPacket fields into the buffer
-            Uuids.PACKET_CODEC.encode(buf, value.getEntityId());
+            // First write the runtime entity int id, then the stable UUID
+            PacketCodecs.INTEGER.encode(buf, value.getEntityIdInt());
+            Uuids.PACKET_CODEC.encode(buf, value.getEntityUuid());
             PacketCodecs.STRING.encode(buf, value.getName());
             PacketCodecs.STRING.encode(buf, value.getProfession());
             PacketCodecs.INTEGER.encode(buf, value.getHappiness());
@@ -30,6 +32,7 @@ public class VillagerDataPacket {
             PacketCodecs.STRING.encode(buf, value.getEmotionalDescription());
         },
         buf -> new VillagerDataPacket(
+            PacketCodecs.INTEGER.decode(buf),
             Uuids.PACKET_CODEC.decode(buf),
             PacketCodecs.STRING.decode(buf),
             PacketCodecs.STRING.decode(buf),
@@ -50,7 +53,10 @@ public class VillagerDataPacket {
         )
     );
 
-    private final UUID entityId;
+    // Stable UUID for identity across sessions
+    private final UUID entityUuid;
+    // Runtime entity ID for server lookups and packets like teleport, notes, etc.
+    private final int entityIdInt;
     private final String name;
     private final String profession;
     private final int happiness;
@@ -68,7 +74,11 @@ public class VillagerDataPacket {
     private final String dominantEmotion;
     private final String emotionalDescription;
 
-    public UUID getEntityId() { return entityId; }
+    // Back-compat: previous getters
+    public UUID getEntityId() { return entityUuid; }
+    // Clear getters
+    public UUID getEntityUuid() { return entityUuid; }
+    public int getEntityIdInt() { return entityIdInt; }
     public String getName() { return name; }
     public String getProfession() { return profession; }
     public int getHappiness() { return happiness; }
@@ -87,7 +97,7 @@ public class VillagerDataPacket {
     public String getEmotionalDescription() { return emotionalDescription; }
 
     // Additional methods needed by GUI classes
-    public UUID getId() { return entityId; }
+    public UUID getId() { return entityUuid; }
     public String getSpouseId() { return spouseName; }
     public int getAgeInDays() { return age; }
     public String getHappinessDescription() {
@@ -105,11 +115,12 @@ public class VillagerDataPacket {
     public void setNotes(String notes) { this.mutableNotes = notes; }
     public String getMutableNotes() { return mutableNotes != null ? mutableNotes : notes; }
 
-    public VillagerDataPacket(UUID entityId, String name, String profession, int happiness, String personality,
+    public VillagerDataPacket(int entityIdInt, UUID entityUuid, String name, String profession, int happiness, String personality,
                             String hobby, int age, String gender, String favoriteFood, String notes,
                             String spouseName, int totalTrades, String birthPlace, String currentGoal,
                             String currentAction, String dominantEmotion, String emotionalDescription) {
-        this.entityId = entityId;
+        this.entityUuid = entityUuid;
+        this.entityIdInt = entityIdInt;
         this.name = name;
         this.profession = profession;
         this.happiness = happiness;
@@ -129,7 +140,7 @@ public class VillagerDataPacket {
     }
 
 
-    public static VillagerDataPacket fromVillagerData(com.beeny.data.VillagerData data, UUID entityId) {
+    public static VillagerDataPacket fromVillagerData(com.beeny.data.VillagerData data, int entityIdInt, UUID entityUuid) {
         // Safely handle potential null AIState and EmotionalState to avoid NPEs
         com.beeny.data.AIState aiState = data.getAiState();
         String safeCurrentGoal = (aiState != null && aiState.getCurrentGoal() != null) ? aiState.getCurrentGoal() : "";
@@ -140,7 +151,8 @@ public class VillagerDataPacket {
         String safeEmotionalDescription = (emotionalState != null && emotionalState.getEmotionalDescription() != null) ? emotionalState.getEmotionalDescription() : "";
 
         return new VillagerDataPacket(
-            entityId,
+            entityIdInt,
+            entityUuid,
             data.getName(),
             data.getProfessionData().getCurrentProfession(),
             data.getHappiness(),

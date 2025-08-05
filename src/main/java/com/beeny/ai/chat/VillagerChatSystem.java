@@ -2,7 +2,6 @@ package com.beeny.ai.chat;
 
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
-import com.beeny.ai.social.VillagerGossipNetwork;
 import com.beeny.ai.learning.VillagerLearningSystem;
 import com.beeny.dialogue.LLMDialogueManager;
 import com.beeny.dialogue.VillagerMemoryManager;
@@ -181,7 +180,7 @@ public class VillagerChatSystem {
             // Safely retrieve emotional state and ensure non-null default
             VillagerEmotionSystem.EmotionalState state = null;
             try {
-                state = (villager != null) ? VillagerEmotionSystem.getEmotionalState(villager) : null;
+                state = (villager != null) ? ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().getEmotionalState(villager) : null;
             } catch (Throwable t) {
                 // Ignore and use default below
             }
@@ -245,7 +244,7 @@ public class VillagerChatSystem {
             
             // Process learning from the interaction
             float interactionOutcome = calculateInteractionOutcome(context);
-            VillagerLearningSystem.processPlayerInteraction(
+            ServerVillagerManager.getInstance().getAIWorldManager().getLearningSystem().processPlayerInteraction(
                 context.villager, context.player, "chat_" + context.detectedIntent.name(), interactionOutcome
             );
             
@@ -347,10 +346,11 @@ public class VillagerChatSystem {
         }
         
         private static String generateVillageInfoResponse(ChatContext context) {
-            List<VillagerGossipNetwork.GossipPiece> recentGossip = VillagerGossipNetwork.getGossipAbout(context.villager, "village_news");
+            java.util.List<com.beeny.ai.social.VillagerGossipManager.GossipPiece> recentGossip =
+                ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().getGossipAbout(context.villager, "village_news");
             
             if (!recentGossip.isEmpty()) {
-                VillagerGossipNetwork.GossipPiece gossip = recentGossip.get(0);
+                com.beeny.ai.social.VillagerGossipManager.GossipPiece gossip = recentGossip.get(0);
                 return "Well, " + gossip.details + " Have you heard about that?";
             }
             
@@ -427,7 +427,7 @@ public class VillagerChatSystem {
         }
         
         private static String generateGossipResponse(ChatContext context) {
-            List<Text> gossipDialogue = VillagerGossipNetwork.generateGossipDialogue(context.villager, context.player);
+            List<Text> gossipDialogue = ServerVillagerManager.getInstance().getAIWorldManager().getGossipManager().generateGossipDialogue(context.villager, context.player);
             
             if (gossipDialogue.isEmpty() || gossipDialogue.get(0).getString().contains("don't have much news")) {
                 return switch (context.villagerData.getPersonality().name()) {
@@ -442,7 +442,7 @@ public class VillagerChatSystem {
         }
         
         private static String generateComplimentResponse(ChatContext context) {
-            VillagerEmotionSystem.processEmotionalEvent(context.villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, 20.0f, "compliment", false));
             
             return switch (context.villagerData.getPersonality().name()) {
@@ -456,7 +456,7 @@ public class VillagerChatSystem {
         }
         
         private static String generateInsultResponse(ChatContext context) {
-            VillagerEmotionSystem.processEmotionalEvent(context.villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, 25.0f, "insult", false));
             
             if (context.villagerData != null) {
@@ -552,15 +552,15 @@ public class VillagerChatSystem {
         
         private static void updateEmotionalState(ChatContext context, float outcome) {
             if (outcome > 0.5f) {
-                VillagerEmotionSystem.processEmotionalEvent(context.villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(context.villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.HAPPINESS, outcome * 10.0f, "positive_chat", false));
             } else if (outcome < -0.5f) {
-                VillagerEmotionSystem.processEmotionalEvent(context.villager,
+                ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(context.villager,
                     new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.ANGER, Math.abs(outcome) * 15.0f, "negative_chat", false));
             }
             
             // Always get a small social interaction boost
-            VillagerEmotionSystem.processEmotionalEvent(context.villager,
+            ServerVillagerManager.getInstance().getAIWorldManager().getEmotionSystem().processEmotionalEvent(context.villager,
                 new VillagerEmotionSystem.EmotionalEvent(VillagerEmotionSystem.EmotionType.LONELINESS, -5.0f, "social_interaction", false));
         }
         

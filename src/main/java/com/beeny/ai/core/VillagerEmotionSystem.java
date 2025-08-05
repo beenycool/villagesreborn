@@ -1,12 +1,19 @@
 package com.beeny.ai.core;
 
+import com.beeny.data.VillagerData;
 import net.minecraft.entity.passive.VillagerEntity;
-import java.util.HashMap;
-import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 
-public class VillagerEmotionSystem {
-    
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Instance-based emotion system. Static methods remain as deprecated delegators during migration,
+ * but all state is now owned by an instance (to be created and managed by AIWorldManager).
+ */
+public class VillagerEmotionSystem implements AISubsystem {
+
     public enum EmotionType {
         HAPPINESS,
         SADNESS,
@@ -22,48 +29,45 @@ public class VillagerEmotionSystem {
         CONFIDENCE,
         CURIOSITY
     }
-    
+
     public static class EmotionalState {
         private final Map<EmotionType, Float> emotions = new HashMap<>();
-        
+
         public EmotionalState() {
-            // Initialize all emotions to neutral (50.0f)
             for (EmotionType type : EmotionType.values()) {
                 emotions.put(type, 50.0f);
             }
         }
-        
+
         public float getEmotion(@NotNull EmotionType type) {
             return emotions.getOrDefault(type, 50.0f);
         }
-        
+
         public void setEmotion(@NotNull EmotionType type, float value) {
             emotions.put(type, Math.max(0.0f, Math.min(100.0f, value)));
         }
-        
+
         public void adjustEmotion(@NotNull EmotionType type, float delta) {
             float current = getEmotion(type);
             setEmotion(type, current + delta);
         }
-        
+
         public EmotionType getDominantEmotion() {
             EmotionType dominant = null;
-            float maxValue = 0.0f;
-            
+            float maxValue = -1.0f;
             for (Map.Entry<EmotionType, Float> entry : emotions.entrySet()) {
                 if (entry.getValue() > maxValue) {
                     maxValue = entry.getValue();
                     dominant = entry.getKey();
                 }
             }
-            
             return dominant != null ? dominant : EmotionType.CONTENTMENT;
         }
-        
+
         public String getEmotionalDescription() {
             EmotionType dominant = getDominantEmotion();
             float intensity = getEmotion(dominant);
-            
+
             String intensityDesc;
             if (intensity > 80) {
                 intensityDesc = "very ";
@@ -74,35 +78,34 @@ public class VillagerEmotionSystem {
             } else {
                 intensityDesc = "mildly ";
             }
-            
             return intensityDesc + dominant.name().toLowerCase().replace("_", " ");
         }
     }
-    
+
     public static class EmotionalEvent {
         public final EmotionType primaryEmotion;
         public final float intensity;
         public final String description;
         public final boolean isPositive;
-        
+
         public EmotionalEvent(EmotionType primaryEmotion, float intensity, String description) {
             this(primaryEmotion, intensity, description, isPositiveEmotion(primaryEmotion));
         }
-        
+
         public EmotionalEvent(EmotionType primaryEmotion, float intensity, String description, boolean isPositive) {
             this.primaryEmotion = primaryEmotion;
             this.intensity = intensity;
             this.description = description;
             this.isPositive = isPositive;
         }
-        
+
         private static boolean isPositiveEmotion(EmotionType emotion) {
             return switch (emotion) {
                 case HAPPINESS, LOVE, CONTENTMENT, EXCITEMENT, CONFIDENCE, CURIOSITY -> true;
                 case SADNESS, ANGER, FEAR, LONELINESS, STRESS, BOREDOM, ANXIETY -> false;
             };
         }
-        
+
         // Predefined common events
         public static final EmotionalEvent SUCCESSFUL_TRADE = new EmotionalEvent(EmotionType.HAPPINESS, 10.0f, "successful trade", true);
         public static final EmotionalEvent FAILED_TRADE = new EmotionalEvent(EmotionType.SADNESS, 5.0f, "failed trade", false);
@@ -110,18 +113,18 @@ public class VillagerEmotionSystem {
         public static final EmotionalEvent VILLAGER_DEATH = new EmotionalEvent(EmotionType.SADNESS, 20.0f, "villager death", false);
         public static final EmotionalEvent REPETITIVE_TASK = new EmotionalEvent(EmotionType.BOREDOM, 5.0f, "repetitive task", false);
     }
-    
-    private static final Map<String, EmotionalState> villagerEmotions = new HashMap<>();
-    
-    public static EmotionalState getEmotionalState(@NotNull VillagerEntity villager) {
+
+    // Instance state (per-server instance via AIWorldManager)
+    private final Map<String, EmotionalState> villagerEmotions = new ConcurrentHashMap<>();
+
+    public EmotionalState getEmotionalState(@NotNull VillagerEntity villager) {
         return villagerEmotions.computeIfAbsent(villager.getUuidAsString(), k -> new EmotionalState());
     }
-    
-    public static void processEmotionalEvent(@NotNull VillagerEntity villager, @NotNull EmotionalEvent event) {
+
+    public void processEmotionalEvent(@NotNull VillagerEntity villager, @NotNull EmotionalEvent event) {
         EmotionalState state = getEmotionalState(villager);
         state.adjustEmotion(event.primaryEmotion, event.intensity);
-        
-        // Secondary emotion effects
+
         switch (event.primaryEmotion) {
             case HAPPINESS -> {
                 state.adjustEmotion(EmotionType.SADNESS, -event.intensity * 0.5f);
@@ -139,13 +142,14 @@ public class VillagerEmotionSystem {
                 state.adjustEmotion(EmotionType.ANXIETY, event.intensity * 0.6f);
                 state.adjustEmotion(EmotionType.CONTENTMENT, -event.intensity * 0.4f);
             }
+            default -> {
+                // no-op
+            }
         }
     }
-    
-    public static void updateEmotionalDecay(@NotNull VillagerEntity villager) {
+
+    public void updateEmotionalDecay(@NotNull VillagerEntity villager) {
         EmotionalState state = getEmotionalState(villager);
-        
-        // Gradual decay towards neutral (50.0f)
         for (EmotionType type : EmotionType.values()) {
             float current = state.getEmotion(type);
             float target = 50.0f;
@@ -153,8 +157,74 @@ public class VillagerEmotionSystem {
             state.adjustEmotion(type, decay);
         }
     }
-    
-    public static void clearEmotionalState(@NotNull String villagerUuid) {
+
+    public void clearEmotionalState(@NotNull String villagerUuid) {
         villagerEmotions.remove(villagerUuid);
     }
+
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        // Emotion system uses lazy initialization; no explicit initialization required
+        getEmotionalState(villager);
+    }
+    
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        updateEmotionalDecay(villager);
+    }
+    
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        clearEmotionalState(villagerUuid);
+    }
+    
+    @Override
+    public void performMaintenance() {
+        // Emotion system is stateless per-instance; decay/maintenance handled elsewhere if needed
+    }
+    
+    @Override
+    public void shutdown() {
+        // Clear all emotional states
+        villagerEmotions.clear();
+    }
+    
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        // Emotion decay should happen periodically, not every tick
+        return true; // Let scheduler handle frequency
+    }
+    
+    @Override
+    public long getUpdateInterval() {
+        return com.beeny.config.ConfigManager.getInt("aiEmotionUpdateInterval", 60000);
+    }
+    
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "EmotionSystem";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 10; // High priority - emotions affect other systems
+    }
+    
+    @Override
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("active_emotional_states", villagerEmotions.size());
+        
+        // Calculate emotion distribution
+        Map<String, Integer> emotionCounts = new HashMap<>();
+        for (EmotionalState state : villagerEmotions.values()) {
+            EmotionType dominant = state.getDominantEmotion();
+            emotionCounts.merge(dominant.name(), 1, Integer::sum);
+        }
+        analytics.put("dominant_emotions", emotionCounts);
+        
+        return analytics;
+    }
+
 }

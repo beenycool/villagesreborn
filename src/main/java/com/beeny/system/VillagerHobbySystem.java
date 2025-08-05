@@ -3,6 +3,7 @@ package com.beeny.system;
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
 import com.beeny.constants.VillagerConstants.HobbyType;
+import com.beeny.util.BoundingBoxUtils;
 import com.beeny.util.VillagerUtils;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.passive.VillagerEntity;
