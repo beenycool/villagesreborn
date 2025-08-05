@@ -183,7 +183,7 @@ public class ServerVillagerManager {
         }
 
         // Resolve the root world directory (same location Minecraft saves level.dat)
-        Path worldDir = this.server.getSavePath(net.minecraft.world.WorldSavePath.ROOT);
+        Path worldDir = this.server.getSavePath(net.minecraft.util.WorldSavePath.ROOT);
         if (worldDir == null) {
             Villagersreborn.LOGGER.error("exportVillagerDataBackup(): Failed to resolve world directory path");
             return;
