@@ -1,10 +1,12 @@
 package com.beeny.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import com.beeny.commands.TTSCommands;
 
 /**
  * Registry for all villager-related commands.
@@ -19,14 +21,23 @@ public class VillagerCommandRegistry {
         CommandRegistrationCallback.EVENT.register(VillagerCommandRegistry::registerCommands);
     }
     
-    private static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher, 
-                                       CommandRegistryAccess registryAccess, 
+    private static void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher,
+                                       CommandRegistryAccess registryAccess,
                                        CommandManager.RegistrationEnvironment environment) {
         
-        // Register all command modules
-        VillagerAICommands.register(dispatcher);
-        VillagerManagementCommands.register(dispatcher);
-        VillagerFamilyCommands.register(dispatcher);
-        VillagerDataCommands.register(dispatcher);
+        // Create the main villager command
+        LiteralArgumentBuilder<ServerCommandSource> villagerCommand = CommandManager.literal("villager");
+        
+        // Register all command modules as sub-commands
+        VillagerAICommands.register(villagerCommand);
+        VillagerManagementCommands.register(villagerCommand);
+        VillagerFamilyCommands.register(villagerCommand);
+        VillagerDataCommands.register(villagerCommand);
+        VillagerActivityCommands.register(villagerCommand);
+        VillagerListCommands.register(villagerCommand);
+        TTSCommands.register(villagerCommand);
+        
+        // Register the main command
+        dispatcher.register(villagerCommand);
     }
 }

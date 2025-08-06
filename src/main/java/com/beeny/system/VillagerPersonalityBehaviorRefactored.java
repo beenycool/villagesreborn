@@ -2,34 +2,36 @@ package com.beeny.system;
 
 import com.beeny.Villagersreborn;
 import com.beeny.ai.core.AISubsystem;
+import com.beeny.config.AISystemConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.constants.VillagerConstants.PersonalityType;
 import com.beeny.system.personality.PersonalityStrategy;
 import com.beeny.system.personality.PersonalityStrategyFactory;
-import com.beeny.util.BoundingBoxUtils;
-import com.beeny.util.VillagerUtils;
 import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.Box;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 
-public class VillagerPersonalityBehavior implements AISubsystem {
+/**
+ * Refactored personality behavior system using strategy pattern.
+ * This replaces the monolithic switch-based approach with clean,
+ * extensible strategy implementations for each personality type.
+ */
+public class VillagerPersonalityBehaviorRefactored implements AISubsystem {
     
     private final Map<String, Long> villagerLastUpdate = new ConcurrentHashMap<>();
     private long updateCount = 0;
     private long lastMaintenanceTime = System.currentTimeMillis();
     
-    public VillagerPersonalityBehavior() {
+    public VillagerPersonalityBehaviorRefactored() {
         // Initialize if needed
     }
     
+    /**
+     * Apply personality-specific effects using strategy pattern
+     */
     public void applyPersonalityEffects(VillagerEntity villager, VillagerData data) {
         if (villager.getWorld().isClient || data == null) return;
         
@@ -97,7 +99,7 @@ public class VillagerPersonalityBehavior implements AISubsystem {
     
     @Override
     public long getUpdateInterval() {
-        return 15000; // Update every 15 seconds
+        return AISystemConfig.PERSONALITY_BEHAVIOR_UPDATE_INTERVAL;
     }
     
     @Override
@@ -107,16 +109,17 @@ public class VillagerPersonalityBehavior implements AISubsystem {
         analytics.put("trackedVillagers", villagerLastUpdate.size());
         analytics.put("updateCount", updateCount);
         analytics.put("lastMaintenanceTime", lastMaintenanceTime);
+        analytics.put("registeredPersonalities", PersonalityStrategyFactory.getRegisteredPersonalities().size());
         return analytics;
     }
     
     @Override
     public void performMaintenance() {
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastMaintenanceTime > 300000) { // 5 minutes
+        if (currentTime - lastMaintenanceTime > AISystemConfig.MAINTENANCE_INTERVAL) {
             // Clean up old entries for villagers that might have been unloaded
             villagerLastUpdate.entrySet().removeIf(entry -> 
-                currentTime - entry.getValue() > 600000); // Remove entries older than 10 minutes
+                currentTime - entry.getValue() > AISystemConfig.CLEANUP_THRESHOLD);
             lastMaintenanceTime = currentTime;
         }
     }
@@ -124,7 +127,7 @@ public class VillagerPersonalityBehavior implements AISubsystem {
     @Override
     @NotNull
     public String getSubsystemName() {
-        return "VillagerPersonalityBehavior";
+        return "VillagerPersonalityBehaviorRefactored";
     }
     
     @Override

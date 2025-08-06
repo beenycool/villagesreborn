@@ -187,15 +187,27 @@ public class AISubsystemManager {
             
             if (lastUpdate == null || (currentTime - lastUpdate) >= subsystem.getUpdateInterval()) {
                 CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
+                    // Measure around the entire server-thread execution for accurate stats
                     long startTime = System.nanoTime();
                     try {
-                        subsystem.updateVillager(villager);
-                        lastUpdateTimes.put(subsystemKey, currentTime);
-                        subsystemUpdateCounts.get(subsystem.getSubsystemName()).incrementAndGet();
+                        // Ensure all MC state interactions happen on the server thread
+                        server.execute(() -> {
+                            try {
+                                subsystem.updateVillager(villager);
+                                lastUpdateTimes.put(subsystemKey, System.currentTimeMillis());
+                                subsystemUpdateCounts.get(subsystem.getSubsystemName()).incrementAndGet();
+                            } catch (Exception e) {
+                                LOGGER.error("Error updating {} for villager {}",
+                                        subsystem.getSubsystemName(), uuid, e);
+                            } finally {
+                                long duration = System.nanoTime() - startTime;
+                                totalUpdateTime.addAndGet(duration);
+                                totalUpdates.incrementAndGet();
+                            }
+                        });
                     } catch (Exception e) {
-                        LOGGER.error("Error updating {} for villager {}", 
-                                   subsystem.getSubsystemName(), uuid, e);
-                    } finally {
+                        LOGGER.error("Failed scheduling update {} for villager {}",
+                                subsystem.getSubsystemName(), uuid, e);
                         long duration = System.nanoTime() - startTime;
                         totalUpdateTime.addAndGet(duration);
                         totalUpdates.incrementAndGet();
@@ -298,12 +310,17 @@ public class AISubsystemManager {
      */
     private void reportPerformanceStats() {
         long updates = totalUpdates.get();
+        double avgMs = updates == 0 ? 0.0 : (totalUpdateTime.get() / 1_000_000.0) / updates;
+        int tracked = trackedVillagers.size();
+        // Use consistent SLF4J placeholders. Format the double separately.
+        LOGGER.info("AI Performance: {} updates, avg {} ms per update, {} tracked villagers",
+                updates, String.format("%.2f", avgMs), tracked);
         long totalTime = totalUpdateTime.get();
         
         if (updates > 0) {
             double avgUpdateTime = (totalTime / 1_000_000.0) / updates; // Convert to milliseconds
-            LOGGER.info("AI Performance: {} updates, avg {:.2f}ms per update, {} tracked villagers", 
-                       updates, avgUpdateTime, trackedVillagers.size());
+            LOGGER.info("AI Performance: {} updates, avg {} ms per update, {} tracked villagers",
+                    updates, String.format("%.2f", avgUpdateTime), trackedVillagers.size());
             
             // Log subsystem-specific stats
             for (AISubsystem subsystem : subsystems) {

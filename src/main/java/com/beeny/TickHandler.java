@@ -1,10 +1,10 @@
 package com.beeny;
 import com.beeny.constants.VillagerConstants;
 
+import com.beeny.ai.AIWorldManagerRefactored;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.system.VillagerRelationshipManager;
-import com.beeny.system.VillagerScheduleManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -45,7 +45,10 @@ final class TickHandler {
             if (tickCounter % VillagerConstants.Relationship.TICKS_SCHEDULE_UPDATE == 0) {
                 server.getWorlds().forEach(world -> {
                     if (world instanceof ServerWorld serverWorld) {
-                        VillagerScheduleManager.updateSchedules(serverWorld);
+                        AIWorldManagerRefactored instance = AIWorldManagerRefactored.getInstance();
+                        if (instance != null) {
+                            instance.getScheduleManager().updateSchedules(serverWorld);
+                        }
                     }
                 });
             }

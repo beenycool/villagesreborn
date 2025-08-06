@@ -7,6 +7,8 @@ import com.beeny.ai.social.VillagerGossipManager;
 import com.beeny.ai.planning.VillagerGOAPRefactored;
 import com.beeny.ai.quests.VillagerQuestSystem;
 import com.beeny.system.VillagerHobbySystem;
+import com.beeny.system.VillagerScheduleManager;
+import com.beeny.system.VillagerPersonalityBehavior;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
@@ -15,6 +17,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Refactored AI World Manager that uses the subsystem pattern
@@ -39,6 +43,8 @@ public class AIWorldManagerRefactored {
     private final VillagerQuestSystem questSystem;
     private final VillagerAIManager aiManager;
     private final VillagerHobbySystem hobbySystem;
+    private final VillagerScheduleManager scheduleManager;
+    private final VillagerPersonalityBehavior personalityBehavior;
     
     private AIWorldManagerRefactored(@NotNull MinecraftServer server) {
         this.server = server;
@@ -52,13 +58,17 @@ public class AIWorldManagerRefactored {
         this.questSystem = new VillagerQuestSystem();
         this.aiManager = new VillagerAIManager();
         this.hobbySystem = new VillagerHobbySystem();
+        this.scheduleManager = new VillagerScheduleManager();
+        this.personalityBehavior = new VillagerPersonalityBehavior();
         
         // Register subsystems with the manager (order matters for dependencies)
-        subsystemManager.registerSubsystem(emotionSystem);    // High priority - affects others
-        subsystemManager.registerSubsystem(aiManager);        // Medium priority - general state management
-        subsystemManager.registerSubsystem(learningSystem);   // Medium priority
-        subsystemManager.registerSubsystem(planningSystem);   // Medium priority
-        subsystemManager.registerSubsystem(hobbySystem);      // Low priority - entertainment/activity
+        subsystemManager.registerSubsystem(emotionSystem);      // High priority - affects others
+        subsystemManager.registerSubsystem(aiManager);          // Medium priority - general state management
+        subsystemManager.registerSubsystem(scheduleManager);    // Medium-high priority - scheduling affects behavior
+        subsystemManager.registerSubsystem(personalityBehavior); // Medium priority - personality effects
+        subsystemManager.registerSubsystem(learningSystem);     // Medium priority
+        subsystemManager.registerSubsystem(planningSystem);     // Medium priority
+        subsystemManager.registerSubsystem(hobbySystem);        // Low priority - entertainment/activity
         // questSystem currently does not implement AISubsystem; do not register to avoid type error
         // Note: gossipManager doesn't implement AISubsystem yet, would need refactoring
         
@@ -106,20 +116,41 @@ public class AIWorldManagerRefactored {
     }
     
     /**
+     * Safely execute an operation with error handling and logging
+     */
+    private void safeExecute(String operation, String villagerUuid, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            LOGGER.error("Error {} for villager {}", operation, villagerUuid, e);
+        }
+    }
+    
+    /**
+     * Safely execute an operation with error handling, logging, and fallback
+     */
+    private <T> T safeExecuteWithFallback(String operation, String villagerUuid, Supplier<T> action, Supplier<T> fallback) {
+        try {
+            return action.get();
+        } catch (Exception e) {
+            LOGGER.error("Error {} for villager {}, using fallback", operation, villagerUuid, e);
+            return fallback.get();
+        }
+    }
+    
+    /**
      * Initialize AI for a villager
      */
     public void initializeVillagerAI(@NotNull VillagerEntity villager) {
         subsystemManager.initializeVillager(villager);
         
         // Handle gossip manager separately since it doesn't implement AISubsystem yet
-        try {
+        safeExecute("initializing gossip", villager.getUuidAsString(), () -> {
             com.beeny.data.VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 gossipManager.initializeVillagerGossip(villager, data);
             }
-        } catch (Exception e) {
-            LOGGER.error("Error initializing gossip for villager {}", villager.getUuidAsString(), e);
-        }
+        });
     }
     
     /**
@@ -131,11 +162,8 @@ public class AIWorldManagerRefactored {
         subsystemManager.updateVillager(villager);
         
         // Handle gossip manager updates separately
-        try {
-            gossipManager.updateVillagerGossip(villager);
-        } catch (Exception e) {
-            LOGGER.error("Error updating gossip for villager {}", villager.getUuidAsString(), e);
-        }
+        safeExecute("updating gossip", villager.getUuidAsString(), () -> 
+            gossipManager.updateVillagerGossip(villager));
     }
     
     /**
@@ -145,11 +173,8 @@ public class AIWorldManagerRefactored {
         subsystemManager.cleanupVillager(villagerUuid);
         
         // Handle gossip manager cleanup separately
-        try {
-            gossipManager.cleanupVillager(villagerUuid);
-        } catch (Exception e) {
-            LOGGER.error("Error cleaning up gossip for villager {}", villagerUuid, e);
-        }
+        safeExecute("cleaning up gossip", villagerUuid, () -> 
+            gossipManager.cleanupVillager(villagerUuid));
     }
     
     /**
@@ -183,11 +208,8 @@ public class AIWorldManagerRefactored {
         LOGGER.info("Shutting down AIWorldManagerRefactored...");
         
         // Shutdown gossip manager first
-        try {
-            gossipManager.shutdown();
-        } catch (Exception e) {
-            LOGGER.error("Error shutting down gossip manager", e);
-        }
+        safeExecute("shutting down gossip manager", "system", () -> 
+            gossipManager.shutdown());
         
         // Shutdown subsystem manager (handles individual subsystems)
         subsystemManager.shutdown();
@@ -203,11 +225,9 @@ public class AIWorldManagerRefactored {
         Map<String, Object> analytics = subsystemManager.getAnalytics();
         
         // Add gossip analytics separately
-        try {
-            analytics.put("gossip", gossipManager.getAnalytics());
-        } catch (Exception e) {
-            analytics.put("gossip_error", e.getMessage());
-        }
+        analytics.put("gossip", safeExecuteWithFallback("getting gossip analytics", "system", 
+            () -> gossipManager.getAnalytics(),
+            () -> Map.of("error", "Failed to get gossip analytics")));
         
         return analytics;
     }
@@ -219,6 +239,8 @@ public class AIWorldManagerRefactored {
     @NotNull public VillagerGOAPRefactored getPlanningSystem() { return planningSystem; }
     @NotNull public VillagerQuestSystem getQuestSystem() { return questSystem; }
     @NotNull public VillagerAIManager getAIManager() { return aiManager; }
+    @NotNull public VillagerScheduleManager getScheduleManager() { return scheduleManager; }
+    @NotNull public VillagerPersonalityBehavior getPersonalityBehavior() { return personalityBehavior; }
     @NotNull public VillagerAIManager getVillagerAIManager() { return aiManager; } // Compatibility alias
     @NotNull public AISubsystemManager getSubsystemManager() { return subsystemManager; }
     @NotNull public MinecraftServer getServer() { return server; }

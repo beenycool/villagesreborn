@@ -1,6 +1,7 @@
 package com.beeny.system;
 
 import com.beeny.Villagersreborn;
+import com.beeny.ai.core.AISubsystem;
 import com.beeny.data.VillagerData;
 import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.ai.goal.Goal;
@@ -12,10 +13,13 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.poi.PointOfInterestTypes;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class VillagerScheduleManager {
+public class VillagerScheduleManager implements AISubsystem {
     
     public enum TimeOfDay {
         DAWN(0, 1000, "Dawn"),
@@ -93,15 +97,17 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static final Map<String, Schedule> PROFESSION_SCHEDULES = new HashMap<>();
-    private static long lastProcessedDay = -1;
+    private final Map<String, Schedule> professionSchedules = new HashMap<>();
+    private final Map<String, Long> villagerLastUpdate = new ConcurrentHashMap<>();
+    private long lastProcessedDay = -1;
+    private long updateCount = 0;
+    private long lastMaintenanceTime = System.currentTimeMillis();
     
-    static {
-        
+    public VillagerScheduleManager() {
         initializeProfessionSchedules();
     }
     
-    private static void initializeProfessionSchedules() {
+    private void initializeProfessionSchedules() {
         
         Schedule farmerSchedule = new Schedule();
         farmerSchedule.setActivity(TimeOfDay.DAWN, Activity.WAKE_UP);
@@ -110,7 +116,7 @@ public class VillagerScheduleManager {
         farmerSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WORK);
         farmerSchedule.setActivity(TimeOfDay.DUSK, Activity.RELAX);
         farmerSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:farmer", farmerSchedule);
+        professionSchedules.put("minecraft:farmer", farmerSchedule);
         
         
         Schedule librarianSchedule = new Schedule();
@@ -120,7 +126,7 @@ public class VillagerScheduleManager {
         librarianSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.STUDY);
         librarianSchedule.setActivity(TimeOfDay.DUSK, Activity.SOCIALIZE);
         librarianSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:librarian", librarianSchedule);
+        professionSchedules.put("minecraft:librarian", librarianSchedule);
         
         
         Schedule clericSchedule = new Schedule();
@@ -130,7 +136,7 @@ public class VillagerScheduleManager {
         clericSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.SOCIALIZE);
         clericSchedule.setActivity(TimeOfDay.DUSK, Activity.PRAY);
         clericSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:cleric", clericSchedule);
+        professionSchedules.put("minecraft:cleric", clericSchedule);
         
         
         Schedule blacksmithSchedule = new Schedule();
@@ -140,9 +146,9 @@ public class VillagerScheduleManager {
         blacksmithSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WORK);
         blacksmithSchedule.setActivity(TimeOfDay.DUSK, Activity.EXERCISE);
         blacksmithSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:armorer", blacksmithSchedule);
-        PROFESSION_SCHEDULES.put("minecraft:weaponsmith", blacksmithSchedule);
-        PROFESSION_SCHEDULES.put("minecraft:toolsmith", blacksmithSchedule);
+        professionSchedules.put("minecraft:armorer", blacksmithSchedule);
+        professionSchedules.put("minecraft:weaponsmith", blacksmithSchedule);
+        professionSchedules.put("minecraft:toolsmith", blacksmithSchedule);
         
         
         Schedule nitwitSchedule = new Schedule();
@@ -152,7 +158,7 @@ public class VillagerScheduleManager {
         nitwitSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WANDER);
         nitwitSchedule.setActivity(TimeOfDay.DUSK, Activity.SOCIALIZE);
         nitwitSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:nitwit", nitwitSchedule);
+        professionSchedules.put("minecraft:nitwit", nitwitSchedule);
     }
     
     public static Activity getCurrentActivity(VillagerEntity villager) {
@@ -165,19 +171,19 @@ public class VillagerScheduleManager {
         }
         
         // Get individual time preferences based on personality and villager ID
-        int personalityOffset = getPersonalityTimeOffset(data);
+        int personalityOffset = getPersonalityTimeOffsetStatic(data);
         int individualOffset = Math.abs(villager.getUuid().hashCode()) % 4 - 2; // -2 to +1 hours variation
         long adjustedTime = (worldTime + (personalityOffset + individualOffset) * 1000) % 24000;
         TimeOfDay adjustedTimeOfDay = TimeOfDay.fromWorldTime(adjustedTime);
         
         // Get base activity probabilities for the time period
-        Map<Activity, Float> activityWeights = getActivityWeights(adjustedTimeOfDay, data, villager);
+        Map<Activity, Float> activityWeights = getActivityWeightsStatic(adjustedTimeOfDay, data, villager);
         
         // Select activity based on weighted probability
-        return selectWeightedActivity(activityWeights, villager);
+        return selectWeightedActivityStatic(activityWeights, villager);
     }
     
-    private static int getPersonalityTimeOffset(VillagerData data) {
+    private static int getPersonalityTimeOffsetStatic(VillagerData data) {
         return switch (data.getPersonality().name()) {
             case "ENERGETIC" -> -2; // Early riser
             case "LAZY" -> 3; // Late sleeper
@@ -189,7 +195,7 @@ public class VillagerScheduleManager {
         };
     }
     
-    private static Map<Activity, Float> getActivityWeights(TimeOfDay timeOfDay, VillagerData data, VillagerEntity villager) {
+    private static Map<Activity, Float> getActivityWeightsStatic(TimeOfDay timeOfDay, VillagerData data, VillagerEntity villager) {
         Map<Activity, Float> weights = new EnumMap<>(Activity.class);
         
         // Base weights for time of day
@@ -245,18 +251,18 @@ public class VillagerScheduleManager {
         }
         
         // Apply personality modifiers
-        applyPersonalityModifiers(weights, data);
+        applyPersonalityModifiersStatic(weights, data);
         
         // Apply profession modifiers
-        applyProfessionModifiers(weights, villager);
+        applyProfessionModifiersStatic(weights, villager);
         
         // Apply contextual modifiers
-        applyContextualModifiers(weights, data, villager);
+        applyContextualModifiersStatic(weights, data, villager);
         
         return weights;
     }
     
-    private static void applyPersonalityModifiers(Map<Activity, Float> weights, VillagerData data) {
+    private static void applyPersonalityModifiersStatic(Map<Activity, Float> weights, VillagerData data) {
         switch (data.getPersonality().name()) {
             case "ENERGETIC" -> {
                 weights.replaceAll((k, v) -> k == Activity.EXERCISE || k == Activity.WORK ? v * 1.5f : v);
@@ -290,7 +296,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static void applyProfessionModifiers(Map<Activity, Float> weights, VillagerEntity villager) {
+    private static void applyProfessionModifiersStatic(Map<Activity, Float> weights, VillagerEntity villager) {
         String professionKey = villager.getVillagerData().profession().getKey()
             .map(key -> key.getValue().toString()).orElse("minecraft:none");
             
@@ -311,7 +317,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static void applyContextualModifiers(Map<Activity, Float> weights, VillagerData data, VillagerEntity villager) {
+    private static void applyContextualModifiersStatic(Map<Activity, Float> weights, VillagerData data, VillagerEntity villager) {
         // Happiness affects activity preferences
         if (data.getHappiness() < 20) {
             weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 2.0f : v);
@@ -335,7 +341,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static Activity selectWeightedActivity(Map<Activity, Float> weights, VillagerEntity villager) {
+    private static Activity selectWeightedActivityStatic(Map<Activity, Float> weights, VillagerEntity villager) {
         float totalWeight = weights.values().stream().reduce(0f, Float::sum);
         if (totalWeight <= 0) return Activity.WANDER;
         
@@ -353,7 +359,7 @@ public class VillagerScheduleManager {
         return Activity.WANDER;
     }
     
-    public static void updateSchedules(ServerWorld world) {
+    public void updateSchedules(ServerWorld world) {
         // Check for day change
         long currentTime = world.getTimeOfDay();
         long currentDay = currentTime / 24000;
@@ -367,25 +373,25 @@ public class VillagerScheduleManager {
             // Only update villagers in the same world
             if (villager.getWorld() != world) continue;
             
-            Activity currentActivity = getCurrentActivity(villager);
+            Activity currentActivity = VillagerScheduleManager.getCurrentActivity(villager);
             
             // Track activity changes
             String villagerId = villager.getUuidAsString();
             DailyActivityTracker.ActivityEntry trackedActivity = DailyActivityTracker.getCurrentActivity(villagerId);
             
             if (trackedActivity == null || !trackedActivity.getActivity().equals(currentActivity.description)) {
-                String details = generateActivityDetails(villager, currentActivity);
+                String details = this.generateActivityDetails(villager, currentActivity);
                 DailyActivityTracker.startActivity(villager, currentActivity, details);
             }
             
-            updateVillagerBehavior(villager, currentActivity);
+            VillagerScheduleManager.updateVillagerBehavior(villager, currentActivity);
             
             
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 if (currentActivity != Activity.WAKE_UP) {
                     Text activityText = Text.literal(" [" + currentActivity.description + "]")
-                        .formatted(getActivityFormatting(currentActivity));
+                        .formatted(this.getActivityFormatting(currentActivity));
                     Text fullName = Text.literal(data.getName()).append(activityText);
                     villager.setCustomName(fullName);
                 } else {
@@ -395,7 +401,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
+    public static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
         
         
         
@@ -424,7 +430,7 @@ public class VillagerScheduleManager {
         return daysSinceBirth > 0 && daysSinceBirth % 365 == 0;
     }
     
-    private static Formatting getActivityFormatting(Activity activity) {
+    private Formatting getActivityFormatting(Activity activity) {
         return switch (activity) {
             case WAKE_UP -> Formatting.AQUA;
             case WORK -> Formatting.GOLD;
@@ -441,12 +447,12 @@ public class VillagerScheduleManager {
         };
     }
     
-    public static List<Text> getScheduleInfo(VillagerEntity villager) {
+    public List<Text> getScheduleInfo(VillagerEntity villager) {
         List<Text> info = new ArrayList<>();
         
         String professionKey = villager.getVillagerData().profession().getKey()
             .map(key -> key.getValue().toString()).orElse("minecraft:none");
-        Schedule schedule = PROFESSION_SCHEDULES.getOrDefault(professionKey, new Schedule());
+        Schedule schedule = professionSchedules.getOrDefault(professionKey, new Schedule());
         
         info.add(Text.literal("=== Daily Schedule ===").formatted(Formatting.GOLD));
         
@@ -455,21 +461,21 @@ public class VillagerScheduleManager {
             info.add(Text.literal(time.name + ": ")
                 .formatted(Formatting.GRAY)
                 .append(Text.literal(activity.description)
-                    .formatted(getActivityFormatting(activity))));
+                    .formatted(this.getActivityFormatting(activity))));
         }
         
         
-        Activity current = getCurrentActivity(villager);
+        Activity current = this.getCurrentActivity(villager);
         info.add(Text.empty());
         info.add(Text.literal("Currently: ")
             .formatted(Formatting.YELLOW)
             .append(Text.literal(current.description)
-                .formatted(getActivityFormatting(current))));
+                .formatted(this.getActivityFormatting(current))));
         
         return info;
     }
     
-    private static String generateActivityDetails(VillagerEntity villager, Activity activity) {
+    private String generateActivityDetails(VillagerEntity villager, Activity activity) {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data == null) return "";
         
@@ -518,6 +524,95 @@ public class VillagerScheduleManager {
         return details.toString();
     }
     
+    // AISubsystem interface implementation
+    
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        String villagerUuid = villager.getUuidAsString();
+        villagerLastUpdate.put(villagerUuid, System.currentTimeMillis());
+    }
+    
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        String villagerUuid = villager.getUuidAsString();
+        long currentTime = System.currentTimeMillis();
+        villagerLastUpdate.put(villagerUuid, currentTime);
+        updateCount++;
+        
+        // Update villager activity based on current time
+        Activity currentActivity = this.getCurrentActivity(villager);
+        this.updateVillagerBehavior(villager, currentActivity);
+        
+        // Update villager display name with activity
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data != null) {
+            if (currentActivity != Activity.WAKE_UP) {
+                Text activityText = Text.literal(" [" + currentActivity.description + "]")
+                    .formatted(this.getActivityFormatting(currentActivity));
+                Text fullName = Text.literal(data.getName()).append(activityText);
+                villager.setCustomName(fullName);
+            } else {
+                villager.setCustomName(Text.literal(data.getName()));
+            }
+        }
+    }
+    
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        villagerLastUpdate.remove(villagerUuid);
+    }
+    
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        String villagerUuid = villager.getUuidAsString();
+        Long lastUpdate = villagerLastUpdate.get(villagerUuid);
+        if (lastUpdate == null) return true;
+        
+        return System.currentTimeMillis() - lastUpdate >= this.getUpdateInterval();
+    }
+    
+    @Override
+    public long getUpdateInterval() {
+        return 10000; // Update every 10 seconds
+    }
+    
+    @Override
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("trackedVillagers", villagerLastUpdate.size()); 
+        analytics.put("updateCount", updateCount);
+        analytics.put("lastProcessedDay", lastProcessedDay);
+        return analytics;
+    }
+    
+    @Override
+    public void performMaintenance() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastMaintenanceTime > 300000) { // 5 minutes
+            // Clean up old entries for villagers that might have been unloaded
+            villagerLastUpdate.entrySet().removeIf(entry -> 
+                currentTime - entry.getValue() > 600000); // Remove entries older than 10 minutes
+            lastMaintenanceTime = currentTime;
+        }
+    }
+    
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "VillagerScheduleManager";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 50; // Medium-high priority for scheduling
+    }
+    
+    @Override
+    public void shutdown() {
+        villagerLastUpdate.clear();
+    }
+    
     
     public static class ScheduleGoal extends Goal {
         private final VillagerEntity villager;
@@ -540,9 +635,9 @@ public class VillagerScheduleManager {
         
         @Override
         public void tick() {
-            Activity currentActivity = getCurrentActivity(villager);
+            Activity currentActivity = VillagerScheduleManager.getCurrentActivity(villager);
             if (currentActivity != lastActivity) {
-                updateVillagerBehavior(villager, currentActivity);
+                VillagerScheduleManager.updateVillagerBehavior(villager, currentActivity);
                 lastActivity = currentActivity;
             }
         }

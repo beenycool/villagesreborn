@@ -118,6 +118,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void switchTab(Tab newTab) {
+        System.out.println("[EnhancedVillagerJournalScreen] Switching to tab: " + newTab.name);
 
         clearTabWidgets();
 
@@ -166,7 +167,12 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initDetailsTab(int screenX, int contentY) {
-        if (selectedVillagerData == null) return;
+        if (selectedVillagerData == null) {
+            System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selectedVillagerData is NULL");
+            return;
+        }
+        
+        System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selected villager = " + selectedVillagerData.getName());
         
         teleportButton = ButtonWidget.builder(
             Text.literal("Teleport to Villager"),
@@ -224,7 +230,9 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        // Avoid blur completely here to prevent "Can only blur once per frame".
+        // Draw a dim background without triggering the blur pipeline.
+        context.fill(0, 0, this.width, this.height, 0x7F000000);
         animationTick += delta;
         
         int screenX = (width - SCREEN_WIDTH) / 2;
@@ -521,18 +529,41 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void updateListButtons() {
+        // Guard for uninitialized UI or empty data
+        if (villagerButtons == null || villagerButtons.isEmpty()) {
+            return;
+        }
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
+
+        // Clamp scrollOffset within bounds based on current filtered list size
+        int maxOffset = Math.max(0, filteredVillagers.size() - ENTRIES_PER_PAGE);
+        if (scrollOffset > maxOffset) {
+            scrollOffset = maxOffset;
+        }
+        if (scrollOffset < 0) {
+            scrollOffset = 0;
+        }
+
         int endIndex = Math.min(scrollOffset + ENTRIES_PER_PAGE, filteredVillagers.size());
-        
+
         for (int i = 0; i < ENTRIES_PER_PAGE; i++) {
             ButtonWidget button = villagerButtons.get(i);
-            if (i + scrollOffset < endIndex) {
-                VillagerDataPacket data = filteredVillagers.get(i + scrollOffset);
-                
-                String name = data.getName();
-                button.setMessage(Text.literal(name));
+            int dataIndex = scrollOffset + i;
+
+            if (dataIndex >= 0 && dataIndex < endIndex) {
+                // Safe access within bounds
+                VillagerDataPacket data = filteredVillagers.get(dataIndex);
+                String name = data != null ? String.valueOf(data.getName()) : "";
+                button.setMessage(Text.literal(name != null ? name : ""));
                 button.visible = true;
+                button.active = true;
             } else {
+                // Hide and deactivate unused button slots
+                button.setMessage(Text.empty());
                 button.visible = false;
+                button.active = false;
             }
         }
     }
@@ -540,7 +571,14 @@ public class EnhancedVillagerJournalScreen extends Screen {
     private void selectVillager(int index) {
         if (index >= 0 && index < filteredVillagers.size()) {
             selectedVillagerData = filteredVillagers.get(index);
-            switchTab(currentTab);
+            if (selectedVillagerData != null) {
+                System.out.println("[EnhancedVillagerJournalScreen] Selected villager: " + selectedVillagerData.getName());
+            } else {
+                System.out.println("[EnhancedVillagerJournalScreen] ERROR: Selected villager is null");
+            }
+            switchTab(Tab.DETAILS);
+        } else {
+            System.out.println("[EnhancedVillagerJournalScreen] ERROR: Invalid villager index: " + index);
         }
     }
     
@@ -552,9 +590,16 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void updateSearch(String query) {
-        searchQuery = query.toLowerCase();
+        searchQuery = query == null ? "" : query.toLowerCase(Locale.ROOT);
         applySearchFilter();
+
+        // Reset scroll and ensure it's valid for the new filtered list
         scrollOffset = 0;
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
+
+        // If nothing matches, just refresh buttons which will hide all rows
         updateListButtons();
     }
     
@@ -582,6 +627,9 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void scrollList(int direction) {
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
         int maxOffset = Math.max(0, filteredVillagers.size() - ENTRIES_PER_PAGE);
         scrollOffset = Math.max(0, Math.min(maxOffset, scrollOffset + direction));
         updateListButtons();

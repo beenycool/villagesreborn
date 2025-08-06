@@ -202,12 +202,14 @@ public class VillagerUtilityAI {
         
         @Override
         public float getValue(VillagerEntity villager, Object context) {
-            VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
-            
+            VillagerEmotionSystem.EmotionalState emotions =
+                    AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
+            if (emotions == null) {
+                return 0.5f; // Neutral fallback when state not yet initialized
+            }
             float love = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LOVE) / 100.0f;
             float happiness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.HAPPINESS) / 100.0f;
             float loneliness = emotions.getEmotion(VillagerEmotionSystem.EmotionType.LONELINESS) / 100.0f; // Normalize to 0–1 range
-            
             return Math.max(0.0f, Math.min(1.0f, (love + happiness + loneliness) / 3.0f));
         }
     }

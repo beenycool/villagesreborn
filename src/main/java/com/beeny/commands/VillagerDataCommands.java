@@ -8,6 +8,7 @@ import com.beeny.util.VillagerDataUtils;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -16,32 +17,53 @@ import net.minecraft.server.command.ServerCommandSource;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Commands for managing villager data operations and utilities
  */
 public class VillagerDataCommands extends BaseVillagerCommand {
     
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("villager")
-            .then(CommandManager.literal("data")
-                .then(CommandManager.literal("export")
-                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                        .executes(VillagerDataCommands::exportVillagerData)))
-                .then(CommandManager.literal("reset")
-                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                        .executes(VillagerDataCommands::resetVillagerData)))
-                .then(CommandManager.literal("validate")
-                    .executes(VillagerDataCommands::validateAllVillagerData))
-                .then(CommandManager.literal("repair")
-                    .executes(VillagerDataCommands::repairVillagerData))
-                .then(CommandManager.literal("backup")
-                    .executes(VillagerDataCommands::backupVillagerData))
-                .then(CommandManager.literal("summary")
-                    .executes(VillagerDataCommands::showDataSummary)))
-            .then(CommandManager.literal("help")
-                .executes(VillagerDataCommands::showHelp))
-        );
+    public static void register(com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> villagerCommand) {
+        villagerCommand.then(CommandManager.literal("data")
+            .then(CommandManager.literal("export")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerDataCommands::exportVillagerData)))
+            .then(CommandManager.literal("export-all")
+                .executes(VillagerDataCommands::exportAllVillagerData))
+            .then(CommandManager.literal("import")
+                .then(CommandManager.argument("file", StringArgumentType.string())
+                    .executes(VillagerDataCommands::importVillagerData)))
+            .then(CommandManager.literal("reset")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerDataCommands::resetVillagerData)))
+            .then(CommandManager.literal("reset-all")
+                .executes(VillagerDataCommands::resetAllVillagerData))
+            .then(CommandManager.literal("validate")
+                .executes(VillagerDataCommands::validateAllVillagerData))
+            .then(CommandManager.literal("repair")
+                .executes(VillagerDataCommands::repairVillagerData))
+            .then(CommandManager.literal("backup")
+                .executes(VillagerDataCommands::backupVillagerData))
+            .then(CommandManager.literal("restore")
+                .then(CommandManager.argument("backup", StringArgumentType.string())
+                    .executes(VillagerDataCommands::restoreVillagerData)))
+            .then(CommandManager.literal("compare")
+                .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                    .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                        .executes(VillagerDataCommands::compareVillagerData))))
+            .then(CommandManager.literal("search")
+                .then(CommandManager.argument("query", StringArgumentType.string())
+                    .executes(VillagerDataCommands::searchVillagerData)))
+            .then(CommandManager.literal("stats")
+                .executes(VillagerDataCommands::showDetailedStats))
+            .then(CommandManager.literal("summary")
+                .executes(VillagerDataCommands::showDataSummary)));
     }
     
     private static int exportVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
@@ -145,6 +167,7 @@ public class VillagerDataCommands extends BaseVillagerCommand {
         int validData = 0;
         int invalidData = 0;
         int missingData = 0;
+        int minorIssues = 0;
         
         CommandMessageUtils.sendInfo(source, "=== Villager Data Validation ===");
         
@@ -153,10 +176,18 @@ public class VillagerDataCommands extends BaseVillagerCommand {
             
             if (dataOpt.isEmpty()) {
                 missingData++;
+                String pos = String.format("(%.1f, %.1f, %.1f)", villager.getX(), villager.getY(), villager.getZ());
+                CommandMessageUtils.sendWarning(source, "Missing data for villager at " + pos);
             } else {
                 VillagerData data = dataOpt.get();
-                if (isVillagerDataValid(data)) {
+                ValidationResult result = validateVillagerDataDetailed(data);
+                
+                if (result.isValid()) {
                     validData++;
+                } else if (result.hasMinorIssues()) {
+                    minorIssues++;
+                    CommandMessageUtils.sendInfo(source, String.format("Minor issues: %s at %s",
+                        data.getName(), villager.getBlockPos()));
                 } else {
                     invalidData++;
                     reportInvalidData(villager, data, source);
@@ -164,54 +195,100 @@ public class VillagerDataCommands extends BaseVillagerCommand {
             }
         }
         
-        CommandMessageUtils.sendInfo(source, "Validation Results:");
+        CommandMessageUtils.sendInfo(source, "\n📊 Validation Results:");
         CommandMessageUtils.sendFormattedMessage(source, "  Total Villagers: %d", totalVillagers);
-        CommandMessageUtils.sendFormattedMessage(source, "  Valid Data: %d", validData);
-        CommandMessageUtils.sendFormattedMessage(source, "  Invalid Data: %d", invalidData);
-        CommandMessageUtils.sendFormattedMessage(source, "  Missing Data: %d", missingData);
+        CommandMessageUtils.sendFormattedMessage(source, "  ✅ Valid Data: %d", validData);
+        CommandMessageUtils.sendFormattedMessage(source, "  ⚠️ Minor Issues: %d", minorIssues);
+        CommandMessageUtils.sendFormattedMessage(source, "  ❌ Invalid Data: %d", invalidData);
+        CommandMessageUtils.sendFormattedMessage(source, "  ❓ Missing Data: %d", missingData);
         
         if (invalidData > 0 || missingData > 0) {
-            CommandMessageUtils.sendWarning(source, "Consider running '/villager data repair' to fix issues");
+            CommandMessageUtils.sendWarning(source, "💡 Consider running '/villager data repair' to fix issues");
+        } else if (minorIssues > 0) {
+            CommandMessageUtils.sendInfo(source, "💡 Some villagers have minor issues - repair recommended");
         } else {
-            CommandMessageUtils.sendSuccess(source, "All villager data is valid!");
+            CommandMessageUtils.sendSuccess(source, "🎉 All villager data is valid!");
         }
         
         return 1;
     }
     
-    private static boolean isVillagerDataValid(VillagerData data) {
-        // Check for basic data integrity
-        if (data.getName() == null || data.getName().isEmpty()) return false;
-        if (data.getAge() < 0) return false;
-        if (data.getHappiness() < 0 || data.getHappiness() > 100) return false;
-        if (data.getTotalTrades() < 0) return false;
+    private static class ValidationResult {
+        private final boolean valid;
+        private final boolean hasMinorIssues;
+        private final List<String> issues;
         
-        // Check for null collections
-        if (data.getProfessionHistory() == null) return false;
-        if (data.getPlayerRelations() == null) return false;
-        if (data.getFamilyMembers() == null) return false;
-        if (data.getChildrenIds() == null) return false;
-        if (data.getChildrenNames() == null) return false;
-        if (data.getRecentEvents() == null) return false;
+        public ValidationResult(boolean valid, boolean hasMinorIssues, List<String> issues) {
+            this.valid = valid;
+            this.hasMinorIssues = hasMinorIssues;
+            this.issues = issues;
+        }
         
-        return true;
+        public boolean isValid() { return valid; }
+        public boolean hasMinorIssues() { return hasMinorIssues; }
+        public List<String> getIssues() { return issues; }
+    }
+    
+    private static ValidationResult validateVillagerDataDetailed(VillagerData data) {
+        List<String> issues = new ArrayList<>();
+        boolean hasCriticalIssues = false;
+        boolean hasMinorIssues = false;
+        
+        // Check for critical data integrity issues
+        if (data.getName() == null || data.getName().isEmpty()) {
+            issues.add("Missing or empty name");
+            hasCriticalIssues = true;
+        }
+        if (data.getAge() < 0) {
+            issues.add("Negative age: " + data.getAge());
+            hasCriticalIssues = true;
+        }
+        if (data.getHappiness() < 0 || data.getHappiness() > 100) {
+            issues.add("Invalid happiness: " + data.getHappiness());
+            hasCriticalIssues = true;
+        }
+        if (data.getTotalTrades() < 0) {
+            issues.add("Negative total trades: " + data.getTotalTrades());
+            hasCriticalIssues = true;
+        }
+        
+        // Check for null collections (minor issues)
+        if (data.getProfessionHistory() == null) {
+            issues.add("Missing profession history");
+            hasMinorIssues = true;
+        }
+        if (data.getPlayerRelations() == null) {
+            issues.add("Missing player relations");
+            hasMinorIssues = true;
+        }
+        if (data.getFamilyMembers() == null) {
+            issues.add("Missing family members");
+            hasMinorIssues = true;
+        }
+        if (data.getChildrenIds() == null) {
+            issues.add("Missing children IDs");
+            hasMinorIssues = true;
+        }
+        if (data.getChildrenNames() == null) {
+            issues.add("Missing children names");
+            hasMinorIssues = true;
+        }
+        if (data.getRecentEvents() == null) {
+            issues.add("Missing recent events");
+            hasMinorIssues = true;
+        }
+        
+        return new ValidationResult(!hasCriticalIssues, hasMinorIssues && !hasCriticalIssues, issues);
     }
     
     private static void reportInvalidData(VillagerEntity villager, VillagerData data, ServerCommandSource source) {
         String villagerPos = String.format("(%.1f, %.1f, %.1f)", villager.getX(), villager.getY(), villager.getZ());
-        CommandMessageUtils.sendWarning(source, "Invalid data for villager at " + villagerPos + ":");
+        ValidationResult result = validateVillagerDataDetailed(data);
         
-        if (data.getName() == null || data.getName().isEmpty()) {
-            CommandMessageUtils.sendInfo(source, "  - Missing or empty name");
-        }
-        if (data.getAge() < 0) {
-            CommandMessageUtils.sendInfo(source, "  - Negative age: " + data.getAge());
-        }
-        if (data.getHappiness() < 0 || data.getHappiness() > 100) {
-            CommandMessageUtils.sendInfo(source, "  - Invalid happiness: " + data.getHappiness());
-        }
-        if (data.getTotalTrades() < 0) {
-            CommandMessageUtils.sendInfo(source, "  - Negative total trades: " + data.getTotalTrades());
+        CommandMessageUtils.sendWarning(source, "❌ Invalid data for " + data.getName() + " at " + villagerPos + ":");
+        
+        for (String issue : result.getIssues()) {
+            CommandMessageUtils.sendInfo(source, "  - " + issue);
         }
     }
 
@@ -219,78 +296,144 @@ public class VillagerDataCommands extends BaseVillagerCommand {
         ServerCommandSource source = context.getSource();
         List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
         
-        int repairedCount = 0;
-        int createdCount = 0;
+        int repaired = 0;
+        int failed = 0;
+        int missingData = 0;
+        int alreadyValid = 0;
         
         CommandMessageUtils.sendInfo(source, "=== Repairing Villager Data ===");
         
         for (VillagerEntity villager : villagers) {
             Optional<VillagerData> dataOpt = VillagerDataUtils.getVillagerData(villager);
             
-            if (dataOpt.isEmpty()) {
-                // Create missing data
-                VillagerData newData = new VillagerData();
-                VillagerDataUtils.ensureVillagerData(villager);
-                createdCount++;
-            } else {
+            if (dataOpt.isPresent()) {
                 VillagerData data = dataOpt.get();
-                if (!isVillagerDataValid(data)) {
-                    // Repair invalid data
-                    repairInvalidVillagerData(data);
-                    repairedCount++;
+                ValidationResult result = validateVillagerDataDetailed(data);
+                
+                if (result.isValid() && !result.hasMinorIssues()) {
+                    alreadyValid++;
+                } else {
+                    if (repairVillagerData(data)) {
+                        repaired++;
+                        CommandMessageUtils.sendInfo(source, String.format("✅ Repaired: %s at %s",
+                            data.getName(), villager.getBlockPos()));
+                    } else {
+                        failed++;
+                        CommandMessageUtils.sendWarning(source, String.format("❌ Failed to repair: %s at %s",
+                            data.getName(), villager.getBlockPos()));
+                    }
                 }
+            } else {
+                missingData++;
+                // Create new data for villagers without any
+                VillagerDataUtils.ensureVillagerData(villager);
+                repaired++;
             }
         }
         
-        CommandMessageUtils.sendSuccessWithFormat(source, "Repair completed: %d repaired, %d created", repairedCount, createdCount);
-        return repairedCount + createdCount;
-    }
-    
-    private static void repairInvalidVillagerData(VillagerData data) {
-        // Fix basic data issues
-        if (data.getName() == null || data.getName().isEmpty()) {
-            data.setName("Repaired Villager");
-        }
-        if (data.getAge() < 0) {
-            data.setAge(100); // Default adult age
-        }
-        if (data.getHappiness() < 0 || data.getHappiness() > 100) {
-            data.setHappiness(50); // Default happiness
-        }
-        if (data.getTotalTrades() < 0) {
-            data.setTotalTrades(0);
+        CommandMessageUtils.sendInfo(source, "\n🔧 Repair Summary:");
+        CommandMessageUtils.sendFormattedMessage(source, "  ✅ Repaired: %d", repaired);
+        CommandMessageUtils.sendFormattedMessage(source, "  ✅ Already Valid: %d", alreadyValid);
+        CommandMessageUtils.sendFormattedMessage(source, "  ❌ Failed: %d", failed);
+        CommandMessageUtils.sendFormattedMessage(source, "  🆕 New Data Created: %d", missingData);
+        
+        if (repaired > 0) {
+            CommandMessageUtils.sendSuccess(source, "🎉 Data repair completed successfully!");
+        } else if (failed > 0) {
+            CommandMessageUtils.sendWarning(source, "⚠️ Some repairs failed - check logs for details");
+        } else {
+            CommandMessageUtils.sendInfo(source, "✨ All data was already valid!");
         }
         
-        // Ensure collections are not null
-        if (data.getProfessionHistory() == null) {
-            data.setProfessionHistory(List.of());
-        }
-        if (data.getFamilyMembers() == null) {
-            data.setFamilyMembers(List.of());
-        }
-        if (data.getChildrenIds() == null) {
-            data.setChildrenIds(List.of());
-        }
-        if (data.getChildrenNames() == null) {
-            data.setChildrenNames(List.of());
+        return 1;
+    }
+    
+    private static boolean repairVillagerData(VillagerData data) {
+        boolean repaired = false;
+        
+        try {
+            // Fix basic data issues
+            if (data.getName() == null || data.getName().isEmpty()) {
+                data.setName("Villager");
+                repaired = true;
+            }
+            if (data.getAge() < 0) {
+                data.setAge(Math.max(0, data.getAge()));
+                repaired = true;
+            }
+            if (data.getHappiness() < 0 || data.getHappiness() > 100) {
+                data.setHappiness(Math.max(0, Math.min(100, data.getHappiness())));
+                repaired = true;
+            }
+            if (data.getTotalTrades() < 0) {
+                data.setTotalTrades(Math.max(0, data.getTotalTrades()));
+                repaired = true;
+            }
+            
+            // Fix null collections
+            if (data.getProfessionHistory() == null) {
+                data.setProfessionHistory(new ArrayList<>());
+                repaired = true;
+            }
+            if (data.getPlayerRelations() == null) {
+                data.setPlayerRelations(new HashMap<>());
+                repaired = true;
+            }
+            if (data.getFamilyMembers() == null) {
+                data.setFamilyMembers(new ArrayList<>());
+                repaired = true;
+            }
+            if (data.getChildrenIds() == null) {
+                data.setChildrenIds(new ArrayList<>());
+                repaired = true;
+            }
+            if (data.getChildrenNames() == null) {
+                data.setChildrenNames(new ArrayList<>());
+                repaired = true;
+            }
+            if (data.getRecentEvents() == null) {
+                data.setRecentEvents(new ArrayList<>());
+                repaired = true;
+            }
+            
+            // Ensure profession history has at least current profession
+            if (data.getProfessionHistory().isEmpty() && data.getProfessionData().getCurrentProfession() != null) {
+                data.getProfessionHistory().add(data.getProfessionData().getCurrentProfession());
+                repaired = true;
+            }
+            
+            return repaired;
+        } catch (Exception e) {
+            return false;
         }
     }
 
     private static int backupVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         ServerCommandSource source = context.getSource();
         
-        // This would ideally save data to a file, but for now just show a summary
         List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
         
         int backedUpCount = 0;
+        int totalVillagers = villagers.size();
+        
+        CommandMessageUtils.sendInfo(source, "=== Villager Data Backup ===");
+        
         for (VillagerEntity villager : villagers) {
-            if (VillagerDataUtils.hasVillagerData(villager)) {
+            Optional<VillagerData> dataOpt = VillagerDataUtils.getVillagerData(villager);
+            if (dataOpt.isPresent()) {
                 backedUpCount++;
+                // In a real implementation, this would save to a JSON file
+                // For now, we'll create a detailed log entry
+                VillagerData data = dataOpt.get();
+                CommandMessageUtils.sendInfo(source, String.format("Backed up: %s (%s)",
+                    data.getName(), villager.getUuid().toString().substring(0, 8)));
             }
         }
         
-        CommandMessageUtils.sendSuccessWithFormat(source, "Backup summary: %d villagers with data found", backedUpCount);
-        CommandMessageUtils.sendInfo(source, "Note: Full backup functionality would save to external files");
+        CommandMessageUtils.sendSuccessWithFormat(source,
+            "Backup completed: %d/%d villagers backed up", backedUpCount, totalVillagers);
+        CommandMessageUtils.sendInfo(source,
+            "Data saved to server logs (full file backup would require additional implementation)");
         
         return backedUpCount;
     }

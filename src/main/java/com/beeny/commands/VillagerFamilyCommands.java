@@ -36,30 +36,28 @@ import java.util.stream.Collectors;
  */
 public class VillagerFamilyCommands extends BaseVillagerCommand {
     
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("villager")
-            .then(CommandManager.literal("family")
-                .then(CommandManager.literal("tree")
-                    .then(CommandManager.argument("villager", EntityArgumentType.entity())
-                        .executes(VillagerFamilyCommands::showFamilyTree)))
-                .then(CommandManager.literal("marry")
-                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
-                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
-                            .executes(VillagerFamilyCommands::marryVillagers))))
-                .then(CommandManager.literal("divorce")
-                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
-                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
-                            .executes(VillagerFamilyCommands::divorceVillagers))))
-                .then(CommandManager.literal("breed")
-                    .then(CommandManager.argument("villager1", EntityArgumentType.entity())
-                        .then(CommandManager.argument("villager2", EntityArgumentType.entity())
-                            .executes(VillagerFamilyCommands::breedVillagers))))
-                .then(CommandManager.literal("debug")
-                    .then(CommandManager.literal("relationships")
-                        .executes(VillagerFamilyCommands::debugRelationships))
-                    .then(CommandManager.literal("cleanup")
-                        .executes(VillagerFamilyCommands::cleanupData))))
-        );
+    public static void register(com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> villagerCommand) {
+        villagerCommand.then(CommandManager.literal("family")
+            .then(CommandManager.literal("tree")
+                .then(CommandManager.argument("villager", EntityArgumentType.entity())
+                    .executes(VillagerFamilyCommands::showFamilyTree)))
+            .then(CommandManager.literal("marry")
+                .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                    .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                        .executes(VillagerFamilyCommands::marryVillagers))))
+            .then(CommandManager.literal("divorce")
+                .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                    .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                        .executes(VillagerFamilyCommands::divorceVillagers))))
+            .then(CommandManager.literal("breed")
+                .then(CommandManager.argument("villager1", EntityArgumentType.entity())
+                    .then(CommandManager.argument("villager2", EntityArgumentType.entity())
+                        .executes(VillagerFamilyCommands::breedVillagers))))
+            .then(CommandManager.literal("debug")
+                .then(CommandManager.literal("relationships")
+                    .executes(VillagerFamilyCommands::debugRelationships))
+                .then(CommandManager.literal("cleanup")
+                    .executes(VillagerFamilyCommands::cleanupData))));
     }
     
     private static int showFamilyTree(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {

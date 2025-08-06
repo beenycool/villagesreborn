@@ -30,28 +30,26 @@ import org.apache.logging.log4j.Logger;
 public class VillagerActivityCommands {
     private static final Logger LOGGER = LogManager.getLogger(VillagerActivityCommands.class);
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
-        dispatcher.register(CommandManager.literal("villager")
-            .then(CommandManager.literal("activity")
-                .then(CommandManager.literal("current")
-                    .executes(VillagerActivityCommands::showCurrentActivity))
-                .then(CommandManager.literal("daily")
-                    .then(CommandManager.argument("day", IntegerArgumentType.integer(0))
-                        .executes(VillagerActivityCommands::showDailyLog)))
-                .then(CommandManager.literal("recent")
+    public static void register(com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> villagerCommand, CommandRegistryAccess registryAccess) {
+        villagerCommand.then(CommandManager.literal("activity")
+            .then(CommandManager.literal("current")
+                .executes(VillagerActivityCommands::showCurrentActivity))
+            .then(CommandManager.literal("daily")
+                .then(CommandManager.argument("day", IntegerArgumentType.integer(0))
+                    .executes(VillagerActivityCommands::showDailyLog)))
+            .then(CommandManager.literal("recent")
+                .then(CommandManager.argument("days", IntegerArgumentType.integer(1, 30))
+                    .executes(VillagerActivityCommands::showRecentLogs)))
+            .then(CommandManager.literal("weekly")
+                .executes(VillagerActivityCommands::showWeeklySummary))
+            .then(CommandManager.literal("patterns")
+                .executes(VillagerActivityCommands::showActivityPatterns))
+            .then(CommandManager.literal("list")
+                .executes(VillagerActivityCommands::listAllVillagersActivity))
+            .then(CommandManager.literal("export")
+                .then(CommandManager.argument("villager", StringArgumentType.string())
                     .then(CommandManager.argument("days", IntegerArgumentType.integer(1, 30))
-                        .executes(VillagerActivityCommands::showRecentLogs)))
-                .then(CommandManager.literal("weekly")
-                    .executes(VillagerActivityCommands::showWeeklySummary))
-                .then(CommandManager.literal("patterns")
-                    .executes(VillagerActivityCommands::showActivityPatterns))
-                .then(CommandManager.literal("list")
-                    .executes(VillagerActivityCommands::listAllVillagersActivity))
-                .then(CommandManager.literal("export")
-                    .then(CommandManager.argument("villager", StringArgumentType.string())
-                        .then(CommandManager.argument("days", IntegerArgumentType.integer(1, 30))
-                            .executes(VillagerActivityCommands::exportActivityData)))))
-        );
+                        .executes(VillagerActivityCommands::exportActivityData)))));
     }
 
     private static int showCurrentActivity(CommandContext<ServerCommandSource> context) {

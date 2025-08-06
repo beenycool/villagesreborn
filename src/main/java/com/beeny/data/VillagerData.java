@@ -257,6 +257,18 @@ public class VillagerData {
     public int getPlayerReputation(String playerId) {
         return playerRelations.getOrDefault(playerId, 0);
     }
+
+    /**
+     * Safely adjust a player's relation by delta (can be negative). Clamps to a reasonable range.
+     */
+    public void adjustPlayerRelation(String playerId, int delta) {
+        int current = playerRelations.getOrDefault(playerId, 0);
+        int updated = current + delta;
+        // Optional clamp to avoid overflow and keep within sensible bounds
+        if (updated > 1000) updated = 1000;
+        if (updated < -1000) updated = -1000;
+        playerRelations.put(playerId, updated);
+    }
     
     public void updateLastConversationTime() {
         this.lastConversationTime = System.currentTimeMillis();

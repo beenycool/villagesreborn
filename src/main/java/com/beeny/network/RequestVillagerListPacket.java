@@ -76,10 +76,25 @@ public class RequestVillagerListPacket implements CustomPayload {
         // Get all tracked villagers from the ServerVillagerManager
         int sameWorldCount = 0;
         int withDataCount = 0;
+        
+        // Track UUIDs to detect duplicates
+        java.util.Set<java.util.UUID> seenUuids = new java.util.HashSet<>();
+        int duplicateCount = 0;
+        
         for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
             // Only include villagers in the same world as the player
             if (villager.getWorld() != player.getWorld()) continue;
             sameWorldCount++;
+            
+            // Check for duplicate UUIDs
+            java.util.UUID villagerUuid = villager.getUuid();
+            if (seenUuids.contains(villagerUuid)) {
+                Villagersreborn.LOGGER.warn("[RequestVillagerListPacket] Duplicate UUID detected: {} for villager at {}",
+                    villagerUuid, villager.getBlockPos());
+                duplicateCount++;
+            } else {
+                seenUuids.add(villagerUuid);
+            }
             
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
@@ -88,6 +103,11 @@ public class RequestVillagerListPacket implements CustomPayload {
                 Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}",
                     data.getName(), villager.getBlockPos());
             }
+        }
+        
+        // Log total duplicate count
+        if (duplicateCount > 0) {
+            Villagersreborn.LOGGER.warn("[RequestVillagerListPacket] Found {} duplicate UUIDs in tracked villager list", duplicateCount);
         }
         
         // Truncate the list to the maximum allowed size before sending
