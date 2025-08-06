@@ -60,8 +60,15 @@ public class FamilyTreeDataPacket implements CustomPayload {
     }
 
     public static void register() {
+        // Register only server-side components here.
+        // C2S request is defined here, so we register its codec on the server play channel.
         PayloadTypeRegistry.playC2S().register(RequestPacket.ID, RequestPacket.CODEC);
-        PayloadTypeRegistry.playS2C().register(ID, CODEC);
+
+        // IMPORTANT: Do NOT register the S2C payload type here.
+        // The client owns registration of S2C payloads to avoid "already registered" errors
+        // when client entrypoints also register the same type.
+        // PayloadTypeRegistry.playS2C().register(ID, CODEC);
+
         ServerPlayNetworking.registerGlobalReceiver(RequestPacket.ID, (payload, context) -> {
             // Send family tree data back to client
             context.server().execute(() -> {
@@ -155,7 +162,7 @@ public class FamilyTreeDataPacket implements CustomPayload {
             data.getBirthTime(),
             data.getDeathTime(),
             derivedAlive,
-            data.getPersonality(),
+            data.getPersonality().name(),
             data.getHappiness(),
             !data.getProfessionHistory().isEmpty() ? data.getProfessionHistory().get(0) : "",
             data.getSpouseName(),

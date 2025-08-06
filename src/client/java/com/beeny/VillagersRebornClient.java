@@ -5,6 +5,8 @@ import com.beeny.network.VillagerTeleportPacketClient;
 import com.beeny.network.OpenFamilyTreePacketClient;
 import com.beeny.network.FamilyTreeDataPacketClient;
 import com.beeny.network.RequestVillagerListPacketClient;
+import com.beeny.commands.ClientDialogueCommands;
+import com.beeny.client.gui.SimpleConfigScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -18,6 +20,7 @@ import org.lwjgl.glfw.GLFW;
 @Environment(EnvType.CLIENT)
 public class VillagersRebornClient implements ClientModInitializer {
     private static KeyBinding openJournalKey;
+    private static KeyBinding openSettingsKey;
 
     @Override
     public void onInitializeClient() {
@@ -27,12 +30,22 @@ public class VillagersRebornClient implements ClientModInitializer {
         FamilyTreeDataPacketClient.register();
         RequestVillagerListPacketClient.register();
         
+        // Register client commands
+        ClientDialogueCommands.register();
+        
         
         openJournalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-            "key.villagersreborn.open_journal",
+            com.beeny.constants.StringConstants.KB_OPEN_JOURNAL,
             InputUtil.Type.KEYSYM,
             GLFW.GLFW_KEY_J,
-            "category.villagersreborn.general"
+            com.beeny.constants.StringConstants.KB_CATEGORY_GENERAL
+        ));
+        
+        openSettingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            com.beeny.constants.StringConstants.KB_OPEN_SETTINGS,
+            InputUtil.Type.KEYSYM,
+            GLFW.GLFW_KEY_V,
+            com.beeny.constants.StringConstants.KB_CATEGORY_GENERAL
         ));
         
         
@@ -40,6 +53,19 @@ public class VillagersRebornClient implements ClientModInitializer {
             while (openJournalKey.wasPressed()) {
                 if (client.player != null && client.world != null) {
                     VillagerJournalItemClient.openVillagerJournal(client.world, client.player);
+                }
+            }
+            
+            while (openSettingsKey.wasPressed()) {
+                if (client.player != null) {
+                    try {
+                        client.execute(() -> {
+                            client.setScreen(new SimpleConfigScreen(client.currentScreen));
+                        });
+                    } catch (Exception e) {
+                        client.player.sendMessage(Text.literal(com.beeny.constants.StringConstants.UI_ERROR_PREFIX + e.getMessage()), false);
+                        e.printStackTrace();
+                    }
                 }
             }
         });
