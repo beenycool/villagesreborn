@@ -51,33 +51,33 @@ public class ConfigManager {
                 VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
             }
             
-            // AI Configuration
+            // AI Configuration (use accessors)
             if (config.has("aiEnabled")) {
-                VillagersRebornConfig.AI_ENABLED = config.get("aiEnabled").getAsBoolean();
+                VillagersRebornConfig.setAiEnabled(config.get("aiEnabled").getAsBoolean());
             }
             
             if (config.has("aiProvider")) {
-                VillagersRebornConfig.AI_PROVIDER = config.get("aiProvider").getAsString();
+                VillagersRebornConfig.setAiProvider(config.get("aiProvider").getAsString());
             }
             
             if (config.has("aiApiKey")) {
-                VillagersRebornConfig.AI_API_KEY = config.get("aiApiKey").getAsString();
+                VillagersRebornConfig.setAiApiKey(config.get("aiApiKey").getAsString());
             }
             
             if (config.has("aiRateLimitSeconds")) {
-                VillagersRebornConfig.AI_RATE_LIMIT_SECONDS = config.get("aiRateLimitSeconds").getAsInt();
+                VillagersRebornConfig.setAiRateLimitSeconds(config.get("aiRateLimitSeconds").getAsInt());
             }
             
             if (config.has("aiMaxTokens")) {
-                VillagersRebornConfig.AI_MAX_TOKENS = config.get("aiMaxTokens").getAsInt();
+                VillagersRebornConfig.setAiMaxTokens(config.get("aiMaxTokens").getAsInt());
             }
             
             if (config.has("toolCallingEnabled")) {
-                VillagersRebornConfig.TOOL_CALLING_ENABLED = config.get("toolCallingEnabled").getAsBoolean();
+                VillagersRebornConfig.setToolCallingEnabled(config.get("toolCallingEnabled").getAsBoolean());
             }
             
             if (config.has("toolUseProbability")) {
-                VillagersRebornConfig.TOOL_USE_PROBABILITY = config.get("toolUseProbability").getAsDouble();
+                VillagersRebornConfig.setToolUseProbability(config.get("toolUseProbability").getAsDouble());
             }
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
@@ -94,13 +94,13 @@ public class ConfigManager {
         config.addProperty("happinessRecoveryRate", VillagersRebornConfig.HAPPINESS_RECOVERY_RATE);
         
         // AI Configuration
-        config.addProperty("aiEnabled", VillagersRebornConfig.AI_ENABLED);
-        config.addProperty("aiProvider", VillagersRebornConfig.AI_PROVIDER);
-        config.addProperty("aiApiKey", VillagersRebornConfig.AI_API_KEY);
-        config.addProperty("aiRateLimitSeconds", VillagersRebornConfig.AI_RATE_LIMIT_SECONDS);
-        config.addProperty("aiMaxTokens", VillagersRebornConfig.AI_MAX_TOKENS);
-        config.addProperty("toolCallingEnabled", VillagersRebornConfig.TOOL_CALLING_ENABLED);
-        config.addProperty("toolUseProbability", VillagersRebornConfig.TOOL_USE_PROBABILITY);
+        config.addProperty("aiEnabled", VillagersRebornConfig.isAiEnabled());
+        config.addProperty("aiProvider", VillagersRebornConfig.getAiProvider());
+        config.addProperty("aiApiKey", VillagersRebornConfig.getAiApiKey());
+        config.addProperty("aiRateLimitSeconds", VillagersRebornConfig.getAiRateLimitSeconds());
+        config.addProperty("aiMaxTokens", VillagersRebornConfig.getAiMaxTokens());
+        config.addProperty("toolCallingEnabled", VillagersRebornConfig.isToolCallingEnabled());
+        config.addProperty("toolUseProbability", VillagersRebornConfig.getToolUseProbability());
         
         Files.writeString(configPath, GSON.toJson(config));
         Villagersreborn.LOGGER.info("Created default Villagers Reborn config");
