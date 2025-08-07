@@ -12,6 +12,10 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.poi.PointOfInterestTypes;
+import net.minecraft.entity.ai.brain.MemoryModuleType;
+import net.minecraft.entity.ai.brain.WalkTarget;
+import net.minecraft.entity.ai.brain.LookTarget;
+import net.minecraft.util.math.GlobalPos;
 
 import java.util.*;
 
@@ -377,24 +381,212 @@ public class VillagerScheduleManager {
     }
     
     private static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
-        
-        
-        
         switch (activity) {
             case SLEEP -> {
-                // Villager should go to bed - note: sleep behavior handled by Minecraft AI
+                // Villager should go to bed - find and path to bed
+                if (!villager.isSleeping()) {
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_SLEPT, villager.getWorld().getTime());
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                    
+                    // Try to find a bed if not already sleeping
+                    Optional<BlockPos> bedPos = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.NEAREST_BED);
+                    if (bedPos.isPresent()) {
+                        villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                            new net.minecraft.entity.ai.brain.WalkTarget(bedPos.get(), 1.0f, 0));
+                    }
+                }
             }
             case WORK -> {
+                // Villager should work at their job site
+                villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_WORKED_AT_POI, villager.getWorld().getTime());
                 
+                // Find job site if not already working
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    BlockPos js = jobSite.get().pos();
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(js, 1.0f, 1));
+                } else {
+                    // Wander near village center if no job site
+                    Optional<GlobalPos> villageCenter = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    villageCenter.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 2)));
+                }
             }
             case SOCIALIZE -> {
+                // Villager should interact with other villagers
+                List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
+                    VillagerEntity.class,
+                    new Box(villager.getBlockPos()).expand(16),
+                    v -> v != villager && v.isAlive()
+                );
                 
+                if (!nearbyVillagers.isEmpty()) {
+                    VillagerEntity target = nearbyVillagers.get(villager.getRandom().nextInt(nearbyVillagers.size()));
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.INTERACTION_TARGET, target);
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                    
+                    // Trigger social interaction
+                    // Use WalkTarget toward target and let vanilla behaviors handle look direction
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                } else {
+                    // Wander if no villagers nearby
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                }
             }
             case EAT -> {
+                // Villager should find food or eat
+                // Note: MemoryModuleType.LAST_EATEN and VillagerEntity.eatFood are not present in this version.
+                // Fallback: if inventory empty, meander toward HOME; otherwise just pause briefly (no consume).
+                if (villager.getInventory().isEmpty()) {
+                    Optional<GlobalPos> villageCenter = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    villageCenter.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 3)));
+                } else {
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                }
+            }
+            case RELAX -> {
+                // Villager should relax at home or in a comfortable spot
+                Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                if (home.isPresent()) {
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(home.get().pos(), 0.6f, 1));
+                } else {
+                    // Find a nearby seat or wander slowly
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                }
+            }
+            case HOBBY -> {
+                // Villager should engage in hobby activities
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (data != null && data.getHobby() != null) {
+                    // Hobby-specific behavior based on the villager's hobby
+                    String hobby = data.getHobby();
+                    switch (hobby.toLowerCase()) {
+                        case "fishing":
+                            // Move toward water
+                            villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                                new net.minecraft.entity.ai.brain.WalkTarget(villager.getBlockPos(), 0.7f, 5));
+                            break;
+                        case "gardening":
+                            // Look for flowers or crops
+                            villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                                new net.minecraft.entity.ai.brain.WalkTarget(villager.getBlockPos(), 0.5f, 3));
+                            break;
+                        default:
+                            // Generic hobby behavior - wander and observe
+                            villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                            villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                    }
+                } else {
+                    // Default hobby behavior
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                }
+            }
+            case WAKE_UP -> {
+                // Villager wakes up from sleep
+                if (villager.isSleeping()) {
+                    villager.wakeUp();
+                }
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_SLEPT);
                 
+                // Look for morning activities
+                Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                    new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 1.0f, 2)));
+            }
+            case WANDER -> {
+                // Villager should wander around
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                
+                // Random wandering behavior
+                if (villager.getRandom().nextInt(100) < 5) { // 5% chance per tick
+                    BlockPos wanderTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(10) - 5,
+                        0,
+                        villager.getRandom().nextInt(10) - 5
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(wanderTarget, 0.8f, 0));
+                }
+            }
+            case PRAY -> {
+                // Villager should pray - typically at a church or designated area
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    // Clerics pray at their job site (church)
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(jobSite.get().pos(), 1.0f, 0));
+                } else {
+                    // Find a quiet spot to pray
+                    Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.5f, 1)));
+                }
+                // Remove LookTarget instantiation (abstract); rely on walk/idle behavior
+            }
+            case STUDY -> {
+                // Villager should study - typically at job site or home
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    // Librarians study at their job site (library)
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(jobSite.get().pos(), 1.0f, 1));
+                } else {
+                    // Study at home
+                    Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 1)));
+                }
+                // Remove LookTarget instantiation (abstract)
+            }
+            case EXERCISE -> {
+                // Villager should exercise - move around actively
+                if (villager.getRandom().nextInt(100) < 10) { // 10% chance per tick
+                    BlockPos exerciseTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(8) - 4,
+                        0,
+                        villager.getRandom().nextInt(8) - 4
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(exerciseTarget, 1.2f, 0));
+                }
+            }
+            case SHOP -> {
+                // Villager should shop - interact with other villagers or visit market areas
+                List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
+                    VillagerEntity.class,
+                    new Box(villager.getBlockPos()).expand(12),
+                    v -> v != villager && v.isAlive() && v.getVillagerData().profession() != villager.getVillagerData().profession()
+                );
+                
+                if (!nearbyVillagers.isEmpty()) {
+                    VillagerEntity target = nearbyVillagers.get(villager.getRandom().nextInt(nearbyVillagers.size()));
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.INTERACTION_TARGET, target);
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                } else {
+                    // Wander to simulate shopping
+                    BlockPos shopTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(6) - 3,
+                        0,
+                        villager.getRandom().nextInt(6) - 3
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(shopTarget, 0.9f, 1));
+                }
             }
             default -> {
-                
+                // Default behavior - basic wandering
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
             }
         }
     }

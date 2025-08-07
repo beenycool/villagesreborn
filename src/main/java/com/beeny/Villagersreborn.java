@@ -133,6 +133,12 @@ public class Villagersreborn implements ModInitializer {
 	}
 	
 	private void registerEvents() {
+		// Register chat message event for AI integration
+		net.fabricmc.fabric.api.message.v1.ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
+			// Process chat message for AI responses
+			com.beeny.system.VillagerAISystem.processPlayerChat(sender, message.getContent().getString());
+		});
+		
 		
 		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
 			if (entity instanceof VillagerEntity villager && !world.isClient) {
