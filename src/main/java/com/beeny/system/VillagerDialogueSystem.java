@@ -450,8 +450,57 @@ public class VillagerDialogueSystem {
         return DialogueCategory.GREETING; 
     }
     
+    public static Text generateContextualDialogue(VillagerEntity villager, PlayerEntity player) {
+        DialogueContext context = new DialogueContext(villager, player);
+        
+        // Use current activity to influence dialogue selection
+        VillagerScheduleManager.Activity currentActivity = 
+            VillagerScheduleManager.getCurrentActivity(villager);
+        
+        DialogueCategory category = chooseDialogueCategoryForActivity(context, currentActivity);
+        Text dialogue = generateDialogue(context, category);
+        
+        // Add activity-specific context to the dialogue
+        if (currentActivity != VillagerScheduleManager.Activity.WANDER) {
+            String activityPrefix = getActivityPrefix(currentActivity);
+            if (activityPrefix != null) {
+                return Text.literal(activityPrefix + " ")
+                    .formatted(Formatting.ITALIC, Formatting.GRAY)
+                    .append(dialogue);
+            }
+        }
+        
+        return dialogue;
+    }
     
-    public static List<Text> generateConversation(VillagerEntity villager, PlayerEntity player) {
+    private static DialogueCategory chooseDialogueCategoryForActivity(DialogueContext context, VillagerScheduleManager.Activity activity) {
+        // Activity-specific dialogue preferences
+        return switch (activity) {
+            case WORK -> DialogueCategory.WORK;
+            case SOCIALIZE -> DialogueCategory.GOSSIP;
+            case EAT -> context.villagerData.getHappiness() > 60 ? DialogueCategory.MOOD : DialogueCategory.GREETING;
+            case HOBBY -> DialogueCategory.HOBBY;
+            case STUDY -> DialogueCategory.ADVICE;
+            case PRAY -> DialogueCategory.MOOD;
+            case EXERCISE -> DialogueCategory.MOOD;
+            case SLEEP -> DialogueCategory.FAREWELL;
+            case WAKE_UP -> DialogueCategory.GREETING;
+            default -> chooseDialogueCategory(context);
+        };
+    }
+    
+    private static String getActivityPrefix(VillagerScheduleManager.Activity activity) {
+        return switch (activity) {
+            case WORK -> "*pauses from work*";
+            case EAT -> "*looks up from eating*";
+            case STUDY -> "*closes book briefly*";
+            case EXERCISE -> "*wipes sweat*";
+            case HOBBY -> "*sets down hobby materials*";
+            case PRAY -> "*finishes prayer*";
+            case SOCIALIZE -> "*turns from conversation*";
+            default -> null;
+        };
+    }
         DialogueContext context = new DialogueContext(villager, player);
         List<Text> conversation = new ArrayList<>();
         

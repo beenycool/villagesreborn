@@ -51,6 +51,35 @@ public class ConfigManager {
                 VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
             }
             
+            // AI Configuration
+            if (config.has("aiEnabled")) {
+                VillagersRebornConfig.AI_ENABLED = config.get("aiEnabled").getAsBoolean();
+            }
+            
+            if (config.has("aiProvider")) {
+                VillagersRebornConfig.AI_PROVIDER = config.get("aiProvider").getAsString();
+            }
+            
+            if (config.has("aiApiKey")) {
+                VillagersRebornConfig.AI_API_KEY = config.get("aiApiKey").getAsString();
+            }
+            
+            if (config.has("aiRateLimitSeconds")) {
+                VillagersRebornConfig.AI_RATE_LIMIT_SECONDS = config.get("aiRateLimitSeconds").getAsInt();
+            }
+            
+            if (config.has("aiMaxTokens")) {
+                VillagersRebornConfig.AI_MAX_TOKENS = config.get("aiMaxTokens").getAsInt();
+            }
+            
+            if (config.has("toolCallingEnabled")) {
+                VillagersRebornConfig.TOOL_CALLING_ENABLED = config.get("toolCallingEnabled").getAsBoolean();
+            }
+            
+            if (config.has("toolUseProbability")) {
+                VillagersRebornConfig.TOOL_USE_PROBABILITY = config.get("toolUseProbability").getAsDouble();
+            }
+            
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
         } catch (Exception e) {
             Villagersreborn.LOGGER.error("Failed to load Villagers Reborn config", e);
@@ -63,6 +92,15 @@ public class ConfigManager {
         config.addProperty("happinessNeutralThreshold", VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD);
         config.addProperty("happinessDecayRate", VillagersRebornConfig.HAPPINESS_DECAY_RATE);
         config.addProperty("happinessRecoveryRate", VillagersRebornConfig.HAPPINESS_RECOVERY_RATE);
+        
+        // AI Configuration
+        config.addProperty("aiEnabled", VillagersRebornConfig.AI_ENABLED);
+        config.addProperty("aiProvider", VillagersRebornConfig.AI_PROVIDER);
+        config.addProperty("aiApiKey", VillagersRebornConfig.AI_API_KEY);
+        config.addProperty("aiRateLimitSeconds", VillagersRebornConfig.AI_RATE_LIMIT_SECONDS);
+        config.addProperty("aiMaxTokens", VillagersRebornConfig.AI_MAX_TOKENS);
+        config.addProperty("toolCallingEnabled", VillagersRebornConfig.TOOL_CALLING_ENABLED);
+        config.addProperty("toolUseProbability", VillagersRebornConfig.TOOL_USE_PROBABILITY);
         
         Files.writeString(configPath, GSON.toJson(config));
         Villagersreborn.LOGGER.info("Created default Villagers Reborn config");
