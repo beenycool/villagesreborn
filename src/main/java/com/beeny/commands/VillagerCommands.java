@@ -990,8 +990,9 @@ public class VillagerCommands {
     private static int setAIProvider(CommandContext<ServerCommandSource> context) {
         String provider = StringArgumentType.getString(context, "provider");
         
-        if (!provider.equals(VillagersRebornConfig.AI_PROVIDER_GEMINI) && !provider.equals(VillagersRebornConfig.AI_PROVIDER_OPENROUTER)) {
-            sendError(context.getSource(), "Invalid provider. Use '" + VillagersRebornConfig.AI_PROVIDER_GEMINI + "' or '" + VillagersRebornConfig.AI_PROVIDER_OPENROUTER + "'");
+        if (!VillagersRebornConfig.SUPPORTED_AI_PROVIDERS.contains(provider)) {
+            sendError(context.getSource(), "Invalid provider. Supported providers: " + 
+                String.join(", ", VillagersRebornConfig.SUPPORTED_AI_PROVIDERS));
             return 0;
         }
         
@@ -1001,8 +1002,7 @@ public class VillagerCommands {
     }
     
     private static CompletableFuture<Suggestions> suggestAIProviders(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
-        builder.suggest(VillagersRebornConfig.AI_PROVIDER_GEMINI);
-        builder.suggest(VillagersRebornConfig.AI_PROVIDER_OPENROUTER);
+        VillagersRebornConfig.SUPPORTED_AI_PROVIDERS.forEach(builder::suggest);
         return builder.buildFuture();
     }
     

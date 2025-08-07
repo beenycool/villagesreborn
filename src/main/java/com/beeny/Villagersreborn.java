@@ -1,6 +1,7 @@
 package com.beeny;
 
 import com.beeny.commands.VillagerCommands;
+import com.beeny.config.ConfigManager;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.network.VillagerTeleportPacket;
@@ -10,10 +11,12 @@ import com.beeny.network.OpenFamilyTreePacket;
 import com.beeny.network.FamilyTreeDataPacket;
 import com.beeny.network.RequestVillagerListPacket;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import com.beeny.registry.ModItems;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
+import com.beeny.system.VillagerAISystem;
 import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
@@ -68,7 +71,7 @@ public class Villagersreborn implements ModInitializer {
 		LOGGER.info("Initializing Villages Reborn mod...");
 		
 		
-		com.beeny.config.ConfigManager.loadConfig();
+		ConfigManager.loadConfig();
 		
 		
 		ModItems.initialize();
@@ -134,9 +137,9 @@ public class Villagersreborn implements ModInitializer {
 	
 	private void registerEvents() {
 		// Register chat message event for AI integration
-		net.fabricmc.fabric.api.message.v1.ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
+		ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
 			// Process chat message for AI responses
-			com.beeny.system.VillagerAISystem.processPlayerChat(sender, message.getContent().getString());
+			VillagerAISystem.processPlayerChat(sender, message.getContent().getString());
 		});
 		
 		

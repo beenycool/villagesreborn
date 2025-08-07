@@ -11,26 +11,90 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class VillagerAISystem {
     
     private static final Gson GSON = new Gson();
     private static final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
+    private static final HttpClient httpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .build();
     
     // API endpoints
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
     private static final String OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    
+    // POJO classes for API responses
+    private static class GeminiResponse {
+        private List<Candidate> candidates;
+        public List<Candidate> getCandidates() { return candidates; }
+    }
+    
+    private static class Candidate {
+        private Content content;
+        public Content getContent() { return content; }
+    }
+    
+    private static class Content {
+        private List<Part> parts;
+        public List<Part> getParts() { return parts; }
+    }
+    
+    private static class Part {
+        private String text;
+        public String getText() { return text; }
+    }
+    
+    private static class OpenRouterResponse {
+        private List<Choice> choices;
+        public List<Choice> getChoices() { return choices; }
+    }
+    
+    private static class Choice {
+        private Message message;
+        public Message getMessage() { return message; }
+    }
+    
+    private static class Message {
+        private String content;
+        public String getContent() { return content; }
+    }
+    
+    // Tool definition structure
+    private static class Tool {
+        final String action;
+        final String defaultTarget;
+        final String description;
+        
+        Tool(String action, String defaultTarget, String description) {
+            this.action = action;
+            this.defaultTarget = defaultTarget;
+            this.description = description;
+        }
+        
+        String toPromptFormat() {
+            return String.format("[TOOL:%s:%s]", action, defaultTarget);
+        }
+    }
+    
+    private static final List<Tool> AVAILABLE_TOOLS = List.of(
+        new Tool("hoe", "crops", "Tend to crops"),
+        new Tool("fishing_rod", "water", "Fish in water"),
+        new Tool("book", "knowledge", "Share knowledge"),
+        new Tool("anvil", "item", "Work on items")
+    );
     
     public static class AIResponse {
         public final String message;
@@ -52,12 +116,18 @@ public class VillagerAISystem {
             return false;
         }
         
-        // Check rate limiting
+        // Sanitize input message
+        if (message.length() > 500) {
+            message = message.substring(0, 500);
+        }
+        message = sanitizeInput(message);
+        
+        // Check rate limiting with atomic operation
         String playerId = player.getUuidAsString();
         long currentTime = System.currentTimeMillis();
-        long lastRequestTime = lastRequestTimes.getOrDefault(playerId, 0L);
+        Long lastRequestTime = lastRequestTimes.get(playerId);
         
-        if (currentTime - lastRequestTime < VillagersRebornConfig.getAiRateLimitSeconds() * 1000) {
+        if (lastRequestTime != null && currentTime - lastRequestTime < VillagersRebornConfig.getAiRateLimitSeconds() * 1000) {
             return false;
         }
         
@@ -81,6 +151,15 @@ public class VillagerAISystem {
         }
         
         return false;
+    }
+    
+    /**
+     * Sanitize input to prevent injection attacks
+     */
+    private static String sanitizeInput(String input) {
+        if (input == null) return "";
+        // Basic sanitization - remove potential injection characters
+        return input.replaceAll("[<>\"'&]", "").trim();
     }
     
     private static List<VillagerEntity> getNearbyVillagers(PlayerEntity player, double radius) {
@@ -184,7 +263,10 @@ public class VillagerAISystem {
         if (VillagersRebornConfig.isToolCallingEnabled()) {
             prompt.append("\n\nIf appropriate for your profession and current activity, you may use tools. ");
             prompt.append("To use a tool, include [TOOL:action:target] in your response. ");
-            prompt.append("Available tools: [TOOL:hoe:crops], [TOOL:fishing_rod:water], [TOOL:book:knowledge], [TOOL:anvil:item]. ");
+            String toolsList = AVAILABLE_TOOLS.stream()
+                .map(Tool::toPromptFormat)
+                .collect(Collectors.joining(", "));
+            prompt.append("Available tools: ").append(toolsList).append(". ");
             prompt.append("Only use tools when it makes sense for your profession and what you're doing.");
         }
         
@@ -208,22 +290,44 @@ public class VillagerAISystem {
                 return parseAIResponse(response);
             }
             
+        } catch (IOException e) {
+            Villagersreborn.LOGGER.error("Network error calling AI API", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Villagersreborn.LOGGER.error("AI API call was interrupted", e);
         } catch (Exception e) {
-            Villagersreborn.LOGGER.error("Error calling AI API", e);
+            Villagersreborn.LOGGER.error("Unexpected error calling AI API", e);
         }
         
         return null;
     }
     
-    private static String callGeminiAPI(String prompt) throws IOException {
-        URL url = new URL(GEMINI_API_URL);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    private static String callGeminiAPI(String prompt) throws IOException, InterruptedException {
+        JsonObject requestBody = buildGeminiRequest(prompt);
         
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("x-goog-api-key", VillagersRebornConfig.getAiApiKey());
-        conn.setDoOutput(true);
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(GEMINI_API_URL))
+            .header("Content-Type", "application/json")
+            .header("x-goog-api-key", VillagersRebornConfig.getAiApiKey())
+            .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(requestBody)))
+            .timeout(Duration.ofSeconds(30))
+            .build();
         
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        if (response.statusCode() == 200) {
+            return parseGeminiResponse(response.body());
+        } else {
+            // Read error body for debugging
+            String errorBody = response.body();
+            Villagersreborn.LOGGER.warn("Gemini API returned status: {} - Error: {}", 
+                response.statusCode(), errorBody);
+        }
+        
+        return null;
+    }
+    
+    private static JsonObject buildGeminiRequest(String prompt) {
         JsonObject requestBody = new JsonObject();
         JsonObject contents = new JsonObject();
         JsonObject parts = new JsonObject();
@@ -236,49 +340,48 @@ public class VillagerAISystem {
         generationConfig.addProperty("maxOutputTokens", VillagersRebornConfig.getAiMaxTokens());
         requestBody.add("generationConfig", generationConfig);
         
-        try (OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8)) {
-            writer.write(GSON.toJson(requestBody));
-        }
-        
-        int responseCode = conn.getResponseCode();
-        if (responseCode == 200) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
-                }
-                
-                JsonObject responseJson = JsonParser.parseString(response.toString()).getAsJsonObject();
-                if (responseJson.has("candidates") && responseJson.getAsJsonArray("candidates").size() > 0) {
-                    JsonObject candidate = responseJson.getAsJsonArray("candidates").get(0).getAsJsonObject();
-                    if (candidate.has("content")) {
-                        JsonObject content = candidate.getAsJsonObject("content");
-                        if (content.has("parts") && content.getAsJsonArray("parts").size() > 0) {
-                            JsonObject part = content.getAsJsonArray("parts").get(0).getAsJsonObject();
-                            if (part.has("text")) {
-                                return part.get("text").getAsString();
-                            }
-                        }
-                    }
-                }
+        return requestBody;
+    }
+    
+    private static String parseGeminiResponse(String responseString) {
+        GeminiResponse response = GSON.fromJson(responseString, GeminiResponse.class);
+        if (response.getCandidates() != null && !response.getCandidates().isEmpty()) {
+            Candidate candidate = response.getCandidates().get(0);
+            if (candidate.getContent() != null && 
+                candidate.getContent().getParts() != null && 
+                !candidate.getContent().getParts().isEmpty()) {
+                return candidate.getContent().getParts().get(0).getText();
             }
+        }
+        return null;
+    }
+    
+    private static String callOpenRouterAPI(String prompt) throws IOException, InterruptedException {
+        JsonObject requestBody = buildOpenRouterRequest(prompt);
+        
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(OPENROUTER_API_URL))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + VillagersRebornConfig.getAiApiKey())
+            .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(requestBody)))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+        
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        if (response.statusCode() == 200) {
+            return parseOpenRouterResponse(response.body());
         } else {
-            Villagersreborn.LOGGER.warn("Gemini API returned status: " + responseCode);
+            // Read error body for debugging
+            String errorBody = response.body();
+            Villagersreborn.LOGGER.warn("OpenRouter API returned status: {} - Error: {}", 
+                response.statusCode(), errorBody);
         }
         
         return null;
     }
     
-    private static String callOpenRouterAPI(String prompt) throws IOException {
-        URL url = new URL(OPENROUTER_API_URL);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + VillagersRebornConfig.getAiApiKey());
-        conn.setDoOutput(true);
-        
+    private static JsonObject buildOpenRouterRequest(String prompt) {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "anthropic/claude-3.5-haiku");
         requestBody.addProperty("max_tokens", VillagersRebornConfig.getAiMaxTokens());
@@ -288,34 +391,17 @@ public class VillagerAISystem {
         message.addProperty("content", prompt);
         requestBody.add("messages", GSON.toJsonTree(new JsonObject[]{message}));
         
-        try (OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8)) {
-            writer.write(GSON.toJson(requestBody));
-        }
-        
-        int responseCode = conn.getResponseCode();
-        if (responseCode == 200) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
-                }
-                
-                JsonObject responseJson = JsonParser.parseString(response.toString()).getAsJsonObject();
-                if (responseJson.has("choices") && responseJson.getAsJsonArray("choices").size() > 0) {
-                    JsonObject choice = responseJson.getAsJsonArray("choices").get(0).getAsJsonObject();
-                    if (choice.has("message")) {
-                        JsonObject message2 = choice.getAsJsonObject("message");
-                        if (message2.has("content")) {
-                            return message2.get("content").getAsString();
-                        }
-                    }
-                }
+        return requestBody;
+    }
+    
+    private static String parseOpenRouterResponse(String responseString) {
+        OpenRouterResponse response = GSON.fromJson(responseString, OpenRouterResponse.class);
+        if (response.getChoices() != null && !response.getChoices().isEmpty()) {
+            Choice choice = response.getChoices().get(0);
+            if (choice.getMessage() != null) {
+                return choice.getMessage().getContent();
             }
-        } else {
-            Villagersreborn.LOGGER.warn("OpenRouter API returned status: " + responseCode);
         }
-        
         return null;
     }
     
@@ -355,6 +441,15 @@ public class VillagerAISystem {
     private static void executeToolAction(VillagerEntity villager, String action, String target) {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data == null) return;
+        
+        // Validate tool action against available tools
+        boolean validTool = AVAILABLE_TOOLS.stream()
+            .anyMatch(tool -> tool.action.equalsIgnoreCase(action));
+        
+        if (!validTool) {
+            Villagersreborn.LOGGER.warn("Invalid tool action attempted: {}", action);
+            return;
+        }
         
         // Simple tool action simulation - just send a message about the action
         String actionMessage = switch (action.toLowerCase()) {

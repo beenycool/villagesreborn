@@ -1,10 +1,10 @@
 package com.beeny.config;
 
 import com.beeny.Villagersreborn;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -14,6 +14,14 @@ import java.nio.file.Paths;
 public class ConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String CONFIG_FILE_NAME = "villagersreborn.json";
+    
+    private static <T> void loadIfPresent(JsonObject config, String key, 
+            Function<JsonElement, T> extractor, 
+            Consumer<T> setter) {
+        if (config.has(key)) {
+            setter.accept(extractor.apply(config.get(key)));
+        }
+    }
     
     public static void loadConfig() {
         try {
@@ -51,34 +59,14 @@ public class ConfigManager {
                 VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
             }
             
-            // AI Configuration (use accessors)
-            if (config.has("aiEnabled")) {
-                VillagersRebornConfig.setAiEnabled(config.get("aiEnabled").getAsBoolean());
-            }
-            
-            if (config.has("aiProvider")) {
-                VillagersRebornConfig.setAiProvider(config.get("aiProvider").getAsString());
-            }
-            
-            if (config.has("aiApiKey")) {
-                VillagersRebornConfig.setAiApiKey(config.get("aiApiKey").getAsString());
-            }
-            
-            if (config.has("aiRateLimitSeconds")) {
-                VillagersRebornConfig.setAiRateLimitSeconds(config.get("aiRateLimitSeconds").getAsInt());
-            }
-            
-            if (config.has("aiMaxTokens")) {
-                VillagersRebornConfig.setAiMaxTokens(config.get("aiMaxTokens").getAsInt());
-            }
-            
-            if (config.has("toolCallingEnabled")) {
-                VillagersRebornConfig.setToolCallingEnabled(config.get("toolCallingEnabled").getAsBoolean());
-            }
-            
-            if (config.has("toolUseProbability")) {
-                VillagersRebornConfig.setToolUseProbability(config.get("toolUseProbability").getAsDouble());
-            }
+            // AI Configuration using helper method
+            loadIfPresent(config, "aiEnabled", JsonElement::getAsBoolean, VillagersRebornConfig::setAiEnabled);
+            loadIfPresent(config, "aiProvider", JsonElement::getAsString, VillagersRebornConfig::setAiProvider);
+            loadIfPresent(config, "aiApiKey", JsonElement::getAsString, VillagersRebornConfig::setAiApiKey);
+            loadIfPresent(config, "aiRateLimitSeconds", JsonElement::getAsInt, VillagersRebornConfig::setAiRateLimitSeconds);
+            loadIfPresent(config, "aiMaxTokens", JsonElement::getAsInt, VillagersRebornConfig::setAiMaxTokens);
+            loadIfPresent(config, "toolCallingEnabled", JsonElement::getAsBoolean, VillagersRebornConfig::setToolCallingEnabled);
+            loadIfPresent(config, "toolUseProbability", JsonElement::getAsDouble, VillagersRebornConfig::setToolUseProbability);
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
         } catch (Exception e) {
