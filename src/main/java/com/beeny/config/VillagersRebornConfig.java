@@ -12,16 +12,15 @@ public class VillagersRebornConfig {
     public static int HAPPINESS_RECOVERY_RATE = 1;
     
     // AI Configuration
-    // AI Configuration
-    private static volatile boolean AI_ENABLED = false;
-    private static volatile String AI_PROVIDER = "gemini"; // "gemini" or "openrouter"
-    private static volatile String AI_API_KEY = "";
-    private static volatile int AI_RATE_LIMIT_SECONDS = 30;
-    private static volatile int AI_MAX_TOKENS = 150;
+    public static boolean AI_ENABLED = false;
+    public static String AI_PROVIDER = "gemini"; // "gemini" or "openrouter"
+    public static String AI_API_KEY = "";
+    public static int AI_RATE_LIMIT_SECONDS = 30;
+    public static int AI_MAX_TOKENS = 150;
     
     // Tool-calling Configuration
-    private static volatile boolean TOOL_CALLING_ENABLED = true;
-    private static volatile double TOOL_USE_PROBABILITY = 0.3;
+    public static boolean TOOL_CALLING_ENABLED = true;
+    public static double TOOL_USE_PROBABILITY = 0.3;
     
     
     public static int getBoundingBoxSize() {
