@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version "${loom_version}"
+	id 'fabric-loom' version '1.4.5'
 	id 'maven-publish'
 }
 
@@ -45,6 +45,8 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	
+	// Add Gson dependency
+	implementation 'com.google.code.gson:gson:2.10.1'
 }
 
 processResources {
