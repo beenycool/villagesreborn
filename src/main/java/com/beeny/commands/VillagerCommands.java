@@ -10,6 +10,7 @@ import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
 import com.beeny.util.VillagerNames;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -168,7 +169,7 @@ public class VillagerCommands {
                     .then(CommandManager.literal("disable")
                         .executes(VillagerCommands::disableToolCalling))
                     .then(CommandManager.literal("probability")
-                        .then(CommandManager.argument("probability", StringArgumentType.word())
+                        .then(CommandManager.argument("probability", DoubleArgumentType.doubleArg(0.0, 1.0))
                             .executes(VillagerCommands::setToolProbability))))));
     }
 
@@ -959,13 +960,13 @@ public class VillagerCommands {
     // AI Command Implementations
     
     private static int enableAI(CommandContext<ServerCommandSource> context) {
-        VillagersRebornConfig.AI_ENABLED = true;
+        VillagersRebornConfig.setAiEnabled(true);
         sendSuccess(context.getSource(), "AI system enabled");
         return 1;
     }
     
     private static int disableAI(CommandContext<ServerCommandSource> context) {
-        VillagersRebornConfig.AI_ENABLED = false;
+        VillagersRebornConfig.setAiEnabled(false);
         sendSuccess(context.getSource(), "AI system disabled");
         return 1;
     }
@@ -974,14 +975,14 @@ public class VillagerCommands {
         ServerCommandSource source = context.getSource();
         
         sendInfo(source, "=== AI System Status ===");
-        sendInfo(source, "Enabled: " + (VillagersRebornConfig.AI_ENABLED ? "Yes" : "No"));
-        sendInfo(source, "Provider: " + VillagersRebornConfig.AI_PROVIDER);
-        sendInfo(source, "API Key: " + (VillagersRebornConfig.AI_API_KEY.isEmpty() ? "Not set" : 
-            VillagerAISystem.maskApiKey(VillagersRebornConfig.AI_API_KEY)));
-        sendInfo(source, "Rate Limit: " + VillagersRebornConfig.AI_RATE_LIMIT_SECONDS + " seconds");
-        sendInfo(source, "Max Tokens: " + VillagersRebornConfig.AI_MAX_TOKENS);
-        sendInfo(source, "Tool Calling: " + (VillagersRebornConfig.TOOL_CALLING_ENABLED ? "Enabled" : "Disabled"));
-        sendInfo(source, "Tool Use Probability: " + (VillagersRebornConfig.TOOL_USE_PROBABILITY * 100) + "%");
+        sendInfo(source, "Enabled: " + (VillagersRebornConfig.isAiEnabled() ? "Yes" : "No"));
+        sendInfo(source, "Provider: " + VillagersRebornConfig.getAiProvider());
+        sendInfo(source, "API Key: " + (VillagersRebornConfig.getAiApiKey().isEmpty() ? "Not set" : 
+            VillagerAISystem.maskApiKey(VillagersRebornConfig.getAiApiKey())));
+        sendInfo(source, "Rate Limit: " + VillagersRebornConfig.getAiRateLimitSeconds() + " seconds");
+        sendInfo(source, "Max Tokens: " + VillagersRebornConfig.getAiMaxTokens());
+        sendInfo(source, "Tool Calling: " + (VillagersRebornConfig.isToolCallingEnabled() ? "Enabled" : "Disabled"));
+        sendInfo(source, "Tool Use Probability: " + (VillagersRebornConfig.getToolUseProbability() * 100) + "%");
         
         return 1;
     }
@@ -989,19 +990,19 @@ public class VillagerCommands {
     private static int setAIProvider(CommandContext<ServerCommandSource> context) {
         String provider = StringArgumentType.getString(context, "provider");
         
-        if (!provider.equals("gemini") && !provider.equals("openrouter")) {
-            sendError(context.getSource(), "Invalid provider. Use 'gemini' or 'openrouter'");
+        if (!provider.equals(VillagersRebornConfig.AI_PROVIDER_GEMINI) && !provider.equals(VillagersRebornConfig.AI_PROVIDER_OPENROUTER)) {
+            sendError(context.getSource(), "Invalid provider. Use '" + VillagersRebornConfig.AI_PROVIDER_GEMINI + "' or '" + VillagersRebornConfig.AI_PROVIDER_OPENROUTER + "'");
             return 0;
         }
         
-        VillagersRebornConfig.AI_PROVIDER = provider;
+        VillagersRebornConfig.setAiProvider(provider);
         sendSuccess(context.getSource(), "AI provider set to: " + provider);
         return 1;
     }
     
     private static CompletableFuture<Suggestions> suggestAIProviders(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
-        builder.suggest("gemini");
-        builder.suggest("openrouter");
+        builder.suggest(VillagersRebornConfig.AI_PROVIDER_GEMINI);
+        builder.suggest(VillagersRebornConfig.AI_PROVIDER_OPENROUTER);
         return builder.buildFuture();
     }
     
@@ -1013,7 +1014,7 @@ public class VillagerCommands {
             return 0;
         }
         
-        VillagersRebornConfig.AI_API_KEY = apiKey;
+        VillagersRebornConfig.setAiApiKey(apiKey);
         sendSuccess(context.getSource(), "AI API key set: " + VillagerAISystem.maskApiKey(apiKey));
         return 1;
     }
@@ -1027,12 +1028,12 @@ public class VillagerCommands {
             return 0;
         }
         
-        if (!VillagersRebornConfig.AI_ENABLED) {
+        if (!VillagersRebornConfig.isAiEnabled()) {
             sendError(context.getSource(), "AI system is not enabled");
             return 0;
         }
         
-        if (VillagersRebornConfig.AI_API_KEY.isEmpty()) {
+        if (VillagersRebornConfig.getAiApiKey().isEmpty()) {
             sendError(context.getSource(), "API key is not set");
             return 0;
         }
@@ -1060,33 +1061,22 @@ public class VillagerCommands {
     }
     
     private static int enableToolCalling(CommandContext<ServerCommandSource> context) {
-        VillagersRebornConfig.TOOL_CALLING_ENABLED = true;
+        VillagersRebornConfig.setToolCallingEnabled(true);
         sendSuccess(context.getSource(), "Tool calling enabled");
         return 1;
     }
     
     private static int disableToolCalling(CommandContext<ServerCommandSource> context) {
-        VillagersRebornConfig.TOOL_CALLING_ENABLED = false;
+        VillagersRebornConfig.setToolCallingEnabled(false);
         sendSuccess(context.getSource(), "Tool calling disabled");
         return 1;
     }
     
     private static int setToolProbability(CommandContext<ServerCommandSource> context) {
-        String probabilityStr = StringArgumentType.getString(context, "probability");
+        double probability = DoubleArgumentType.getDouble(context, "probability");
         
-        try {
-            double probability = Double.parseDouble(probabilityStr);
-            if (probability < 0.0 || probability > 1.0) {
-                sendError(context.getSource(), "Probability must be between 0.0 and 1.0");
-                return 0;
-            }
-            
-            VillagersRebornConfig.TOOL_USE_PROBABILITY = probability;
-            sendSuccess(context.getSource(), "Tool use probability set to: " + (probability * 100) + "%");
-            return 1;
-        } catch (NumberFormatException e) {
-            sendError(context.getSource(), "Invalid number format. Use decimal between 0.0 and 1.0");
-            return 0;
-        }
+        VillagersRebornConfig.setToolUseProbability(probability);
+        sendSuccess(context.getSource(), "Tool use probability set to: " + (probability * 100) + "%");
+        return 1;
     }
 }

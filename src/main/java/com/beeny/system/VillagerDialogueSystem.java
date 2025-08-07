@@ -501,33 +501,4 @@ public class VillagerDialogueSystem {
             default -> null;
         };
     }
-        DialogueContext context = new DialogueContext(villager, player);
-        List<Text> conversation = new ArrayList<>();
-        
-        
-        DialogueCategory openingCategory = RANDOM.nextBoolean() ? 
-            DialogueCategory.GREETING : DialogueCategory.MOOD;
-        conversation.add(generateDialogue(context, openingCategory));
-        
-        
-        DialogueCategory mainCategory = chooseDialogueCategory(context);
-        if (mainCategory != openingCategory) {
-            conversation.add(generateDialogue(context, mainCategory));
-        }
-        
-        
-        if (context.playerReputation > 30 && RANDOM.nextFloat() < 0.5f) {
-            DialogueCategory followUp = RANDOM.nextBoolean() ? 
-                DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
-            conversation.add(generateDialogue(context, followUp));
-        }
-        
-        
-        if (context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK || 
-            context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) {
-            conversation.add(generateDialogue(context, DialogueCategory.FAREWELL));
-        }
-        
-        return conversation;
-    }
 }

@@ -27,7 +27,6 @@ public class VillagerAISystem {
     
     private static final Gson GSON = new Gson();
     private static final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
-    private static final Pattern VILLAGER_NAME_PATTERN = Pattern.compile("\\b([A-Z][a-z]+)\\b");
     
     // API endpoints
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
@@ -49,7 +48,7 @@ public class VillagerAISystem {
      * Processes a chat message to see if a villager should respond with AI
      */
     public static boolean processPlayerChat(PlayerEntity player, String message) {
-        if (!VillagersRebornConfig.AI_ENABLED || VillagersRebornConfig.AI_API_KEY.isEmpty()) {
+        if (!VillagersRebornConfig.isAiEnabled() || VillagersRebornConfig.getAiApiKey().isEmpty()) {
             return false;
         }
         
@@ -58,7 +57,7 @@ public class VillagerAISystem {
         long currentTime = System.currentTimeMillis();
         long lastRequestTime = lastRequestTimes.getOrDefault(playerId, 0L);
         
-        if (currentTime - lastRequestTime < VillagersRebornConfig.AI_RATE_LIMIT_SECONDS * 1000) {
+        if (currentTime - lastRequestTime < VillagersRebornConfig.getAiRateLimitSeconds() * 1000) {
             return false;
         }
         
@@ -98,7 +97,9 @@ public class VillagerAISystem {
         for (VillagerEntity villager : villagers) {
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null && !data.getName().isEmpty()) {
-                if (lowerMessage.contains(data.getName().toLowerCase())) {
+                // Use word boundaries to avoid partial matches
+                Pattern namePattern = Pattern.compile("\\b" + Pattern.quote(data.getName().toLowerCase()) + "\\b");
+                if (namePattern.matcher(lowerMessage).find()) {
                     return villager;
                 }
             }
@@ -124,7 +125,7 @@ public class VillagerAISystem {
                 sendVillagerResponse(villager, response, player);
                 
                 // Execute tool action if specified
-                if (VillagersRebornConfig.TOOL_CALLING_ENABLED && response.toolAction != null) {
+                if (VillagersRebornConfig.isToolCallingEnabled() && response.toolAction != null) {
                     executeToolAction(villager, response.toolAction, response.toolTarget);
                 }
             }
@@ -176,11 +177,11 @@ public class VillagerAISystem {
         prompt.append("Context: ").append(context);
         prompt.append("\n\nPlayer said: \"").append(playerMessage).append("\"");
         prompt.append("\n\nRespond as ").append(data.getName()).append(" in character. ");
-        prompt.append("Keep responses under ").append(VillagersRebornConfig.AI_MAX_TOKENS).append(" characters. ");
+        prompt.append("Keep responses under ").append(VillagersRebornConfig.getAiMaxTokens()).append(" characters. ");
         prompt.append("Be conversational and mention your current activity if relevant. ");
         
         // Add tool-calling instructions if enabled
-        if (VillagersRebornConfig.TOOL_CALLING_ENABLED) {
+        if (VillagersRebornConfig.isToolCallingEnabled()) {
             prompt.append("\n\nIf appropriate for your profession and current activity, you may use tools. ");
             prompt.append("To use a tool, include [TOOL:action:target] in your response. ");
             prompt.append("Available tools: [TOOL:hoe:crops], [TOOL:fishing_rod:water], [TOOL:book:knowledge], [TOOL:anvil:item]. ");
@@ -194,12 +195,12 @@ public class VillagerAISystem {
         try {
             String response;
             
-            if ("gemini".equals(VillagersRebornConfig.AI_PROVIDER)) {
+            if (VillagersRebornConfig.AI_PROVIDER_GEMINI.equals(VillagersRebornConfig.getAiProvider())) {
                 response = callGeminiAPI(prompt);
-            } else if ("openrouter".equals(VillagersRebornConfig.AI_PROVIDER)) {
+            } else if (VillagersRebornConfig.AI_PROVIDER_OPENROUTER.equals(VillagersRebornConfig.getAiProvider())) {
                 response = callOpenRouterAPI(prompt);
             } else {
-                Villagersreborn.LOGGER.warn("Unknown AI provider: " + VillagersRebornConfig.AI_PROVIDER);
+                Villagersreborn.LOGGER.warn("Unknown AI provider: " + VillagersRebornConfig.getAiProvider());
                 return null;
             }
             
@@ -215,11 +216,12 @@ public class VillagerAISystem {
     }
     
     private static String callGeminiAPI(String prompt) throws IOException {
-        URL url = new URL(GEMINI_API_URL + "?key=" + VillagersRebornConfig.AI_API_KEY);
+        URL url = new URL(GEMINI_API_URL);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("x-goog-api-key", VillagersRebornConfig.getAiApiKey());
         conn.setDoOutput(true);
         
         JsonObject requestBody = new JsonObject();
@@ -228,6 +230,11 @@ public class VillagerAISystem {
         parts.addProperty("text", prompt);
         contents.add("parts", GSON.toJsonTree(new JsonObject[]{parts}));
         requestBody.add("contents", GSON.toJsonTree(new JsonObject[]{contents}));
+        
+        // Add generation config with token limit
+        JsonObject generationConfig = new JsonObject();
+        generationConfig.addProperty("maxOutputTokens", VillagersRebornConfig.getAiMaxTokens());
+        requestBody.add("generationConfig", generationConfig);
         
         try (OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8)) {
             writer.write(GSON.toJson(requestBody));
@@ -269,12 +276,12 @@ public class VillagerAISystem {
         
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + VillagersRebornConfig.AI_API_KEY);
+        conn.setRequestProperty("Authorization", "Bearer " + VillagersRebornConfig.getAiApiKey());
         conn.setDoOutput(true);
         
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "anthropic/claude-3.5-haiku");
-        requestBody.addProperty("max_tokens", VillagersRebornConfig.AI_MAX_TOKENS);
+        requestBody.addProperty("max_tokens", VillagersRebornConfig.getAiMaxTokens());
         
         JsonObject message = new JsonObject();
         message.addProperty("role", "user");
@@ -339,11 +346,9 @@ public class VillagerAISystem {
             .formatted(Formatting.YELLOW)
             .append(Text.literal(response.message).formatted(Formatting.WHITE));
         
-        // Send to nearby players
-        villager.getWorld().getPlayers().forEach(nearbyPlayer -> {
-            if (nearbyPlayer.getPos().distanceTo(villager.getPos()) < 20) {
-                nearbyPlayer.sendMessage(villagerMessage, false);
-            }
+        // Send to nearby players (optimized)
+        villager.getWorld().getEntitiesByClass(PlayerEntity.class, villager.getBoundingBox().expand(20), p -> true).forEach(nearbyPlayer -> {
+            nearbyPlayer.sendMessage(villagerMessage, false);
         });
     }
     
@@ -363,10 +368,8 @@ public class VillagerAISystem {
         // Send action message to nearby players
         Text actionText = Text.literal(actionMessage).formatted(Formatting.ITALIC, Formatting.GRAY);
         
-        villager.getWorld().getPlayers().forEach(player -> {
-            if (player.getPos().distanceTo(villager.getPos()) < 15) {
-                player.sendMessage(actionText, false);
-            }
+        villager.getWorld().getEntitiesByClass(PlayerEntity.class, villager.getBoundingBox().expand(15), p -> true).forEach(player -> {
+            player.sendMessage(actionText, false);
         });
         
         Villagersreborn.LOGGER.info("Villager {} performed tool action: {} on {}", data.getName(), action, target);
