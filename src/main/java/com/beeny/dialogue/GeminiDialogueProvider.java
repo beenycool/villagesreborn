@@ -81,6 +81,9 @@ public class GeminiDialogueProvider extends BaseLLMProvider {
         }
         requestBody.add("safetySettings", safetySettings);
         
+        // NOTE: Gemini API requires the API key as a query parameter, not in headers
+        // This creates a security risk as the key may be logged by proxies/servers
+        // TODO: Consider using a different authentication method when available
         String url = endpoint + "/" + model + ":generateContent?key=" + apiKey;
         
         return new Request.Builder()

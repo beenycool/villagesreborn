@@ -68,6 +68,9 @@ public class VillagerAICommands extends BaseVillagerCommand {
         String apiKey = StringArgumentType.getString(context, "apikey");
         ServerCommandSource source = context.getSource();
         
+        // Security warning for API key commands
+        sendApiKeySecurityWarning(source);
+        
         if (!isValidProvider(provider)) {
             CommandMessageUtils.sendError(source, "Invalid provider. Use: gemini, openrouter, or local");
             return 0;
@@ -296,6 +299,14 @@ public class VillagerAICommands extends BaseVillagerCommand {
             CommandMessageUtils.sendError(source, "Failed to save configuration: " + e.getMessage());
             return 0;
         }
+    }
+    
+    /**
+     * Sends security warning when API keys are provided via commands
+     */
+    private static void sendApiKeySecurityWarning(ServerCommandSource source) {
+        CommandMessageUtils.sendWarning(source, "⚠️ API keys in commands may be logged. Use environment variables for production.");
+        CommandMessageUtils.sendInfo(source, "For security, consider using: export VILLAGERS_REBORN_API_KEY=your_key_here");
     }
     
     // Suggestion providers
