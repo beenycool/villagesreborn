@@ -42,7 +42,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 @Mixin(VillagerEntity.class)
 public abstract class VillagerEntityMixin extends LivingEntity {
@@ -54,25 +53,6 @@ public abstract class VillagerEntityMixin extends LivingEntity {
     
     @Unique
     private int updateCounter = 0;
-    
-    /**
-     * Safely execute an operation with the AI manager, with fallback
-     */
-    @Unique
-    private void withAIManager(Consumer<com.beeny.ai.AIWorldManagerRefactored> action, Runnable fallback) {
-        try {
-            com.beeny.ai.AIWorldManagerRefactored aiManager = com.beeny.ai.AIWorldManagerRefactored.getInstance();
-            if (aiManager != null) {
-                action.accept(aiManager);
-                return;
-            }
-        } catch (Exception e) {
-            // Fall through to fallback
-        }
-        if (fallback != null) {
-            fallback.run();
-        }
-    }
     
     protected VillagerEntityMixin() {
         super(null, null);
@@ -90,9 +70,6 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             // Track this villager with the ServerVillagerManager
             if (!villager.getWorld().isClient && villager.getWorld() instanceof ServerWorld) {
                 ServerVillagerManager.getInstance().trackVillager(villager);
-                
-                // Initialize AI systems for this villager
-                withAIManager(aiManager -> aiManager.initializeVillagerAI(villager), null);
             }
         }
     }
@@ -121,21 +98,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             updateHappinessBasedOnConditions(villager, data);
         }
         
-        // Run AI subsystem updates through the centralized manager
-        if (updateCounter % 60 == 0) { // Update AI systems every 3 seconds
-            withAIManager(aiManager -> aiManager.updateVillagerAI(villager), null);
-        }
-        
         // Perform hobby activities
         if (updateCounter % 300 == 0) {
-            withAIManager(
-                aiManager -> aiManager.getHobbySystem().performHobbyActivity(villager, data),
-                () -> {
-                    // Fallback to direct call if AI manager not available
-                    com.beeny.system.VillagerHobbySystem tempHobbySystem = new com.beeny.system.VillagerHobbySystem();
-                    tempHobbySystem.performHobbyActivity(villager, data);
-                }
-            );
+            VillagerHobbySystem.performHobbyActivity(villager, data);
         }
         
         // Update emotional state
@@ -145,14 +110,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         // Apply personality behaviors
         if (updateCounter % 150 == 0) {
-            withAIManager(
-                aiManager -> aiManager.getPersonalityBehavior().applyPersonalityEffects(villager, data),
-                () -> {
-                    // Fallback to direct call if AI manager not available
-                    com.beeny.system.VillagerPersonalityBehavior tempPersonalityBehavior = new com.beeny.system.VillagerPersonalityBehavior();
-                    tempPersonalityBehavior.applyPersonalityEffects(villager, data);
-                }
-            );
+            VillagerPersonalityBehavior.applyPersonalityEffects(villager, data);
         }
         
         // Update memories and clean old ones
@@ -214,9 +172,6 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         // Untrack this villager
         ServerVillagerManager.getInstance().untrackVillager(villager.getUuid());
-        
-        // Cleanup AI systems for this villager
-        withAIManager(aiManager -> aiManager.cleanupVillagerAI(villager.getUuidAsString()), null);
         
         if (!data.getSpouseName().isEmpty() || !data.getChildrenNames().isEmpty()) {
             notifyFamilyOfDeath(villager, data);

@@ -584,8 +584,13 @@ public class VillagerDialogueSystem {
         
         return DialogueCategory.GREETING; 
     }
-    
-    
+
+    // Convenience overload to obtain immediate text while allowing async updates via callback
+    public static Text generateDialogue(DialogueContext context, DialogueCategory category) {
+        return generateDialogue(context, category, t -> {});
+    }
+
+    // Synchronous conversation wrapper with timeout
     public static List<Text> generateConversation(VillagerEntity villager, PlayerEntity player) {
         try {
             return generateConversationAsync(villager, player)
@@ -595,39 +600,93 @@ public class VillagerDialogueSystem {
             return java.util.List.of(net.minecraft.text.Text.literal("...").formatted(net.minecraft.util.Formatting.GRAY));
         }
     }
+
+    // Asynchronously build a short conversation consisting of multiple lines
     public static CompletableFuture<List<Text>> generateConversationAsync(VillagerEntity villager, PlayerEntity player) {
         DialogueContext context = new DialogueContext(villager, player);
         List<CompletableFuture<Text>> futureDialogues = new ArrayList<>();
-        
-        
+
+        // Use current activity to influence dialogue selection
+        VillagerScheduleManager.Activity currentActivity = 
+            VillagerScheduleManager.getCurrentActivity(villager);
+
         DialogueCategory openingCategory = java.util.concurrent.ThreadLocalRandom.current().nextBoolean() ?
             DialogueCategory.GREETING : DialogueCategory.MOOD;
         futureDialogues.add(generateDialogueAsync(context, openingCategory));
-        
-        
+
         DialogueCategory mainCategory = chooseDialogueCategory(context);
         if (mainCategory != openingCategory) {
             futureDialogues.add(generateDialogueAsync(context, mainCategory));
         }
-        
-        
+
         if (context.playerReputation > 30 && java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
             DialogueCategory followUp = java.util.concurrent.ThreadLocalRandom.current().nextBoolean() ?
                 DialogueCategory.GOSSIP : DialogueCategory.ADVICE;
             futureDialogues.add(generateDialogueAsync(context, followUp));
         }
-        
-        
+
         if ((context.timeOfDay == VillagerScheduleManager.TimeOfDay.DUSK ||
              context.timeOfDay == VillagerScheduleManager.TimeOfDay.NIGHT) &&
             mainCategory != DialogueCategory.FAREWELL) {
             futureDialogues.add(generateDialogueAsync(context, DialogueCategory.FAREWELL));
         }
-        
+
         // Combine all futures
         return CompletableFuture.allOf(futureDialogues.toArray(new CompletableFuture[0]))
             .thenApply(v -> futureDialogues.stream()
                 .map(CompletableFuture::join)
                 .collect(java.util.stream.Collectors.toList()));
+    }
+
+    // Single-line contextual dialogue reflective of current activity
+    public static Text generateContextualDialogue(VillagerEntity villager, PlayerEntity player) {
+        DialogueContext context = new DialogueContext(villager, player);
+
+        VillagerScheduleManager.Activity currentActivity =
+            VillagerScheduleManager.getCurrentActivity(villager);
+
+        DialogueCategory category = chooseDialogueCategoryForActivity(context, currentActivity);
+        Text dialogue = generateDialogue(context, category);
+
+        // Add activity-specific context to the dialogue
+        if (currentActivity != VillagerScheduleManager.Activity.WANDER) {
+            String activityPrefix = getActivityPrefix(currentActivity);
+            if (activityPrefix != null) {
+                return Text.literal(activityPrefix + " ")
+                    .formatted(Formatting.ITALIC, Formatting.GRAY)
+                    .append(dialogue);
+            }
+        }
+
+        return dialogue;
+    }
+
+    private static DialogueCategory chooseDialogueCategoryForActivity(DialogueContext context, VillagerScheduleManager.Activity activity) {
+        // Activity-specific dialogue preferences
+        return switch (activity) {
+            case WORK -> DialogueCategory.WORK;
+            case SOCIALIZE -> DialogueCategory.GOSSIP;
+            case EAT -> context.villagerData.getHappiness() > 60 ? DialogueCategory.MOOD : DialogueCategory.GREETING;
+            case HOBBY -> DialogueCategory.HOBBY;
+            case STUDY -> DialogueCategory.ADVICE;
+            case PRAY -> DialogueCategory.MOOD;
+            case EXERCISE -> DialogueCategory.MOOD;
+            case SLEEP -> DialogueCategory.FAREWELL;
+            case WAKE_UP -> DialogueCategory.GREETING;
+            default -> chooseDialogueCategory(context);
+        };
+    }
+
+    private static String getActivityPrefix(VillagerScheduleManager.Activity activity) {
+        return switch (activity) {
+            case WORK -> "*pauses from work*";
+            case EAT -> "*looks up from eating*";
+            case STUDY -> "*closes book briefly*";
+            case EXERCISE -> "*wipes sweat*";
+            case HOBBY -> "*sets down hobby materials*";
+            case PRAY -> "*finishes prayer*";
+            case SOCIALIZE -> "*turns from conversation*";
+            default -> null;
+        };
     }
 }

@@ -60,7 +60,53 @@ public class ConfigManager {
             JsonObject config = JsonParser.parseString(content).getAsJsonObject();
             applyConfig(config);
             
-            Villagersreborn.LOGGER.info("Loaded Villagers Reborn config from file");
+            // Use accessor-based AI config (copilot/fix)
+            if (config.has("villagerScanChunkRadius")) {
+                VillagersRebornConfig.VILLAGER_SCAN_CHUNK_RADIUS = config.get("villagerScanChunkRadius").getAsInt();
+            }
+            
+            if (config.has("happinessNeutralThreshold")) {
+                VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD = config.get("happinessNeutralThreshold").getAsInt();
+            }
+            
+            if (config.has("happinessDecayRate")) {
+                VillagersRebornConfig.HAPPINESS_DECAY_RATE = config.get("happinessDecayRate").getAsInt();
+            }
+            
+            if (config.has("happinessRecoveryRate")) {
+                VillagersRebornConfig.HAPPINESS_RECOVERY_RATE = config.get("happinessRecoveryRate").getAsInt();
+            }
+            
+            // AI Configuration (use accessors)
+            if (config.has("aiEnabled")) {
+                VillagersRebornConfig.setAiEnabled(config.get("aiEnabled").getAsBoolean());
+            }
+            
+            if (config.has("aiProvider")) {
+                VillagersRebornConfig.setAiProvider(config.get("aiProvider").getAsString());
+            }
+            
+            if (config.has("aiApiKey")) {
+                VillagersRebornConfig.setAiApiKey(config.get("aiApiKey").getAsString());
+            }
+            
+            if (config.has("aiRateLimitSeconds")) {
+                VillagersRebornConfig.setAiRateLimitSeconds(config.get("aiRateLimitSeconds").getAsInt());
+            }
+            
+            if (config.has("aiMaxTokens")) {
+                VillagersRebornConfig.setAiMaxTokens(config.get("aiMaxTokens").getAsInt());
+            }
+            
+            if (config.has("toolCallingEnabled")) {
+                VillagersRebornConfig.setToolCallingEnabled(config.get("toolCallingEnabled").getAsBoolean());
+            }
+            
+            if (config.has("toolUseProbability")) {
+                VillagersRebornConfig.setToolUseProbability(config.get("toolUseProbability").getAsDouble());
+            }
+            
+            Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
         } catch (Exception e) {
             Villagersreborn.LOGGER.error("Failed to load Villagers Reborn config from file", e);
         }
@@ -367,6 +413,8 @@ public class ConfigManager {
         config.addProperty("happinessNeutralThreshold", VillagersRebornConfig.HAPPINESS_NEUTRAL_THRESHOLD);
         config.addProperty("happinessDecayRate", VillagersRebornConfig.HAPPINESS_DECAY_RATE);
         config.addProperty("happinessRecoveryRate", VillagersRebornConfig.HAPPINESS_RECOVERY_RATE);
+
+        // LLM and dialogue config (from HEAD)
         config.addProperty("enableDynamicDialogue", VillagersRebornConfig.ENABLE_DYNAMIC_DIALOGUE);
         config.addProperty("llmProvider", VillagersRebornConfig.LLM_PROVIDER);
         config.addProperty("llmApiKey", ""); // Placeholder for user clarity, never used
@@ -380,6 +428,16 @@ public class ConfigManager {
         config.addProperty("dialogueCacheSize", VillagersRebornConfig.DIALOGUE_CACHE_SIZE);
         config.addProperty("conversationHistoryLimit", VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT);
         config.addProperty("llmLocalUrl", VillagersRebornConfig.LLM_LOCAL_URL);
+
+        // AI config (from copilot/fix)
+        config.addProperty("aiEnabled", VillagersRebornConfig.isAiEnabled());
+        config.addProperty("aiProvider", VillagersRebornConfig.getAiProvider());
+        config.addProperty("aiApiKey", VillagersRebornConfig.getAiApiKey());
+        config.addProperty("aiRateLimitSeconds", VillagersRebornConfig.getAiRateLimitSeconds());
+        config.addProperty("aiMaxTokens", VillagersRebornConfig.getAiMaxTokens());
+        config.addProperty("toolCallingEnabled", VillagersRebornConfig.isToolCallingEnabled());
+        config.addProperty("toolUseProbability", VillagersRebornConfig.getToolUseProbability());
+
         if (!Files.exists(configPath.getParent())) {
             Files.createDirectories(configPath.getParent());
         }

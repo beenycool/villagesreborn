@@ -1,21 +1,25 @@
 package com.beeny.config;
 
 public class VillagersRebornConfig {
-    
+
     /**
      * Radius in chunks used when scanning for nearby entities or areas relevant to villagers.
      * Units: chunks (1 chunk = 16 blocks). Effective scan box size is {@link #getBoundingBoxSize()} blocks.
      */
+    // AI Provider Constants
+    public static final String AI_PROVIDER_GEMINI = "gemini";
+    public static final String AI_PROVIDER_OPENROUTER = "openrouter";
+
     public static int VILLAGER_SCAN_CHUNK_RADIUS = 8;
-    
-    
+
+
     /**
      * Baseline happiness value at which villagers are considered neutral.
      * Range: 0-100 (unitless scale where higher is happier).
      */
     public static int HAPPINESS_NEUTRAL_THRESHOLD = 50;
-    
-    
+
+
     /**
      * Amount happiness decreases per tick interval when conditions are unfavorable.
      * Units: points per game tick or configured update step (unitless points).
@@ -26,8 +30,41 @@ public class VillagersRebornConfig {
      * Units: points per game tick or configured update step (unitless points).
      */
     public static int HAPPINESS_RECOVERY_RATE = 1;
-    
-    
+
+    // AI Configuration
+    private static volatile boolean AI_ENABLED = false;
+    private static volatile String AI_PROVIDER = AI_PROVIDER_GEMINI;
+    private static volatile String AI_API_KEY = "";
+    private static volatile int AI_RATE_LIMIT_SECONDS = 30;
+    private static volatile int AI_MAX_TOKENS = 150;
+
+    // Tool-calling Configuration
+    private static volatile boolean TOOL_CALLING_ENABLED = true;
+    private static volatile double TOOL_USE_PROBABILITY = 0.3;
+
+    // AI Configuration getters
+    public static boolean isAiEnabled() { return AI_ENABLED; }
+    public static String getAiProvider() { return AI_PROVIDER; }
+    public static String getAiApiKey() { return AI_API_KEY; }
+    public static int getAiRateLimitSeconds() { return AI_RATE_LIMIT_SECONDS; }
+    public static int getAiMaxTokens() { return AI_MAX_TOKENS; }
+
+    // Tool-calling Configuration getters
+    public static boolean isToolCallingEnabled() { return TOOL_CALLING_ENABLED; }
+    public static double getToolUseProbability() { return TOOL_USE_PROBABILITY; }
+
+    // AI Configuration setters (for commands)
+    public static void setAiEnabled(boolean enabled) { AI_ENABLED = enabled; }
+    public static void setAiProvider(String provider) { AI_PROVIDER = provider; }
+    public static void setAiApiKey(String apiKey) { AI_API_KEY = apiKey; }
+    public static void setAiRateLimitSeconds(int seconds) { AI_RATE_LIMIT_SECONDS = seconds; }
+    public static void setAiMaxTokens(int tokens) { AI_MAX_TOKENS = tokens; }
+
+    // Tool-calling Configuration setters (for commands)
+    public static void setToolCallingEnabled(boolean enabled) { TOOL_CALLING_ENABLED = enabled; }
+    public static void setToolUseProbability(double probability) { TOOL_USE_PROBABILITY = probability; }
+
+
     /**
      * Enables dynamic, LLM-powered dialogue for villagers.
      * If false, the system uses static, predefined lines.
@@ -104,19 +141,19 @@ public class VillagersRebornConfig {
      * Units: milliseconds.
      */
     public static int AI_EMOTION_UPDATE_INTERVAL = 60000; // 60 seconds
-    
+
     /**
      * Update interval for the AI manager state system.
      * Units: milliseconds.
      */
     public static int AI_MANAGER_UPDATE_INTERVAL = 5000; // 5 seconds
-    
+
     /**
      * Update interval for the GOAP planning system.
      * Units: milliseconds.
      */
     public static int AI_GOAP_UPDATE_INTERVAL = 3000; // 3 seconds
-    
+
     /**
      * Cooldown period for villager marriage proposals.
      * Units: milliseconds.
