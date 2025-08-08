@@ -106,8 +106,11 @@ final class TickHandler {
 
                 // Skip if villager2 is already married
                 VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
-                if (data2 != null && !data2.getSpouseId().isEmpty()) {
-                    continue;
+                if (data2 != null) {
+                    String spouse2 = data2.getSpouseId();
+                    if (spouse2 != null && !spouse2.isEmpty()) {
+                        continue;
+                    }
                 }
 
                 double distance = villager1.getPos().distanceTo(villager2.getPos());
