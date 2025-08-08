@@ -57,9 +57,15 @@ You can tweak settings in `config/villagersreborn.json`:
 - `enableDynamicDialogue`: Turn AI chat on or off
 - `llmProvider`: Choose "gemini", "local", or "openrouter"
 - `llmApiKey`: Your API key (required for "gemini" and "openrouter")
+  - For production use, set environment variable `VILLAGERS_REBORN_LLM_API_KEY` instead of storing key in config file
 - `llmLocalUrl`: The local API endpoint for "local" provider (e.g., Ollama: `http://localhost:11434/v1/chat/completions`, llama.cpp: `http://localhost:8080`)
 - `llmApiEndpoint`: Optional override for remote API endpoints (used with "gemini" or "openrouter" if you need a custom URL)
 - `llmModel`: Which model to use
+
+### Environment Variables
+For secure API key management in production:
+- Set `VILLAGERS_REBORN_AI_API_KEY` for AI system keys
+- Set `VILLAGERS_REBORN_LLM_API_KEY` for dialogue system keys
 - `llmTemperature`: How creative the responses are (0.0–2.0)
 - `llmMaxTokens`: Max response length
 - `llmRequestTimeout`: Timeout in seconds

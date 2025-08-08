@@ -95,8 +95,13 @@ public class DialogueConfigScreen extends Screen {
         currentY += 35;
         
         // Provider selection
-        // Add "local" provider for local LLM integration
-        List<String> providers = Arrays.asList(com.beeny.constants.StringConstants.PROVIDER_GEMINI_ID, com.beeny.constants.StringConstants.PROVIDER_OPENROUTER_ID, com.beeny.constants.StringConstants.PROVIDER_LOCAL_ID);
+        // Add "local" and "claude" providers
+        List<String> providers = Arrays.asList(
+            com.beeny.constants.StringConstants.PROVIDER_GEMINI_ID,
+            com.beeny.constants.StringConstants.PROVIDER_OPENROUTER_ID,
+            com.beeny.constants.StringConstants.PROVIDER_LOCAL_ID,
+            com.beeny.constants.StringConstants.PROVIDER_CLAUDE_ID
+        );
         this.providerButton = CyclingButtonWidget.<String>builder(value -> Text.literal(com.beeny.constants.StringConstants.UI_PROVIDER_LABEL_FN + value.toUpperCase()))
             .values(providers)
             .initially(tempProvider)
@@ -181,13 +186,15 @@ public class DialogueConfigScreen extends Screen {
                 defaultModel = switch (tempProvider) {
                     case "gemini" -> "gemini-1.5-flash";
                     case "openrouter" -> "openai/gpt-3.5-turbo";
+                    case "claude" -> "claude-3-haiku-20240307";
                     default -> "";
                 };
             }
             
             if (modelField.getText().isEmpty() ||
                 modelField.getText().equals("gemini-1.5-flash") ||
-                modelField.getText().equals("openai/gpt-3.5-turbo")) {
+                modelField.getText().equals("openai/gpt-3.5-turbo") ||
+                modelField.getText().equals("claude-3-haiku-20240307")) {
                 modelField.setText(defaultModel);
                 tempModel = defaultModel;
             }
@@ -326,6 +333,7 @@ public class DialogueConfigScreen extends Screen {
         return switch (tempProvider) {
             case "gemini" -> "Get your free API key from ai.google.dev";
             case "openrouter" -> "Get your API key from openrouter.ai - supports many models";
+            case "claude" -> "Get your API key from console.anthropic.com";
             default -> "";
         };
     }

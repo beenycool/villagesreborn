@@ -2,6 +2,7 @@ package com.beeny.commands;
 
 import com.beeny.commands.base.BaseVillagerCommand;
 import com.beeny.config.VillagersRebornConfig;
+import com.beeny.constants.StringConstants;
 import com.beeny.data.VillagerData;
 import com.beeny.dialogue.DialogueCache;
 import com.beeny.dialogue.LLMDialogueManager;
@@ -18,13 +19,17 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * Commands for managing villager AI and dialogue systems
  */
 public class VillagerAICommands extends BaseVillagerCommand {
+    private static final Logger LOGGER = LoggerFactory.getLogger(VillagerAICommands.class);
     
     public static void register(com.mojang.brigadier.builder.LiteralArgumentBuilder<ServerCommandSource> villagerCommand) {
         villagerCommand.then(CommandManager.literal("ai")
@@ -87,7 +92,11 @@ public class VillagerAICommands extends BaseVillagerCommand {
         ServerCommandSource source = context.getSource();
         
         if (!isValidProvider(provider)) {
-            CommandMessageUtils.sendError(source, "Invalid provider. Use: gemini, openrouter, or local");
+            CommandMessageUtils.sendError(source, String.format(
+                StringConstants.ERROR_INVALID_PROVIDER,
+                String.join(", ", getValidProviders())
+            ));
+            CommandMessageUtils.sendInfo(source, StringConstants.INFO_PROVIDER_HELP);
             return 0;
         }
         
@@ -116,8 +125,9 @@ public class VillagerAICommands extends BaseVillagerCommand {
             com.beeny.config.ConfigManager.saveConfig();
             CommandMessageUtils.sendSuccess(source, "Model set to: " + model);
             return 1;
-        } catch (Exception e) {
-            CommandMessageUtils.sendError(source, "Failed to save configuration: " + e.getMessage());
+        } catch (IOException e) {
+            CommandMessageUtils.sendError(source, StringConstants.ERROR_CONFIG_SAVE_FAILED);
+            LOGGER.error("Configuration save failed: {}", e.getMessage());
             return 0;
         }
     }
@@ -151,8 +161,14 @@ public class VillagerAICommands extends BaseVillagerCommand {
         
         VillagerData villagerData = VillagerDataUtils.ensureVillagerData(villager);
         
-        VillagerDialogueSystem.DialogueContext dialogueContext = 
-            new VillagerDialogueSystem.DialogueContext(villager, source.getPlayer());
+        PlayerEntity player = source.getPlayer();
+        if (player == null) {
+            CommandMessageUtils.sendError(source, "This command can only be executed by a player.");
+            return 0;
+        }
+        
+        VillagerDialogueSystem.DialogueContext dialogueContext =
+            new VillagerDialogueSystem.DialogueContext(villager, player);
         
         CommandMessageUtils.sendInfo(source, "Testing " + category.name().toLowerCase() + " dialogue with " + villagerData.getName() + "...");
         
@@ -237,6 +253,10 @@ public class VillagerAICommands extends BaseVillagerCommand {
     
     private static boolean isValidProvider(String provider) {
         return provider.equals("gemini") || provider.equals("openrouter") || provider.equals("local");
+    }
+    
+    private static java.util.List<String> getValidProviders() {
+        return java.util.Arrays.asList("gemini", "openrouter", "local");
     }
     
     private static void setDefaultModelForProvider(String provider) {

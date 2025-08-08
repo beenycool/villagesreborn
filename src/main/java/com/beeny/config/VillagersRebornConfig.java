@@ -45,7 +45,14 @@ public class VillagersRebornConfig {
     // AI Configuration getters
     public static boolean isAiEnabled() { return AI_ENABLED; }
     public static String getAiProvider() { return AI_PROVIDER; }
-    public static String getAiApiKey() { return AI_API_KEY; }
+    public static String getAiApiKey() {
+        // First check environment variable
+        String envKey = System.getenv("VILLAGERS_REBORN_AI_API_KEY");
+        if (envKey != null && !envKey.isEmpty()) {
+            return envKey;
+        }
+        return AI_API_KEY;
+    }
     public static int getAiRateLimitSeconds() { return AI_RATE_LIMIT_SECONDS; }
     public static int getAiMaxTokens() { return AI_MAX_TOKENS; }
 
@@ -72,14 +79,23 @@ public class VillagersRebornConfig {
     public static boolean ENABLE_DYNAMIC_DIALOGUE = true;
     /**
      * Selected LLM provider used for dynamic dialogue generation.
-     * Supported values: "gemini", "openrouter", "local".
+     * Supported values: "gemini", "openrouter", "local", "claude".
      */
-    public static String LLM_PROVIDER = "gemini"; // "gemini", "openrouter", or "local"
+    public static String LLM_PROVIDER = "gemini"; // "gemini", "openrouter", "local", or "claude"
     /**
      * API key for the chosen LLM provider. Prefer using env var VILLAGERS_REBORN_API_KEY.
      * Leave empty to rely on environment variable injection.
      */
     public static String LLM_API_KEY = "";
+    
+    public static String getLlmApiKey() {
+        // First check environment variable
+        String envKey = System.getenv("VILLAGERS_REBORN_LLM_API_KEY");
+        if (envKey != null && !envKey.isEmpty()) {
+            return envKey;
+        }
+        return LLM_API_KEY;
+    }
     /**
      * Override for the LLM API base endpoint.
      * Example: https://api.openrouter.ai/v1

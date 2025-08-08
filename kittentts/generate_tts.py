@@ -2,6 +2,7 @@
 import sys
 import uuid
 import os
+import tempfile
 from pathlib import Path
 import argparse
 
@@ -20,7 +21,7 @@ def main():
         sys.exit(1)
     
     # Create output directory if it doesn't exist
-    output_dir = Path("/tmp/villagestts")
+    output_dir = Path(os.path.join(tempfile.gettempdir(), "villagestts"))
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate unique filename

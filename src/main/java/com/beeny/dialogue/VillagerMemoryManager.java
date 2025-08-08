@@ -54,7 +54,7 @@ public class VillagerMemoryManager {
             
             // Limit conversation history size
             while (entries.size() > VillagersRebornConfig.CONVERSATION_HISTORY_LIMIT) {
-                entries.removeLast();
+                entries.remove(entries.size() - 1);
             }
             
             // Track topics

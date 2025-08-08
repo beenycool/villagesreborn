@@ -24,11 +24,32 @@ public class LearningProfile {
     private float adaptability;
 
     public LearningProfile(Map<String, Float> skillLevels, Map<String, Float> learningRates, Map<String, Float> experience, int totalExperience, float adaptability) {
-        this.skillLevels = new HashMap<>(skillLevels);
-        this.learningRates = new HashMap<>(learningRates);
-        this.experience = new HashMap<>(experience);
+        this.skillLevels = new HashMap<>();
+        this.learningRates = new HashMap<>();
+        this.experience = new HashMap<>();
         this.totalExperience = totalExperience;
-        this.adaptability = adaptability;
+        setAdaptability(adaptability);
+
+        // Clamp and assign skill levels
+        if (skillLevels != null) {
+            for (Map.Entry<String, Float> entry : skillLevels.entrySet()) {
+                setSkillLevel(entry.getKey(), entry.getValue());
+            }
+        }
+
+        // Clamp and assign learning rates
+        if (learningRates != null) {
+            for (Map.Entry<String, Float> entry : learningRates.entrySet()) {
+                setLearningRate(entry.getKey(), entry.getValue());
+            }
+        }
+
+        // Clamp and assign experience (>= 0.0f)
+        if (experience != null) {
+            for (Map.Entry<String, Float> entry : experience.entrySet()) {
+                this.experience.put(entry.getKey(), Math.max(0.0f, entry.getValue()));
+            }
+        }
     }
 
     public LearningProfile() {

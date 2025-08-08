@@ -80,6 +80,41 @@ public class VillagerEmotionSystem implements AISubsystem {
             }
             return intensityDesc + dominant.name().toLowerCase().replace("_", " ");
         }
+        // Codec for serialization/deserialization
+        public static final com.mojang.serialization.Codec<EmotionalState> CODEC =
+            com.mojang.serialization.Codec.unboundedMap(
+                com.mojang.serialization.Codec.STRING,
+                com.mojang.serialization.Codec.FLOAT
+            ).xmap(
+                map -> {
+                    EmotionalState state = new EmotionalState();
+                    for (Map.Entry<String, Float> entry : map.entrySet()) {
+                        try {
+                            EmotionType type = EmotionType.valueOf(entry.getKey());
+                            state.setEmotion(type, entry.getValue());
+                        } catch (IllegalArgumentException ignored) {
+                            // Ignore unknown emotion types
+                        }
+                    }
+                    return state;
+                },
+                state -> {
+                    Map<String, Float> map = new HashMap<>();
+                    for (EmotionType type : EmotionType.values()) {
+                        map.put(type.name(), state.getEmotion(type));
+                    }
+                    return map;
+                }
+            );
+
+        // Deep copy method
+        public EmotionalState copy() {
+            EmotionalState copy = new EmotionalState();
+            for (EmotionType type : EmotionType.values()) {
+                copy.setEmotion(type, this.getEmotion(type));
+            }
+            return copy;
+        }
     }
 
     public static class EmotionalEvent {

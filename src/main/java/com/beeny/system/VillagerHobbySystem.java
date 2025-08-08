@@ -82,7 +82,7 @@ public class VillagerHobbySystem implements AISubsystem {
         // No resources to clean up
     }
     
-    public void performHobbyActivity(VillagerEntity villager, VillagerData data) {
+    public static void performHobbyActivity(VillagerEntity villager, VillagerData data) {
         if (villager.getWorld().isClient || data == null) return;
         
         HobbyType hobby = data.getHobby();

@@ -20,8 +20,13 @@ public final class DialogueProviderFactory {
 
     public static synchronized void shutdown() {
         if (currentProvider != null) {
-            currentProvider.shutdown();
-            currentProvider = null;
+            try {
+                currentProvider.shutdown();
+            } catch (Exception e) {
+                logger.error("Error shutting down provider", e);
+            } finally {
+                currentProvider = null;
+            }
         }
         initialized = false;
     }
@@ -64,6 +69,7 @@ public final class DialogueProviderFactory {
             case StringConstants.PROVIDER_GEMINI_ID -> new GeminiDialogueProvider();
             case StringConstants.PROVIDER_OPENROUTER_ID -> new OpenRouterDialogueProvider();
             case StringConstants.PROVIDER_LOCAL_ID -> new LocalLLMProvider();
+            case StringConstants.PROVIDER_CLAUDE_ID -> new ClaudeDialogueProvider();
             default -> throw new IllegalArgumentException("Unknown LLM provider: " + provider);
         };
     }
@@ -75,6 +81,7 @@ public final class DialogueProviderFactory {
             case StringConstants.PROVIDER_GEMINI_ID -> new GeminiDialogueProvider(apiKey, endpoint, model);
             case StringConstants.PROVIDER_OPENROUTER_ID -> new OpenRouterDialogueProvider();
             case StringConstants.PROVIDER_LOCAL_ID -> createLocalProvider(endpoint, model);
+            case StringConstants.PROVIDER_CLAUDE_ID -> new ClaudeDialogueProvider(apiKey, endpoint, model);
             default -> null;
         };
     }

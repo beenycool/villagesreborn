@@ -322,16 +322,16 @@ public class VillagerChatSystem {
             }
             
             // Add personality-based details
-            String personality = context.villagerData != null ? context.villagerData.getPersonality().name() : null;
+            String personality = context.villagerData != null ? context.villagerData.getPersonality().name().toLowerCase() : null;
             if (personality == null) {
                 response.append("I enjoy the simple pleasures of village life.");
             } else {
                 switch (personality) {
-                    case "Friendly" -> response.append("I love meeting new people and helping out!");
-                    case "Curious" -> response.append("I'm always eager to learn new things and explore!");
-                    case "Grumpy" -> response.append("I prefer to keep to myself, mostly.");
-                    case "Energetic" -> response.append("I have so much energy, I can barely sit still!");
-                    case "Shy" -> response.append("I'm... I'm a bit quiet, but I'm friendly once you get to know me.");
+                    case "friendly" -> response.append("I love meeting new people and helping out!");
+                    case "curious" -> response.append("I'm always eager to learn new things and explore!");
+                    case "grumpy" -> response.append("I prefer to keep to myself, mostly.");
+                    case "energetic" -> response.append("I have so much energy, I can barely sit still!");
+                    case "shy" -> response.append("I'm... I'm a bit quiet, but I'm friendly once you get to know me.");
                     default -> response.append("I enjoy the simple pleasures of village life.");
                 }
             }
@@ -519,7 +519,9 @@ public class VillagerChatSystem {
                 // Asynchronously request an LLM response and deliver it to the player when ready
                 VillagerDialogueSystem.generateDialogue(dialogueContext, VillagerDialogueSystem.DialogueCategory.GREETING, llmResponse -> {
                     if (llmResponse != null && context.player != null) {
-                        context.player.sendMessage(Text.of(llmResponse), false);
+                        context.player.getServer().execute(() -> {
+                            context.player.sendMessage(Text.of(llmResponse), false);
+                        });
                     }
                 });
             }

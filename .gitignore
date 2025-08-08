@@ -39,3 +39,6 @@ replay_*.log
 *.hprof
 *.jfr
 .rooignore
+
+# Ignore all log files and logs directory
+run/logs/

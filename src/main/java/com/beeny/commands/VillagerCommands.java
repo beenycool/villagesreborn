@@ -2,6 +2,7 @@ package com.beeny.commands;
 
 import com.beeny.Villagersreborn;
 import com.beeny.config.VillagersRebornConfig;
+import com.beeny.constants.VillagerConstants.PersonalityType;
 import com.beeny.data.VillagerData;
 import com.beeny.network.OpenFamilyTreePacket;
 import com.beeny.system.VillagerAISystem;
@@ -324,8 +325,8 @@ public class VillagerCommands {
                 professionCounts.put(profession, professionCounts.getOrDefault(profession, 0) + 1);
                 
                 
-                personalityCounts.put(data.getPersonality(), 
-                    personalityCounts.getOrDefault(data.getPersonality(), 0) + 1);
+                personalityCounts.put(data.getPersonality().name(), 
+                    personalityCounts.getOrDefault(data.getPersonality().name(), 0) + 1);
                 
                 
                 totalHappiness += data.getHappiness();
@@ -339,7 +340,7 @@ public class VillagerCommands {
                 if (data.getAge() > 300) elderCount++;
                 
                 
-                hobbyCount.put(data.getHobby(), hobbyCount.getOrDefault(data.getHobby(), 0) + 1);
+                hobbyCount.put(data.getHobby().name(), hobbyCount.getOrDefault(data.getHobby().name(), 0) + 1);
             }
         }
         
@@ -614,15 +615,15 @@ public class VillagerCommands {
         }
         
         
-        if (!Arrays.asList(VillagerData.PERSONALITIES).contains(personality)) {
+        if (!isValidPersonality(personality)) {
             sendError(context.getSource(), "Invalid personality. Use /villager personality list to see valid options");
             return 0;
         }
         
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data != null) {
-            String oldPersonality = data.getPersonality();
-            data.setPersonality(personality);
+            String oldPersonality = data.getPersonality().name();
+            data.setPersonality(PersonalityType.fromString(personality));
             sendSuccess(context.getSource(), "Changed " + data.getName() + "'s personality from " + 
                 oldPersonality + " to " + personality);
         }
@@ -633,15 +634,15 @@ public class VillagerCommands {
     private static int listPersonalities(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         sendInfo(source, "Available Personalities:");
-        for (String personality : VillagerData.PERSONALITIES) {
-            sendInfo(source, "  - " + personality);
+        for (PersonalityType personality : PersonalityType.values()) {
+            sendInfo(source, "  - " + personality.name());
         }
         return 1;
     }
 
     private static CompletableFuture<Suggestions> suggestPersonalities(CommandContext<ServerCommandSource> context, SuggestionsBuilder builder) {
-        for (String personality : VillagerData.PERSONALITIES) {
-            builder.suggest(personality);
+        for (PersonalityType personality : PersonalityType.values()) {
+            builder.suggest(personality.name());
         }
         return builder.buildFuture();
     }
@@ -1014,10 +1015,19 @@ public class VillagerCommands {
             return 0;
         }
         
+        // Warn about potential exposure
+        sendInfo(context.getSource(), "⚠️ WARNING: API keys entered via commands may be visible in:");
+        sendInfo(context.getSource(), "  - Server logs");
+        sendInfo(context.getSource(), "  - Chat history");
+        sendInfo(context.getSource(), "  - Admin panels");
+        sendInfo(context.getSource(), "For production use, store API keys in config files or environment variables");
+        
         VillagersRebornConfig.setAiApiKey(apiKey);
         sendSuccess(context.getSource(), "AI API key set: " + VillagerAISystem.maskApiKey(apiKey));
         return 1;
     }
+    
+    private static final ExecutorService AI_TEST_EXECUTOR = Executors.newFixedThreadPool(10);
     
     private static int testAIResponse(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
         Entity entity = EntityArgumentType.getEntity(context, "villager");
@@ -1043,7 +1053,7 @@ public class VillagerCommands {
         // Simulate a player for the test
         if (context.getSource().getPlayer() != null) {
             // Process the message as if a player said it
-            Thread.ofVirtual().start(() -> {
+            AI_TEST_EXECUTOR.submit(() -> {
                 try {
                     // This will generate a response if the villager is mentioned
                     VillagerAISystem.processPlayerChat(context.getSource().getPlayer(), message);
@@ -1078,5 +1088,14 @@ public class VillagerCommands {
         VillagersRebornConfig.setToolUseProbability(probability);
         sendSuccess(context.getSource(), "Tool use probability set to: " + (probability * 100) + "%");
         return 1;
+    }
+    
+    private static boolean isValidPersonality(String personality) {
+        for (PersonalityType type : PersonalityType.values()) {
+            if (type.name().equalsIgnoreCase(personality)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

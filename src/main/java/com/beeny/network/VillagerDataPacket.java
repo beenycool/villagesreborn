@@ -98,7 +98,6 @@ public class VillagerDataPacket {
 
     // Additional methods needed by GUI classes
     public UUID getId() { return entityUuid; }
-    public String getSpouseId() { return spouseName; }
     public int getAgeInDays() { return age; }
     public String getHappinessDescription() {
         if (happiness >= 80) return "Very Happy";
@@ -146,7 +145,7 @@ public class VillagerDataPacket {
         String safeCurrentGoal = (aiState != null && aiState.getCurrentGoal() != null) ? aiState.getCurrentGoal() : "";
         String safeCurrentAction = (aiState != null && aiState.getCurrentAction() != null) ? aiState.getCurrentAction() : "";
 
-        com.beeny.data.EmotionalState emotionalState = data.getEmotionalState();
+        com.beeny.ai.core.VillagerEmotionSystem.EmotionalState emotionalState = data.getEmotionalState();
         String safeDominantEmotion = (emotionalState != null && emotionalState.getDominantEmotion() != null) ? emotionalState.getDominantEmotion() : "";
         String safeEmotionalDescription = (emotionalState != null && emotionalState.getEmotionalDescription() != null) ? emotionalState.getEmotionalDescription() : "";
 

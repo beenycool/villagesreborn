@@ -30,7 +30,7 @@ public class VillagerPersonalityBehavior implements AISubsystem {
         // Initialize if needed
     }
     
-    public void applyPersonalityEffects(VillagerEntity villager, VillagerData data) {
+    public static void applyPersonalityEffects(VillagerEntity villager, VillagerData data) {
         if (villager.getWorld().isClient || data == null) return;
         
         PersonalityType personality = data.getPersonality();
@@ -77,7 +77,7 @@ public class VillagerPersonalityBehavior implements AISubsystem {
         
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data != null) {
-            this.applyPersonalityEffects(villager, data);
+            applyPersonalityEffects(villager, data);
         }
     }
     

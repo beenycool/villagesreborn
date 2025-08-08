@@ -89,6 +89,13 @@ public abstract class BaseLLMProvider implements LLMDialogueProvider {
         if (client != null) {
             client.dispatcher().executorService().shutdown();
             client.connectionPool().evictAll();
+            try {
+                if (!client.dispatcher().executorService().awaitTermination(5, TimeUnit.SECONDS)) {
+                    client.dispatcher().executorService().shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
     

@@ -1,6 +1,7 @@
 package com.beeny.config;
 
 import com.beeny.Villagersreborn;
+import com.beeny.constants.StringConstants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -108,7 +109,7 @@ public class ConfigManager {
             
             Villagersreborn.LOGGER.info("Loaded Villagers Reborn config");
         } catch (Exception e) {
-            Villagersreborn.LOGGER.error("Failed to load Villagers Reborn config from file", e);
+            Villagersreborn.LOGGER.error(StringConstants.ERROR_CONFIG_LOAD_FAILED, e);
         }
     }
 
@@ -291,8 +292,9 @@ public class ConfigManager {
 
     private static void createDefaultConfig(Path configPath) throws IOException {
         // Ensure parent directory exists before saving
-        if (!Files.exists(configPath.getParent())) {
-            Files.createDirectories(configPath.getParent());
+        Path parentDir = configPath.getParent();
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir);
         }
         // Use the no-arg saveConfig which reads values from VillagersRebornConfig
         saveConfig();
@@ -438,8 +440,9 @@ public class ConfigManager {
         config.addProperty("toolCallingEnabled", VillagersRebornConfig.isToolCallingEnabled());
         config.addProperty("toolUseProbability", VillagersRebornConfig.getToolUseProbability());
 
-        if (!Files.exists(configPath.getParent())) {
-            Files.createDirectories(configPath.getParent());
+        Path parentDir = configPath.getParent();
+        if (parentDir != null && !Files.exists(parentDir)) {
+            Files.createDirectories(parentDir);
         }
         Files.writeString(configPath, GSON.toJson(config));
     }

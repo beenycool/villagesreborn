@@ -393,13 +393,13 @@ public class DailyActivityTracker {
         DAILY_SOCIAL_COUNT.clear();
 
         if (nbt == null || !nbt.contains("daily_logs")) return;
-        NbtCompound logsNbt = nbt.getCompound("daily_logs").orElse(new NbtCompound());
+        NbtCompound logsNbt = nbt.getCompound("daily_logs");
 
         for (String villagerId : logsNbt.getKeys()) {
-            NbtCompound villagerNbt = logsNbt.getCompound(villagerId).orElse(new NbtCompound());
+            NbtCompound villagerNbt = logsNbt.getCompound(villagerId);
             Map<Integer, DailyLog> dayLogs = new ConcurrentHashMap<>();
             for (String dayKey : villagerNbt.getKeys()) {
-                NbtCompound dayNbt = villagerNbt.getCompound(dayKey).orElse(new NbtCompound());
+                NbtCompound dayNbt = villagerNbt.getCompound(dayKey);
                 DailyLog.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, dayNbt)
                     .result()
                     .ifPresent(log -> dayLogs.put(Integer.parseInt(dayKey), log));

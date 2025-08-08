@@ -63,6 +63,7 @@ public class Villagersreborn implements ModInitializer {
             .buildAndRegister(Identifier.of(MOD_ID, "villager_name"));
 
     private static final Random RANDOM = new Random();
+    private static int tickCounter = 0;
 
 	@Override
 	public void onInitialize() {

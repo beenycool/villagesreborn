@@ -1,5 +1,7 @@
 package com.beeny.client.gui;
 
+import com.beeny.Villagersreborn;
+
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -43,7 +45,7 @@ public class SimpleConfigScreen extends Screen {
                     if (player != null) {
                         player.sendMessage(Text.literal(com.beeny.constants.StringConstants.UI_ERROR_PREFIX + e.getMessage()).formatted(Formatting.RED), false);
                     }
-                    e.printStackTrace();
+                    com.beeny.Villagersreborn.LOGGER.error("Error opening full settings screen", e);
                 }
             }).dimensions(centerX - 100, centerY, 200, 20).build());
         

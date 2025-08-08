@@ -33,9 +33,9 @@ public class VillagerCommandRegistry {
         VillagerManagementCommands.register(villagerCommand);
         VillagerFamilyCommands.register(villagerCommand);
         VillagerDataCommands.register(villagerCommand);
-        VillagerActivityCommands.register(villagerCommand);
-        VillagerListCommands.register(villagerCommand);
-        TTSCommands.register(villagerCommand);
+        VillagerActivityCommands.register(villagerCommand, registryAccess);
+        VillagerListCommands.register(dispatcher);
+        TTSCommands.register(dispatcher);
         
         // Register the main command
         dispatcher.register(villagerCommand);

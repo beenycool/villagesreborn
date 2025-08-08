@@ -100,7 +100,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         // Perform hobby activities
         if (updateCounter % 300 == 0) {
-            VillagerHobbySystem.performHobbyActivity(villager, data);
+            com.beeny.ai.AIWorldManagerRefactored.getInstance().getHobbySystem().performHobbyActivity(villager, data);
         }
         
         // Update emotional state
@@ -110,7 +110,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         // Apply personality behaviors
         if (updateCounter % 150 == 0) {
-            VillagerPersonalityBehavior.applyPersonalityEffects(villager, data);
+            com.beeny.ai.AIWorldManagerRefactored.getInstance().getPersonalityBehavior().applyPersonalityEffects(villager, data);
         }
         
         // Update memories and clean old ones

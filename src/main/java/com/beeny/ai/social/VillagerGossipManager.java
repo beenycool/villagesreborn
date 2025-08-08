@@ -2,6 +2,7 @@ package com.beeny.ai.social;
 
 import com.beeny.ai.AIWorldManagerRefactored;
 import com.beeny.data.VillagerData;
+import com.beeny.config.AIConfig;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -23,16 +24,16 @@ public class VillagerGossipManager {
     private final AIWorldManagerRefactored worldManager;
     
     public enum GossipType {
-        POSITIVE_INTERACTION("positive interaction", 5, 0.8f, true),
-        NEGATIVE_INTERACTION("negative interaction", -8, 0.9f, true),
-        TRADE_SUCCESS("successful trade", 3, 0.6f, true),
-        TRADE_EXPLOIT("trade exploitation", -12, 0.95f, true),
-        KINDNESS("act of kindness", 8, 0.7f, true),
-        AGGRESSION("aggressive behavior", -15, 0.85f, true),
-        HELPFULNESS("being helpful", 6, 0.65f, true),
-        ROMANCE("romantic situation", 2, 0.9f, false), // High spread but neutral impact
-        SCANDAL("village scandal", -5, 0.95f, false),
-        ACHIEVEMENT("notable achievement", 10, 0.6f, true),
+        POSITIVE_INTERACTION("positive interaction", AIConfig.GOSSIP_POSITIVE_INTERACTION, 0.8f, true),
+        NEGATIVE_INTERACTION("negative interaction", AIConfig.GOSSIP_NEGATIVE_INTERACTION, 0.9f, true),
+        TRADE_SUCCESS("successful trade", AIConfig.GOSSIP_TRADE_SUCCESS, 0.6f, true),
+        TRADE_EXPLOIT("trade exploitation", AIConfig.GOSSIP_TRADE_EXPLOIT, 0.95f, true),
+        KINDNESS("act of kindness", AIConfig.GOSSIP_KINDNESS, 0.7f, true),
+        AGGRESSION("aggressive behavior", AIConfig.GOSSIP_AGGRESSION, 0.85f, true),
+        HELPFULNESS("being helpful", AIConfig.GOSSIP_HELPFULNESS, 0.65f, true),
+        ROMANCE("romantic situation", AIConfig.GOSSIP_ROMANCE, 0.9f, false), // High spread but neutral impact
+        SCANDAL("village scandal", AIConfig.GOSSIP_SCANDAL, 0.95f, false),
+        ACHIEVEMENT("notable achievement", AIConfig.GOSSIP_ACHIEVEMENT, 0.6f, true),
         MYSTERIOUS_BEHAVIOR("mysterious behavior", 0, 0.8f, false);
         
         public final String description;

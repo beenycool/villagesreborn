@@ -10,6 +10,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
+import com.beeny.Villagersreborn;
 
 /**
  * Unified client commands under the /villager namespace.
@@ -59,7 +60,7 @@ public class ClientDialogueCommands {
                 if (client.player != null) {
                     client.player.sendMessage(Text.literal("Error opening settings: " + e.getMessage()).formatted(Formatting.RED), false);
                 }
-                e.printStackTrace();
+                com.beeny.Villagersreborn.LOGGER.error("Error opening settings screen", e);
             }
         });
         

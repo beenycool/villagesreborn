@@ -2,6 +2,8 @@ package com.beeny.ai.quests;
 
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
+import com.beeny.ai.core.AISubsystem;
+import com.beeny.constants.VillagerConstants.Personality;
 import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -20,7 +22,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * Dynamic quest generation system that creates contextual quests based on villager needs,
  * village state, relationships, and ongoing storylines
  */
-public class VillagerQuestSystem {
+public class VillagerQuestSystem implements AISubsystem {
     
     public enum QuestType {
         FETCH_ITEM("Fetch Quest", "Bring me a specific item"),
@@ -492,9 +494,9 @@ public class VillagerQuestSystem {
         @Override
         public boolean canGenerateQuest(VillagerEntity villager, PlayerEntity player) {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
-            return data != null && 
+            return data != null &&
                    data.getPlayerReputation(player.getUuidAsString()) > 40 &&
-                   data.getPersonality().equals("Curious");
+                   data.getPersonality() == Personality.CURIOUS;
         }
         
         @Override
@@ -514,35 +516,67 @@ public class VillagerQuestSystem {
     );
     
     // Instance-based lifecycle methods
-    public void initializeVillagerQuests(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
         // Initialize quest state for villager if needed
     }
+    
+    public void initializeVillagerQuests(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        initializeVillager(villager, data);
+    }
 
-    public void updateVillagerQuests(@NotNull VillagerEntity villager) {
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
         // Update quest progress, check for completions, etc.
         cleanupExpiredQuests();
     }
+    
+    public void updateVillagerQuests(@NotNull VillagerEntity villager) {
+        updateVillager(villager);
+    }
 
+    @Override
     public void cleanupVillager(@NotNull String villagerUuid) {
         // Remove quests associated with this villager
         activeQuests.values().removeIf(quest -> quest.giverUuid.equals(villagerUuid));
     }
 
+    @Override
     public void performMaintenance() {
         cleanupExpiredQuests();
     }
 
+    @Override
     public void shutdown() {
         activeQuests.clear();
         playerQuests.clear();
     }
 
+    @Override
     @NotNull
     public Map<String, Object> getAnalytics() {
         Map<String, Object> analytics = new HashMap<>();
         analytics.put("total_active_quests", activeQuests.size());
         analytics.put("total_players_with_quests", playerQuests.size());
         return analytics;
+    }
+    
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        // Only update if there are active quests for this villager
+        return activeQuests.values().stream()
+            .anyMatch(quest -> quest.giverUuid.equals(villager.getUuidAsString()));
+    }
+    
+    @Override
+    public long getUpdateInterval() {
+        return 5000L; // 5 seconds
+    }
+    
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "Quest System";
     }
     
     public Quest generateQuestForVillager(VillagerEntity villager, PlayerEntity player) {

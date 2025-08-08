@@ -13,9 +13,11 @@ public final class StringConstants {
     public static final String PROVIDER_GEMINI_ID = "gemini";
     public static final String PROVIDER_OPENROUTER_ID = "openrouter";
     public static final String PROVIDER_LOCAL_ID = "local";
+    public static final String PROVIDER_CLAUDE_ID = "claude";
     public static final String PROVIDER_NAME_GEMINI = "Gemini";
     public static final String PROVIDER_NAME_OPENROUTER = "OpenRouter";
     public static final String PROVIDER_NAME_LOCAL = "local";
+    public static final String PROVIDER_NAME_CLAUDE = "Claude";
 
     // Environment variables
     public static final String ENV_API_KEY = "VILLAGERS_REBORN_API_KEY";
@@ -25,6 +27,8 @@ public final class StringConstants {
     public static final String DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
     public static final String DEFAULT_OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
     public static final String DEFAULT_OPENROUTER_MODEL = "openai/gpt-3.5-turbo";
+    public static final String DEFAULT_CLAUDE_ENDPOINT = "https://api.anthropic.com/v1/messages";
+    public static final String DEFAULT_CLAUDE_MODEL = "claude-3-haiku-20240307";
 
     // Network channel / packet names
     public static final String CH_OPEN_FAMILY_TREE = "open_family_tree";
@@ -36,6 +40,17 @@ public final class StringConstants {
     public static final String CH_TEST_LLM_CONNECTION_RESULT = "test_llm_connection_result";
 
     // UI/Chat messages
+    // Error messages
+    public static final String ERROR_INVALID_PROVIDER = "Invalid provider '%s'. Valid options: %s";
+    public static final String ERROR_API_KEY_TOO_SHORT = "API key must be at least 10 characters";
+    public static final String ERROR_CONFIG_LOAD_FAILED = "Failed to load configuration. Check server logs for details";
+    public static final String ERROR_CONFIG_SAVE_FAILED = "Failed to save configuration. Check server logs for details";
+    
+    // Informational messages
+    public static final String INFO_PROVIDER_HELP = "Run '/villager ai providers' for detailed provider information";
+    public static final String INFO_API_KEY_HELP = "Get your API key from the provider's developer console";
+    
+    // Existing messages
     public static final String MSG_LLM_NOT_CONFIGURED = "LLM provider not configured";
     public static final String MSG_LLM_TROUBLE = "Sorry, I'm having trouble speaking right now...";
     public static final String MSG_INVALID_VILLAGER_ID = "§cInvalid villager ID!";

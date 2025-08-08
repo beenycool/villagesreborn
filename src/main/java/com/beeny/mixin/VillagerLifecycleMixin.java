@@ -200,17 +200,17 @@ public abstract class VillagerLifecycleMixin extends LivingEntity {
     @Unique
     private void updateHappinessBasedOnConditions(VillagerEntity villager, VillagerData data) {
         // Night time happiness modifier
-        if (villager.getWorld().getTimeOfDay() % 24000 > 13000) { 
-            if (data.getPersonality().name().equals("MELANCHOLY")) {
+        if (villager.getWorld().getTimeOfDay() % 24000 > 13000) {
+            if (data.getPersonality() != null && data.getPersonality().name().equals("MELANCHOLY")) {
                 data.adjustHappiness(1);
-            } else if (data.getPersonality().name().equals("ANXIOUS")) {
+            } else if (data.getPersonality() != null && data.getPersonality().name().equals("ANXIOUS")) {
                 data.adjustHappiness(-1);
             }
         }
         
         // Weather-based happiness
         if (villager.getWorld().isRaining()) {
-            if (data.getPersonality().name().equals("MELANCHOLY")) {
+            if (data.getPersonality() != null && data.getPersonality().name().equals("MELANCHOLY")) {
                 data.adjustHappiness(1);
             } else {
                 data.adjustHappiness(-1);

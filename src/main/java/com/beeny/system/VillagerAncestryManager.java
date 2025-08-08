@@ -95,11 +95,14 @@ public class VillagerAncestryManager {
         VillagerData father = generateAncestor(villagerData, "male", 1, world, pos);
         parents.add(father);
         
-        // Link them as spouses to each other
+        // Generate UUIDs for spouses and link them
+        String motherSpouseId = UUID.randomUUID().toString();
+        String fatherSpouseId = UUID.randomUUID().toString();
+        
         mother.setSpouseName(father.getName());
-        mother.setSpouseId("ancestor_" + father.getName().hashCode());
+        mother.setSpouseId(fatherSpouseId);
         father.setSpouseName(mother.getName());
-        father.setSpouseId("ancestor_" + mother.getName().hashCode());
+        father.setSpouseId(motherSpouseId);
         
         // Add child relationship
         mother.addChild(villager.getUuidAsString(), villager.getName().getString());
@@ -125,11 +128,14 @@ public class VillagerAncestryManager {
         VillagerData father = generateAncestorFromChild(child, "male", generationLevel);
         parents.add(father);
         
-        // Link them as spouses
+        // Generate UUIDs for spouses and link them
+        String motherSpouseId = UUID.randomUUID().toString();
+        String fatherSpouseId = UUID.randomUUID().toString();
+        
         mother.setSpouseName(father.getName());
-        mother.setSpouseId("ancestor_" + father.getName().hashCode());
+        mother.setSpouseId(fatherSpouseId);
         father.setSpouseName(mother.getName());
-        father.setSpouseId("ancestor_" + mother.getName().hashCode());
+        father.setSpouseId(motherSpouseId);
         
         return parents;
     }

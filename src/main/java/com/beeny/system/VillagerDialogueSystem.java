@@ -376,8 +376,9 @@ public class VillagerDialogueSystem {
     private static Text generateStaticDialogue(DialogueContext context, DialogueCategory category) {
         
         String personality = context.villagerData.getPersonality().name();
+        String personalityKey = personality.substring(0, 1).toUpperCase() + personality.substring(1).toLowerCase();
         Map<DialogueCategory, List<String>> personalityDialogues =
-            DIALOGUE_TEMPLATES.getOrDefault(personality, DIALOGUE_TEMPLATES.get("FRIENDLY"));
+            DIALOGUE_TEMPLATES.getOrDefault(personalityKey, DIALOGUE_TEMPLATES.get("Friendly"));
         
         
         String professionKey = "profession_" + context.villager.getVillagerData()

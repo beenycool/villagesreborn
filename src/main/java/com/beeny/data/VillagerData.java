@@ -13,6 +13,7 @@ import com.beeny.constants.VillagerConstants;
 import com.beeny.constants.VillagerConstants.PersonalityType;
 import com.beeny.constants.VillagerConstants.HobbyType;
 import java.util.concurrent.ThreadLocalRandom;
+import com.beeny.ai.core.VillagerEmotionSystem.EmotionalState;
 
 public class VillagerData {
     // Split into multiple codecs to avoid method parameter limit
@@ -319,5 +320,24 @@ public class VillagerData {
             new HashMap<>(playerMemories), new HashMap<>(topicFrequency),
             new ArrayList<>(recentEvents), lastConversationTime
         );
+    }
+    
+    // Additional utility methods
+    public void incrementAge() {
+        this.age++;
+    }
+    
+    public int getAgeInDays() {
+        // Convert internal age to days (assuming 1 age unit = some time period)
+        // This is a placeholder - adjust based on your actual age system
+        return age;
+    }
+    
+    public String getProfession() {
+        // Return the current profession from profession data
+        if (professionData != null && professionData.getCurrentProfession() != null) {
+            return professionData.getCurrentProfession();
+        }
+        return "None";
     }
 }

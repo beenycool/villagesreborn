@@ -112,8 +112,8 @@ public class RequestVillagerListPacket implements CustomPayload {
         
         // Truncate the list to the maximum allowed size before sending
         List<VillagerDataPacket> toSend = villagerDataList.size() > MAX_VILLAGERS_TO_SEND
-                ? villagerDataList.subList(0, MAX_VILLAGERS_TO_SEND)
-                : villagerDataList;
+                ? new ArrayList<>(villagerDataList.subList(0, MAX_VILLAGERS_TO_SEND))
+                : new ArrayList<>(villagerDataList);
 
         Villagersreborn.LOGGER.info("[RequestVillagerListPacket] Found {} villagers in same world, {} with data. Sending {} (capped at {}) villagers to client.",
                 sameWorldCount, withDataCount, toSend.size(), MAX_VILLAGERS_TO_SEND);

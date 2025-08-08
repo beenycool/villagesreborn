@@ -77,6 +77,7 @@ final class TickHandler {
 
         for (int i = 0; i < villagers.size(); i++) {
             VillagerEntity villager1 = villagers.get(i);
+            boolean married = false;
 
             for (int j = i + 1; j < villagers.size(); j++) {
                 VillagerEntity villager2 = villagers.get(j);
@@ -85,9 +86,12 @@ final class TickHandler {
                 if (distance <= VillagerConstants.Relationship.MARRIAGE_DISTANCE_THRESHOLD) {
                     if (ThreadLocalRandom.current().nextFloat() < VillagerConstants.Relationship.MARRIAGE_RANDOM_CHANCE) {
                         VillagerRelationshipManager.attemptMarriage(villager1, villager2);
+                        married = true;
+                        break; // Exit inner loop after successful marriage
                     }
                 }
             }
+            if (married) continue; // Optional: skip remaining checks for this villager
         }
     }
 

@@ -69,7 +69,7 @@ public class AIWorldManagerRefactored {
         subsystemManager.registerSubsystem(learningSystem);     // Medium priority
         subsystemManager.registerSubsystem(planningSystem);     // Medium priority
         subsystemManager.registerSubsystem(hobbySystem);        // Low priority - entertainment/activity
-        // questSystem currently does not implement AISubsystem; do not register to avoid type error
+        subsystemManager.registerSubsystem(questSystem);        // Low priority - quest generation and management
         // Note: gossipManager doesn't implement AISubsystem yet, would need refactoring
         
         LOGGER.info("AIWorldManagerRefactored initialized with {} subsystems", 

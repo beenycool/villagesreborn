@@ -93,6 +93,12 @@ public class VillagerFamilyCommands extends BaseVillagerCommand {
         VillagerEntity villager1 = (VillagerEntity) entity1;
         VillagerEntity villager2 = (VillagerEntity) entity2;
         
+        // Prevent same-villager operations
+        if (villager1.getUuid().equals(villager2.getUuid())) {
+            CommandMessageUtils.sendError(context.getSource(), "Cannot perform this action on the same villager");
+            return 0;
+        }
+        
         if (VillagerRelationshipManager.attemptMarriage(villager1, villager2)) {
             CommandMessageUtils.sendSuccess(context.getSource(), "Marriage successful!");
             displayMarriageSuccess(villager1, villager2, context.getSource());
@@ -107,7 +113,11 @@ public class VillagerFamilyCommands extends BaseVillagerCommand {
     private static void displayMarriageSuccess(VillagerEntity villager1, VillagerEntity villager2, ServerCommandSource source) {
         String name1 = VillagerDataUtils.getVillagerName(villager1);
         String name2 = VillagerDataUtils.getVillagerName(villager2);
-        CommandMessageUtils.sendSuccessWithFormat(source, "%s and %s are now married! 💕", name1, name2);
+        
+        // Only send message if source is a player
+        if (source.getPlayer() != null) {
+            CommandMessageUtils.sendSuccessWithFormat(source, "%s and %s are now married! 💕", name1, name2);
+        }
     }
     
     private static void explainMarriageFailure(VillagerEntity villager1, VillagerEntity villager2, ServerCommandSource source) {
@@ -139,9 +149,15 @@ public class VillagerFamilyCommands extends BaseVillagerCommand {
         if (!validateVillager(entity1, context.getSource()) || !validateVillager(entity2, context.getSource())) {
             return 0;
         }
-        
         VillagerEntity villager1 = (VillagerEntity) entity1;
         VillagerEntity villager2 = (VillagerEntity) entity2;
+        
+        // Prevent same-villager operations
+        if (villager1.getUuid().equals(villager2.getUuid())) {
+            CommandMessageUtils.sendError(context.getSource(), "Cannot perform this action on the same villager");
+            return 0;
+        }
+        
         
         VillagerRelationshipManager.divorce(villager1, villager2);
         
@@ -159,9 +175,15 @@ public class VillagerFamilyCommands extends BaseVillagerCommand {
         if (!validateVillager(entity1, context.getSource()) || !validateVillager(entity2, context.getSource())) {
             return 0;
         }
-        
         VillagerEntity villager1 = (VillagerEntity) entity1;
         VillagerEntity villager2 = (VillagerEntity) entity2;
+        
+        // Prevent same-villager operations
+        if (villager1.getUuid().equals(villager2.getUuid())) {
+            CommandMessageUtils.sendError(context.getSource(), "Cannot perform this action on the same villager");
+            return 0;
+        }
+        
         
         // Validate marriage status
         if (!validateMarriageForBreeding(villager1, villager2, context.getSource())) {

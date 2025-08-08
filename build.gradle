@@ -94,10 +94,22 @@ java {
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
 
-	// Ensure JUnit 5 is the test framework
-	test {
-		useJUnitPlatform()
-	}
+}
+
+test {
+	useJUnitPlatform()
+}
+
+test {
+	useJUnitPlatform()
+}
+
+test {
+	useJUnitPlatform()
+}
+
+test {
+	useJUnitPlatform()
 }
 
 jar {

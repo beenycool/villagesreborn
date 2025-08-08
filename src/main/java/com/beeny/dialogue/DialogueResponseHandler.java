@@ -7,6 +7,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import java.io.IOException;
+import com.google.gson.JsonSyntaxException;
 
 final class DialogueResponseHandler {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DialogueResponseHandler.class);
@@ -32,7 +34,20 @@ final class DialogueResponseHandler {
     }
 
     static @NotNull Text onFailure(@Nullable Throwable throwable) {
-        logger.warn("[WARN] [DialogueResponseHandler] [onFailure] - LLM dialogue generation failed: {}", throwable != null ? throwable.getMessage() : "unknown");
+        if (throwable != null) {
+            logger.warn("[WARN] [DialogueResponseHandler] [onFailure] - LLM dialogue generation failed: {}", throwable.getMessage(), throwable);
+            
+            if (throwable instanceof IOException) {
+                return Text.literal("Error: Failed to connect to AI service").formatted(Formatting.RED);
+            } else if (throwable instanceof JsonSyntaxException) {
+                return Text.literal("Error: Invalid response from AI service").formatted(Formatting.RED);
+            } else if (throwable.getMessage().contains("empty array")) {
+                return Text.literal("Error: No response from AI service").formatted(Formatting.RED);
+            }
+        } else {
+            logger.warn("[WARN] [DialogueResponseHandler] [onFailure] - LLM dialogue generation failed: unknown");
+        }
+        
         if (VillagersRebornConfig.FALLBACK_TO_STATIC) {
             return null;
         }

@@ -82,11 +82,11 @@ public class VillagerDataTest {
     
     @Test
     void testEmotionalStateIntegration() {
-        com.beeny.data.EmotionalState emotional = villagerData.getEmotionalState();
+        com.beeny.ai.core.VillagerEmotionSystem.EmotionalState emotional = villagerData.getEmotionalState();
         assertNotNull(emotional);
         
         // Test that emotional state changes are preserved
-        emotional.adjustEmotion("happiness", 0.5f);
+        emotional.adjustEmotion(com.beeny.ai.core.VillagerEmotionSystem.EmotionType.HAPPINESS, 0.5f);
         assertEquals(emotional, villagerData.getEmotionalState());
     }
 }

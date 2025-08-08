@@ -82,14 +82,23 @@ public class AISubsystemManager {
         this.subsystems = new ArrayList<>();
         this.lastUpdateTimes = new ConcurrentHashMap<>();
         
-        // Create thread pools with reasonable limits
+        // Create thread pools with bounded queue and proper rejection policy
         int threadPoolSize = Math.max(2, Math.min(8, Runtime.getRuntime().availableProcessors()));
         this.scheduler = Executors.newScheduledThreadPool(2);
-        this.updateExecutor = Executors.newFixedThreadPool(threadPoolSize, r -> {
-            Thread t = new Thread(r, "AISubsystem-Worker");
-            t.setDaemon(true);
-            return t;
-        });
+        
+        // Bounded queue with capacity 1000 and caller-runs policy
+        this.updateExecutor = new ThreadPoolExecutor(
+            threadPoolSize,
+            threadPoolSize,
+            60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(1000),
+            r -> {
+                Thread t = new Thread(r, "AISubsystem-Worker");
+                t.setDaemon(true);
+                return t;
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy()
+        );
         
         LOGGER.info("AISubsystemManager initialized with {} worker threads", threadPoolSize);
     }
@@ -174,11 +183,13 @@ public class AISubsystemManager {
         
         if (tracker == null) return;
         
+        // Refresh access time to prevent premature cleanup
+        tracker.getVillager();
+        
         long currentTime = System.currentTimeMillis();
         
-        // Submit update tasks for subsystems that need updates
-        List<CompletableFuture<Void>> updateTasks = new ArrayList<>();
-        
+        // Collect subsystems needing updates
+        List<AISubsystem> subsystemsToUpdate = new ArrayList<>();
         for (AISubsystem subsystem : subsystems) {
             if (!subsystem.isEnabled() || !subsystem.needsUpdate(villager)) continue;
             
@@ -186,12 +197,19 @@ public class AISubsystemManager {
             Long lastUpdate = lastUpdateTimes.get(subsystemKey);
             
             if (lastUpdate == null || (currentTime - lastUpdate) >= subsystem.getUpdateInterval()) {
-                CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-                    // Measure around the entire server-thread execution for accurate stats
-                    long startTime = System.nanoTime();
-                    try {
-                        // Ensure all MC state interactions happen on the server thread
-                        server.execute(() -> {
+                subsystemsToUpdate.add(subsystem);
+            }
+        }
+        
+        if (!subsystemsToUpdate.isEmpty()) {
+            // Submit single task for all subsystem updates
+            updateExecutor.execute(() -> {
+                long startTime = System.nanoTime();
+                try {
+                    // Run all updates in a single server-thread execution
+                    server.execute(() -> {
+                        for (AISubsystem subsystem : subsystemsToUpdate) {
+                            String subsystemKey = uuid + ":" + subsystem.getSubsystemName();
                             try {
                                 subsystem.updateVillager(villager);
                                 lastUpdateTimes.put(subsystemKey, System.currentTimeMillis());
@@ -199,28 +217,20 @@ public class AISubsystemManager {
                             } catch (Exception e) {
                                 LOGGER.error("Error updating {} for villager {}",
                                         subsystem.getSubsystemName(), uuid, e);
-                            } finally {
-                                long duration = System.nanoTime() - startTime;
-                                totalUpdateTime.addAndGet(duration);
-                                totalUpdates.incrementAndGet();
                             }
-                        });
-                    } catch (Exception e) {
-                        LOGGER.error("Failed scheduling update {} for villager {}",
-                                subsystem.getSubsystemName(), uuid, e);
-                        long duration = System.nanoTime() - startTime;
-                        totalUpdateTime.addAndGet(duration);
-                        totalUpdates.incrementAndGet();
-                    }
-                }, updateExecutor);
-                
-                updateTasks.add(task);
-            }
-        }
-        
-        // Don't wait for completion to avoid blocking the main thread
-        if (!updateTasks.isEmpty()) {
-            LOGGER.debug("Submitted {} update tasks for villager {}", updateTasks.size(), uuid);
+                        }
+                    });
+                } catch (Exception e) {
+                    LOGGER.error("Failed scheduling updates for villager {}", uuid, e);
+                } finally {
+                    long duration = System.nanoTime() - startTime;
+                    totalUpdateTime.addAndGet(duration);
+                    totalUpdates.addAndGet(subsystemsToUpdate.size());
+                }
+            });
+            
+            LOGGER.debug("Submitted 1 coalesced update task for {} subsystems on villager {}",
+                       subsystemsToUpdate.size(), uuid);
         }
     }
     

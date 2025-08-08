@@ -23,6 +23,9 @@ public class DialogueCache {
     
     // Synchronized cache access
     public static @Nullable String get(@NotNull String key) {
+        if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) {
+            return null;
+        }
         synchronized (cache) {
             CacheEntry entry = cache.get(key);
             if (entry == null || entry.isExpired()) {
@@ -34,6 +37,9 @@ public class DialogueCache {
     }
     
     public static void put(@NotNull String key, @NotNull String dialogue, long ttl) {
+        if (!VillagersRebornConfig.ENABLE_DIALOGUE_CACHE) {
+            return;
+        }
         synchronized (cache) {
             cache.put(key, new CacheEntry(dialogue, ttl));
         }

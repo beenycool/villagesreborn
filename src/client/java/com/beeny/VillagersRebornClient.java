@@ -64,7 +64,7 @@ public class VillagersRebornClient implements ClientModInitializer {
                         });
                     } catch (Exception e) {
                         client.player.sendMessage(Text.literal(com.beeny.constants.StringConstants.UI_ERROR_PREFIX + e.getMessage()), false);
-                        e.printStackTrace();
+                        com.beeny.Villagersreborn.LOGGER.error("Error opening settings screen", e);
                     }
                 }
             }

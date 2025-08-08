@@ -149,10 +149,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, filtered, "Filtered Villagers (" + criteria + ")", 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -162,7 +159,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         String field = StringArgumentType.getString(context, "field");
         List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
         
-        Comparator<VillagerEntity> comparator = getComparatorForField(field);
+        Comparator<VillagerEntity> comparator = getComparatorForField(field, source);
         
         displayVillagerList(source, villagers, "Villagers sorted by " + field, comparator);
         
@@ -195,10 +192,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, matches, "Search Results for: " + query, 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -250,10 +244,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, professionVillagers, "Villagers with profession: " + profession, 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -275,10 +266,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, married, "Married Villagers", 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -300,10 +288,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, withChildren, "Villagers with Children", 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -325,10 +310,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
         
         displayVillagerList(source, single, "Single Villagers", 
-            Comparator.comparing(v -> {
-                Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
-                return data.map(VillagerData::getName).orElse("Unnamed Villager");
-            }));
+            getComparatorForField("name", source));
         
         return 1;
     }
@@ -530,7 +512,7 @@ public class VillagerListCommands extends BaseVillagerCommand {
         }
     }
     
-    private static Comparator<VillagerEntity> getComparatorForField(String field) {
+    private static Comparator<VillagerEntity> getComparatorForField(String field, ServerCommandSource source) {
         switch (field.toLowerCase()) {
             case "name":
                 return Comparator.comparing(v -> {
@@ -543,12 +525,12 @@ public class VillagerListCommands extends BaseVillagerCommand {
                     return data.map(VillagerData::getAge).orElse(0);
                 });
             case "happiness":
-                return Comparator.comparingInt(v -> {
+                return Comparator.<VillagerEntity>comparingInt(v -> {
                     Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
                     return data.map(VillagerData::getHappiness).orElse(0);
                 }).reversed();
             case "trades":
-                return Comparator.comparingInt(v -> {
+                return Comparator.<VillagerEntity>comparingInt(v -> {
                     Optional<VillagerData> data = VillagerDataUtils.getVillagerData(v);
                     return data.map(VillagerData::getTotalTrades).orElse(0);
                 }).reversed();
@@ -559,8 +541,8 @@ public class VillagerListCommands extends BaseVillagerCommand {
                 });
             case "distance":
                 return Comparator.comparingDouble(v -> {
-                    ServerCommandSource source = v.getCommandSource();
-                    return source != null ? v.squaredDistanceTo(source.getPosition()) : Double.MAX_VALUE;
+                    if (source == null) return 0;
+                    return v.squaredDistanceTo(source.getPosition());
                 });
             case "birth-time":
                 return Comparator.comparingLong(v -> {

@@ -3,9 +3,12 @@ package com.beeny.ai;
 import com.beeny.ai.core.AISubsystem;
 import com.beeny.data.VillagerData;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -60,6 +63,59 @@ public class VillagerAIManager implements AISubsystem {
         state.setContext("last_trade_player", player.getUuidAsString());
     }
 
+    // Tool interaction methods
+    public void useHoeTool(VillagerEntity villager) {
+        int radius = com.beeny.config.AIConfig.HOE_RADIUS;
+        float growthBoost = com.beeny.config.AIConfig.GROWTH_BOOST;
+        
+        BlockPos villagerPos = villager.getBlockPos();
+        
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                BlockPos checkPos = villagerPos.add(x, 0, z);
+                net.minecraft.block.BlockState state = villager.getWorld().getBlockState(checkPos);
+                if (state.getBlock() instanceof net.minecraft.block.CropBlock) {
+                    int age = state.get(net.minecraft.block.CropBlock.AGE);
+                    if (age < net.minecraft.block.CropBlock.MAX_AGE) {
+                        villager.getWorld().setBlockState(checkPos, state.with(net.minecraft.block.CropBlock.AGE, age + 1));
+                    }
+                }
+            }
+        }
+    }
+
+    public void useFishingRod(VillagerEntity villager) {
+        int radius = com.beeny.config.AIConfig.FISHING_RADIUS;
+        double successChance = com.beeny.config.AIConfig.FISHING_SUCCESS_CHANCE;
+        
+        if (villager.getWorld().getRandom().nextDouble() < successChance) {
+            net.minecraft.entity.ItemEntity fishEntity = new net.minecraft.entity.ItemEntity(
+                villager.getWorld(),
+                villager.getX(),
+                villager.getY(),
+                villager.getZ(),
+                new net.minecraft.item.ItemStack(net.minecraft.item.Items.COD)
+            );
+            villager.getWorld().spawnEntity(fishEntity);
+        }
+    }
+
+    private List<net.minecraft.block.BlockState> findNearbyCrops(VillagerEntity villager, int radius) {
+        BlockPos pos = villager.getBlockPos();
+        List<net.minecraft.block.BlockState> crops = new ArrayList<>();
+        
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                BlockPos checkPos = pos.add(x, 0, z);
+                net.minecraft.block.BlockState state = villager.getWorld().getBlockState(checkPos);
+                if (state.getBlock() instanceof net.minecraft.block.CropBlock) {
+                    crops.add(state);
+                }
+            }
+        }
+        return crops;
+    }
+
     public java.util.List<net.minecraft.text.Text> getVillagerAIStatus(@NotNull VillagerEntity villager) {
         java.util.List<net.minecraft.text.Text> status = new java.util.ArrayList<>();
         VillagerAIState state = getVillagerAIState(villager);
@@ -105,7 +161,7 @@ public class VillagerAIManager implements AISubsystem {
 
     @Override
     public long getUpdateInterval() {
-        return com.beeny.config.ConfigManager.getInt("aiManagerUpdateInterval", 5000);
+        return com.beeny.config.AIConfig.AI_MANAGER_UPDATE_INTERVAL;
     }
 
     @Override
@@ -116,7 +172,7 @@ public class VillagerAIManager implements AISubsystem {
 
     @Override
     public int getPriority() {
-        return 50; // Medium priority - runs after emotions but before complex systems
+        return com.beeny.config.AIConfig.AI_MANAGER_PRIORITY;
     }
 
     @Override

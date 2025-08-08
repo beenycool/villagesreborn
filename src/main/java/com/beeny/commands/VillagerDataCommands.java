@@ -152,9 +152,9 @@ public class VillagerDataCommands extends BaseVillagerCommand {
         
         // Create new VillagerData and attach it
         VillagerData newData = new VillagerData();
-        VillagerDataUtils.ensureVillagerData(villager);
+        VillagerDataUtils.setVillagerData(villager, newData);
         
-        CommandMessageUtils.sendSuccessWithFormat(context.getSource(), 
+        CommandMessageUtils.sendSuccessWithFormat(context.getSource(),
             "Reset data for villager at %s", villager.getBlockPos());
         return 1;
     }
@@ -535,6 +535,175 @@ public class VillagerDataCommands extends BaseVillagerCommand {
         CommandMessageUtils.sendInfo(source, "2. Test it: /villager ai test (look at a villager)");
         CommandMessageUtils.sendInfo(source, "3. Manage villagers: /villager manage list");
         
+        return 1;
+    }
+    
+    // Missing command implementations
+    private static int exportAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
+        
+        CommandMessageUtils.sendInfo(source, "=== Exporting All Villager Data ===");
+        
+        for (VillagerEntity villager : villagers) {
+            Optional<VillagerData> dataOpt = VillagerDataUtils.getVillagerData(villager);
+            if (dataOpt.isPresent()) {
+                exportDetailedVillagerData(dataOpt.get(), source);
+                CommandMessageUtils.sendInfo(source, ""); // Separator
+            }
+        }
+        
+        CommandMessageUtils.sendSuccess(source, String.format("Exported data for %d villagers", villagers.size()));
+        return 1;
+    }
+    
+    private static int importVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String filename = StringArgumentType.getString(context, "file");
+        CommandMessageUtils.sendInfo(context.getSource(), "Import functionality not yet implemented for file: " + filename);
+        CommandMessageUtils.sendInfo(context.getSource(), "This would restore villager data from a backup file");
+        return 1;
+    }
+    
+    private static int resetAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
+        
+        int resetCount = 0;
+        for (VillagerEntity villager : villagers) {
+            VillagerDataUtils.ensureVillagerData(villager);
+            resetCount++;
+        }
+        
+        CommandMessageUtils.sendSuccess(source, String.format("Reset data for %d villagers", resetCount));
+        return 1;
+    }
+    
+    private static int restoreVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String backupName = StringArgumentType.getString(context, "backup");
+        CommandMessageUtils.sendInfo(context.getSource(), "Restore functionality not yet implemented for backup: " + backupName);
+        CommandMessageUtils.sendInfo(context.getSource(), "This would restore villager data from a specific backup");
+        return 1;
+    }
+    
+    private static int compareVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        try {
+            Entity entity1 = EntityArgumentType.getEntity(context, "villager1");
+            Entity entity2 = EntityArgumentType.getEntity(context, "villager2");
+            
+            if (!validateVillager(entity1, context.getSource()) || !validateVillager(entity2, context.getSource())) {
+                return 0;
+            }
+            
+            VillagerEntity villager1 = (VillagerEntity) entity1;
+            VillagerEntity villager2 = (VillagerEntity) entity2;
+            
+            Optional<VillagerData> data1 = VillagerDataUtils.getVillagerData(villager1);
+            Optional<VillagerData> data2 = VillagerDataUtils.getVillagerData(villager2);
+            
+            if (data1.isEmpty() || data2.isEmpty()) {
+                CommandMessageUtils.sendError(context.getSource(), "One or both villagers have no data");
+                return 0;
+            }
+            
+            CommandMessageUtils.sendInfo(context.getSource(), "=== Villager Data Comparison ===");
+            compareVillagerDataFields(data1.get(), data2.get(), context.getSource());
+            
+            return 1;
+        } catch (Exception e) {
+            CommandMessageUtils.sendError(context.getSource(), "Error comparing villagers: " + e.getMessage());
+            return 0;
+        }
+    }
+    
+    private static void compareVillagerDataFields(VillagerData data1, VillagerData data2, ServerCommandSource source) {
+        CommandMessageUtils.sendInfo(source, String.format("Comparing: %s vs %s", data1.getName(), data2.getName()));
+        
+        if (!data1.getPersonality().equals(data2.getPersonality())) {
+            CommandMessageUtils.sendInfo(source, String.format("Personality: %s vs %s", data1.getPersonality(), data2.getPersonality()));
+        }
+        if (data1.getHappiness() != data2.getHappiness()) {
+            CommandMessageUtils.sendInfo(source, String.format("Happiness: %d vs %d", data1.getHappiness(), data2.getHappiness()));
+        }
+        if (data1.getAge() != data2.getAge()) {
+            CommandMessageUtils.sendInfo(source, String.format("Age: %d vs %d", data1.getAge(), data2.getAge()));
+        }
+        if (!data1.getHobby().equals(data2.getHobby())) {
+            CommandMessageUtils.sendInfo(source, String.format("Hobby: %s vs %s", data1.getHobby(), data2.getHobby()));
+        }
+    }
+    
+    private static int searchVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String query = StringArgumentType.getString(context, "query").toLowerCase();
+        ServerCommandSource source = context.getSource();
+        List<VillagerEntity> villagers = getAllVillagersInArea(source, STATS_SEARCH_RADIUS);
+        
+        CommandMessageUtils.sendInfo(source, "=== Searching Villager Data ===");
+        CommandMessageUtils.sendInfo(source, "Query: " + query);
+        
+        int matchCount = 0;
+        for (VillagerEntity villager : villagers) {
+            Optional<VillagerData> dataOpt = VillagerDataUtils.getVillagerData(villager);
+            if (dataOpt.isPresent()) {
+                VillagerData data = dataOpt.get();
+                if (matchesQuery(data, query)) {
+                    matchCount++;
+                    CommandMessageUtils.sendInfo(source, String.format("Match: %s at %s", 
+                        data.getName(), villager.getBlockPos()));
+                }
+            }
+        }
+        
+        CommandMessageUtils.sendSuccess(source, String.format("Found %d matches", matchCount));
+        return 1;
+    }
+    
+    private static boolean matchesQuery(VillagerData data, String query) {
+        return data.getName().toLowerCase().contains(query) ||
+               data.getPersonality().name().toLowerCase().contains(query) ||
+               data.getHobby().name().toLowerCase().contains(query) ||
+               data.getFavoriteFood().toLowerCase().contains(query) ||
+               data.getNotes().toLowerCase().contains(query);
+    }
+    
+    private static int exportAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        CommandMessageUtils.sendInfo(source, "Export all functionality not yet implemented");
+        return 1;
+    }
+    
+    private static int importVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String filename = StringArgumentType.getString(context, "file");
+        CommandMessageUtils.sendInfo(context.getSource(), "Import functionality not yet implemented for file: " + filename);
+        return 1;
+    }
+    
+    private static int resetAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        CommandMessageUtils.sendInfo(source, "Reset all functionality not yet implemented");
+        return 1;
+    }
+    
+    private static int restoreVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String backupName = StringArgumentType.getString(context, "backup");
+        CommandMessageUtils.sendInfo(context.getSource(), "Restore functionality not yet implemented for backup: " + backupName);
+        return 1;
+    }
+    
+    private static int compareVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        CommandMessageUtils.sendInfo(source, "Compare functionality not yet implemented");
+        return 1;
+    }
+    
+    private static int searchVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        String query = StringArgumentType.getString(context, "query");
+        CommandMessageUtils.sendInfo(context.getSource(), "Search functionality not yet implemented for query: " + query);
+        return 1;
+    }
+    
+    private static int showDetailedStats(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        CommandMessageUtils.sendInfo(source, "Detailed stats functionality not yet implemented");
         return 1;
     }
 }

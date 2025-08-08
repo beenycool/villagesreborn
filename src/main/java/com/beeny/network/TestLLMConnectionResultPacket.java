@@ -13,12 +13,12 @@ public record TestLLMConnectionResultPacket(boolean success, String message) imp
 
     public static final PacketCodec<RegistryByteBuf, TestLLMConnectionResultPacket> CODEC = PacketCodec.of(
         (value, buf) -> {
-            buf.writeBoolean(value.success);
-            buf.writeString(value.message == null ? "" : value.message);
+            buf.writeBoolean(value.success());
+            buf.writeString(value.message() == null ? "" : value.message());
         },
         buf -> new TestLLMConnectionResultPacket(
             buf.readBoolean(),
-            buf.readString()
+            buf.readString(32767)
         )
     );
 

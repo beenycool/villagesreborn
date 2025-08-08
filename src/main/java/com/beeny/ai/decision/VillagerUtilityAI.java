@@ -269,7 +269,7 @@ public class VillagerUtilityAI {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             
-            if (data == null) return 0.5f;
+            if (data == null || emotions == null) return 0.5f;
             
             float boredom = emotions.getEmotion(VillagerEmotionSystem.EmotionType.BOREDOM);
             float contentment = emotions.getEmotion(VillagerEmotionSystem.EmotionType.CONTENTMENT);
@@ -398,7 +398,7 @@ public class VillagerUtilityAI {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             VillagerEmotionSystem.EmotionalState emotions = AIWorldManagerRefactored.getInstance().getEmotionSystem().getEmotionalState(villager);
             
-            if (data == null) return false;
+            if (data == null || emotions == null) return false;
             
             // Consider multiple factors
             float happiness = data.getHappiness();

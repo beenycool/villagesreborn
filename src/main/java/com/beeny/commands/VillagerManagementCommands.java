@@ -352,8 +352,8 @@ public class VillagerManagementCommands extends BaseVillagerCommand {
     private static void displayVillageStats(VillageStats stats, ServerCommandSource source) {
         CommandMessageUtils.sendInfo(source, "=== Village Statistics ===");
         CommandMessageUtils.sendInfo(source, "Total Villagers: " + stats.totalVillagers);
-        CommandMessageUtils.sendInfo(source, "Average Happiness: " + (stats.totalHappiness / stats.totalVillagers) + "%");
-        CommandMessageUtils.sendInfo(source, "Average Age: " + (stats.totalAge / stats.totalVillagers) + " days");
+        CommandMessageUtils.sendInfo(source, "Average Happiness: " + String.format("%.1f", (float) stats.totalHappiness / stats.totalVillagers) + "%");
+        CommandMessageUtils.sendInfo(source, "Average Age: " + String.format("%.1f", (float) stats.totalAge / stats.totalVillagers) + " days");
         CommandMessageUtils.sendInfo(source, "Married: " + stats.marriedCount + " (" + (stats.marriedCount * 100 / stats.totalVillagers) + "%)");
         CommandMessageUtils.sendInfo(source, "Babies: " + stats.babyCount + " | Elders: " + stats.elderCount);
         

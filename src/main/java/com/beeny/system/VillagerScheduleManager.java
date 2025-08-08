@@ -101,9 +101,9 @@ public class VillagerScheduleManager implements AISubsystem {
         }
     }
     
-    private final Map<String, Schedule> professionSchedules = new HashMap<>();
+    private static final Map<String, Schedule> professionSchedules = new HashMap<>();
     private final Map<String, Long> villagerLastUpdate = new ConcurrentHashMap<>();
-    private long lastProcessedDay = -1;
+    private static long lastProcessedDay = -1;
     private long updateCount = 0;
     private long lastMaintenanceTime = System.currentTimeMillis();
     
@@ -174,14 +174,25 @@ public class VillagerScheduleManager implements AISubsystem {
             return Activity.WANDER;
         }
         
+        // Get config values
+        int maxTimeVariation = com.beeny.config.ConfigManager.getInt("maxTimeVariation", 4);
+        int defaultActivityWeight = com.beeny.config.ConfigManager.getInt("defaultActivityWeight", 100);
+        
         // Get individual time preferences based on personality and villager ID
         int personalityOffset = getPersonalityTimeOffsetStatic(data);
-        int individualOffset = Math.abs(villager.getUuid().hashCode()) % 4 - 2; // -2 to +1 hours variation
+        int individualOffset = Math.abs(villager.getUuid().hashCode()) % maxTimeVariation - (maxTimeVariation/2);
         long adjustedTime = (worldTime + (personalityOffset + individualOffset) * 1000) % 24000;
         TimeOfDay adjustedTimeOfDay = TimeOfDay.fromWorldTime(adjustedTime);
         
         // Get base activity probabilities for the time period
         Map<Activity, Float> activityWeights = getActivityWeightsStatic(adjustedTimeOfDay, data, villager);
+        
+        // Apply default weight for activities not configured
+        activityWeights.forEach((activity, weight) -> {
+            if (weight == null || weight <= 0) {
+                activityWeights.put(activity, (float) defaultActivityWeight);
+            }
+        });
         
         // Select activity based on weighted probability
         return selectWeightedActivityStatic(activityWeights, villager);
@@ -366,7 +377,7 @@ public class VillagerScheduleManager implements AISubsystem {
         return Activity.WANDER;
     }
     
-    public void updateSchedules(ServerWorld world) {
+    public static void updateSchedules(ServerWorld world) {
         // Check for day change
         long currentTime = world.getTimeOfDay();
         long currentDay = currentTime / 24000;
@@ -387,7 +398,7 @@ public class VillagerScheduleManager implements AISubsystem {
             DailyActivityTracker.ActivityEntry trackedActivity = DailyActivityTracker.getCurrentActivity(villagerId);
             
             if (trackedActivity == null || !trackedActivity.getActivity().equals(currentActivity.description)) {
-                String details = this.generateActivityDetails(villager, currentActivity);
+                String details = generateActivityDetails(villager, currentActivity);
                 DailyActivityTracker.startActivity(villager, currentActivity, details);
             }
             
@@ -398,7 +409,7 @@ public class VillagerScheduleManager implements AISubsystem {
             if (data != null) {
                 if (currentActivity != Activity.WAKE_UP) {
                     Text activityText = Text.literal(" [" + currentActivity.description + "]")
-                        .formatted(this.getActivityFormatting(currentActivity));
+                        .formatted(getActivityFormatting(currentActivity));
                     Text fullName = Text.literal(data.getName()).append(activityText);
                     villager.setCustomName(fullName);
                 } else {
@@ -495,7 +506,7 @@ public class VillagerScheduleManager implements AISubsystem {
                 VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
                 if (data != null && data.getHobby() != null) {
                     // Hobby-specific behavior based on the villager's hobby
-                    String hobby = data.getHobby();
+                    String hobby = data.getHobby().name();
                     switch (hobby.toLowerCase()) {
                         case "fishing":
                             // Move toward water
@@ -625,7 +636,7 @@ public class VillagerScheduleManager implements AISubsystem {
         return daysSinceBirth > 0 && daysSinceBirth % 365 == 0;
     }
     
-    private Formatting getActivityFormatting(Activity activity) {
+    private static Formatting getActivityFormatting(Activity activity) {
         return switch (activity) {
             case WAKE_UP -> Formatting.AQUA;
             case WORK -> Formatting.GOLD;
@@ -642,7 +653,7 @@ public class VillagerScheduleManager implements AISubsystem {
         };
     }
     
-    public List<Text> getScheduleInfo(VillagerEntity villager) {
+    public static List<Text> getScheduleInfo(VillagerEntity villager) {
         List<Text> info = new ArrayList<>();
         
         String professionKey = villager.getVillagerData().profession().getKey()
@@ -656,21 +667,21 @@ public class VillagerScheduleManager implements AISubsystem {
             info.add(Text.literal(time.name + ": ")
                 .formatted(Formatting.GRAY)
                 .append(Text.literal(activity.description)
-                    .formatted(this.getActivityFormatting(activity))));
+                    .formatted(getActivityFormatting(activity))));
         }
         
         
-        Activity current = this.getCurrentActivity(villager);
+        Activity current = getCurrentActivity(villager);
         info.add(Text.empty());
         info.add(Text.literal("Currently: ")
             .formatted(Formatting.YELLOW)
             .append(Text.literal(current.description)
-                .formatted(this.getActivityFormatting(current))));
+                .formatted(getActivityFormatting(current))));
         
         return info;
     }
     
-    private String generateActivityDetails(VillagerEntity villager, Activity activity) {
+    private static String generateActivityDetails(VillagerEntity villager, Activity activity) {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         if (data == null) return "";
         

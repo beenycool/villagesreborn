@@ -1,5 +1,7 @@
 package com.beeny.commands;
 
+import com.beeny.Villagersreborn;
+
 import com.beeny.util.TTSBridge;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -43,7 +45,7 @@ public class TestTTSCommand implements Command<ServerCommandSource> {
             return 1;
         } catch (IOException | InterruptedException e) {
             player.sendMessage(Text.literal("TTS failed: " + e.getMessage()), false);
-            e.printStackTrace();
+            com.beeny.Villagersreborn.LOGGER.error("TTS failed", e);
             return -1;
         }
     }
