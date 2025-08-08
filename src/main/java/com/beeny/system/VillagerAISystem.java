@@ -28,11 +28,24 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 public class VillagerAISystem {
     
     private static final Gson GSON = new Gson();
     private static final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
+    
+    // Thread pool for AI processing with limited concurrent requests
+    private static final ExecutorService AI_THREAD_POOL = Executors.newFixedThreadPool(
+        Math.min(Runtime.getRuntime().availableProcessors(), 4), // Max 4 threads
+        r -> {
+            Thread t = new Thread(r, "VillagerAI-Worker");
+            t.setDaemon(true);
+            return t;
+        }
+    );
     
     // API endpoints
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
@@ -88,14 +101,19 @@ public class VillagerAISystem {
         if (targetVillager != null) {
             lastRequestTimes.put(playerId, currentTime);
             
-            // Generate AI response asynchronously to avoid blocking
-            Thread.ofVirtual().start(() -> {
-                try {
-                    generateAndSendAIResponse(targetVillager, player, message);
-                } catch (Exception e) {
-                    Villagersreborn.LOGGER.error("Error generating AI response", e);
-                }
-            });
+            // Generate AI response asynchronously using managed thread pool
+            try {
+                AI_THREAD_POOL.submit(() -> {
+                    try {
+                        generateAndSendAIResponse(targetVillager, player, message);
+                    } catch (Exception e) {
+                        Villagersreborn.LOGGER.error("Error generating AI response", e);
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                Villagersreborn.LOGGER.warn("AI thread pool at capacity, rejecting request for player {}", playerId);
+                player.sendMessage(Text.literal("AI system is busy, please try again later").formatted(Formatting.YELLOW), false);
+            }
             
             return true;
         }
@@ -324,5 +342,22 @@ public class VillagerAISystem {
             return "***";
         }
         return apiKey.substring(0, 4) + "***" + apiKey.substring(apiKey.length() - 4);
+    }
+    
+    /**
+     * Shutdown the AI thread pool gracefully
+     */
+    public static void shutdown() {
+        if (AI_THREAD_POOL != null && !AI_THREAD_POOL.isShutdown()) {
+            AI_THREAD_POOL.shutdown();
+            try {
+                if (!AI_THREAD_POOL.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    AI_THREAD_POOL.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                AI_THREAD_POOL.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }
