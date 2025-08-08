@@ -16,153 +16,135 @@ import java.util.concurrent.ThreadLocalRandom;
 import com.beeny.ai.core.VillagerEmotionSystem.EmotionalState;
 
 public class VillagerData {
-    // Core data codec - split into multiple codecs to avoid method parameter limit
-    private static final Codec<VillagerData> CORE_CODEC = RecordCodecBuilder.create(instance ->
+    // Lightweight data holder records to avoid multiple object creation during deserialization
+    private record CoreData(EmotionalState emotionalState, AIState aiState, LearningProfile learningProfile,
+                           ProfessionData professionData, String name, int age, String gender, PersonalityType personality) {}
+    
+    private record ExtendedData(int happiness, int totalTrades, String favoritePlayerId, List<String> professionHistory,
+                               Map<String, Integer> playerRelations, List<String> familyMembers, String spouseName, String spouseId) {}
+    
+    private record FamilyData(List<String> childrenIds, List<String> childrenNames, String favoriteFood, HobbyType hobby,
+                             long birthTime, String birthPlace, String notes, long deathTime) {}
+    
+    private record MemoryData(boolean isAlive, Map<String, String> playerMemories, Map<String, Integer> topicFrequency,
+                             List<String> recentEvents, long lastConversationTime) {}
+
+    // Core data codec using lightweight record
+    private static final Codec<CoreData> CORE_DATA_CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
-            EmotionalState.CODEC.fieldOf("emotionalState").orElse(new EmotionalState()).forGetter(VillagerData::getEmotionalState),
-            AIState.CODEC.fieldOf("aiState").orElse(new AIState()).forGetter(VillagerData::getAiState),
-            LearningProfile.CODEC.fieldOf("learningProfile").orElse(new LearningProfile()).forGetter(VillagerData::getLearningProfile),
-            ProfessionData.CODEC.fieldOf("professionData").orElse(new ProfessionData()).forGetter(VillagerData::getProfessionData),
-            Codec.STRING.fieldOf("name").orElse(VillagerConstants.Defaults.NAME).forGetter(VillagerData::getName),
-            Codec.INT.fieldOf("age").orElse(VillagerConstants.Defaults.AGE).forGetter(VillagerData::getAge),
-            Codec.STRING.fieldOf("gender").orElse(VillagerConstants.Defaults.GENDER).forGetter(VillagerData::getGender),
+            EmotionalState.CODEC.fieldOf("emotionalState").orElse(new EmotionalState()).forGetter(CoreData::emotionalState),
+            AIState.CODEC.fieldOf("aiState").orElse(new AIState()).forGetter(CoreData::aiState),
+            LearningProfile.CODEC.fieldOf("learningProfile").orElse(new LearningProfile()).forGetter(CoreData::learningProfile),
+            ProfessionData.CODEC.fieldOf("professionData").orElse(new ProfessionData()).forGetter(CoreData::professionData),
+            Codec.STRING.fieldOf("name").orElse(VillagerConstants.Defaults.NAME).forGetter(CoreData::name),
+            Codec.INT.fieldOf("age").orElse(VillagerConstants.Defaults.AGE).forGetter(CoreData::age),
+            Codec.STRING.fieldOf("gender").orElse(VillagerConstants.Defaults.GENDER).forGetter(CoreData::gender),
             Codec.STRING.fieldOf("personality")
                 .orElse(PersonalityType.FRIENDLY.name())
                 .xmap(PersonalityType::fromString, PersonalityType::name)
-                .forGetter(VillagerData::getPersonality)
-        ).apply(instance, (emotionalState, aiState, learningProfile, professionData, name, age, gender, personality) -> {
-            VillagerData data = new VillagerData();
-            data.emotionalState = emotionalState;
-            data.aiState = aiState;
-            data.learningProfile = learningProfile;
-            data.professionData = professionData;
-            data.name = name;
-            data.age = age;
-            data.gender = gender;
-            data.personality = personality;
-            return data;
-        })
+                .forGetter(CoreData::personality)
+        ).apply(instance, CoreData::new)
     );
 
-    // Extended data codec for additional fields
-    private static final Codec<VillagerData> EXTENDED_CODEC = RecordCodecBuilder.create(instance ->
+    // Extended data codec using lightweight record
+    private static final Codec<ExtendedData> EXTENDED_DATA_CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
-            Codec.INT.fieldOf("happiness").orElse(VillagerConstants.Defaults.HAPPINESS).forGetter(VillagerData::getHappiness),
-            Codec.INT.fieldOf("totalTrades").orElse(VillagerConstants.Defaults.TOTAL_TRADES).forGetter(VillagerData::getTotalTrades),
-            Codec.STRING.fieldOf("favoritePlayerId").orElse(VillagerConstants.Defaults.FAVORITE_PLAYER_ID).forGetter(VillagerData::getFavoritePlayerId),
-            Codec.list(Codec.STRING).fieldOf("professionHistory").orElse(Collections.emptyList()).forGetter(VillagerData::getProfessionHistory),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("playerRelations").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerRelations),
-            Codec.list(Codec.STRING).fieldOf("familyMembers").orElse(Collections.emptyList()).forGetter(VillagerData::getFamilyMembers),
-            Codec.STRING.fieldOf("spouseName").orElse(VillagerConstants.Defaults.SPOUSE_NAME).forGetter(VillagerData::getSpouseName),
-            Codec.STRING.fieldOf("spouseId").orElse(VillagerConstants.Defaults.SPOUSE_ID).forGetter(VillagerData::getSpouseId)
-        ).apply(instance, (happiness, totalTrades, favoritePlayerId, professionHistory, playerRelations, familyMembers, spouseName, spouseId) -> {
-            VillagerData data = new VillagerData();
-            data.happiness = happiness;
-            data.totalTrades = totalTrades;
-            data.favoritePlayerId = favoritePlayerId;
-            data.professionHistory = new ArrayList<>(professionHistory);
-            data.playerRelations = new HashMap<>(playerRelations);
-            data.familyMembers = new ArrayList<>(familyMembers);
-            data.spouseName = spouseName;
-            data.spouseId = spouseId;
-            return data;
-        })
+            Codec.INT.fieldOf("happiness").orElse(VillagerConstants.Defaults.HAPPINESS).forGetter(ExtendedData::happiness),
+            Codec.INT.fieldOf("totalTrades").orElse(VillagerConstants.Defaults.TOTAL_TRADES).forGetter(ExtendedData::totalTrades),
+            Codec.STRING.fieldOf("favoritePlayerId").orElse(VillagerConstants.Defaults.FAVORITE_PLAYER_ID).forGetter(ExtendedData::favoritePlayerId),
+            Codec.list(Codec.STRING).fieldOf("professionHistory").orElse(Collections.emptyList()).forGetter(ExtendedData::professionHistory),
+            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("playerRelations").orElse(Collections.emptyMap()).forGetter(ExtendedData::playerRelations),
+            Codec.list(Codec.STRING).fieldOf("familyMembers").orElse(Collections.emptyList()).forGetter(ExtendedData::familyMembers),
+            Codec.STRING.fieldOf("spouseName").orElse(VillagerConstants.Defaults.SPOUSE_NAME).forGetter(ExtendedData::spouseName),
+            Codec.STRING.fieldOf("spouseId").orElse(VillagerConstants.Defaults.SPOUSE_ID).forGetter(ExtendedData::spouseId)
+        ).apply(instance, ExtendedData::new)
     );
 
-    // Family and hobby data codec
-    private static final Codec<VillagerData> FAMILY_CODEC = RecordCodecBuilder.create(instance ->
+    // Family and hobby data codec using lightweight record
+    private static final Codec<FamilyData> FAMILY_DATA_CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
-            Codec.list(Codec.STRING).fieldOf("childrenIds").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenIds),
-            Codec.list(Codec.STRING).fieldOf("childrenNames").orElse(Collections.emptyList()).forGetter(VillagerData::getChildrenNames),
-            Codec.STRING.fieldOf("favoriteFood").orElse(VillagerConstants.Defaults.FAVORITE_FOOD).forGetter(VillagerData::getFavoriteFood),
+            Codec.list(Codec.STRING).fieldOf("childrenIds").orElse(Collections.emptyList()).forGetter(FamilyData::childrenIds),
+            Codec.list(Codec.STRING).fieldOf("childrenNames").orElse(Collections.emptyList()).forGetter(FamilyData::childrenNames),
+            Codec.STRING.fieldOf("favoriteFood").orElse(VillagerConstants.Defaults.FAVORITE_FOOD).forGetter(FamilyData::favoriteFood),
             Codec.STRING.fieldOf("hobby")
                 .orElse(HobbyType.GARDENING.name())
                 .xmap(HobbyType::fromString, HobbyType::name)
-                .forGetter(VillagerData::getHobby),
-            Codec.LONG.fieldOf("birthTime").orElse(VillagerConstants.Defaults.BIRTH_TIME).forGetter(VillagerData::getBirthTime),
-            Codec.STRING.fieldOf("birthPlace").orElse(VillagerConstants.Defaults.BIRTH_PLACE).forGetter(VillagerData::getBirthPlace),
-            Codec.STRING.fieldOf("notes").orElse(VillagerConstants.Defaults.NOTES).forGetter(VillagerData::getNotes),
-            Codec.LONG.fieldOf("deathTime").orElse(VillagerConstants.Defaults.DEATH_TIME).forGetter(VillagerData::getDeathTime)
-        ).apply(instance, (childrenIds, childrenNames, favoriteFood, hobby, birthTime, birthPlace, notes, deathTime) -> {
-            VillagerData data = new VillagerData();
-            data.childrenIds = new ArrayList<>(childrenIds);
-            data.childrenNames = new ArrayList<>(childrenNames);
-            data.favoriteFood = favoriteFood;
-            data.hobby = hobby;
-            data.birthTime = birthTime;
-            data.birthPlace = birthPlace;
-            data.notes = notes;
-            data.deathTime = deathTime;
-            return data;
-        })
+                .forGetter(FamilyData::hobby),
+            Codec.LONG.fieldOf("birthTime").orElse(VillagerConstants.Defaults.BIRTH_TIME).forGetter(FamilyData::birthTime),
+            Codec.STRING.fieldOf("birthPlace").orElse(VillagerConstants.Defaults.BIRTH_PLACE).forGetter(FamilyData::birthPlace),
+            Codec.STRING.fieldOf("notes").orElse(VillagerConstants.Defaults.NOTES).forGetter(FamilyData::notes),
+            Codec.LONG.fieldOf("deathTime").orElse(VillagerConstants.Defaults.DEATH_TIME).forGetter(FamilyData::deathTime)
+        ).apply(instance, FamilyData::new)
     );
 
-    // Memory and interaction data codec
-    private static final Codec<VillagerData> MEMORY_CODEC = RecordCodecBuilder.create(instance ->
+    // Memory and interaction data codec using lightweight record
+    private static final Codec<MemoryData> MEMORY_DATA_CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
-            Codec.BOOL.fieldOf("isAlive").orElse(VillagerConstants.Defaults.IS_ALIVE).forGetter(VillagerData::isAlive),
-            Codec.unboundedMap(Codec.STRING, Codec.STRING).fieldOf("playerMemories").orElse(Collections.emptyMap()).forGetter(VillagerData::getPlayerMemories),
-            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("topicFrequency").orElse(Collections.emptyMap()).forGetter(VillagerData::getTopicFrequency),
-            Codec.list(Codec.STRING).fieldOf("recentEvents").orElse(Collections.emptyList()).forGetter(VillagerData::getRecentEvents),
-            Codec.LONG.fieldOf("lastConversationTime").orElse(VillagerConstants.Defaults.LAST_CONVERSATION_TIME).forGetter(VillagerData::getLastConversationTime)
-        ).apply(instance, (isAlive, playerMemories, topicFrequency, recentEvents, lastConversationTime) -> {
-            VillagerData data = new VillagerData();
-            data.isAlive = isAlive;
-            data.playerMemories = new HashMap<>(playerMemories);
-            data.topicFrequency = new HashMap<>(topicFrequency);
-            data.recentEvents = new ConcurrentLinkedDeque<>(recentEvents);
-            data.lastConversationTime = lastConversationTime;
-            return data;
-        })
+            Codec.BOOL.fieldOf("isAlive").orElse(VillagerConstants.Defaults.IS_ALIVE).forGetter(MemoryData::isAlive),
+            Codec.unboundedMap(Codec.STRING, Codec.STRING).fieldOf("playerMemories").orElse(Collections.emptyMap()).forGetter(MemoryData::playerMemories),
+            Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("topicFrequency").orElse(Collections.emptyMap()).forGetter(MemoryData::topicFrequency),
+            Codec.list(Codec.STRING).fieldOf("recentEvents").orElse(Collections.emptyList()).forGetter(MemoryData::recentEvents),
+            Codec.LONG.fieldOf("lastConversationTime").orElse(VillagerConstants.Defaults.LAST_CONVERSATION_TIME).forGetter(MemoryData::lastConversationTime)
+        ).apply(instance, MemoryData::new)
     );
 
-    // Complete codec that combines all data sections
+    // Complete codec that combines all data sections - creates only ONE VillagerData object
     public static final Codec<VillagerData> CODEC = RecordCodecBuilder.create(instance ->
         instance.group(
-            CORE_CODEC.fieldOf("core").forGetter(data -> data),
-            EXTENDED_CODEC.fieldOf("extended").forGetter(data -> data),
-            FAMILY_CODEC.fieldOf("family").forGetter(data -> data),
-            MEMORY_CODEC.fieldOf("memory").forGetter(data -> data)
+            CORE_DATA_CODEC.fieldOf("core").forGetter(data -> new CoreData(
+                data.getEmotionalState(), data.getAiState(), data.getLearningProfile(), data.getProfessionData(),
+                data.getName(), data.getAge(), data.getGender(), data.getPersonality())),
+            EXTENDED_DATA_CODEC.fieldOf("extended").forGetter(data -> new ExtendedData(
+                data.getHappiness(), data.getTotalTrades(), data.getFavoritePlayerId(), 
+                new ArrayList<>(data.getProfessionHistory()), new HashMap<>(data.getPlayerRelations()),
+                new ArrayList<>(data.getFamilyMembers()), data.getSpouseName(), data.getSpouseId())),
+            FAMILY_DATA_CODEC.fieldOf("family").forGetter(data -> new FamilyData(
+                new ArrayList<>(data.getChildrenIds()), new ArrayList<>(data.getChildrenNames()),
+                data.getFavoriteFood(), data.getHobby(), data.getBirthTime(), data.getBirthPlace(),
+                data.getNotes(), data.getDeathTime())),
+            MEMORY_DATA_CODEC.fieldOf("memory").forGetter(data -> new MemoryData(
+                data.isAlive(), new HashMap<>(data.getPlayerMemories()), new HashMap<>(data.getTopicFrequency()),
+                new ArrayList<>(data.getRecentEvents()), data.getLastConversationTime()))
         ).apply(instance, (core, extended, family, memory) -> {
-            // Merge all data sections into a single VillagerData object
+            // Create a SINGLE VillagerData object from the lightweight records
             VillagerData result = new VillagerData();
             
             // Copy from core
-            result.emotionalState = core.emotionalState;
-            result.aiState = core.aiState;
-            result.learningProfile = core.learningProfile;
-            result.professionData = core.professionData;
-            result.name = core.name;
-            result.age = core.age;
-            result.gender = core.gender;
-            result.personality = core.personality;
+            result.emotionalState = core.emotionalState();
+            result.aiState = core.aiState();
+            result.learningProfile = core.learningProfile();
+            result.professionData = core.professionData();
+            result.name = core.name();
+            result.age = core.age();
+            result.gender = core.gender();
+            result.personality = core.personality();
             
-            // Copy from extended
-            result.happiness = extended.happiness;
-            result.totalTrades = extended.totalTrades;
-            result.favoritePlayerId = extended.favoritePlayerId;
-            result.professionHistory = extended.professionHistory;
-            result.playerRelations = extended.playerRelations;
-            result.familyMembers = extended.familyMembers;
-            result.spouseName = extended.spouseName;
-            result.spouseId = extended.spouseId;
+            // Copy from extended with defensive copying to prevent shared mutable state
+            result.happiness = extended.happiness();
+            result.totalTrades = extended.totalTrades();
+            result.favoritePlayerId = extended.favoritePlayerId();
+            result.professionHistory = new ArrayList<>(extended.professionHistory());
+            result.playerRelations = new HashMap<>(extended.playerRelations());
+            result.familyMembers = new ArrayList<>(extended.familyMembers());
+            result.spouseName = extended.spouseName();
+            result.spouseId = extended.spouseId();
             
-            // Copy from family
-            result.childrenIds = family.childrenIds;
-            result.childrenNames = family.childrenNames;
-            result.favoriteFood = family.favoriteFood;
-            result.hobby = family.hobby;
-            result.birthTime = family.birthTime;
-            result.birthPlace = family.birthPlace;
-            result.notes = family.notes;
-            result.deathTime = family.deathTime;
+            // Copy from family with defensive copying
+            result.childrenIds = new ArrayList<>(family.childrenIds());
+            result.childrenNames = new ArrayList<>(family.childrenNames());
+            result.favoriteFood = family.favoriteFood();
+            result.hobby = family.hobby();
+            result.birthTime = family.birthTime();
+            result.birthPlace = family.birthPlace();
+            result.notes = family.notes();
+            result.deathTime = family.deathTime();
             
-            // Copy from memory
-            result.isAlive = memory.isAlive;
-            result.playerMemories = memory.playerMemories;
-            result.topicFrequency = memory.topicFrequency;
-            result.recentEvents = memory.recentEvents;
-            result.lastConversationTime = memory.lastConversationTime;
+            // Copy from memory with defensive copying
+            result.isAlive = memory.isAlive();
+            result.playerMemories = new HashMap<>(memory.playerMemories());
+            result.topicFrequency = new HashMap<>(memory.topicFrequency());
+            result.recentEvents = new ConcurrentLinkedDeque<>(memory.recentEvents());
+            result.lastConversationTime = memory.lastConversationTime();
             
             return result;
         })

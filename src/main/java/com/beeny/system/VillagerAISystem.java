@@ -31,20 +31,26 @@ import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class VillagerAISystem {
     
     private static final Gson GSON = new Gson();
     private static final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
     
-    // Thread pool for AI processing with limited concurrent requests
-    private static final ExecutorService AI_THREAD_POOL = Executors.newFixedThreadPool(
-        Math.min(Runtime.getRuntime().availableProcessors(), 4), // Max 4 threads
+    // Thread pool for AI processing with bounded queue to prevent memory issues
+    private static final ExecutorService AI_THREAD_POOL = new ThreadPoolExecutor(
+        4, 4, // Core and max pool size
+        0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(64), // Bounded queue to prevent memory issues
         r -> {
             Thread t = new Thread(r, "VillagerAI-Worker");
             t.setDaemon(true);
             return t;
-        }
+        },
+        new ThreadPoolExecutor.DiscardPolicy() // Discard excess tasks to prevent blocking
     );
     
     // API endpoints

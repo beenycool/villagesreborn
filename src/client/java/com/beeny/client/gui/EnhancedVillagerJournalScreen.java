@@ -578,11 +578,11 @@ public class EnhancedVillagerJournalScreen extends Screen {
             if (selectedVillagerData != null) {
                 LOGGER.debug("Selected villager: {}", selectedVillagerData.getName());
             } else {
-                LOGGER.error("Selected villager is null");
+                LOGGER.warn("Selected villager is null");
             }
             switchTab(Tab.DETAILS);
         } else {
-            LOGGER.error("Invalid villager index: {}", index);
+            LOGGER.warn("Invalid villager index: {}", index);
         }
     }
     

@@ -119,30 +119,43 @@ public class VillagerDataTest {
         originalData.addRecentEvent("Met player");
         originalData.setLastConversationTime(500L);
         
-        // Test that all fields are accessible after creation
-        // This ensures the codec includes all necessary fields
-        assertEquals("TestVillager", originalData.getName());
-        assertEquals(25, originalData.getAge());
-        assertEquals(75, originalData.getHappiness());
-        assertEquals(5, originalData.getTotalTrades());
-        assertEquals("player123", originalData.getFavoritePlayerId());
-        assertTrue(originalData.getProfessionHistory().contains("farmer"));
-        assertTrue(originalData.getProfessionHistory().contains("librarian"));
-        assertTrue(originalData.getFamilyMembers().contains("spouse"));
-        assertEquals("TestSpouse", originalData.getSpouseName());
-        assertEquals("spouse123", originalData.getSpouseId());
-        assertTrue(originalData.getChildrenIds().contains("child123"));
-        assertTrue(originalData.getChildrenNames().contains("TestChild"));
-        assertEquals("bread", originalData.getFavoriteFood());
-        assertEquals(VillagerConstants.HobbyType.GARDENING, originalData.getHobby());
-        assertEquals(1000L, originalData.getBirthTime());
-        assertEquals("TestVillage", originalData.getBirthPlace());
-        assertEquals("Test notes", originalData.getNotes());
-        assertEquals(0L, originalData.getDeathTime());
-        assertTrue(originalData.isAlive());
-        assertEquals("Kind player", originalData.getPlayerMemory("player123"));
-        assertEquals(1, originalData.getTopicFrequency().get("weather"));
-        assertTrue(originalData.getRecentEvents().contains("Met player"));
-        assertEquals(500L, originalData.getLastConversationTime());
+        // CRITICAL: Actually test the codec by performing encode-decode round-trip
+        try {
+            // Serialize the data to JSON
+            com.mojang.serialization.JsonOps jsonOps = com.mojang.serialization.JsonOps.INSTANCE;
+            com.google.gson.JsonElement encoded = VillagerData.CODEC.encodeStart(jsonOps, originalData)
+                .getOrThrow(false, msg -> fail("Encoding failed: " + msg));
+            
+            // Deserialize it back
+            VillagerData deserializedData = VillagerData.CODEC.parse(jsonOps, encoded)
+                .getOrThrow(false, msg -> fail("Decoding failed: " + msg));
+            
+            // Assert that all fields are preserved after round-trip serialization
+            assertEquals(originalData.getName(), deserializedData.getName());
+            assertEquals(originalData.getAge(), deserializedData.getAge());
+            assertEquals(originalData.getHappiness(), deserializedData.getHappiness());
+            assertEquals(originalData.getTotalTrades(), deserializedData.getTotalTrades());
+            assertEquals(originalData.getFavoritePlayerId(), deserializedData.getFavoritePlayerId());
+            assertTrue(deserializedData.getProfessionHistory().contains("farmer"));
+            assertTrue(deserializedData.getProfessionHistory().contains("librarian"));
+            assertTrue(deserializedData.getFamilyMembers().contains("spouse"));
+            assertEquals(originalData.getSpouseName(), deserializedData.getSpouseName());
+            assertEquals(originalData.getSpouseId(), deserializedData.getSpouseId());
+            assertTrue(deserializedData.getChildrenIds().contains("child123"));
+            assertTrue(deserializedData.getChildrenNames().contains("TestChild"));
+            assertEquals(originalData.getFavoriteFood(), deserializedData.getFavoriteFood());
+            assertEquals(originalData.getHobby(), deserializedData.getHobby());
+            assertEquals(originalData.getBirthTime(), deserializedData.getBirthTime());
+            assertEquals(originalData.getBirthPlace(), deserializedData.getBirthPlace());
+            assertEquals(originalData.getNotes(), deserializedData.getNotes());
+            assertEquals(originalData.getDeathTime(), deserializedData.getDeathTime());
+            assertEquals(originalData.isAlive(), deserializedData.isAlive());
+            assertEquals("Kind player", deserializedData.getPlayerMemory("player123"));
+            assertEquals(Integer.valueOf(1), deserializedData.getTopicFrequency().get("weather"));
+            assertTrue(deserializedData.getRecentEvents().contains("Met player"));
+            assertEquals(originalData.getLastConversationTime(), deserializedData.getLastConversationTime());
+        } catch (Exception e) {
+            fail("Codec round-trip test failed with exception: " + e.getMessage());
+        }
     }
 }

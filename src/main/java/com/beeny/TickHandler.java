@@ -87,8 +87,11 @@ final class TickHandler {
             
             // Skip if already married to avoid unnecessary checks
             VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
-            if (data1 != null && !data1.getSpouseId().isEmpty()) {
-                continue;
+            if (data1 != null) {
+                String spouse1 = data1.getSpouseId();
+                if (spouse1 != null && !spouse1.isEmpty()) {
+                    continue;
+                }
             }
 
             // Only check nearby villagers within marriage distance to reduce complexity
@@ -116,9 +119,11 @@ final class TickHandler {
                 double distance = villager1.getPos().distanceTo(villager2.getPos());
                 if (distance <= VillagerConstants.Relationship.MARRIAGE_DISTANCE_THRESHOLD) {
                     if (ThreadLocalRandom.current().nextFloat() < VillagerConstants.Relationship.MARRIAGE_RANDOM_CHANCE) {
-                        VillagerRelationshipManager.attemptMarriage(villager1, villager2);
-                        marriagesThisTick++;
-                        break; // Move to next villager1 after successful marriage
+                        // Only increment counter on successful marriage
+                        if (VillagerRelationshipManager.attemptMarriage(villager1, villager2)) {
+                            marriagesThisTick++;
+                            break; // Move to next villager1 after successful marriage
+                        }
                     }
                 }
             }

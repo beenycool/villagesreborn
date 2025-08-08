@@ -83,6 +83,11 @@ public class Villagersreborn implements ModInitializer {
 			ServerVillagerManager.getInstance().initialize(server);
 		});
 		
+		// Shutdown AI thread pool on server stop to prevent thread leaks
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			com.beeny.system.VillagerAISystem.shutdown();
+		});
+		
 		
 		VillagerTeleportPacket.register();
 		UpdateVillagerNotesPacket.register();

@@ -20,5 +20,6 @@
   "gui.villagersreborn.settings.test_connection": "Test Connection",
   "gui.villagersreborn.settings.done": "Done",
   "villagersreborn.dialogue.generating": "Generating reply...",
-  "villagersreborn.journal.search_placeholder": "Search villagers..."
+  "villagersreborn.journal.search_placeholder": "Search villagers...",
+  "villagersreborn.command.api_key_warning": "⚠️ API keys in commands may be logged. Use environment variables for production."
 }

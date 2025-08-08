@@ -305,7 +305,7 @@ public class VillagerAICommands extends BaseVillagerCommand {
      * Sends security warning when API keys are provided via commands
      */
     private static void sendApiKeySecurityWarning(ServerCommandSource source) {
-        CommandMessageUtils.sendWarning(source, "⚠️ API keys in commands may be logged. Use environment variables for production.");
+        CommandMessageUtils.sendWarning(source, net.minecraft.text.Text.translatable("villagersreborn.command.api_key_warning").getString());
         CommandMessageUtils.sendInfo(source, "For security, consider using: export VILLAGERS_REBORN_API_KEY=your_key_here");
     }
     
