@@ -75,23 +75,50 @@ final class TickHandler {
             v -> true
         );
 
-        for (int i = 0; i < villagers.size(); i++) {
-            VillagerEntity villager1 = villagers.get(i);
-            boolean married = false;
+        // Performance optimization: limit marriages per tick to avoid O(N²) issues
+        int maxMarriagesPerTick = 1;
+        int marriagesThisTick = 0;
 
-            for (int j = i + 1; j < villagers.size(); j++) {
-                VillagerEntity villager2 = villagers.get(j);
+        // Use shuffled iteration to ensure fair distribution over time
+        java.util.Collections.shuffle(villagers, ThreadLocalRandom.current());
+
+        for (int i = 0; i < villagers.size() && marriagesThisTick < maxMarriagesPerTick; i++) {
+            VillagerEntity villager1 = villagers.get(i);
+            
+            // Skip if already married to avoid unnecessary checks
+            VillagerData data1 = villager1.getAttached(Villagersreborn.VILLAGER_DATA);
+            if (data1 != null && !data1.getSpouseId().isEmpty()) {
+                continue;
+            }
+
+            // Only check nearby villagers within marriage distance to reduce complexity
+            List<VillagerEntity> nearbyVillagers = world.getEntitiesByClass(
+                VillagerEntity.class,
+                villager1.getBoundingBox().expand(VillagerConstants.Relationship.MARRIAGE_DISTANCE_THRESHOLD),
+                v -> v != villager1 && v.getUuid().compareTo(villager1.getUuid()) > 0 // Avoid duplicate pairs
+            );
+
+            for (VillagerEntity villager2 : nearbyVillagers) {
+                // Early exit if we've hit our marriage limit
+                if (marriagesThisTick >= maxMarriagesPerTick) {
+                    break;
+                }
+
+                // Skip if villager2 is already married
+                VillagerData data2 = villager2.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (data2 != null && !data2.getSpouseId().isEmpty()) {
+                    continue;
+                }
 
                 double distance = villager1.getPos().distanceTo(villager2.getPos());
                 if (distance <= VillagerConstants.Relationship.MARRIAGE_DISTANCE_THRESHOLD) {
                     if (ThreadLocalRandom.current().nextFloat() < VillagerConstants.Relationship.MARRIAGE_RANDOM_CHANCE) {
                         VillagerRelationshipManager.attemptMarriage(villager1, villager2);
-                        married = true;
-                        break; // Exit inner loop after successful marriage
+                        marriagesThisTick++;
+                        break; // Move to next villager1 after successful marriage
                     }
                 }
             }
-            if (married) continue; // Optional: skip remaining checks for this villager
         }
     }
 

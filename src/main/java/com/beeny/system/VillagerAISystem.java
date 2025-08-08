@@ -293,7 +293,35 @@ public class VillagerAISystem {
             cleanMessage = response.replaceAll("\\[TOOL:[^\\]]+\\]", "").trim();
         }
         
+        // Sanitize AI response to prevent harmful content
+        cleanMessage = sanitizeAIResponse(cleanMessage);
+        
         return new AIResponse(cleanMessage, toolAction, toolTarget);
+    }
+    
+    /**
+     * Sanitizes AI response content to prevent harmful or unwanted content
+     */
+    private static String sanitizeAIResponse(String response) {
+        if (response == null || response.trim().isEmpty()) {
+            return "..."; // Fallback for empty responses
+        }
+        
+        // Limit response length to prevent spam
+        if (response.length() > 500) {
+            response = response.substring(0, 497) + "...";
+        }
+        
+        // Remove potentially harmful patterns
+        response = response.replaceAll("(?i)\\b(server|admin|op|whitelist|ban|kick)\\b", "[REDACTED]");
+        
+        // Remove excessive whitespace and normalize
+        response = response.replaceAll("\\s+", " ").trim();
+        
+        // Remove any remaining formatting codes or special characters that could be problematic
+        response = response.replaceAll("[§&][0-9a-fk-or]", "");
+        
+        return response;
     }
     
     private static void sendVillagerResponse(VillagerEntity villager, AIResponse response, PlayerEntity player) {
