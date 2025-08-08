@@ -6,7 +6,7 @@ import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.config.AIConfig;
 import com.beeny.dialogue.DialogueProviderFactory;
-import com.beeny.dialogue.DialogueRequest;
+import com.beeny.dialogue.LLMDialogueProvider.DialogueRequest;
 import com.beeny.dialogue.LLMDialogueProvider;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -18,6 +18,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.io.BufferedReader;
+import java.util.concurrent.CompletableFuture;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;

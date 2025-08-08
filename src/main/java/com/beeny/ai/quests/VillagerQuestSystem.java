@@ -3,7 +3,7 @@ package com.beeny.ai.quests;
 import com.beeny.data.VillagerData;
 import com.beeny.ai.core.VillagerEmotionSystem;
 import com.beeny.ai.core.AISubsystem;
-import com.beeny.constants.VillagerConstants.Personality;
+import com.beeny.constants.VillagerConstants.PersonalityType;
 import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -496,7 +496,7 @@ public class VillagerQuestSystem implements AISubsystem {
             VillagerData data = villager.getAttached(com.beeny.Villagersreborn.VILLAGER_DATA);
             return data != null &&
                    data.getPlayerReputation(player.getUuidAsString()) > 40 &&
-                   data.getPersonality() == Personality.CURIOUS;
+                   data.getPersonality() == PersonalityType.CURIOUS;
         }
         
         @Override

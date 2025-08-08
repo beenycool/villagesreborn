@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import com.google.gson.JsonSyntaxException;
 
-final class DialogueResponseHandler {
+public final class DialogueResponseHandler {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DialogueResponseHandler.class);
 
     private DialogueResponseHandler() {}

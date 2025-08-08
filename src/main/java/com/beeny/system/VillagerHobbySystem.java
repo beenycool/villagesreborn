@@ -237,7 +237,7 @@ public class VillagerHobbySystem implements AISubsystem {
         if (foundBooks) {
             data.adjustHappiness(3);
             // Readers become slightly smarter over time (affect AI decisions)
-            data.getEmotionalState().adjustEmotion("intelligence", 0.1f);
+            data.getEmotionalState().adjustEmotion(com.beeny.ai.core.VillagerEmotionSystem.EmotionType.CURIOSITY, 0.1f);
         } else {
             data.adjustHappiness(1); // Still enjoys quiet time
         }

@@ -79,7 +79,7 @@ public class VillagerEmotionalBehavior {
             VillagerData nearbyData = VillagerUtils.getVillagerData(nearby);
             if (nearbyData != null) {
                 nearbyData.adjustHappiness(2);
-                nearbyData.getEmotionalState().adjustEmotion("joy", 0.1f);
+                nearbyData.getEmotionalState().adjustEmotion(com.beeny.ai.core.VillagerEmotionSystem.EmotionType.HAPPINESS, 0.1f);
                 
                 VillagerUtils.spawnParticles(world, nearby.getPos().add(0, 1, 0), 
                     ParticleTypes.HEART, 3, 0.5);
