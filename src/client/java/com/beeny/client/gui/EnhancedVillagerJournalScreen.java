@@ -21,8 +21,12 @@ import net.minecraft.util.math.MathHelper;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class EnhancedVillagerJournalScreen extends Screen {
+    
+    private static final Logger LOGGER = LoggerFactory.getLogger(EnhancedVillagerJournalScreen.class);
     
     private static final int SCREEN_WIDTH = 400;
     private static final int SCREEN_HEIGHT = 300;
@@ -118,7 +122,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void switchTab(Tab newTab) {
-        System.out.println("[EnhancedVillagerJournalScreen] Switching to tab: " + newTab.name);
+        LOGGER.debug("Switching to tab: {}", newTab.name);
 
         clearTabWidgets();
 
@@ -168,11 +172,11 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     private void initDetailsTab(int screenX, int contentY) {
         if (selectedVillagerData == null) {
-            System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selectedVillagerData is NULL");
+            LOGGER.warn("initDetailsTab: selectedVillagerData is null");
             return;
         }
         
-        System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selected villager = " + selectedVillagerData.getName());
+        LOGGER.debug("initDetailsTab: selected villager = {}", selectedVillagerData.getName());
         
         teleportButton = ButtonWidget.builder(
             Text.literal("Teleport to Villager"),
@@ -572,13 +576,13 @@ public class EnhancedVillagerJournalScreen extends Screen {
         if (index >= 0 && index < filteredVillagers.size()) {
             selectedVillagerData = filteredVillagers.get(index);
             if (selectedVillagerData != null) {
-                System.out.println("[EnhancedVillagerJournalScreen] Selected villager: " + selectedVillagerData.getName());
+                LOGGER.debug("Selected villager: {}", selectedVillagerData.getName());
             } else {
-                System.out.println("[EnhancedVillagerJournalScreen] ERROR: Selected villager is null");
+                LOGGER.error("Selected villager is null");
             }
             switchTab(Tab.DETAILS);
         } else {
-            System.out.println("[EnhancedVillagerJournalScreen] ERROR: Invalid villager index: " + index);
+            LOGGER.error("Invalid villager index: {}", index);
         }
     }
     
