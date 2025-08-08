@@ -152,7 +152,7 @@ public class VillagerDataCommands extends BaseVillagerCommand {
         
         // Create new VillagerData and attach it
         VillagerData newData = new VillagerData();
-        VillagerDataUtils.setVillagerData(villager, newData);
+        villager.setAttached(com.beeny.Villagersreborn.VILLAGER_DATA, newData);
         
         CommandMessageUtils.sendSuccessWithFormat(context.getSource(),
             "Reset data for villager at %s", villager.getBlockPos());
@@ -663,42 +663,6 @@ public class VillagerDataCommands extends BaseVillagerCommand {
                data.getHobby().name().toLowerCase().contains(query) ||
                data.getFavoriteFood().toLowerCase().contains(query) ||
                data.getNotes().toLowerCase().contains(query);
-    }
-    
-    private static int exportAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        CommandMessageUtils.sendInfo(source, "Export all functionality not yet implemented");
-        return 1;
-    }
-    
-    private static int importVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        String filename = StringArgumentType.getString(context, "file");
-        CommandMessageUtils.sendInfo(context.getSource(), "Import functionality not yet implemented for file: " + filename);
-        return 1;
-    }
-    
-    private static int resetAllVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        CommandMessageUtils.sendInfo(source, "Reset all functionality not yet implemented");
-        return 1;
-    }
-    
-    private static int restoreVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        String backupName = StringArgumentType.getString(context, "backup");
-        CommandMessageUtils.sendInfo(context.getSource(), "Restore functionality not yet implemented for backup: " + backupName);
-        return 1;
-    }
-    
-    private static int compareVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        CommandMessageUtils.sendInfo(source, "Compare functionality not yet implemented");
-        return 1;
-    }
-    
-    private static int searchVillagerData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        String query = StringArgumentType.getString(context, "query");
-        CommandMessageUtils.sendInfo(context.getSource(), "Search functionality not yet implemented for query: " + query);
-        return 1;
     }
     
     private static int showDetailedStats(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {

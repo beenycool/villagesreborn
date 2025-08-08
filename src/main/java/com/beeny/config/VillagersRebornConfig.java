@@ -9,6 +9,14 @@ public class VillagersRebornConfig {
     // AI Provider Constants
     public static final String AI_PROVIDER_GEMINI = "gemini";
     public static final String AI_PROVIDER_OPENROUTER = "openrouter";
+    
+    // AI Endpoints
+    public static final String GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/";
+    public static final String OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+    
+    // AI Models
+    public static final String GEMINI_MODEL = "gemini-1.5-flash";
+    public static final String OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
 
     public static int VILLAGER_SCAN_CHUNK_RADIUS = 8;
 

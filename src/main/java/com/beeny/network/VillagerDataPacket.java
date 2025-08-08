@@ -146,7 +146,7 @@ public class VillagerDataPacket {
         String safeCurrentAction = (aiState != null && aiState.getCurrentAction() != null) ? aiState.getCurrentAction() : "";
 
         com.beeny.ai.core.VillagerEmotionSystem.EmotionalState emotionalState = data.getEmotionalState();
-        String safeDominantEmotion = (emotionalState != null && emotionalState.getDominantEmotion() != null) ? emotionalState.getDominantEmotion() : "";
+        String safeDominantEmotion = (emotionalState != null && emotionalState.getDominantEmotion() != null) ? emotionalState.getDominantEmotion().name() : "";
         String safeEmotionalDescription = (emotionalState != null && emotionalState.getEmotionalDescription() != null) ? emotionalState.getEmotionalDescription() : "";
 
         return new VillagerDataPacket(

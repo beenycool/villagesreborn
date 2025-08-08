@@ -6,7 +6,7 @@ import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
 import com.beeny.config.AIConfig;
 import com.beeny.dialogue.DialogueProviderFactory;
-import com.beeny.dialogue.DialogueRequest;
+import com.beeny.dialogue.LLMDialogueProvider.DialogueRequest;
 import com.beeny.dialogue.LLMDialogueProvider;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -18,6 +18,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.io.BufferedReader;
+import java.util.concurrent.CompletableFuture;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -28,11 +29,30 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class VillagerAISystem {
     
     private static final Gson GSON = new Gson();
     private static final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
+    
+    // Thread pool for AI processing with bounded queue to prevent memory issues
+    private static final ExecutorService AI_THREAD_POOL = new ThreadPoolExecutor(
+        4, 4, // Core and max pool size
+        0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(64), // Bounded queue to prevent memory issues
+        r -> {
+            Thread t = new Thread(r, "VillagerAI-Worker");
+            t.setDaemon(true);
+            return t;
+        },
+        new ThreadPoolExecutor.DiscardPolicy() // Discard excess tasks to prevent blocking
+    );
     
     // API endpoints
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
@@ -88,14 +108,19 @@ public class VillagerAISystem {
         if (targetVillager != null) {
             lastRequestTimes.put(playerId, currentTime);
             
-            // Generate AI response asynchronously to avoid blocking
-            Thread.ofVirtual().start(() -> {
-                try {
-                    generateAndSendAIResponse(targetVillager, player, message);
-                } catch (Exception e) {
-                    Villagersreborn.LOGGER.error("Error generating AI response", e);
-                }
-            });
+            // Generate AI response asynchronously using managed thread pool
+            try {
+                AI_THREAD_POOL.submit(() -> {
+                    try {
+                        generateAndSendAIResponse(targetVillager, player, message);
+                    } catch (Exception e) {
+                        Villagersreborn.LOGGER.error("Error generating AI response", e);
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                Villagersreborn.LOGGER.warn("AI thread pool at capacity, rejecting request for player {}", playerId);
+                player.sendMessage(Text.literal("AI system is busy, please try again later").formatted(Formatting.YELLOW), false);
+            }
             
             return true;
         }
@@ -275,7 +300,35 @@ public class VillagerAISystem {
             cleanMessage = response.replaceAll("\\[TOOL:[^\\]]+\\]", "").trim();
         }
         
+        // Sanitize AI response to prevent harmful content
+        cleanMessage = sanitizeAIResponse(cleanMessage);
+        
         return new AIResponse(cleanMessage, toolAction, toolTarget);
+    }
+    
+    /**
+     * Sanitizes AI response content to prevent harmful or unwanted content
+     */
+    private static String sanitizeAIResponse(String response) {
+        if (response == null || response.trim().isEmpty()) {
+            return "..."; // Fallback for empty responses
+        }
+        
+        // Limit response length to prevent spam
+        if (response.length() > 500) {
+            response = response.substring(0, 497) + "...";
+        }
+        
+        // Remove potentially harmful patterns
+        response = response.replaceAll("(?i)\\b(server|admin|op|whitelist|ban|kick)\\b", "[REDACTED]");
+        
+        // Remove excessive whitespace and normalize
+        response = response.replaceAll("\\s+", " ").trim();
+        
+        // Remove any remaining formatting codes or special characters that could be problematic
+        response = response.replaceAll("[§&][0-9a-fk-or]", "");
+        
+        return response;
     }
     
     private static void sendVillagerResponse(VillagerEntity villager, AIResponse response, PlayerEntity player) {
@@ -324,5 +377,22 @@ public class VillagerAISystem {
             return "***";
         }
         return apiKey.substring(0, 4) + "***" + apiKey.substring(apiKey.length() - 4);
+    }
+    
+    /**
+     * Shutdown the AI thread pool gracefully
+     */
+    public static void shutdown() {
+        if (AI_THREAD_POOL != null && !AI_THREAD_POOL.isShutdown()) {
+            AI_THREAD_POOL.shutdown();
+            try {
+                if (!AI_THREAD_POOL.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    AI_THREAD_POOL.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                AI_THREAD_POOL.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }

@@ -17,6 +17,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import org.slf4j.Logger;
@@ -67,6 +68,9 @@ public class VillagerAICommands extends BaseVillagerCommand {
         String provider = StringArgumentType.getString(context, "provider").toLowerCase();
         String apiKey = StringArgumentType.getString(context, "apikey");
         ServerCommandSource source = context.getSource();
+        
+        // Security warning for API key commands
+        sendApiKeySecurityWarning(source);
         
         if (!isValidProvider(provider)) {
             CommandMessageUtils.sendError(source, "Invalid provider. Use: gemini, openrouter, or local");
@@ -296,6 +300,14 @@ public class VillagerAICommands extends BaseVillagerCommand {
             CommandMessageUtils.sendError(source, "Failed to save configuration: " + e.getMessage());
             return 0;
         }
+    }
+    
+    /**
+     * Sends security warning when API keys are provided via commands
+     */
+    private static void sendApiKeySecurityWarning(ServerCommandSource source) {
+        CommandMessageUtils.sendWarning(source, net.minecraft.text.Text.translatable("villagersreborn.command.api_key_warning").getString());
+        CommandMessageUtils.sendInfo(source, "For security, consider using: export VILLAGERS_REBORN_API_KEY=your_key_here");
     }
     
     // Suggestion providers

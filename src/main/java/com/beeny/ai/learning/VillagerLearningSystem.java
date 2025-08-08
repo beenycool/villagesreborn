@@ -9,6 +9,7 @@ import com.beeny.constants.VillagerConstants;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 
 import java.util.*;
@@ -753,25 +754,25 @@ public class VillagerLearningSystem implements AISubsystem {
     public void loadLearningDataFromNbt(VillagerEntity villager, NbtCompound nbt) {
         if (!nbt.contains("learning_data")) return;
         
-        NbtCompound learningNbt = nbt.getCompound("learning_data");
+        NbtCompound learningNbt = nbt.getCompound("learning_data").orElse(new NbtCompound());
         VillagerLearningProfile profile = new VillagerLearningProfile();
         
         // Load preferences
         if (learningNbt.contains("preferences")) {
-            NbtCompound preferencesNbt = learningNbt.getCompound("preferences");
+            NbtCompound preferencesNbt = learningNbt.getCompound("preferences").orElse(new NbtCompound());
             if (preferencesNbt != null) {
                 for (String key : preferencesNbt.getKeys()) {
-                    profile.preferences.put(key, preferencesNbt.getFloat(key));
+                    profile.preferences.put(key, preferencesNbt.getFloat(key).orElse(0.0f));
                 }
             }
         }
         
         // Load behavior counts
         if (learningNbt.contains("behaviors")) {
-            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors");
+            NbtCompound behaviorsNbt = learningNbt.getCompound("behaviors").orElse(new NbtCompound());
             if (behaviorsNbt != null) {
                 for (String key : behaviorsNbt.getKeys()) {
-                    profile.behaviorCounts.put(key, behaviorsNbt.getInt(key));
+                    profile.behaviorCounts.put(key, behaviorsNbt.getInt(key).orElse(0));
                 }
             }
         }
@@ -780,7 +781,7 @@ public class VillagerLearningSystem implements AISubsystem {
         if (learningNbt.contains("experiences")) {
             NbtList experiencesNbt = learningNbt.getList("experiences", NbtElement.COMPOUND_TYPE);
             for (int i = 0; i < experiencesNbt.size(); i++) {
-                NbtCompound expNbt = experiencesNbt.getCompound(i);
+                NbtCompound expNbt = experiencesNbt.getCompound(i).orElse(new NbtCompound());
                 Map<String, Object> parameters = new HashMap<>();
                 if (expNbt.contains("parameters")) {
                     NbtCompound paramsNbt = expNbt.getCompound("parameters").orElse(new NbtCompound());
@@ -794,18 +795,18 @@ public class VillagerLearningSystem implements AISubsystem {
                         }
                     }
                 }
-                String typeStr = expNbt.getString("type");
+                String typeStr = expNbt.getString("type").orElse("PLAYER_INTERACTION");
                 ExperienceType expType = ExperienceType.PLAYER_INTERACTION; // Default fallback
                 try {
                     expType = ExperienceType.valueOf(typeStr);
                 } catch (IllegalArgumentException ignored) {}
                 Experience exp = new Experience(
                     expType,
-                    expNbt.getString("context"),
+                    expNbt.getString("context").orElse(""),
                     parameters,
-                    expNbt.getFloat("outcome")
+                    expNbt.getFloat("outcome").orElse(0.0f)
                 );
-                int reinforcements = expNbt.getInt("reinforcements");
+                int reinforcements = expNbt.getInt("reinforcements").orElse(0);
                 for (int j = 1; j < reinforcements; j++) exp.reinforce(exp.getOutcome());
                 while (!profile.experiences.offer(exp)) {
                     profile.experiences.poll();
@@ -821,18 +822,18 @@ public class VillagerLearningSystem implements AISubsystem {
                 NbtCompound patNbt = patternsNbt.getCompound(i).orElse(new NbtCompound());
                 
                 LearnedPattern pattern = new LearnedPattern(
-                    patNbt.getString("pattern_id"),
-                    patNbt.getString("description")
+                    patNbt.getString("pattern_id").orElse(""),
+                    patNbt.getString("description").orElse("")
                 );
-                pattern.confidence     = patNbt.getFloat("confidence");
-                pattern.timesObserved  = patNbt.getInt("times_observed");
+                pattern.confidence     = patNbt.getFloat("confidence").orElse(0.0f);
+                pattern.timesObserved  = patNbt.getInt("times_observed").orElse(0);
                 
                 // Load conditions
                 if (patNbt.contains("conditions")) {
                     NbtCompound condNbt = patNbt.getCompound("conditions").orElse(new NbtCompound());
                     if (condNbt != null) {
                         for (String key : condNbt.getKeys()) {
-                            pattern.conditions.put(key, condNbt.getFloat(key));
+                            pattern.conditions.put(key, condNbt.getFloat(key).orElse(0.0f));
                         }
                     }
                 }
@@ -842,7 +843,7 @@ public class VillagerLearningSystem implements AISubsystem {
                     NbtCompound outNbt = patNbt.getCompound("outcomes").orElse(new NbtCompound());
                     if (outNbt != null) {
                         for (String key : outNbt.getKeys()) {
-                            pattern.outcomes.put(key, outNbt.getFloat(key));
+                            pattern.outcomes.put(key, outNbt.getFloat(key).orElse(0.0f));
                         }
                     }
                 }
@@ -852,7 +853,7 @@ public class VillagerLearningSystem implements AISubsystem {
         }
         
         if (learningNbt != null && learningNbt.contains("learning_rate")) {
-            profile.learningRate = learningNbt.getFloat("learning_rate");
+            profile.learningRate = learningNbt.getFloat("learning_rate").orElse(0.1f);
         }
         
         learningProfiles.put(villager.getUuidAsString(), profile);

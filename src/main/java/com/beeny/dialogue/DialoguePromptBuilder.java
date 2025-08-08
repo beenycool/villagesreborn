@@ -196,7 +196,7 @@ public class DialoguePromptBuilder {
         }
         
         // Emotional state context
-        String dominantEmotion = data.getEmotionalState().getDominantEmotion();
+        String dominantEmotion = data.getEmotionalState().getDominantEmotion().name();
         if (!dominantEmotion.isEmpty() && !dominantEmotion.equals("neutral")) {
             memory.append("Currently, you're feeling particularly ").append(dominantEmotion.toLowerCase()).append(". ");
         }

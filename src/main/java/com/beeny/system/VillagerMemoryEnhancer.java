@@ -107,7 +107,7 @@ public class VillagerMemoryEnhancer {
                 }
                 
                 // Add emotional context
-                String dominantEmotion = data.getEmotionalState().getDominantEmotion();
+                String dominantEmotion = data.getEmotionalState().getDominantEmotion().name();
                 if (!dominantEmotion.isEmpty() && !dominantEmotion.equals("neutral")) {
                     memory.append(". I was feeling ").append(dominantEmotion.toLowerCase())
                         .append(" at the time");
@@ -204,7 +204,7 @@ public class VillagerMemoryEnhancer {
     
     public static void updateMemoryBasedOnMood(VillagerData data) {
         // Update memories based on current emotional state
-        String dominantEmotion = data.getEmotionalState().getDominantEmotion();
+        String dominantEmotion = data.getEmotionalState().getDominantEmotion().name();
         
         if (dominantEmotion.equals("sadness") && ThreadLocalRandom.current().nextFloat() < 0.1f) {
             data.addRecentEvent("Felt melancholy today, remembering better times");
