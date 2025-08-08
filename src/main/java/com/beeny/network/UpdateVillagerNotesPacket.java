@@ -1,6 +1,7 @@
 package com.beeny.network;
 
 import com.beeny.Villagersreborn;
+import com.beeny.constants.StringConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.beeny.data.VillagerData;
@@ -19,7 +20,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
     private static final Logger LOGGER = LoggerFactory.getLogger(UpdateVillagerNotesPacket.class);
     
     public static final Id<UpdateVillagerNotesPacket> ID = new Id<>(
-        Identifier.of("villagersreborn", "update_notes"));
+        Identifier.of(StringConstants.MOD_ID, StringConstants.CH_UPDATE_NOTES));
     
     public static final PacketCodec<RegistryByteBuf, UpdateVillagerNotesPacket> CODEC = PacketCodec.of(
         (value, buf) -> {
@@ -49,13 +50,13 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
             context.server().execute(() -> {
                 
                 if (payload.villagerId() <= 0) {
-                    player.sendMessage(Text.literal("§cInvalid villager ID!"), false);
+                    player.sendMessage(Text.literal(StringConstants.MSG_INVALID_VILLAGER_ID), false);
                     return;
                 }
                 
                 
                 if (player == null) {
-                    LOGGER.warn("Player is null in UpdateVillagerNotesPacket");
+                    LOGGER.warn("[WARN] [UpdateVillagerNotesPacket] [register] - Player is null in UpdateVillagerNotesPacket");
                     return;
                 }
                 
@@ -63,7 +64,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 
                 if (!(entity instanceof VillagerEntity)) {
-                    player.sendMessage(Text.literal("§cEntity is not a villager!"), false);
+                    player.sendMessage(Text.literal(StringConstants.MSG_NOT_A_VILLAGER), false);
                     return;
                 }
                 
@@ -72,7 +73,7 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 double distance = player.getPos().distanceTo(villager.getPos());
                 if (distance > 10.0) {
-                    player.sendMessage(Text.literal("§cYou are too far from the villager!"), false);
+                    player.sendMessage(Text.literal(StringConstants.MSG_TOO_FAR), false);
                     return;
                 }
                 
@@ -80,12 +81,12 @@ public record UpdateVillagerNotesPacket(int villagerId, String notes) implements
                 
                 
                 if (data == null) {
-                    player.sendMessage(Text.literal("§cVillager data not found!"), false);
+                    player.sendMessage(Text.literal(StringConstants.MSG_VILLAGER_DATA_NOT_FOUND), false);
                     return;
                 }
                 
                 data.setNotes(payload.notes());
-                player.sendMessage(Text.literal("Notes updated for " + data.getName()), false);
+                player.sendMessage(Text.literal(StringConstants.MSG_NOTES_UPDATED_PREFIX + data.getName()), false);
             });
         });
     }

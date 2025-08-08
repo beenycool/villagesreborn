@@ -1,0 +1,26 @@
+[20:03:27] [Test worker/WARN]: Config key 'villagerScanChunkRadius' out of range [0..64] (was -1); using default 8
+[20:03:27] [Test worker/WARN]: Config key 'happinessNeutralThreshold' missing; using default 50
+[20:03:27] [Test worker/WARN]: Config key 'happinessDecayRate' missing; using default 1
+[20:03:27] [Test worker/WARN]: Config key 'happinessRecoveryRate' missing; using default 1
+[20:03:27] [Test worker/WARN]: Config key 'enableDynamicDialogue' has invalid type (expected boolean); using default true
+[20:03:27] [Test worker/WARN]: Config key 'llmProvider' has unsupported value 'unsupported'; allowed: gemini, openrouter, local; using default 'gemini'
+[20:03:27] [Test worker/WARN]: Config key 'llmApiEndpoint' missing; using default ''
+[20:03:27] [Test worker/WARN]: Config key 'llmModel' missing; using default ''
+[20:03:27] [Test worker/WARN]: Config key 'llmTemperature' out of range [0.0..2.0] (was 5.0); using default 0.7
+[20:03:27] [Test worker/WARN]: Config key 'llmMaxTokens' out of range [1..1000000] (was 0); using default 150
+[20:03:27] [Test worker/WARN]: Config key 'llmRequestTimeout' out of range [100..3600000] (was 50); using default 10000
+[20:03:27] [Test worker/WARN]: Config key 'fallbackToStatic' missing; using default true
+[20:03:27] [Test worker/WARN]: Config key 'enableDialogueCache' missing; using default true
+[20:03:27] [Test worker/WARN]: Config key 'dialogueCacheSize' missing; using default 1000
+[20:03:27] [Test worker/WARN]: Config key 'conversationHistoryLimit' missing; using default 10
+[20:03:27] [Test worker/WARN]: Config key 'llmLocalUrl' missing; using default 'http://localhost:8080'
+[20:03:27] [Test worker/WARN]: Config key 'aiEmotionUpdateInterval' missing; using default 60000
+[20:03:27] [Test worker/WARN]: Config key 'aiManagerUpdateInterval' missing; using default 5000
+[20:03:27] [Test worker/WARN]: Config key 'aiGoapUpdateInterval' missing; using default 3000
+[20:03:27] [Test worker/WARN]: Config key 'marriagePacketCooldown' missing; using default 5000
+[20:03:27] [Test worker/INFO]: Loaded Villagers Reborn config from file
+[20:03:27] [Test worker/WARN]: Config key 'aiEmotionUpdateInterval' missing; using default 1111
+[20:03:27] [Test worker/WARN]: Config key 'aiManagerUpdateInterval' missing; using default 2222
+[20:03:27] [Test worker/WARN]: Config key 'aiGoapUpdateInterval' missing; using default 3333
+[20:03:27] [Test worker/WARN]: Config key 'marriagePacketCooldown' missing; using default 4444
+[20:03:27] [Test worker/INFO]: Loaded Villagers Reborn config from file

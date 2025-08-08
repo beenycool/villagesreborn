@@ -1,6 +1,7 @@
 package com.beeny.client.gui;
 
 import com.beeny.data.VillagerData;
+import com.beeny.network.VillagerDataPacket;
 import com.beeny.network.VillagerTeleportPacket;
 import com.beeny.network.UpdateVillagerNotesPacket;
 import com.beeny.Villagersreborn;
@@ -12,7 +13,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.VillagerEntity;
+import com.beeny.data.VillagerData;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -49,9 +50,8 @@ public class EnhancedVillagerJournalScreen extends Screen {
     private final Map<Tab, ButtonWidget> tabButtons = new HashMap<>();
     
     
-    private final List<VillagerEntity> villagers;
-    private VillagerEntity selectedVillager;
-    private VillagerData selectedVillagerData;
+    private final List<VillagerDataPacket> villagers;
+    private VillagerDataPacket selectedVillagerData;
     
     
     private int scrollOffset = 0;
@@ -71,20 +71,19 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     private TextFieldWidget searchField;
     private String searchQuery = "";
-    private List<VillagerEntity> filteredVillagers;
+    private List<VillagerDataPacket> filteredVillagers;
     
     
     private float animationTick = 0;
     
-    public EnhancedVillagerJournalScreen(List<VillagerEntity> villagers) {
+    public EnhancedVillagerJournalScreen(List<VillagerDataPacket> villagers) {
         super(Text.literal("Villager Journal"));
         this.villagers = villagers;
         this.filteredVillagers = new ArrayList<>(villagers);
-        
-        
+    
         this.filteredVillagers.sort((v1, v2) -> {
-            String name1 = VillagerNames.getVillagerName(v1);
-            String name2 = VillagerNames.getVillagerName(v2);
+            String name1 = v1.getName();
+            String name2 = v2.getName();
             return Comparator.nullsFirst(String::compareTo).compare(name1, name2);
         });
     }
@@ -92,11 +91,10 @@ public class EnhancedVillagerJournalScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        
+
         int screenX = (width - SCREEN_WIDTH) / 2;
         int screenY = (height - SCREEN_HEIGHT) / 2;
-        
-        
+
         int tabWidth = SCREEN_WIDTH / Tab.values().length;
         int tabX = screenX;
         for (Tab tab : Tab.values()) {
@@ -104,33 +102,32 @@ public class EnhancedVillagerJournalScreen extends Screen {
                 Text.literal(tab.name),
                 btn -> switchTab(tab)
             ).dimensions(tabX, screenY, tabWidth - 2, TAB_HEIGHT).build();
-            
+
             tabButtons.put(tab, tabButton);
             addDrawableChild(tabButton);
             tabX += tabWidth;
         }
-        
-        
-        searchField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN, 
+
+        searchField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN,
             screenY + TAB_HEIGHT + 5, 150, 20, Text.literal("Search"));
         searchField.setChangedListener(this::updateSearch);
-        searchField.setPlaceholder(Text.literal("Search villagers..."));
+        searchField.setPlaceholder(Text.translatable("villagersreborn.journal.search_placeholder"));
         addDrawableChild(searchField);
-        
-        
+
         switchTab(currentTab);
     }
     
     private void switchTab(Tab newTab) {
-        
+        System.out.println("[EnhancedVillagerJournalScreen] Switching to tab: " + newTab.name);
+
         clearTabWidgets();
-        
+
         currentTab = newTab;
-        
+
         int screenX = (width - SCREEN_WIDTH) / 2;
         int screenY = (height - SCREEN_HEIGHT) / 2;
         int contentY = screenY + TAB_HEIGHT + 35;
-        
+
         switch (currentTab) {
             case LIST -> initListTab(screenX, contentY);
             case DETAILS -> initDetailsTab(screenX, contentY);
@@ -141,20 +138,19 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initListTab(int screenX, int contentY) {
-        
+
         scrollUpButton = ButtonWidget.builder(
             Text.literal("▲"),
             btn -> scrollList(-1)
         ).dimensions(screenX + SCREEN_WIDTH - 30, contentY, 20, 20).build();
         addDrawableChild(scrollUpButton);
-        
+
         scrollDownButton = ButtonWidget.builder(
             Text.literal("▼"),
             btn -> scrollList(1)
         ).dimensions(screenX + SCREEN_WIDTH - 30, contentY + 200, 20, 20).build();
         addDrawableChild(scrollDownButton);
-        
-        
+
         villagerButtons.clear();
         for (int i = 0; i < ENTRIES_PER_PAGE; i++) {
             final int index = i;
@@ -171,7 +167,12 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initDetailsTab(int screenX, int contentY) {
-        if (selectedVillager == null) return;
+        if (selectedVillagerData == null) {
+            System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selectedVillagerData is NULL");
+            return;
+        }
+        
+        System.out.println("[EnhancedVillagerJournalScreen] initDetailsTab: selected villager = " + selectedVillagerData.getName());
         
         teleportButton = ButtonWidget.builder(
             Text.literal("Teleport to Villager"),
@@ -195,7 +196,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void initNotesTab(int screenX, int contentY) {
-        if (selectedVillager == null) return;
+        if (selectedVillagerData == null) return;
         
         notesField = new TextFieldWidget(textRenderer, screenX + CONTENT_MARGIN,
             contentY + 10, SCREEN_WIDTH - 2 * CONTENT_MARGIN, 150, Text.literal("Notes"));
@@ -229,7 +230,9 @@ public class EnhancedVillagerJournalScreen extends Screen {
     
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        // Avoid blur completely here to prevent "Can only blur once per frame".
+        // Draw a dim background without triggering the blur pipeline.
+        context.fill(0, 0, this.width, this.height, 0x7F000000);
         animationTick += delta;
         
         int screenX = (width - SCREEN_WIDTH) / 2;
@@ -275,7 +278,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void renderDetailsTab(DrawContext context, int screenX, int contentY) {
-        if (selectedVillager == null || selectedVillagerData == null) {
+        if (selectedVillagerData == null) {
             context.drawCenteredTextWithShadow(textRenderer, 
                 Text.literal("Select a villager from the List tab"),
                 screenX + SCREEN_WIDTH / 2, contentY + 50, 0xFFFFFF);
@@ -346,7 +349,7 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void renderFamilyTab(DrawContext context, int screenX, int contentY) {
-        if (selectedVillager == null || selectedVillagerData == null) {
+        if (selectedVillagerData == null) {
             context.drawCenteredTextWithShadow(textRenderer, 
                 Text.literal("Select a villager from the List tab"),
                 screenX + SCREEN_WIDTH / 2, contentY + 50, 0xFFFFFF);
@@ -416,16 +419,15 @@ public class EnhancedVillagerJournalScreen extends Screen {
         int elderCount = 0;
         int babyCount = 0;
         
-        for (VillagerEntity villager : villagers) {
-            VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-            if (data != null) {
-                String profession = villager.getVillagerData().profession().toString();
+        for (VillagerDataPacket dataPacket : villagers) {
+            if (dataPacket != null) {
+                String profession = dataPacket.getProfession();
                 professionCounts.put(profession, professionCounts.getOrDefault(profession, 0) + 1);
-                
-                totalHappiness += data.getHappiness();
-                if (!data.getSpouseId().isEmpty()) marriedCount++;
-                if (data.getAge() > 300) elderCount++;
-                if (data.getAge() < 20) babyCount++;
+
+                totalHappiness += dataPacket.getHappiness();
+                if (dataPacket.getSpouseId() != null && !dataPacket.getSpouseId().isEmpty()) marriedCount++;
+                if (dataPacket.getAge() > 300) elderCount++;
+                if (dataPacket.getAge() < 20) babyCount++;
             }
         }
         
@@ -480,15 +482,15 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void renderNotesTab(DrawContext context, int screenX, int contentY) {
-        if (selectedVillager == null) {
-            context.drawCenteredTextWithShadow(textRenderer, 
+        if (selectedVillagerData == null) {
+            context.drawCenteredTextWithShadow(textRenderer,
                 Text.literal("Select a villager from the List tab"),
                 screenX + SCREEN_WIDTH / 2, contentY + 50, 0xFFFFFF);
             return;
         }
         
         context.drawTextWithShadow(textRenderer,
-            Text.literal("📝 Notes for " + VillagerNames.getVillagerName(selectedVillager)).formatted(Formatting.YELLOW),
+            Text.literal("📝 Notes for " + selectedVillagerData.getName()).formatted(Formatting.YELLOW),
             screenX + CONTENT_MARGIN, contentY - 10, 0xFFFFFF);
     }
     
@@ -527,28 +529,56 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void updateListButtons() {
+        // Guard for uninitialized UI or empty data
+        if (villagerButtons == null || villagerButtons.isEmpty()) {
+            return;
+        }
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
+
+        // Clamp scrollOffset within bounds based on current filtered list size
+        int maxOffset = Math.max(0, filteredVillagers.size() - ENTRIES_PER_PAGE);
+        if (scrollOffset > maxOffset) {
+            scrollOffset = maxOffset;
+        }
+        if (scrollOffset < 0) {
+            scrollOffset = 0;
+        }
+
         int endIndex = Math.min(scrollOffset + ENTRIES_PER_PAGE, filteredVillagers.size());
-        
+
         for (int i = 0; i < ENTRIES_PER_PAGE; i++) {
             ButtonWidget button = villagerButtons.get(i);
-            if (i + scrollOffset < endIndex) {
-                VillagerEntity villager = filteredVillagers.get(i + scrollOffset);
-                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-                
-                String name = VillagerNames.getVillagerName(villager);
-                button.setMessage(Text.literal(name));
+            int dataIndex = scrollOffset + i;
+
+            if (dataIndex >= 0 && dataIndex < endIndex) {
+                // Safe access within bounds
+                VillagerDataPacket data = filteredVillagers.get(dataIndex);
+                String name = data != null ? String.valueOf(data.getName()) : "";
+                button.setMessage(Text.literal(name != null ? name : ""));
                 button.visible = true;
+                button.active = true;
             } else {
+                // Hide and deactivate unused button slots
+                button.setMessage(Text.empty());
                 button.visible = false;
+                button.active = false;
             }
         }
     }
     
     private void selectVillager(int index) {
         if (index >= 0 && index < filteredVillagers.size()) {
-            selectedVillager = filteredVillagers.get(index);
-            selectedVillagerData = selectedVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-            switchTab(currentTab); 
+            selectedVillagerData = filteredVillagers.get(index);
+            if (selectedVillagerData != null) {
+                System.out.println("[EnhancedVillagerJournalScreen] Selected villager: " + selectedVillagerData.getName());
+            } else {
+                System.out.println("[EnhancedVillagerJournalScreen] ERROR: Selected villager is null");
+            }
+            switchTab(Tab.DETAILS);
+        } else {
+            System.out.println("[EnhancedVillagerJournalScreen] ERROR: Invalid villager index: " + index);
         }
     }
     
@@ -560,9 +590,16 @@ public class EnhancedVillagerJournalScreen extends Screen {
     }
     
     private void updateSearch(String query) {
-        searchQuery = query.toLowerCase();
+        searchQuery = query == null ? "" : query.toLowerCase(Locale.ROOT);
         applySearchFilter();
+
+        // Reset scroll and ensure it's valid for the new filtered list
         scrollOffset = 0;
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
+
+        // If nothing matches, just refresh buttons which will hide all rows
         updateListButtons();
     }
     
@@ -571,61 +608,56 @@ public class EnhancedVillagerJournalScreen extends Screen {
             filteredVillagers = new ArrayList<>(villagers);
         } else {
             filteredVillagers = villagers.stream()
-                .filter(villager -> {
-                    String name = VillagerNames.getVillagerName(villager).toLowerCase();
-                    VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
-                    if (data != null) {
-                        String profession = villager.getVillagerData().profession().toString().toLowerCase();
-                        String personality = data.getPersonality().toLowerCase();
-                        return name.contains(searchQuery) || 
-                               profession.contains(searchQuery) || 
-                               personality.contains(searchQuery);
-                    }
-                    return name.contains(searchQuery);
+                .filter(data -> {
+                    String name = data.getName().toLowerCase();
+                    String profession = data.getProfession().toLowerCase();
+                    String personality = data.getPersonality().toLowerCase();
+                    return name.contains(searchQuery) ||
+                           profession.contains(searchQuery) ||
+                           personality.contains(searchQuery);
                 })
                 .collect(Collectors.toList());
         }
-        
-        
+
         filteredVillagers.sort((v1, v2) -> {
-            String name1 = VillagerNames.getVillagerName(v1);
-            String name2 = VillagerNames.getVillagerName(v2);
+            String name1 = v1.getName();
+            String name2 = v2.getName();
             return Comparator.nullsFirst(String::compareTo).compare(name1, name2);
         });
     }
     
     private void scrollList(int direction) {
+        if (filteredVillagers == null) {
+            filteredVillagers = Collections.emptyList();
+        }
         int maxOffset = Math.max(0, filteredVillagers.size() - ENTRIES_PER_PAGE);
         scrollOffset = Math.max(0, Math.min(maxOffset, scrollOffset + direction));
         updateListButtons();
     }
     
     private void teleportToVillager() {
-        if (selectedVillager != null && client != null && client.player != null) {
-            
-            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillager.getId()));
-            
-            
+        if (selectedVillagerData != null && client != null && client.player != null) {
+            // Send teleport packet using the correct runtime entity ID
+            ClientPlayNetworking.send(new VillagerTeleportPacket(selectedVillagerData.getEntityIdInt()));
+
             client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.ENTITY_ENDERMAN_TELEPORT, 1.0f));
-            
-            
             close();
         }
     }
     
     private void refreshVillagerData() {
-        if (selectedVillager != null) {
-            selectedVillagerData = selectedVillager.getAttached(Villagersreborn.VILLAGER_DATA);
-            switchTab(currentTab); 
-        }
+        // In strict separation, data is refreshed via packets from the server.
+        // This method can be implemented to request updated data from the server if needed.
+        // For now, just switch tab to refresh UI.
+        switchTab(currentTab);
     }
-    
     private void saveVillagerNotes() {
-        if (selectedVillager != null && notesField != null && client != null) {
+        if (selectedVillagerData != null && notesField != null && client != null) {
             String notes = notesField.getText();
             
             
-            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillager.getId(), notes));
+            
+            ClientPlayNetworking.send(new UpdateVillagerNotesPacket(selectedVillagerData.getEntityIdInt(), notes));
             
             
             if (selectedVillagerData != null) {

@@ -2,6 +2,7 @@ package com.beeny.system;
 
 import com.beeny.data.VillagerData;
 import com.beeny.util.VillagerNames;
+import com.beeny.constants.VillagerConstants;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -94,13 +95,18 @@ public class VillagerAncestryManager {
         VillagerData father = generateAncestor(villagerData, "male", 1, world, pos);
         parents.add(father);
         
-        // Make them married to each other
-        mother.marry(father.getName(), "ancestor_" + father.getName().hashCode());
-        father.marry(mother.getName(), "ancestor_" + mother.getName().hashCode());
+        // Generate UUIDs for spouses and link them
+        String motherSpouseId = UUID.randomUUID().toString();
+        String fatherSpouseId = UUID.randomUUID().toString();
+        
+        mother.setSpouseName(father.getName());
+        mother.setSpouseId(fatherSpouseId);
+        father.setSpouseName(mother.getName());
+        father.setSpouseId(motherSpouseId);
         
         // Add child relationship
-        mother.addChild(villager.getUuidAsString());
-        father.addChild(villager.getUuidAsString());
+        mother.addChild(villager.getUuidAsString(), villager.getName().getString());
+        father.addChild(villager.getUuidAsString(), villager.getName().getString());
         
         return parents;
     }
@@ -122,9 +128,14 @@ public class VillagerAncestryManager {
         VillagerData father = generateAncestorFromChild(child, "male", generationLevel);
         parents.add(father);
         
-        // Make them married
-        mother.marry(father.getName(), "ancestor_" + father.getName().hashCode());
-        father.marry(mother.getName(), "ancestor_" + mother.getName().hashCode());
+        // Generate UUIDs for spouses and link them
+        String motherSpouseId = UUID.randomUUID().toString();
+        String fatherSpouseId = UUID.randomUUID().toString();
+        
+        mother.setSpouseName(father.getName());
+        mother.setSpouseId(fatherSpouseId);
+        father.setSpouseName(mother.getName());
+        father.setSpouseId(motherSpouseId);
         
         return parents;
     }
@@ -147,7 +158,7 @@ public class VillagerAncestryManager {
         long birthTime = System.currentTimeMillis() - (yearsAgo * 365L * 24 * 60 * 60 * 1000); // In a real implementation, this would use world.getTime()
         
         // Generate personality influenced by descendant
-        String personality = generateInheritedPersonality(descendant.getPersonality(), random);
+        String personality = generateInheritedPersonality(descendant.getPersonality().name(), random);
         
         // Age and other attributes
         int age = (int)(yearsAgo * 365 + random.nextInt(365 * 5)); // Add some variation
@@ -160,18 +171,29 @@ public class VillagerAncestryManager {
         // Generate historical birth place
         String birthPlace = generateHistoricalBirthPlace(generationsBack, world, pos, random);
         
-        // Create ancestor data
-        VillagerData ancestor = new VillagerData(
-            name, age, gender, personality, happiness, 
-            random.nextInt(50), "", professionHistory,
-            new HashMap<>(), new ArrayList<>(), "", "",
-            new ArrayList<>(), new ArrayList<>(), 
-            "", getHistoricalHobby(random), birthTime, birthPlace,
-            generateHistoricalNotes(generationsBack, random), 
-            birthTime + (65L + random.nextInt(20)) * 365 * 24 * 60 * 60 * 1000, // Death time (lived 65-85 years)
-            false // Ancestors are not alive
-        );
-        
+        // Create ancestor data using default constructor and setters
+        VillagerData ancestor = new VillagerData();
+        ancestor.setName(name);
+        ancestor.setAge(age);
+        ancestor.setGender(gender);
+        ancestor.setPersonality(VillagerConstants.PersonalityType.fromString(personality));
+        ancestor.setHappiness(happiness);
+        ancestor.setTotalTrades(random.nextInt(50));
+        ancestor.setFavoritePlayerId("");
+        ancestor.setProfessionHistory(professionHistory);
+        ancestor.setPlayerRelations(new HashMap<>());
+        ancestor.setFamilyMembers(new ArrayList<>());
+        ancestor.setSpouseName("");
+        ancestor.setSpouseId("");
+        ancestor.setChildrenIds(new ArrayList<>());
+        ancestor.setChildrenNames(new ArrayList<>());
+        ancestor.setFavoriteFood("");
+        ancestor.setHobby(VillagerConstants.HobbyType.fromString(getHistoricalHobby(random)));
+        ancestor.setBirthTime(birthTime);
+        ancestor.setBirthPlace(birthPlace);
+        ancestor.setNotes(generateHistoricalNotes(generationsBack, random));
+        ancestor.setDeathTime(birthTime + (65L + random.nextInt(20)) * 365L * 24 * 60 * 60 * 1000);
+        ancestor.setAlive(false);
         return ancestor;
     }
     
@@ -186,7 +208,7 @@ public class VillagerAncestryManager {
         long birthTime = child.getBirthTime() - (parentAgeAtBirth * 365L * 24 * 60 * 60 * 1000);
         
         // Inherit some personality traits
-        String personality = generateInheritedPersonality(child.getPersonality(), random);
+        String personality = generateInheritedPersonality(child.getPersonality().name(), random);
         
         int age = (int)((System.currentTimeMillis() - birthTime) / (1000L * 60 * 60 * 24 * 365));
         int happiness = 40 + random.nextInt(60);
@@ -194,17 +216,28 @@ public class VillagerAncestryManager {
         String profession = getHistoricalProfession(generationLevel, random);
         String birthPlace = generateAncestralBirthPlace(child.getBirthPlace(), generationLevel, random);
         
-        VillagerData ancestor = new VillagerData(
-            name, age, gender, personality, happiness,
-            random.nextInt(100), "", List.of(profession),
-            new HashMap<>(), new ArrayList<>(), "", "",
-            new ArrayList<>(), new ArrayList<>(),
-            "", getHistoricalHobby(random), birthTime, birthPlace,
-            generateHistoricalNotes(generationLevel, random),
-            birthTime + (60L + random.nextInt(25)) * 365 * 24 * 60 * 60 * 1000,
-            false
-        );
-        
+        VillagerData ancestor = new VillagerData();
+        ancestor.setName(name);
+        ancestor.setAge(age);
+        ancestor.setGender(gender);
+        ancestor.setPersonality(VillagerConstants.PersonalityType.fromString(personality));
+        ancestor.setHappiness(happiness);
+        ancestor.setTotalTrades(random.nextInt(100));
+        ancestor.setFavoritePlayerId("");
+        ancestor.setProfessionHistory(List.of(profession));
+        ancestor.setPlayerRelations(new HashMap<>());
+        ancestor.setFamilyMembers(new ArrayList<>());
+        ancestor.setSpouseName("");
+        ancestor.setSpouseId("");
+        ancestor.setChildrenIds(new ArrayList<>());
+        ancestor.setChildrenNames(new ArrayList<>());
+        ancestor.setFavoriteFood("");
+        ancestor.setHobby(VillagerConstants.HobbyType.fromString(getHistoricalHobby(random)));
+        ancestor.setBirthTime(birthTime);
+        ancestor.setBirthPlace(birthPlace);
+        ancestor.setNotes(generateHistoricalNotes(generationLevel, random));
+        ancestor.setDeathTime(birthTime + (60L + random.nextInt(25)) * 365L * 24 * 60 * 60 * 1000);
+        ancestor.setAlive(false);
         return ancestor;
     }
     
@@ -237,7 +270,7 @@ public class VillagerAncestryManager {
             return childPersonality;
         }
         
-        String[] personalities = VillagerData.PERSONALITIES;
+        String[] personalities = java.util.Arrays.stream(com.beeny.constants.VillagerConstants.PersonalityType.values()).map(Enum::name).toArray(String[]::new);
         return personalities[random.nextInt(personalities.length)];
     }
     

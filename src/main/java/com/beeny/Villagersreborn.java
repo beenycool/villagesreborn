@@ -1,33 +1,31 @@
 package com.beeny;
 
+import com.beeny.commands.TestTTSCommand;
 import com.beeny.commands.VillagerCommands;
 import com.beeny.config.VillagersRebornConfig;
 import com.beeny.data.VillagerData;
-import com.beeny.network.VillagerTeleportPacket;
-import com.beeny.network.UpdateVillagerNotesPacket;
-import com.beeny.network.VillagerMarriagePacket;
-import com.beeny.network.OpenFamilyTreePacket;
-import com.beeny.network.FamilyTreeDataPacket;
-import com.beeny.network.RequestVillagerListPacket;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import com.beeny.network.*;
 import com.beeny.registry.ModItems;
+import com.beeny.system.ServerVillagerManager;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
-import com.beeny.system.ServerVillagerManager;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.serialization.Codec;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.component.DataComponentTypes;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.registry.Registries;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
@@ -35,33 +33,37 @@ import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.registry.Registries;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Random;
 
-public class Villagersreborn implements ModInitializer {
-	public static final String MOD_ID = "villagersreborn";
-	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-	
-	private static final Random RANDOM = new Random();
-	private static int tickCounter = 0;
+import static net.minecraft.server.command.CommandManager.argument;
+import static net.minecraft.server.command.CommandManager.literal;
 
-	
-	public static final AttachmentType<String> VILLAGER_NAME = AttachmentRegistry.<String>builder()
-			.persistent(Codec.STRING)
-			.buildAndRegister(Identifier.of(MOD_ID, "villager_name"));
-	
-	
-	public static final AttachmentType<VillagerData> VILLAGER_DATA = AttachmentRegistry.<VillagerData>builder()
-			.persistent(VillagerData.CODEC)
-			.initializer(VillagerData::new)
-			.buildAndRegister(Identifier.of(MOD_ID, "villager_data"));
+/**
+ * Thin delegator preserved for compatibility. Real logic split into:
+ * - ModInitializer (initialization, registration, setup)
+ * - EventHandler (event handling)
+ * - TickHandler (server tick periodic tasks)
+ */
+public class Villagersreborn implements ModInitializer {
+    public static final String MOD_ID = com.beeny.constants.StringConstants.MOD_ID;
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    // Attachment storing the full VillagerData on villager entities
+    public static final AttachmentType<VillagerData> VILLAGER_DATA = AttachmentRegistry.<VillagerData>builder()
+	    .persistent(VillagerData.CODEC)
+	    .buildAndRegister(Identifier.of(MOD_ID, "villager_data"));
+
+    public static final AttachmentType<String> VILLAGER_NAME = AttachmentRegistry.<String>builder()
+            .persistent(Codec.STRING)
+            .buildAndRegister(Identifier.of(MOD_ID, "villager_name"));
+
+    private static final Random RANDOM = new Random();
+    private static int tickCounter = 0;
 
 	@Override
 	public void onInitialize() {
@@ -133,6 +135,12 @@ public class Villagersreborn implements ModInitializer {
 	}
 	
 	private void registerEvents() {
+		// Register chat message event for AI integration
+		net.fabricmc.fabric.api.message.v1.ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
+			// Process chat message for AI responses
+			com.beeny.system.VillagerAISystem.processPlayerChat(sender, message.getContent().getString());
+		});
+		
 		
 		UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
 			if (entity instanceof VillagerEntity villager && !world.isClient) {

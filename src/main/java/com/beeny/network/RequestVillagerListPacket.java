@@ -1,6 +1,7 @@
 package com.beeny.network;
 
 import com.beeny.Villagersreborn;
+import com.beeny.constants.StringConstants;
 import com.beeny.data.VillagerData;
 import com.beeny.system.ServerVillagerManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -17,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RequestVillagerListPacket implements CustomPayload {
-    public static final CustomPayload.Id<RequestVillagerListPacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, "request_villager_list"));
+    public static final CustomPayload.Id<RequestVillagerListPacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, StringConstants.CH_REQUEST_VILLAGER_LIST));
     public static final PacketCodec<RegistryByteBuf, RequestVillagerListPacket> CODEC = PacketCodec.of((value, buf) -> {}, buf -> new RequestVillagerListPacket());
 
     @Override
@@ -37,6 +38,10 @@ public class RequestVillagerListPacket implements CustomPayload {
     }
 
     public static void sendVillagerList(ServerPlayerEntity player) {
+        // Cap the number of villagers sent to the client to avoid network/perf issues.
+        // 200 is a sensible upper bound for UI lists and dense villages while preventing large payloads.
+        final int MAX_VILLAGERS_TO_SEND = 200;
+
         List<VillagerDataPacket> villagerDataList = new ArrayList<>();
         
         // Debug logging
@@ -71,99 +76,65 @@ public class RequestVillagerListPacket implements CustomPayload {
         // Get all tracked villagers from the ServerVillagerManager
         int sameWorldCount = 0;
         int withDataCount = 0;
+        
+        // Track UUIDs to detect duplicates
+        java.util.Set<java.util.UUID> seenUuids = new java.util.HashSet<>();
+        int duplicateCount = 0;
+        
         for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
             // Only include villagers in the same world as the player
             if (villager.getWorld() != player.getWorld()) continue;
             sameWorldCount++;
             
+            // Check for duplicate UUIDs
+            java.util.UUID villagerUuid = villager.getUuid();
+            if (seenUuids.contains(villagerUuid)) {
+                Villagersreborn.LOGGER.warn("[RequestVillagerListPacket] Duplicate UUID detected: {} for villager at {}",
+                    villagerUuid, villager.getBlockPos());
+                duplicateCount++;
+            } else {
+                seenUuids.add(villagerUuid);
+            }
+            
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
             if (data != null) {
                 withDataCount++;
-                villagerDataList.add(new VillagerDataPacket(
-                    villager.getId(),
-                    data.getName(),
-                    villager.getBlockPos(),
-                    data.getProfessionHistory().isEmpty() ? "None" : data.getProfessionHistory().get(0),
-                    data.getHappiness()
-                ));
-                Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}", 
+                villagerDataList.add(VillagerDataPacket.fromVillagerData(data, villager.getId(), villager.getUuid()));
+                Villagersreborn.LOGGER.debug("[RequestVillagerListPacket] Including villager: {} at {}",
                     data.getName(), villager.getBlockPos());
             }
         }
         
-        Villagersreborn.LOGGER.info("[RequestVillagerListPacket] Found {} villagers in same world, {} with data. Sending {} villagers to client.", 
-            sameWorldCount, withDataCount, villagerDataList.size());
-        
-        ServerPlayNetworking.send(player, new ResponsePacket(villagerDataList));
-    }
-
-    public static class VillagerDataPacket {
-        private final int entityId;
-        private final String name;
-        private final int x, y, z;
-        private final String profession;
-        private final int happiness;
-
-        public VillagerDataPacket(int entityId, String name, int x, int y, int z, String profession, int happiness) {
-            this.entityId = entityId;
-            this.name = name;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.profession = profession;
-            this.happiness = happiness;
+        // Log total duplicate count
+        if (duplicateCount > 0) {
+            Villagersreborn.LOGGER.warn("[RequestVillagerListPacket] Found {} duplicate UUIDs in tracked villager list", duplicateCount);
         }
         
-        public VillagerDataPacket(int entityId, String name, net.minecraft.util.math.BlockPos pos, String profession, int happiness) {
-            this(entityId, name, pos.getX(), pos.getY(), pos.getZ(), profession, happiness);
-        }
+        // Truncate the list to the maximum allowed size before sending
+        List<VillagerDataPacket> toSend = villagerDataList.size() > MAX_VILLAGERS_TO_SEND
+                ? new ArrayList<>(villagerDataList.subList(0, MAX_VILLAGERS_TO_SEND))
+                : new ArrayList<>(villagerDataList);
 
-        public void toPacket(RegistryByteBuf buf) {
-            buf.writeInt(entityId);
-            buf.writeString(name);
-            buf.writeInt(x);
-            buf.writeInt(y);
-            buf.writeInt(z);
-            buf.writeString(profession);
-            buf.writeInt(happiness);
-        }
+        Villagersreborn.LOGGER.info("[RequestVillagerListPacket] Found {} villagers in same world, {} with data. Sending {} (capped at {}) villagers to client.",
+                sameWorldCount, withDataCount, toSend.size(), MAX_VILLAGERS_TO_SEND);
 
-        public static VillagerDataPacket fromPacket(RegistryByteBuf buf) {
-            int entityId = buf.readInt();
-            String name = buf.readString();
-            int x = buf.readInt();
-            int y = buf.readInt();
-            int z = buf.readInt();
-            String profession = buf.readString();
-            int happiness = buf.readInt();
-            
-            return new VillagerDataPacket(entityId, name, x, y, z, profession, happiness);
-        }
-
-        // Getters
-        public int getEntityId() { return entityId; }
-        public String getName() { return name; }
-        public int getX() { return x; }
-        public int getY() { return y; }
-        public int getZ() { return z; }
-        public String getProfession() { return profession; }
-        public int getHappiness() { return happiness; }
+        ServerPlayNetworking.send(player, new ResponsePacket(toSend));
     }
 
     public static class ResponsePacket implements CustomPayload {
-        public static final CustomPayload.Id<ResponsePacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, "villager_list_response"));
+        public static final CustomPayload.Id<ResponsePacket> ID = new CustomPayload.Id<>(Identifier.of(Villagersreborn.MOD_ID, StringConstants.CH_VILLAGER_LIST_RESPONSE));
         public static final PacketCodec<RegistryByteBuf, ResponsePacket> CODEC = PacketCodec.of(
             (value, buf) -> {
                 buf.writeInt(value.villagerDataList.size());
                 for (VillagerDataPacket villagerData : value.villagerDataList) {
-                    villagerData.toPacket(buf);
+                    VillagerDataPacket.CODEC.encode(buf, villagerData);
                 }
             },
             buf -> {
                 int size = buf.readInt();
                 List<VillagerDataPacket> list = new ArrayList<>();
                 for (int i = 0; i < size; i++) {
-                    list.add(VillagerDataPacket.fromPacket(buf));
+                    list.add(VillagerDataPacket.CODEC.decode(buf));
                 }
                 return new ResponsePacket(list);
             }

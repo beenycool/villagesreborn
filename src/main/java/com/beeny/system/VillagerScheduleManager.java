@@ -1,6 +1,7 @@
 package com.beeny.system;
 
 import com.beeny.Villagersreborn;
+import com.beeny.ai.core.AISubsystem;
 import com.beeny.data.VillagerData;
 import com.beeny.system.ServerVillagerManager;
 import net.minecraft.entity.ai.goal.Goal;
@@ -12,10 +13,17 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.poi.PointOfInterestTypes;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import net.minecraft.entity.ai.brain.MemoryModuleType;
+import net.minecraft.entity.ai.brain.WalkTarget;
+import net.minecraft.entity.ai.brain.LookTarget;
+import net.minecraft.util.math.GlobalPos;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class VillagerScheduleManager {
+public class VillagerScheduleManager implements AISubsystem {
     
     public enum TimeOfDay {
         DAWN(0, 1000, "Dawn"),
@@ -26,9 +34,9 @@ public class VillagerScheduleManager {
         NIGHT(13000, 23000, "Night"),
         MIDNIGHT(23000, 24000, "Midnight");
         
-        final long startTime;
-        final long endTime;
-        final String name;
+        public final long startTime;
+        public final long endTime;
+        public final String name;
         
         TimeOfDay(long startTime, long endTime, String name) {
             this.startTime = startTime;
@@ -93,14 +101,17 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static final Map<String, Schedule> PROFESSION_SCHEDULES = new HashMap<>();
+    private static final Map<String, Schedule> professionSchedules = new HashMap<>();
+    private final Map<String, Long> villagerLastUpdate = new ConcurrentHashMap<>();
+    private static long lastProcessedDay = -1;
+    private long updateCount = 0;
+    private long lastMaintenanceTime = System.currentTimeMillis();
     
-    static {
-        
+    public VillagerScheduleManager() {
         initializeProfessionSchedules();
     }
     
-    private static void initializeProfessionSchedules() {
+    private void initializeProfessionSchedules() {
         
         Schedule farmerSchedule = new Schedule();
         farmerSchedule.setActivity(TimeOfDay.DAWN, Activity.WAKE_UP);
@@ -109,7 +120,7 @@ public class VillagerScheduleManager {
         farmerSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WORK);
         farmerSchedule.setActivity(TimeOfDay.DUSK, Activity.RELAX);
         farmerSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:farmer", farmerSchedule);
+        professionSchedules.put("minecraft:farmer", farmerSchedule);
         
         
         Schedule librarianSchedule = new Schedule();
@@ -119,7 +130,7 @@ public class VillagerScheduleManager {
         librarianSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.STUDY);
         librarianSchedule.setActivity(TimeOfDay.DUSK, Activity.SOCIALIZE);
         librarianSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:librarian", librarianSchedule);
+        professionSchedules.put("minecraft:librarian", librarianSchedule);
         
         
         Schedule clericSchedule = new Schedule();
@@ -129,7 +140,7 @@ public class VillagerScheduleManager {
         clericSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.SOCIALIZE);
         clericSchedule.setActivity(TimeOfDay.DUSK, Activity.PRAY);
         clericSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:cleric", clericSchedule);
+        professionSchedules.put("minecraft:cleric", clericSchedule);
         
         
         Schedule blacksmithSchedule = new Schedule();
@@ -139,9 +150,9 @@ public class VillagerScheduleManager {
         blacksmithSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WORK);
         blacksmithSchedule.setActivity(TimeOfDay.DUSK, Activity.EXERCISE);
         blacksmithSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:armorer", blacksmithSchedule);
-        PROFESSION_SCHEDULES.put("minecraft:weaponsmith", blacksmithSchedule);
-        PROFESSION_SCHEDULES.put("minecraft:toolsmith", blacksmithSchedule);
+        professionSchedules.put("minecraft:armorer", blacksmithSchedule);
+        professionSchedules.put("minecraft:weaponsmith", blacksmithSchedule);
+        professionSchedules.put("minecraft:toolsmith", blacksmithSchedule);
         
         
         Schedule nitwitSchedule = new Schedule();
@@ -151,7 +162,7 @@ public class VillagerScheduleManager {
         nitwitSchedule.setActivity(TimeOfDay.AFTERNOON, Activity.WANDER);
         nitwitSchedule.setActivity(TimeOfDay.DUSK, Activity.SOCIALIZE);
         nitwitSchedule.setActivity(TimeOfDay.NIGHT, Activity.SLEEP);
-        PROFESSION_SCHEDULES.put("minecraft:nitwit", nitwitSchedule);
+        professionSchedules.put("minecraft:nitwit", nitwitSchedule);
     }
     
     public static Activity getCurrentActivity(VillagerEntity villager) {
@@ -163,37 +174,51 @@ public class VillagerScheduleManager {
             return Activity.WANDER;
         }
         
+        // Get config values
+        int maxTimeVariation = com.beeny.config.ConfigManager.getInt("maxTimeVariation", 4);
+        int defaultActivityWeight = com.beeny.config.ConfigManager.getInt("defaultActivityWeight", 100);
+        
         // Get individual time preferences based on personality and villager ID
-        int personalityOffset = getPersonalityTimeOffset(data);
-        int individualOffset = Math.abs(villager.getUuid().hashCode()) % 4 - 2; // -2 to +1 hours variation
+        int personalityOffset = getPersonalityTimeOffsetStatic(data);
+        int individualOffset = Math.abs(villager.getUuid().hashCode()) % maxTimeVariation - (maxTimeVariation/2);
         long adjustedTime = (worldTime + (personalityOffset + individualOffset) * 1000) % 24000;
         TimeOfDay adjustedTimeOfDay = TimeOfDay.fromWorldTime(adjustedTime);
         
         // Get base activity probabilities for the time period
-        Map<Activity, Float> activityWeights = getActivityWeights(adjustedTimeOfDay, data, villager);
+        Map<Activity, Float> activityWeights = getActivityWeightsStatic(adjustedTimeOfDay, data, villager);
+        
+        // Apply default weight for activities not configured
+        activityWeights.forEach((activity, weight) -> {
+            if (weight == null || weight <= 0) {
+                activityWeights.put(activity, (float) defaultActivityWeight);
+            }
+        });
         
         // Select activity based on weighted probability
-        return selectWeightedActivity(activityWeights, villager);
+        return selectWeightedActivityStatic(activityWeights, villager);
     }
     
-    private static int getPersonalityTimeOffset(VillagerData data) {
-        return switch (data.getPersonality()) {
-            case "Energetic" -> -2; // Early riser
-            case "Lazy" -> 3; // Late sleeper
-            case "Serious" -> -1; // Slightly early
-            case "Cheerful" -> -1; // Morning person
-            case "Grumpy" -> 2; // Not a morning person
-            case "Nervous" -> 1; // Irregular schedule
+    private static int getPersonalityTimeOffsetStatic(VillagerData data) {
+        return switch (data.getPersonality().name()) {
+            case "ENERGETIC" -> -2; // Early riser
+            case "LAZY" -> 3; // Late sleeper
+            case "SERIOUS" -> -1; // Slightly early
+            case "CHEERFUL" -> -1; // Morning person
+            case "GRUMPY" -> 2; // Not a morning person
+            case "NERVOUS" -> 1; // Irregular schedule
             default -> 0; // Normal schedule
         };
     }
     
-    private static Map<Activity, Float> getActivityWeights(TimeOfDay timeOfDay, VillagerData data, VillagerEntity villager) {
+    private static Map<Activity, Float> getActivityWeightsStatic(TimeOfDay timeOfDay, VillagerData data, VillagerEntity villager) {
         Map<Activity, Float> weights = new EnumMap<>(Activity.class);
         
         // Base weights for time of day
         switch (timeOfDay) {
             case DAWN -> {
+                weights.put(Activity.WAKE_UP, 0.3f);
+                weights.put(Activity.SLEEP, 0.4f);
+                weights.put(Activity.PRAY, 0.1f);
                 weights.put(Activity.WAKE_UP, 0.3f);
                 weights.put(Activity.SLEEP, 0.4f);
                 weights.put(Activity.PRAY, 0.1f);
@@ -244,52 +269,52 @@ public class VillagerScheduleManager {
         }
         
         // Apply personality modifiers
-        applyPersonalityModifiers(weights, data);
+        applyPersonalityModifiersStatic(weights, data);
         
         // Apply profession modifiers
-        applyProfessionModifiers(weights, villager);
+        applyProfessionModifiersStatic(weights, villager);
         
         // Apply contextual modifiers
-        applyContextualModifiers(weights, data, villager);
+        applyContextualModifiersStatic(weights, data, villager);
         
         return weights;
     }
     
-    private static void applyPersonalityModifiers(Map<Activity, Float> weights, VillagerData data) {
-        switch (data.getPersonality()) {
-            case "Energetic" -> {
+    private static void applyPersonalityModifiersStatic(Map<Activity, Float> weights, VillagerData data) {
+        switch (data.getPersonality().name()) {
+            case "ENERGETIC" -> {
                 weights.replaceAll((k, v) -> k == Activity.EXERCISE || k == Activity.WORK ? v * 1.5f : v);
                 weights.replaceAll((k, v) -> k == Activity.SLEEP || k == Activity.RELAX ? v * 0.7f : v);
             }
-            case "Lazy" -> {
+            case "LAZY" -> {
                 weights.replaceAll((k, v) -> k == Activity.RELAX || k == Activity.SLEEP ? v * 1.4f : v);
                 weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.EXERCISE ? v * 0.6f : v);
             }
-            case "Friendly" -> {
+            case "FRIENDLY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 1.6f : v);
             }
-            case "Shy" -> {
+            case "SHY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.5f : v);
                 weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.HOBBY ? v * 1.3f : v);
             }
-            case "Curious" -> {
+            case "CURIOUS" -> {
                 weights.replaceAll((k, v) -> k == Activity.STUDY || k == Activity.WANDER ? v * 1.4f : v);
             }
-            case "Serious" -> {
+            case "SERIOUS" -> {
                 weights.replaceAll((k, v) -> k == Activity.WORK || k == Activity.STUDY ? v * 1.3f : v);
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 0.8f : v);
             }
-            case "Cheerful" -> {
+            case "CHEERFUL" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE || k == Activity.HOBBY ? v * 1.3f : v);
             }
-            case "Grumpy" -> {
+            case "GRUMPY" -> {
                 weights.replaceAll((k, v) -> k == Activity.SOCIALIZE ? v * 0.6f : v);
                 weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 1.4f : v);
             }
         }
     }
     
-    private static void applyProfessionModifiers(Map<Activity, Float> weights, VillagerEntity villager) {
+    private static void applyProfessionModifiersStatic(Map<Activity, Float> weights, VillagerEntity villager) {
         String professionKey = villager.getVillagerData().profession().getKey()
             .map(key -> key.getValue().toString()).orElse("minecraft:none");
             
@@ -310,7 +335,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static void applyContextualModifiers(Map<Activity, Float> weights, VillagerData data, VillagerEntity villager) {
+    private static void applyContextualModifiersStatic(Map<Activity, Float> weights, VillagerData data, VillagerEntity villager) {
         // Happiness affects activity preferences
         if (data.getHappiness() < 20) {
             weights.replaceAll((k, v) -> k == Activity.WANDER ? v * 2.0f : v);
@@ -334,7 +359,7 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static Activity selectWeightedActivity(Map<Activity, Float> weights, VillagerEntity villager) {
+    private static Activity selectWeightedActivityStatic(Map<Activity, Float> weights, VillagerEntity villager) {
         float totalWeight = weights.values().stream().reduce(0f, Float::sum);
         if (totalWeight <= 0) return Activity.WANDER;
         
@@ -353,13 +378,31 @@ public class VillagerScheduleManager {
     }
     
     public static void updateSchedules(ServerWorld world) {
+        // Check for day change
+        long currentTime = world.getTimeOfDay();
+        long currentDay = currentTime / 24000;
+        if (lastProcessedDay != currentDay) {
+            DailyActivityTracker.onDayChange(world);
+            lastProcessedDay = currentDay;
+        }
+        
         // Use ServerVillagerManager instead of scanning the entire world
         for (VillagerEntity villager : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
             // Only update villagers in the same world
             if (villager.getWorld() != world) continue;
             
-            Activity currentActivity = getCurrentActivity(villager);
-            updateVillagerBehavior(villager, currentActivity);
+            Activity currentActivity = VillagerScheduleManager.getCurrentActivity(villager);
+            
+            // Track activity changes
+            String villagerId = villager.getUuidAsString();
+            DailyActivityTracker.ActivityEntry trackedActivity = DailyActivityTracker.getCurrentActivity(villagerId);
+            
+            if (trackedActivity == null || !trackedActivity.getActivity().equals(currentActivity.description)) {
+                String details = generateActivityDetails(villager, currentActivity);
+                DailyActivityTracker.startActivity(villager, currentActivity, details);
+            }
+            
+            VillagerScheduleManager.updateVillagerBehavior(villager, currentActivity);
             
             
             VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
@@ -376,25 +419,213 @@ public class VillagerScheduleManager {
         }
     }
     
-    private static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
-        
-        
-        
+    public static void updateVillagerBehavior(VillagerEntity villager, Activity activity) {
         switch (activity) {
             case SLEEP -> {
-                // Villager should go to bed - note: sleep behavior handled by Minecraft AI
+                // Villager should go to bed - find and path to bed
+                if (!villager.isSleeping()) {
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_SLEPT, villager.getWorld().getTime());
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                    
+                    // Try to find a bed if not already sleeping
+                    Optional<BlockPos> bedPos = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.NEAREST_BED);
+                    if (bedPos.isPresent()) {
+                        villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                            new net.minecraft.entity.ai.brain.WalkTarget(bedPos.get(), 1.0f, 0));
+                    }
+                }
             }
             case WORK -> {
+                // Villager should work at their job site
+                villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_WORKED_AT_POI, villager.getWorld().getTime());
                 
+                // Find job site if not already working
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    BlockPos js = jobSite.get().pos();
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(js, 1.0f, 1));
+                } else {
+                    // Wander near village center if no job site
+                    Optional<GlobalPos> villageCenter = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    villageCenter.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 2)));
+                }
             }
             case SOCIALIZE -> {
+                // Villager should interact with other villagers
+                List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
+                    VillagerEntity.class,
+                    new Box(villager.getBlockPos()).expand(16),
+                    v -> v != villager && v.isAlive()
+                );
                 
+                if (!nearbyVillagers.isEmpty()) {
+                    VillagerEntity target = nearbyVillagers.get(villager.getRandom().nextInt(nearbyVillagers.size()));
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.INTERACTION_TARGET, target);
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                    
+                    // Trigger social interaction
+                    // Use WalkTarget toward target and let vanilla behaviors handle look direction
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                } else {
+                    // Wander if no villagers nearby
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                }
             }
             case EAT -> {
+                // Villager should find food or eat
+                // Note: MemoryModuleType.LAST_EATEN and VillagerEntity.eatFood are not present in this version.
+                // Fallback: if inventory empty, meander toward HOME; otherwise just pause briefly (no consume).
+                if (villager.getInventory().isEmpty()) {
+                    Optional<GlobalPos> villageCenter = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    villageCenter.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 3)));
+                } else {
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                }
+            }
+            case RELAX -> {
+                // Villager should relax at home or in a comfortable spot
+                Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                if (home.isPresent()) {
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(home.get().pos(), 0.6f, 1));
+                } else {
+                    // Find a nearby seat or wander slowly
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                }
+            }
+            case HOBBY -> {
+                // Villager should engage in hobby activities
+                VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+                if (data != null && data.getHobby() != null) {
+                    // Hobby-specific behavior based on the villager's hobby
+                    String hobby = data.getHobby().name();
+                    switch (hobby.toLowerCase()) {
+                        case "fishing":
+                            // Move toward water
+                            villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                                new net.minecraft.entity.ai.brain.WalkTarget(villager.getBlockPos(), 0.7f, 5));
+                            break;
+                        case "gardening":
+                            // Look for flowers or crops
+                            villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                                new net.minecraft.entity.ai.brain.WalkTarget(villager.getBlockPos(), 0.5f, 3));
+                            break;
+                        default:
+                            // Generic hobby behavior - wander and observe
+                            villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                            villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                    }
+                } else {
+                    // Default hobby behavior
+                    villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                }
+            }
+            case WAKE_UP -> {
+                // Villager wakes up from sleep
+                if (villager.isSleeping()) {
+                    villager.wakeUp();
+                }
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_SLEPT);
                 
+                // Look for morning activities
+                Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                    new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 1.0f, 2)));
+            }
+            case WANDER -> {
+                // Villager should wander around
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
+                
+                // Random wandering behavior
+                if (villager.getRandom().nextInt(100) < 5) { // 5% chance per tick
+                    BlockPos wanderTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(10) - 5,
+                        0,
+                        villager.getRandom().nextInt(10) - 5
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(wanderTarget, 0.8f, 0));
+                }
+            }
+            case PRAY -> {
+                // Villager should pray - typically at a church or designated area
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    // Clerics pray at their job site (church)
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(jobSite.get().pos(), 1.0f, 0));
+                } else {
+                    // Find a quiet spot to pray
+                    Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.5f, 1)));
+                }
+                // Remove LookTarget instantiation (abstract); rely on walk/idle behavior
+            }
+            case STUDY -> {
+                // Villager should study - typically at job site or home
+                Optional<GlobalPos> jobSite = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+                if (jobSite.isPresent()) {
+                    // Librarians study at their job site (library)
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(jobSite.get().pos(), 1.0f, 1));
+                } else {
+                    // Study at home
+                    Optional<GlobalPos> home = villager.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+                    home.ifPresent(gp -> villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(gp.pos(), 0.8f, 1)));
+                }
+                // Remove LookTarget instantiation (abstract)
+            }
+            case EXERCISE -> {
+                // Villager should exercise - move around actively
+                if (villager.getRandom().nextInt(100) < 10) { // 10% chance per tick
+                    BlockPos exerciseTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(8) - 4,
+                        0,
+                        villager.getRandom().nextInt(8) - 4
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(exerciseTarget, 1.2f, 0));
+                }
+            }
+            case SHOP -> {
+                // Villager should shop - interact with other villagers or visit market areas
+                List<VillagerEntity> nearbyVillagers = villager.getWorld().getEntitiesByClass(
+                    VillagerEntity.class,
+                    new Box(villager.getBlockPos()).expand(12),
+                    v -> v != villager && v.isAlive() && v.getVillagerData().profession() != villager.getVillagerData().profession()
+                );
+                
+                if (!nearbyVillagers.isEmpty()) {
+                    VillagerEntity target = nearbyVillagers.get(villager.getRandom().nextInt(nearbyVillagers.size()));
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.INTERACTION_TARGET, target);
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(target.getBlockPos(), 1.0f, 1));
+                } else {
+                    // Wander to simulate shopping
+                    BlockPos shopTarget = villager.getBlockPos().add(
+                        villager.getRandom().nextInt(6) - 3,
+                        0,
+                        villager.getRandom().nextInt(6) - 3
+                    );
+                    villager.getBrain().remember(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET,
+                        new net.minecraft.entity.ai.brain.WalkTarget(shopTarget, 0.9f, 1));
+                }
             }
             default -> {
-                
+                // Default behavior - basic wandering
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.WALK_TARGET);
+                villager.getBrain().forget(net.minecraft.entity.ai.brain.MemoryModuleType.LOOK_TARGET);
             }
         }
     }
@@ -427,7 +658,7 @@ public class VillagerScheduleManager {
         
         String professionKey = villager.getVillagerData().profession().getKey()
             .map(key -> key.getValue().toString()).orElse("minecraft:none");
-        Schedule schedule = PROFESSION_SCHEDULES.getOrDefault(professionKey, new Schedule());
+        Schedule schedule = professionSchedules.getOrDefault(professionKey, new Schedule());
         
         info.add(Text.literal("=== Daily Schedule ===").formatted(Formatting.GOLD));
         
@@ -448,6 +679,144 @@ public class VillagerScheduleManager {
                 .formatted(getActivityFormatting(current))));
         
         return info;
+    }
+    
+    private static String generateActivityDetails(VillagerEntity villager, Activity activity) {
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data == null) return "";
+        
+        StringBuilder details = new StringBuilder();
+        
+        switch (activity) {
+            case WORK -> {
+                String profession = villager.getVillagerData().profession().getKey()
+                    .map(key -> key.getValue().toString()).orElse("unknown");
+                details.append("Working as ").append(profession.replace("minecraft:", ""));
+            }
+            case SOCIALIZE -> {
+                long nearbyVillagers = villager.getWorld().getEntitiesByClass(VillagerEntity.class, 
+                    villager.getBoundingBox().expand(10), v -> v != villager).size();
+                details.append("With ").append(nearbyVillagers).append(" other villagers");
+            }
+            case EAT -> {
+                details.append("Enjoying ").append(data.getFavoriteFood().isEmpty() ? "food" : data.getFavoriteFood());
+            }
+            case HOBBY -> {
+                details.append("Enjoying ").append(com.beeny.system.VillagerHobbySystem.getHobbyActivityDescription(data.getHobby()));
+            }
+            case RELAX -> {
+                details.append("Happiness: ").append(data.getHappiness()).append("/100");
+            }
+            case SLEEP -> {
+                details.append("Getting rest");
+            }
+            case STUDY -> {
+                details.append("Reading and learning");
+            }
+            case EXERCISE -> {
+                details.append("Staying fit");
+            }
+            case SHOP -> {
+                details.append("Looking for supplies");
+            }
+            case PRAY -> {
+                details.append("At place of worship");
+            }
+            default -> {
+                details.append("Age: ").append(data.getAge()).append(" days");
+            }
+        }
+        
+        return details.toString();
+    }
+    
+    // AISubsystem interface implementation
+    
+    @Override
+    public void initializeVillager(@NotNull VillagerEntity villager, @NotNull VillagerData data) {
+        String villagerUuid = villager.getUuidAsString();
+        villagerLastUpdate.put(villagerUuid, System.currentTimeMillis());
+    }
+    
+    @Override
+    public void updateVillager(@NotNull VillagerEntity villager) {
+        String villagerUuid = villager.getUuidAsString();
+        long currentTime = System.currentTimeMillis();
+        villagerLastUpdate.put(villagerUuid, currentTime);
+        updateCount++;
+        
+        // Update villager activity based on current time
+        Activity currentActivity = this.getCurrentActivity(villager);
+        this.updateVillagerBehavior(villager, currentActivity);
+        
+        // Update villager display name with activity
+        VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
+        if (data != null) {
+            if (currentActivity != Activity.WAKE_UP) {
+                Text activityText = Text.literal(" [" + currentActivity.description + "]")
+                    .formatted(this.getActivityFormatting(currentActivity));
+                Text fullName = Text.literal(data.getName()).append(activityText);
+                villager.setCustomName(fullName);
+            } else {
+                villager.setCustomName(Text.literal(data.getName()));
+            }
+        }
+    }
+    
+    @Override
+    public void cleanupVillager(@NotNull String villagerUuid) {
+        villagerLastUpdate.remove(villagerUuid);
+    }
+    
+    @Override
+    public boolean needsUpdate(@NotNull VillagerEntity villager) {
+        String villagerUuid = villager.getUuidAsString();
+        Long lastUpdate = villagerLastUpdate.get(villagerUuid);
+        if (lastUpdate == null) return true;
+        
+        return System.currentTimeMillis() - lastUpdate >= this.getUpdateInterval();
+    }
+    
+    @Override
+    public long getUpdateInterval() {
+        return 10000; // Update every 10 seconds
+    }
+    
+    @Override
+    @NotNull
+    public Map<String, Object> getAnalytics() {
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("trackedVillagers", villagerLastUpdate.size()); 
+        analytics.put("updateCount", updateCount);
+        analytics.put("lastProcessedDay", lastProcessedDay);
+        return analytics;
+    }
+    
+    @Override
+    public void performMaintenance() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastMaintenanceTime > 300000) { // 5 minutes
+            // Clean up old entries for villagers that might have been unloaded
+            villagerLastUpdate.entrySet().removeIf(entry -> 
+                currentTime - entry.getValue() > 600000); // Remove entries older than 10 minutes
+            lastMaintenanceTime = currentTime;
+        }
+    }
+    
+    @Override
+    @NotNull
+    public String getSubsystemName() {
+        return "VillagerScheduleManager";
+    }
+    
+    @Override
+    public int getPriority() {
+        return 50; // Medium-high priority for scheduling
+    }
+    
+    @Override
+    public void shutdown() {
+        villagerLastUpdate.clear();
     }
     
     
@@ -472,9 +841,9 @@ public class VillagerScheduleManager {
         
         @Override
         public void tick() {
-            Activity currentActivity = getCurrentActivity(villager);
+            Activity currentActivity = VillagerScheduleManager.getCurrentActivity(villager);
             if (currentActivity != lastActivity) {
-                updateVillagerBehavior(villager, currentActivity);
+                VillagerScheduleManager.updateVillagerBehavior(villager, currentActivity);
                 lastActivity = currentActivity;
             }
         }

@@ -2,10 +2,16 @@ package com.beeny.mixin;
 
 import com.beeny.Villagersreborn;
 import com.beeny.data.VillagerData;
+import com.beeny.constants.VillagerConstants.PersonalityType;
 import com.beeny.system.VillagerRelationshipManager;
 import com.beeny.system.VillagerScheduleManager;
 import com.beeny.system.ServerVillagerManager;
+import com.beeny.system.VillagerHobbySystem;
+import com.beeny.system.VillagerEmotionalBehavior;
+import com.beeny.system.VillagerPersonalityBehavior;
+import com.beeny.system.VillagerMemoryEnhancer;
 import com.beeny.util.VillagerNames;
+import com.beeny.util.VillagerUtils;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -20,6 +26,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.village.TradeOffer;
 import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.World;
@@ -33,15 +40,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
 @Mixin(VillagerEntity.class)
 public abstract class VillagerEntityMixin extends LivingEntity {
     @Shadow public abstract void setVillagerData(net.minecraft.village.VillagerData villagerData);
     
-    @Unique
-    private static final Random RANDOM = new Random();
     
     @Unique
     private int greetingCooldown = 0;
@@ -93,6 +98,27 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             updateHappinessBasedOnConditions(villager, data);
         }
         
+        // Perform hobby activities
+        if (updateCounter % 300 == 0) {
+            com.beeny.ai.AIWorldManagerRefactored.getInstance().getHobbySystem().performHobbyActivity(villager, data);
+        }
+        
+        // Update emotional state
+        if (updateCounter % 200 == 0) {
+            VillagerEmotionalBehavior.updateEmotionalState(villager, data);
+        }
+        
+        // Apply personality behaviors
+        if (updateCounter % 150 == 0) {
+            com.beeny.ai.AIWorldManagerRefactored.getInstance().getPersonalityBehavior().applyPersonalityEffects(villager, data);
+        }
+        
+        // Update memories and clean old ones
+        if (updateCounter % 600 == 0) {
+            VillagerMemoryEnhancer.updateMemoryBasedOnMood(data);
+            VillagerMemoryEnhancer.clearOldMemories(data);
+        }
+        
         
         if (updateCounter % 200 == 0 && !data.getSpouseId().isEmpty()) {
             checkSpouseProximity(villager, data);
@@ -107,6 +133,21 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         VillagerData data = villager.getAttached(Villagersreborn.VILLAGER_DATA);
         
         if (data == null) return;
+        
+        // Unhappy villagers might refuse interactions
+        if (data.getHappiness() < 20 && ThreadLocalRandom.current().nextFloat() < 0.3f) {
+            player.sendMessage(Text.literal(data.getName() + " turns away, too upset to interact...")
+                .formatted(Formatting.RED), true);
+            cir.setReturnValue(ActionResult.FAIL);
+            return;
+        }
+        
+        // Emotional state might affect interactions
+        if (VillagerEmotionalBehavior.shouldRefuseInteraction(data)) {
+            String emotionalRefusal = VillagerEmotionalBehavior.getEmotionalGreeting(data, data.getName(), data.getPersonality().name());
+            player.sendMessage(Text.literal(emotionalRefusal).formatted(Formatting.YELLOW), true);
+            // Don't fully refuse, just show emotional state
+        }
         
         
         if (player.isSneaking() && hand == Hand.MAIN_HAND) {
@@ -177,20 +218,70 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         data.incrementTrades();
         
         
-        data.adjustHappiness(2);
+        int happinessBonus = Math.max(1, data.getHappiness() / 25); // 1-4 happiness gain based on current happiness
+        
+        // Apply personality modifier to happiness gain
+        float personalityModifier = VillagerPersonalityBehavior.getPersonalityHappinessModifier(data.getPersonality());
+        happinessBonus = Math.round(happinessBonus * personalityModifier);
+        
+        data.adjustHappiness(happinessBonus);
         
         
         Entity customer = villager.getCustomer();
         if (customer instanceof PlayerEntity player) {
-            data.updatePlayerRelation(player.getUuidAsString(), 1);
+            // Happy villagers give better reputation gains, modified by personality
+            int reputationGain = data.getHappiness() > 70 ? 2 : 1;
+            int personalityBonus = VillagerPersonalityBehavior.getPersonalityTradeBonus(
+                data.getPersonality(), data.getPlayerReputation(player.getUuidAsString()));
+            reputationGain += personalityBonus;
+            
+            data.updatePlayerRelation(player.getUuidAsString(), Math.max(0, reputationGain));
+            
+            // Update memory system with trade interaction
+            VillagerMemoryEnhancer.updatePlayerMemory(villager, player, "trade");
+            
+            // Notify player of villager's mood and experience affecting the trade
+            if (data.getHappiness() > 80) {
+                player.sendMessage(Text.literal(data.getName() + " seems delighted by this trade!").formatted(Formatting.GREEN), true);
+            } else if (data.getHappiness() < 30) {
+                player.sendMessage(Text.literal(data.getName() + " reluctantly completes the trade...").formatted(Formatting.YELLOW), true);
+            }
+            
+            // Experience-based messages
+            if (data.getTotalTrades() == 1) {
+                player.sendMessage(Text.literal(data.getName() + " completed their first trade ever!").formatted(Formatting.GOLD), false);
+            } else if (data.getTotalTrades() == 25) {
+                player.sendMessage(Text.literal(data.getName() + " has become an experienced trader!").formatted(Formatting.BLUE), false);
+            } else if (data.getTotalTrades() == 100) {
+                player.sendMessage(Text.literal(data.getName() + " is now a master trader!").formatted(Formatting.LIGHT_PURPLE), false);
+            }
             
             
-            if (data.getTotalTrades() > 10 && data.getFavoritePlayerId().isEmpty()) {
+            // Favorite customer system with scaling requirements
+            if (data.getFavoritePlayerId().isEmpty()) {
                 int reputation = data.getPlayerReputation(player.getUuidAsString());
-                if (reputation > 20) {
+                int tradesWithPlayer = Math.min(data.getTotalTrades() / 3, 50); // Estimate trades with this player
+                
+                if (data.getTotalTrades() > 10 && reputation > 20 && tradesWithPlayer > 5) {
                     data.setFavoritePlayerId(player.getUuidAsString());
                     player.sendMessage(Text.literal(data.getName() + " now considers you their favorite customer!")
                         .formatted(Formatting.GOLD), false);
+                } else if (data.getTotalTrades() > 50 && reputation > 50) {
+                    data.setFavoritePlayerId(player.getUuidAsString());
+                    player.sendMessage(Text.literal(data.getName() + " declares you their most valued business partner!")
+                        .formatted(Formatting.LIGHT_PURPLE), false);
+                }
+            } else if (data.getFavoritePlayerId().equals(player.getUuidAsString())) {
+                // Special messages for favorite customers
+                if (ThreadLocalRandom.current().nextFloat() < 0.1f) {
+                    String[] favoriteMessages = {
+                        "Always a pleasure doing business with you!",
+                        "My favorite customer is back!",
+                        "I saved the best deals for you!",
+                        "You're the reason I love trading!"
+                    };
+                    String message = favoriteMessages[ThreadLocalRandom.current().nextInt(favoriteMessages.length)];
+                    player.sendMessage(Text.literal(data.getName() + ": " + message).formatted(Formatting.GOLD), true);
                 }
             }
         }
@@ -203,9 +294,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         
         if (data != null) {
             
-            String[] dramaticPersonalities = {"Energetic", "Confident", "Cheerful"};
-            data.setPersonality(dramaticPersonalities[RANDOM.nextInt(dramaticPersonalities.length)]);
-            data.adjustHappiness(-20); 
+            PersonalityType[] dramaticPersonalities = {PersonalityType.ENERGETIC, PersonalityType.CONFIDENT, PersonalityType.CHEERFUL};
+            data.setPersonality(dramaticPersonalities[ThreadLocalRandom.current().nextInt(dramaticPersonalities.length)]);
+            data.adjustHappiness(-20);
         }
     }
     
@@ -282,16 +373,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         }
         
         
-        // Use ServerVillagerManager for efficient nearby villager lookup
-        List<VillagerEntity> nearbyVillagers = new java.util.ArrayList<>();
-        for (VillagerEntity v : ServerVillagerManager.getInstance().getAllTrackedVillagers()) {
-            if (v != villager && v.getWorld() == villager.getWorld()) {
-                double distance = villager.getPos().distanceTo(v.getPos());
-                if (distance <= 10.0) {
-                    nearbyVillagers.add(v);
-                }
-            }
-        }
+        // Check social happiness based on nearby villagers
+        double range = 10.0;
+        List<VillagerEntity> nearbyVillagers = VillagerUtils.getNearbyVillagersOptimized(villager, range);
         
         if (nearbyVillagers.size() > 2) {
             data.adjustHappiness(1);
@@ -326,19 +410,36 @@ public abstract class VillagerEntityMixin extends LivingEntity {
         Formatting color;
         
         if (reputation > 50) {
-            greeting = getPositiveGreeting(data.getName(), data.getPersonality());
+            greeting = getPositiveGreeting(data.getName(), data.getPersonality().name());
             color = Formatting.GREEN;
             data.adjustHappiness(1);
         } else if (reputation < -20) {
-            greeting = getNegativeGreeting(data.getName(), data.getPersonality());
+            greeting = getNegativeGreeting(data.getName(), data.getPersonality().name());
             color = Formatting.RED;
         } else {
-            greeting = getNeutralGreeting(data.getName(), data.getPersonality());
+            greeting = getNeutralGreeting(data.getName(), data.getPersonality().name());
             color = Formatting.WHITE;
+        }
+        
+        // Override with emotional greeting if emotions are strong
+        String emotionalGreeting = VillagerEmotionalBehavior.getEmotionalGreeting(data, data.getName(), data.getPersonality().name());
+        if (!emotionalGreeting.equals(data.getName() + " says hello.")) {
+            greeting = emotionalGreeting;
+            color = Formatting.LIGHT_PURPLE;
+        } else {
+            // Use personality-specific greeting
+            String personalityGreeting = VillagerPersonalityBehavior.getPersonalitySpecificGreeting(
+                data.getPersonality(), data.getName(), reputation);
+            if (!personalityGreeting.contains("Hello") || personalityGreeting.length() > 20) {
+                greeting = personalityGreeting;
+                color = Formatting.AQUA;
+            }
         }
         
         player.sendMessage(Text.literal(greeting).formatted(color), true);
         
+        // Update memory system with greeting interaction
+        VillagerMemoryEnhancer.updatePlayerMemory(villager, player, "greeting");
         
         data.updatePlayerRelation(playerUuid, 1);
     }
@@ -367,7 +468,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
                 "Hello there!"
             };
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique
@@ -378,7 +479,7 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             case "Grumpy" -> new String[]{"What now?", "Yes?", "Hmph."};
             default -> new String[]{"Hello.", "Greetings.", "Good day."};
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique
@@ -400,13 +501,13 @@ public abstract class VillagerEntityMixin extends LivingEntity {
                 "Leave me alone."
             };
         };
-        return greetings[RANDOM.nextInt(greetings.length)];
+        return greetings[ThreadLocalRandom.current().nextInt(greetings.length)];
     }
     
     @Unique
     private void showDetailedInfo(PlayerEntity player, VillagerEntity villager, VillagerData data) {
         player.sendMessage(Text.literal("=== " + data.getName() + " ===").formatted(Formatting.GOLD), false);
-        player.sendMessage(Text.literal("Gender: " + data.getGender() + " | Age: " + data.getAgeInDays()), false);
+        player.sendMessage(Text.literal("Gender: " + data.getGender() + " | Age: " + data.getAge()), false);
         player.sendMessage(Text.literal("Personality: " + data.getPersonality() + " | Mood: " + data.getHappinessDescription()), false);
         player.sendMessage(Text.literal("Hobby: " + data.getHobby()), false);
         
@@ -438,7 +539,9 @@ public abstract class VillagerEntityMixin extends LivingEntity {
             if (spouse != null) {
                 VillagerData spouseData = spouse.getAttached(Villagersreborn.VILLAGER_DATA);
                 if (spouseData != null) {
-                    spouseData.setWidowed();
+                    // Updated API: clear spouse and mark status (no explicit marital status API available)
+                    spouseData.setSpouseId("");
+                    spouseData.setSpouseName("");
                     spouseData.adjustHappiness(-50);
                     spouseData.setNotes("Lost spouse " + data.getName() + " - Forever in mourning");
                 }
